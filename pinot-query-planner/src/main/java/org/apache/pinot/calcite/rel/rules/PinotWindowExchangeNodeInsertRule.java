@@ -22,9 +22,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -42,6 +44,8 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexWindowBound;
+import org.apache.calcite.rex.RexWindowBounds;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -57,7 +61,6 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
  *     2. Add support for functions other than:
  *        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
  *        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
- *     3. Add support for custom frames
  */
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   public static final PinotWindowExchangeNodeInsertRule INSTANCE =
@@ -65,9 +68,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
 
   // Supported window functions
   // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
-  private static final Set<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND =
-      Set.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK,
-          SqlKind.DENSE_RANK, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE,
+  private static final EnumSet<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND =
+      EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK,
+          SqlKind.DENSE_RANK, SqlKind.NTILE, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE,
           SqlKind.OTHER_FUNCTION);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
@@ -144,60 +147,92 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         List.of(windowGroup)));
   }
 
+  /**
+   * Replaces the reference to literal arguments in the window group with the actual literal values.
+   * NOTE: {@link Window} has a field called "constants" which contains the literal values. If the input reference is
+   * beyond the window input size, it is a reference to the constants.
+   */
   private Window.Group updateLiteralArgumentsInWindowGroup(Window window) {
     Window.Group oldWindowGroup = window.groups.get(0);
-    int windowInputSize = window.getInput().getRowType().getFieldCount();
-    ImmutableList<Window.RexWinAggCall> oldAggCalls = oldWindowGroup.aggCalls;
-    List<Window.RexWinAggCall> newAggCallWindow = new ArrayList<>(oldAggCalls.size());
-    boolean aggCallChanged = false;
-    for (Window.RexWinAggCall oldAggCall : oldAggCalls) {
+    RelNode input = ((HepRelVertex) window.getInput()).getCurrentRel();
+    int numInputFields = input.getRowType().getFieldCount();
+    List<RexNode> projects = input instanceof Project ? ((Project) input).getProjects() : null;
+
+    List<Window.RexWinAggCall> newAggCallWindow = new ArrayList<>(oldWindowGroup.aggCalls.size());
+    boolean windowChanged = false;
+    for (Window.RexWinAggCall oldAggCall : oldWindowGroup.aggCalls) {
       boolean changed = false;
-      List<RexNode> oldAggCallArgList = oldAggCall.getOperands();
-      List<RexNode> rexList = new ArrayList<>(oldAggCallArgList.size());
-      for (RexNode rexNode : oldAggCallArgList) {
-        RexNode newRexNode = rexNode;
-        if (rexNode instanceof RexInputRef) {
-          RexInputRef inputRef = (RexInputRef) rexNode;
-          int inputRefIndex = inputRef.getIndex();
-          // If the input reference is greater than the window input size, it is a reference to the constants
-          if (inputRefIndex >= windowInputSize) {
-            newRexNode = window.constants.get(inputRefIndex - windowInputSize);
-            changed = true;
-            aggCallChanged = true;
-          } else {
-            RelNode windowInputRelNode = ((HepRelVertex) window.getInput()).getCurrentRel();
-            if (windowInputRelNode instanceof LogicalProject) {
-              RexNode inputRefRexNode = ((LogicalProject) windowInputRelNode).getProjects().get(inputRefIndex);
-              if (inputRefRexNode instanceof RexLiteral) {
-                // If the input reference is a literal, replace it with the literal value
-                newRexNode = inputRefRexNode;
-                changed = true;
-                aggCallChanged = true;
-              }
-            }
-          }
+      List<RexNode> oldOperands = oldAggCall.getOperands();
+      List<RexNode> newOperands = new ArrayList<>(oldOperands.size());
+      for (RexNode oldOperand : oldOperands) {
+        RexLiteral literal = getLiteral(oldOperand, numInputFields, window.constants, projects);
+        if (literal != null) {
+          newOperands.add(literal);
+          changed = true;
+          windowChanged = true;
+        } else {
+          newOperands.add(oldOperand);
         }
-        rexList.add(newRexNode);
       }
       if (changed) {
         newAggCallWindow.add(
-            new Window.RexWinAggCall((SqlAggFunction) oldAggCall.getOperator(), oldAggCall.type, rexList,
+            new Window.RexWinAggCall((SqlAggFunction) oldAggCall.getOperator(), oldAggCall.type, newOperands,
                 oldAggCall.ordinal, oldAggCall.distinct, oldAggCall.ignoreNulls));
       } else {
         newAggCallWindow.add(oldAggCall);
       }
     }
-    if (aggCallChanged) {
-      return new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, oldWindowGroup.lowerBound,
-          oldWindowGroup.upperBound, oldWindowGroup.orderKeys, newAggCallWindow);
+
+    RexWindowBound lowerBound = oldWindowGroup.lowerBound;
+    RexNode offset = lowerBound.getOffset();
+    if (offset != null) {
+      RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
+      if (literal == null) {
+        throw new IllegalStateException(
+            "Could not read window lower bound literal value from window group: " + oldWindowGroup);
+      }
+      lowerBound = lowerBound.isPreceding() ? RexWindowBounds.preceding(literal) : RexWindowBounds.following(literal);
+      windowChanged = true;
     }
-    return oldWindowGroup;
+    RexWindowBound upperBound = oldWindowGroup.upperBound;
+    offset = upperBound.getOffset();
+    if (offset != null) {
+      RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
+      if (literal == null) {
+        throw new IllegalStateException(
+            "Could not read window upper bound literal value from window group: " + oldWindowGroup);
+      }
+      upperBound = upperBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
+      windowChanged = true;
+    }
+
+    return windowChanged ? new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, lowerBound, upperBound,
+        oldWindowGroup.orderKeys, newAggCallWindow) : oldWindowGroup;
+  }
+
+  @Nullable
+  private RexLiteral getLiteral(RexNode rexNode, int numInputFields, ImmutableList<RexLiteral> constants,
+      @Nullable List<RexNode> projects) {
+    if (!(rexNode instanceof RexInputRef)) {
+      return null;
+    }
+    int index = ((RexInputRef) rexNode).getIndex();
+    if (index >= numInputFields) {
+      return constants.get(index - numInputFields);
+    }
+    if (projects != null) {
+      RexNode project = projects.get(index);
+      if (project instanceof RexLiteral) {
+        return (RexLiteral) project;
+      }
+    }
+    return null;
   }
 
   private void validateWindows(Window window) {
     int numGroups = window.groups.size();
     // For Phase 1 we only handle single window groups
-    Preconditions.checkState(numGroups <= 1,
+    Preconditions.checkState(numGroups == 1,
         String.format("Currently only 1 window group is supported, query has %d groups", numGroups));
 
     // Validate that only supported window aggregation functions are present
@@ -209,8 +244,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   }
 
   private void validateWindowAggCallsSupported(Window.Group windowGroup) {
-    for (int i = 0; i < windowGroup.aggCalls.size(); i++) {
-      Window.RexWinAggCall aggCall = windowGroup.aggCalls.get(i);
+    for (Window.RexWinAggCall aggCall : windowGroup.aggCalls) {
       SqlKind aggKind = aggCall.getKind();
       Preconditions.checkState(SUPPORTED_WINDOW_FUNCTION_KIND.contains(aggKind),
           String.format("Unsupported Window function kind: %s. Only aggregation functions are supported!", aggKind));
@@ -218,24 +252,15 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   }
 
   private void validateWindowFrames(Window.Group windowGroup) {
-    // Has ROWS only aggregation call kind (e.g. ROW_NUMBER)?
-    boolean isRowsOnlyTypeAggregateCall = isRowsOnlyAggregationCallType(windowGroup.aggCalls);
-    // For Phase 1 only the default frame is supported
-    Preconditions.checkState(!windowGroup.isRows || isRowsOnlyTypeAggregateCall,
-        "Default frame must be of type RANGE and not ROWS unless this is a ROWS only aggregation function");
-    Preconditions.checkState(windowGroup.lowerBound.isPreceding() && windowGroup.lowerBound.isUnbounded(),
-        String.format("Lower bound must be UNBOUNDED PRECEDING but it is: %s", windowGroup.lowerBound));
-    if (windowGroup.orderKeys.getKeys().isEmpty() && !isRowsOnlyTypeAggregateCall) {
-      Preconditions.checkState(windowGroup.upperBound.isFollowing() && windowGroup.upperBound.isUnbounded(),
-          String.format("Upper bound must be UNBOUNDED FOLLOWING but it is: %s", windowGroup.upperBound));
-    } else {
-      Preconditions.checkState(windowGroup.upperBound.isCurrentRow(),
-          String.format("Upper bound must be CURRENT ROW but it is: %s", windowGroup.upperBound));
-    }
-  }
+    RexWindowBound lowerBound = windowGroup.lowerBound;
+    RexWindowBound upperBound = windowGroup.upperBound;
 
-  private boolean isRowsOnlyAggregationCallType(ImmutableList<Window.RexWinAggCall> aggCalls) {
-    return aggCalls.stream().anyMatch(aggCall -> aggCall.getKind().equals(SqlKind.ROW_NUMBER));
+    boolean hasOffset = (lowerBound.isPreceding() && !lowerBound.isUnbounded()) || (upperBound.isFollowing()
+        && !upperBound.isUnbounded());
+
+    if (!windowGroup.isRows) {
+      Preconditions.checkState(!hasOffset, "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+    }
   }
 
   private boolean isPartitionByOnlyQuery(Window.Group windowGroup) {

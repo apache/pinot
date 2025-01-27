@@ -38,7 +38,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
 /**
- * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
+ * The <code>AggregationOperator</code> class implements keyless aggregation query on a single segment in V1/SSQE.
  */
 @SuppressWarnings("rawtypes")
 public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {

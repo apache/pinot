@@ -135,6 +135,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
         }
       }
     }
+
     Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
         + numRows + " rows!");
   }

@@ -249,6 +249,12 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   private void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTimeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
+
+    // dateTimeConvert with bucketing time zone is not optimized yet
+    if (dateTimeConvertOperands.size() == 5) {
+      return;
+    }
+
     Preconditions.checkArgument(dateTimeConvertOperands.size() == 4,
         "Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");
     Preconditions.checkArgument(

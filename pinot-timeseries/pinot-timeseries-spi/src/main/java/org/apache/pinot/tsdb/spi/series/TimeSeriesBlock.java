@@ -32,6 +32,10 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  */
 public class TimeSeriesBlock {
   private final TimeBuckets _timeBuckets;
+  /**
+   * Refer to {@link TimeSeries} for semantics on how to compute the Long hashed value from a
+   * {@link TimeSeries#getId()}.
+   */
   private final Map<Long, List<TimeSeries>> _seriesMap;
 
   public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {

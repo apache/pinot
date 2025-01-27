@@ -68,11 +68,11 @@ public final class BasicAuthUtils {
       String name = rawName.trim();
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "%s is not a valid name", name);
 
-      String password = configuration.getProperty(String.format("%s.%s.%s", prefix, name, PASSWORD));
+      String password = configuration.getProperty(prefix + "." + name + "." + PASSWORD);
       Preconditions.checkArgument(StringUtils.isNotBlank(password), "must provide a password for %s", name);
 
-      Set<String> tables = extractSet(configuration, String.format("%s.%s.%s", prefix, name, TABLES));
-      Set<String> permissions = extractSet(configuration, String.format("%s.%s.%s", prefix, name, PERMISSIONS));
+      Set<String> tables = extractSet(configuration, prefix + "." + name + "." + TABLES);
+      Set<String> permissions = extractSet(configuration, prefix + "." + name + "." + PERMISSIONS);
 
       return new BasicAuthPrincipal(name, org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken(name, password),
           tables, permissions);

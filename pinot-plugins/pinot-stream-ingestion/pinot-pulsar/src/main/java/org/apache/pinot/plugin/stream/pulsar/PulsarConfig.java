@@ -42,6 +42,7 @@ import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 public class PulsarConfig {
   public static final String STREAM_TYPE = "pulsar";
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
+  public static final String SERVICE_HTTP_URL = "serviceHttpUrl";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String OAUTH_ISSUER_URL = "issuerUrl";
@@ -53,6 +54,7 @@ public class PulsarConfig {
   private final String _subscriberId;
   private final String _pulsarTopicName;
   private final String _bootstrapServers;
+  private final String _serviceHttpUrl;
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
@@ -79,6 +81,7 @@ public class PulsarConfig {
     _bootstrapServers = getConfigValue(streamConfigMap, BOOTSTRAP_SERVERS);
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
 
+    _serviceHttpUrl = getConfigValue(streamConfigMap, SERVICE_HTTP_URL);
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(streamConfig.getOffsetCriteria());
     _authenticationToken = getConfigValue(streamConfigMap, AUTHENTICATION_TOKEN);
     _tlsTrustCertsFilePath = getConfigValue(streamConfigMap, TLS_TRUST_CERTS_FILE_PATH);
@@ -147,6 +150,10 @@ public class PulsarConfig {
 
   public String getBootstrapServers() {
     return _bootstrapServers;
+  }
+
+  public String getServiceHttpUrl() {
+    return _serviceHttpUrl;
   }
 
   public SubscriptionInitialPosition getInitialSubscriberPosition() {

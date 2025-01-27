@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +40,8 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
@@ -50,6 +53,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +71,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
     _queryEnvironment.init(config);
     _queryDispatcher = queryDispatcher;
+    TimeSeriesBuilderFactoryProvider.init(config);
   }
 
   @Override
@@ -90,17 +95,36 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
       RequestContext requestContext) {
-    RangeTimeSeriesRequest timeSeriesRequest = null;
+    PinotBrokerTimeSeriesResponse timeSeriesResponse = null;
+    long queryStartTime = System.currentTimeMillis();
     try {
-      timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES, 1);
+      requestContext.setBrokerId(_brokerId);
+      requestContext.setRequestId(_requestIdGenerator.get());
+      RangeTimeSeriesRequest timeSeriesRequest = null;
+      try {
+        timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString);
+      } catch (URISyntaxException e) {
+        return PinotBrokerTimeSeriesResponse.newErrorResponse("BAD_REQUEST", "Error building RangeTimeSeriesRequest");
+      }
+      TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
+      TimeSeriesDispatchablePlan dispatchablePlan =
+          _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
+      timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
+          timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
+      return timeSeriesResponse;
+    } finally {
+      _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
+          TimeUnit.MILLISECONDS);
+      if (timeSeriesResponse == null
+          || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+        final String errorMessage = timeSeriesResponse == null ? "null time-series response"
+            : timeSeriesResponse.getError();
+        // TODO(timeseries): Remove logging for failed queries.
+        LOGGER.warn("time-series query failed with error: {}", errorMessage);
+      }
     }
-    TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
-    TimeSeriesDispatchablePlan dispatchablePlan = _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext,
-        logicalPlanResult);
-    return _queryDispatcher.submitAndGet(requestContext, dispatchablePlan, timeSeriesRequest.getTimeout().toMillis(),
-        new HashMap<>());
   }
 
   @Override

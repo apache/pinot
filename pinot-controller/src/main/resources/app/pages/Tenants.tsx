@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
 import { InstanceType } from 'Models';
 import { RouteComponentProps } from 'react-router-dom';
@@ -25,6 +25,7 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import AsyncPinotTables from '../components/AsyncPinotTables';
 import CustomButton from '../components/CustomButton';
 import { AsyncInstanceTable } from '../components/AsyncInstanceTable';
+import PinotMethodUtils from '../utils/PinotMethodUtils';
 
 const useStyles = makeStyles((theme) => ({
   operationDiv: {
@@ -41,6 +42,28 @@ type Props = {
 const TenantPage = ({ match }: RouteComponentProps<Props>) => {
   const { tenantName } = match.params;
   const classes = useStyles();
+  const [instanceNames, setInstanceNames] = useState({
+    [InstanceType.BROKER]: null,
+    [InstanceType.SERVER]: null,
+  })
+  const [liveInstanceNames, setLiveInstanceNames] = useState<string[]>();
+
+  useEffect(() => {
+     fetchInstanceData();
+  }, []);
+
+  const fetchInstanceData = async () => {
+    const brokerNames = await PinotMethodUtils.getBrokerOfTenant(tenantName) || [];
+    const serverNames = await PinotMethodUtils.getServerOfTenant(tenantName) || [];
+    setInstanceNames({
+      [InstanceType.BROKER]: Array.isArray(brokerNames) ? brokerNames : [],
+      [InstanceType.SERVER]: Array.isArray(serverNames) ? serverNames : [],
+    });
+
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstances();
+    setLiveInstanceNames(liveInstanceNames.data || []);
+
+  }
 
   return (
     <Grid
@@ -58,16 +81,18 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
           <div>
             <CustomButton
               onClick={() => {}}
-              tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
-              enableTooltip={true}
+              // Tooltips do not render on disabled buttons. Add this back when we have a working implementation.
+              // tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
+              // enableTooltip={true}
               isDisabled={true}
             >
               Rebalance Server Tenant
             </CustomButton>
             <CustomButton
               onClick={() => {}}
-              tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
-              enableTooltip={true}
+              // Tooltips do not render on disabled buttons. Add this back when we have a working implementation.
+              // tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
+              // enableTooltip={true}
               isDisabled={true}
             >
               Rebuild Broker Resource
@@ -81,16 +106,20 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         baseUrl={`/tenants/${tenantName}/table/`}
       />
       <Grid container spacing={2}>
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <AsyncInstanceTable
+            instanceNames={instanceNames[InstanceType.BROKER]}
             instanceType={InstanceType.BROKER}
-            tenant={tenantName}
+            liveInstanceNames={liveInstanceNames}
+            showInstanceDetails
           />
         </Grid>
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <AsyncInstanceTable
+            instanceNames={instanceNames[InstanceType.SERVER]}
             instanceType={InstanceType.SERVER}
-            tenant={tenantName}
+            liveInstanceNames={liveInstanceNames}
+            showInstanceDetails
           />
         </Grid>
       </Grid>

@@ -52,7 +52,7 @@ public class MultiStageExplainAskingServersUtils {
       TransformationTracker<PlanNode, RelNode> tracker, AskingServerStageExplainer serversExplainer) {
     // extract a key node operator
     Map<DispatchablePlanFragment, PlanNode> leafNodes = queryStages.stream()
-        .filter(fragment -> !fragment.getWorkerIdToSegmentsMap().isEmpty()) // ignore root and intermediate stages
+        .filter(fragment -> fragment.getTableName() != null) // ignore root and intermediate stages
         .collect(Collectors.toMap(Function.identity(), fragment -> fragment.getPlanFragment().getFragmentRoot()));
 
     // creates a map where each leaf node is converted into another RelNode that may contain physical information

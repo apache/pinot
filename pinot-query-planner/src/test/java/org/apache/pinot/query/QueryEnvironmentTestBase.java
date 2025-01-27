@@ -88,6 +88,7 @@ public class QueryEnvironmentTestBase {
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col5", FieldSpec.DataType.BOOLEAN, false)
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .addDateTime("ts_timestamp", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
         .addMetric("col6", FieldSpec.DataType.INT, 0)
@@ -135,6 +136,10 @@ public class QueryEnvironmentTestBase {
         new Object[]{
             "SELECT a.col2, DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a "
                 + "GROUP BY a.col2 ORDER BY a.col2"
+        },
+        new Object[]{
+            "SELECT DISTINCTCOUNTTHETASKETCH(col1, 'nominalEntries=4096', 'col3=0', 'col6=0', 'SET_INTERSECT($1, $2)') "
+                + "FROM a"
         },
         new Object[]{"SELECT a.col1, SKEWNESS(a.col3), KURTOSIS(a.col3), DISTINCTCOUNT(a.col1) FROM a GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
@@ -231,6 +236,28 @@ public class QueryEnvironmentTestBase {
             "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
                 + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"
         },
+        new Object[]{"SELECT ROUND(ts_timestamp, 10000) FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'INT') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'FLOAT') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'DOUBLE') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'BOOLEAN') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'BIG_DECIMAL') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'TIMESTAMP') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'INT_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'FLOAT_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'DOUBLE_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING_ARRAY') FROM a"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp BETWEEN TIMESTAMP '2016-01-01 00:00:00' AND "
+            + "TIMESTAMP '2016-01-01 10:00:00'"},
+        new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= CAST(1454284798000 AS TIMESTAMP)"},
+        new Object[]{"SELECT TIMESTAMPADD(day, 10, NOW()) FROM a"},
+        new Object[]{"SELECT ts_timestamp - CAST(123456789 AS TIMESTAMP) FROM a"},
+        new Object[]{"SELECT SUB(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"},
+        new Object[]{"SELECT ts_timestamp + CAST(123456789 AS TIMESTAMP) FROM a"},
+        new Object[]{"SELECT ADD(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"}
     };
   }
 

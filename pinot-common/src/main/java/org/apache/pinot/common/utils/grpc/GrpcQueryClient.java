@@ -62,13 +62,15 @@ public class GrpcQueryClient implements Closeable {
   public GrpcQueryClient(String host, int port, GrpcConfig config) {
     ManagedChannelBuilder<?> channelBuilder;
     if (config.isUsePlainText()) {
-      channelBuilder =
-          ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-              .usePlaintext();
+      channelBuilder = ManagedChannelBuilder
+          .forAddress(host, port)
+          .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+          .usePlaintext();
     } else {
-      channelBuilder =
-          NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-              .sslContext(buildSslContext(config.getTlsConfig()));
+      channelBuilder = NettyChannelBuilder
+          .forAddress(host, port)
+          .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+          .sslContext(buildSslContext(config.getTlsConfig()));
     }
 
     // Set keep alive configs, if enabled
@@ -85,8 +87,8 @@ public class GrpcQueryClient implements Closeable {
   }
 
   public static SslContext buildSslContext(TlsConfig tlsConfig) {
-    LOGGER.info("Building gRPC SSL context");
-    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
+    LOGGER.info("Building gRPC client SSL context");
+    return CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
         SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig,
             PinotInsecureMode::isPinotInInsecureMode);
@@ -101,10 +103,9 @@ public class GrpcQueryClient implements Closeable {
         }
         return sslContextBuilder.build();
       } catch (SSLException e) {
-        throw new RuntimeException("Failed to build gRPC SSL context", e);
+        throw new RuntimeException("Failed to build gRPC client SSL context", e);
       }
     });
-    return sslContext;
   }
 
   public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {

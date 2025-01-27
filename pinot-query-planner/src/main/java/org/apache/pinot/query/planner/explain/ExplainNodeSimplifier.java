@@ -21,10 +21,7 @@ package org.apache.pinot.query.planner.explain;
 import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -54,10 +51,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Its title must contain the text {@code Combine}</li>
  * </ol>
  *
- * Also nodes with only one input are not simplifiable by definition.
- *
- * Simplified nodes will have a new attribute {@code repeated} that will contain the number of times the node was
- * repeated.
+ * The simplification process merges the inputs of the node into a single node.
+ * As a corollary, nodes with only one input are already simplified by definition.
  */
 public class ExplainNodeSimplifier {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainNodeSimplifier.class);
@@ -73,8 +68,6 @@ public class ExplainNodeSimplifier {
   }
 
   private static class Visitor implements PlanNodeVisitor<PlanNode, Void> {
-    private static final String REPEAT_ATTRIBUTE_KEY = "repeated";
-
     private PlanNode defaultNode(PlanNode node) {
       List<PlanNode> inputs = node.getInputs();
       List<PlanNode> newInputs = simplifyChildren(inputs);
@@ -159,13 +152,8 @@ public class ExplainNodeSimplifier {
         }
         child1 = merged;
       }
-      Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>(node.getAttributes());
-      Plan.ExplainNode.AttributeValue repeatedValue = Plan.ExplainNode.AttributeValue.newBuilder()
-          .setLong(simplifiedChildren.size())
-          .build();
-      attributes.put(REPEAT_ATTRIBUTE_KEY, repeatedValue);
       return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
-          Collections.singletonList(child1), node.getTitle(), attributes);
+          Collections.singletonList(child1), node.getTitle(), node.getAttributes());
     }
 
     private List<PlanNode> simplifyChildren(List<PlanNode> children) {

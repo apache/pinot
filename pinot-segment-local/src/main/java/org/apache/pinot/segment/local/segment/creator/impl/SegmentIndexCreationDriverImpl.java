@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +36,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
-import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
@@ -60,9 +57,12 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
@@ -80,7 +80,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
@@ -103,7 +102,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private SegmentCreationDataSource _dataSource;
   private Schema _dataSchema;
-  private RecordEnricherPipeline _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
@@ -129,8 +127,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     TableConfig tableConfig = segmentGeneratorConfig.getTableConfig();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> sourceFields = IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(),
-        segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields =
+        IngestionUtils.getFieldsForRecordExtractor(tableConfig, segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -160,21 +158,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void init(SegmentGeneratorConfig config, RecordReader recordReader)
       throws Exception {
-    SegmentCreationDataSource dataSource = new RecordReaderSegmentCreationDataSource(recordReader);
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader),
         new TransformPipeline(config.getTableConfig(), config.getSchema()));
   }
 
-  @Deprecated
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordTransformer recordTransformer, @Nullable ComplexTypeTransformer complexTypeTransformer)
-      throws Exception {
-    init(config, dataSource, RecordEnricherPipeline.fromTableConfig(config.getTableConfig()),
-        new TransformPipeline(recordTransformer, complexTypeTransformer));
-  }
-
-  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
-      RecordEnricherPipeline enricherPipeline,
       TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
@@ -185,11 +173,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
-    _recordEnricherPipeline = enricherPipeline;
     _transformPipeline = transformPipeline;
     // Use the same transform pipeline if the data source is backed by a record reader
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
-      ((RecordReaderSegmentCreationDataSource) dataSource).setRecordEnricherPipeline(enricherPipeline);
       ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
     }
 
@@ -278,12 +264,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         try {
           GenericRow decodedRow = _recordReader.next(reuse);
           long recordReadStartTimeNs = System.nanoTime();
-
-          // Should not be needed anymore.
-          // Add row to indexes
-          _recordEnricherPipeline.run(decodedRow);
           _transformPipeline.processRow(decodedRow, reusedResult);
-
           recordReadStopTimeNs = System.nanoTime();
           _totalRecordReadTimeNs += (recordReadStopTimeNs - recordReadStartTimeNs);
         } catch (Exception e) {
@@ -530,35 +511,34 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void collectStatsAndIndexCreationInfo() throws Exception {
+  void collectStatsAndIndexCreationInfo()
+      throws Exception {
     long statsCollectorStartTime = System.nanoTime();
 
     // Initialize stats collection
     _segmentStats = _dataSource.gatherStats(
         new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
     _totalDocs = _segmentStats.getTotalDocCount();
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
 
-    Set<String> varLengthDictionaryColumns = new HashSet<>(_config.getVarLengthDictionaryColumns());
-    Set<String> rawIndexCreationColumns = _config.getRawIndexCreationColumns();
-    Set<String> rawIndexCompressionTypeKeys = _config.getRawIndexCompressionType().keySet();
     for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
       // Ignore virtual columns
       if (fieldSpec.isVirtualColumn()) {
         continue;
       }
 
-      String columnName = fieldSpec.getName();
+      String column = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(columnName);
-      boolean useVarLengthDictionary =
-          shouldUseVarLengthDictionary(columnName, varLengthDictionaryColumns, storedType, columnProfile);
+      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+      boolean createDictionary = dictionaryIndexConfig.isDisabled();
+      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
       Object defaultNullValue = fieldSpec.getDefaultNullValue();
       if (storedType == DataType.BYTES) {
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
-      boolean createDictionary =
-          !rawIndexCreationColumns.contains(columnName) && !rawIndexCompressionTypeKeys.contains(columnName);
-      _indexCreationInfoMap.put(columnName,
+      _indexCreationInfoMap.put(column,
           new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
               defaultNullValue));
     }

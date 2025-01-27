@@ -19,10 +19,14 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
@@ -53,6 +57,9 @@ public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
 
   private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
+
+  public static final String DATETIME_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
+  public static final String UTC = "UTC";
 
   private MinionTaskUtils() {
   }
@@ -234,5 +241,16 @@ public class MinionTaskUtils {
       break;
     }
     return validDocIds;
+  }
+
+  public static String toUTCString(long epochMillis) {
+    Date date = new Date(epochMillis);
+    SimpleDateFormat isoFormat = new SimpleDateFormat(DATETIME_PATTERN);
+    isoFormat.setTimeZone(TimeZone.getTimeZone(UTC));
+    return isoFormat.format(date);
+  }
+
+  public static long fromUTCString(String utcString) {
+    return Instant.parse(utcString).toEpochMilli();
   }
 }

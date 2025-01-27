@@ -86,21 +86,13 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void oldConfNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(ForwardIndexConfig.DEFAULT);
-    }
-
-    @Test
     public void oldConfNotFound()
         throws IOException {
       _tableConfig.setFieldConfigList(
           JsonUtils.stringToObject("[]", _fieldConfigListTypeRef)
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault());
     }
 
     @Test
@@ -116,7 +108,7 @@ public class ForwardIndexTypeTest {
                   + " }]", _fieldConfigListTypeRef)
       );
 
-      assertEquals(ForwardIndexConfig.DISABLED);
+      assertEquals(ForwardIndexConfig.getDisabled());
     }
 
     @Test
@@ -128,7 +120,7 @@ public class ForwardIndexTypeTest {
           + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault());
     }
 
     @Test
@@ -185,7 +177,7 @@ public class ForwardIndexTypeTest {
           + "    \"encodingType\": \"DICTIONARY\"\n"
           + " }"
       );
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault());
     }
 
     @Test
@@ -212,7 +204,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault());
     }
 
     @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
@@ -235,7 +227,7 @@ public class ForwardIndexTypeTest {
                 .withCompressionType(expectedChunkCompression)
                 .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
-                .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
+                .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
                 .build()
       );
     }
@@ -256,7 +248,7 @@ public class ForwardIndexTypeTest {
       assertEquals(new ForwardIndexConfig.Builder()
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
-          .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
+          .withRawIndexWriterVersion(ForwardIndexConfig.getDefaultRawWriterVersion())
           .build());
     }
 
@@ -292,7 +284,8 @@ public class ForwardIndexTypeTest {
               + "    }\n"
               + "  }"
       );
-      assertEquals(ForwardIndexConfig.DISABLED);
+
+      assertEquals(ForwardIndexConfig.getDisabled());
     }
 
     @Test
@@ -305,7 +298,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(ForwardIndexConfig.getDefault());
     }
 
     @Test

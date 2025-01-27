@@ -90,7 +90,8 @@ public class PinotConfigurationTest {
     Assert.assertTrue(keys.contains("property.2.key"));
     Assert.assertTrue(keys.contains("property.3.key"));
     Assert.assertTrue(keys.contains("property.4.key"));
-    Assert.assertEquals(keys.size(), 4);
+    // "templated" property as well which is why 5 properties are visible
+    Assert.assertEquals(keys.size(), 5);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

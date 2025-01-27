@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
@@ -172,7 +173,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       } catch (Exception e) {
         return null;
       }
-    }, 100L, timeoutMs, "Failed to load all documents");
+    }, timeoutMs, "Failed to load all documents");
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
@@ -207,19 +208,24 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
   protected void waitForSnapshotCreation()
       throws Exception {
-    // Trigger force commit so that snapshots are created
+    // Pause consumption and wait until all consuming segments are committed and loaded as immutable segment
     String rawTableName = getTableName();
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(rawTableName), null);
+    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(rawTableName));
+    TestUtils.waitForCondition(aVoid -> {
+      ExecutionStats executionStats =
+          getPinotConnection().execute("SELECT COUNT(*) FROM " + rawTableName).getExecutionStats();
+      return executionStats.getNumSegmentsQueried() == 5 && executionStats.getNumConsumingSegmentsQueried() == 0;
+    }, 600_000L, "Failed to pause consumption");
+    // Resume consumption to trigger snapshot
+    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(rawTableName));
 
-    // All the uploaded segments should have snapshots generated. There is no guarantee that the just committed segments
-    // have snapshots generated because when the snapshot is taken, the committed segment might not be replaced with the
-    // immutable segment yet.
+    // All the immutable (committed and uploaded) segments should have snapshots generated
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TestUtils.waitForCondition(aVoid -> {
       for (BaseServerStarter serverStarter : _serverStarters) {
         String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
-        File[] files = new File(segmentDir, realtimeTableName).listFiles(
-            (dir, name) -> name.startsWith(rawTableName) && !LLCSegmentName.isLLCSegment(name));
+        File[] files = new File(segmentDir, realtimeTableName).listFiles((dir, name) -> name.startsWith(rawTableName));
+        assertNotNull(files);
         for (File file : files) {
           if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
             return false;

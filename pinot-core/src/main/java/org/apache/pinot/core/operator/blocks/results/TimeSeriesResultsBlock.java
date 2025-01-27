@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
+// TODO(timeseries): Implement unsupported functions when merging with MSE.
 public class TimeSeriesResultsBlock extends BaseResultsBlock {
   private final TimeSeriesBuilderBlock _timeSeriesBuilderBlock;
 
@@ -36,34 +37,31 @@ public class TimeSeriesResultsBlock extends BaseResultsBlock {
 
   @Override
   public int getNumRows() {
-    // TODO: Unused right now.
-    return 0;
+    return _timeSeriesBuilderBlock.getSeriesBuilderMap().size();
   }
 
   @Nullable
   @Override
   public QueryContext getQueryContext() {
-    // TODO: Unused right now.
-    return null;
+    throw new UnsupportedOperationException("Time series results block does not support getting QueryContext yet");
   }
 
   @Nullable
   @Override
   public DataSchema getDataSchema() {
-    // TODO: Unused right now.
-    return null;
+    throw new UnsupportedOperationException("Time series results block does not support getting DataSchema yet");
   }
 
   @Nullable
   @Override
   public List<Object[]> getRows() {
-    return null;
+    throw new UnsupportedOperationException("Time series results block does not support getRows yet");
   }
 
   @Override
   public DataTable getDataTable()
       throws IOException {
-    return null;
+    throw new UnsupportedOperationException("Time series results block does not support returning DataTable");
   }
 
   public TimeSeriesBuilderBlock getTimeSeriesBuilderBlock() {

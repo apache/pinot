@@ -45,9 +45,8 @@ public class OrderByComparatorFactory {
     for (int i = from; i < to; i++) {
       if (!orderByColumnContexts[i].isSingleValue()) {
         // MV columns should not be part of the selection order-by list
-        throw new BadQueryRequestException(
-            String.format("MV expression: %s should not be included in the ORDER-BY clause",
-                orderByExpressions.get(i)));
+        throw new BadQueryRequestException("MV expression: " + orderByExpressions.get(i)
+            + " should not be included in the ORDER-BY clause");
       }
     }
 

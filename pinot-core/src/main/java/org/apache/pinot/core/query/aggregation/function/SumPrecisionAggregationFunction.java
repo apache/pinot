@@ -248,60 +248,65 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          int value = intValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(BigDecimal.valueOf(value));
-            groupByResultHolder.setValueForKey(groupKey, sum);
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              updateGroupByResult(groupKey, groupByResultHolder, BigDecimal.valueOf(intValues[i]));
+            }
           }
-        }
+        });
+
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          long value = longValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(BigDecimal.valueOf(value));
-            groupByResultHolder.setValueForKey(groupKey, sum);
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              updateGroupByResult(groupKey, groupByResultHolder, BigDecimal.valueOf(longValues[i]));
+            }
           }
-        }
+        });
+
         break;
       case FLOAT:
       case DOUBLE:
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          String value = stringValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(new BigDecimal(value));
-            groupByResultHolder.setValueForKey(groupKey, sum);
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              updateGroupByResult(groupKey, groupByResultHolder, new BigDecimal(stringValues[i]));
+            }
           }
-        }
+        });
+
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length; i++) {
-          BigDecimal value = bigDecimalValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(value);
-            groupByResultHolder.setValueForKey(groupKey, sum);
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              updateGroupByResult(groupKey, groupByResultHolder, bigDecimalValues[i]);
+            }
           }
-        }
+        });
+
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          byte[] value = bytesValues[i];
-          for (int groupKey : groupKeysArray[i]) {
-            BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-            sum = sum.add(BigDecimalUtils.deserialize(value));
-            groupByResultHolder.setValueForKey(groupKey, sum);
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              updateGroupByResult(groupKey, groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));
+            }
           }
-        }
+        });
+
         break;
       default:
         throw new IllegalStateException();
@@ -346,6 +351,7 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
+    // TODO: Revisit if we should change this to BIG_DECIMAL
     return ColumnDataType.STRING;
   }
 

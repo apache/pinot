@@ -53,10 +53,13 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final BrokerRoutingManager _routingManager;
@@ -143,6 +146,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
+    }
+
+    // check app qps before doing anything
+    String application = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.APPLICATION_NAME);
+    if (application != null && !_queryQuotaManager.acquireApplication(application)) {
+      String errorMessage =
+          "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
+      LOGGER.info(errorMessage);
+      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
     // Add null handling option from broker config only if there is no override in the query

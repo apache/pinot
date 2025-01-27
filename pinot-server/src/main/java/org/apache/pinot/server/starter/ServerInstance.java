@@ -127,7 +127,7 @@ public class ServerInstance {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer =
           new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, helixManager, _serverMetrics,
-              serverConf.isNettyTlsServerEnabled() ? tlsConfig : null);
+              serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null);
     } else {
       _workerQueryServer = null;
     }
@@ -290,5 +290,9 @@ public class ServerInstance {
 
   public HelixManager getHelixManager() {
     return _helixManager;
+  }
+
+  public QueryScheduler getQueryScheduler() {
+    return _queryScheduler;
   }
 }

@@ -20,14 +20,12 @@ package org.apache.pinot.perf;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -35,9 +33,7 @@ import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -83,8 +79,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FilteredAggregationsTest");
   private static final String TABLE_NAME = "MyTable";
-  private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
-  private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
+  private static final String SEGMENT_NAME_TEMPLATE = "testSegment%d";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String SORTED_COL_NAME = "SORTED_COL";
   private static final String RAW_INT_COL_NAME = "RAW_INT_COL";
@@ -92,17 +87,26 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
+  private static final String TIMESTAMP_COL = "TSTMP_COL";
   private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
 
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setFieldConfigList(FIELD_CONFIGS)
-      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME)).setSortedColumn(SORTED_COL_NAME)
-      .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setStarTreeIndexConfigs(
-          Collections.singletonList(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
-              Collections.singletonList(
-                  new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
-              null, Integer.MAX_VALUE))).build();
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
+      .setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setFieldConfigList(FIELD_CONFIGS)
+      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME, TIMESTAMP_COL))
+      .setSortedColumn(SORTED_COL_NAME)
+      .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setStarTreeIndexConfigs(
+          Collections.singletonList(
+              new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
+                  Collections.singletonList(
+                      new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+                  null, Integer.MAX_VALUE))).build();
+
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .setSchemaName(TABLE_NAME)
       .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
       .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
       .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
@@ -110,7 +114,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
       .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(TIMESTAMP_COL, FieldSpec.DataType.TIMESTAMP)
       .build();
+  //@formatter:on
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -183,6 +189,15 @@ public class BenchmarkQueries extends BaseQueriesTest {
   public static final String FILTERING_SCAN_QUERY = "SELECT SUM(RAW_INT_COL) FROM MyTable "
       + "WHERE RAW_INT_COL BETWEEN 1 AND 10";
 
+  public static final String FILTERING_ON_TIMESTAMP_QUERY = "SELECT * FROM MyTable WHERE "
+      + " dateTimeConvert(TSTMP_COL, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAYS', 'CET') = 120000000";
+
+  public static final String FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY = "SELECT * FROM MyTable WHERE "
+      + "FromDateTime(dateTimeConvert(TSTMP_COL, '1:MILLISECONDS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss"
+      + ".SSSZ tz(CET)', '1:DAYS'), 'yyyy-MM-dd HH:mm:ss.SSSZ') = 120000000";
+
+  @Param({"1", "2", "10", "50"})
+  private int _numSegments;
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -192,29 +207,28 @@ public class BenchmarkQueries extends BaseQueriesTest {
       SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
       COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
-      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY
+      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY,
+      FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY, FILTERING_ON_TIMESTAMP_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private LongSupplier _supplier;
+  private Distribution.DataSupplier _supplier;
 
   @Setup
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createLongSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildSegment(FIRST_SEGMENT_NAME);
-    buildSegment(SECOND_SEGMENT_NAME);
-
+    _indexSegments = new ArrayList<>();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
-    ImmutableSegment firstImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
-    ImmutableSegment secondImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = firstImmutableSegment;
-    _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
+    for (int i = 0; i < _numSegments; i++) {
+      buildSegment(String.format(SEGMENT_NAME_TEMPLATE, i));
+      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, String.format(SEGMENT_NAME_TEMPLATE, i)),
+          indexLoadingConfig));
+    }
+    _indexSegment = _indexSegments.get(0);
   }
 
   @TearDown
@@ -227,39 +241,57 @@ public class BenchmarkQueries extends BaseQueriesTest {
     EXECUTOR_SERVICE.shutdownNow();
   }
 
-  private List<GenericRow> createTestData(int numRows) {
-    Map<Integer, String> strings = new HashMap<>();
-    List<GenericRow> rows = new ArrayList<>();
-    String[] lowCardinalityValues = IntStream.range(0, 10).mapToObj(i -> "value" + i)
-        .toArray(String[]::new);
-    for (int i = 0; i < numRows; i++) {
-      GenericRow row = new GenericRow();
-      row.putValue(SORTED_COL_NAME, numRows - i);
-      row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(RAW_STRING_COL_NAME,
-          strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID().toString()));
-      row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
-      row.putValue(LOW_CARDINALITY_STRING_COL, lowCardinalityValues[i % lowCardinalityValues.length]);
-      rows.add(row);
-    }
-    return rows;
+  private LazyDataGenerator createTestData(int numRows) {
+    //create data lazily to prevent OOM and speed up setup
+
+    return new LazyDataGenerator() {
+      private final Map<Integer, UUID> _strings = new HashMap<>();
+      private final String[] _lowCardinalityValues =
+          IntStream.range(0, 10).mapToObj(i -> "value" + i).toArray(String[]::new);
+
+      @Override
+      public int size() {
+        return numRows;
+      }
+
+      @Override
+      public GenericRow next(GenericRow row, int i) {
+        row.putValue(SORTED_COL_NAME, numRows - i);
+        row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(RAW_STRING_COL_NAME,
+            _strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID()).toString());
+        row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
+        row.putValue(LOW_CARDINALITY_STRING_COL, _lowCardinalityValues[i % _lowCardinalityValues.length]);
+        row.putValue(TIMESTAMP_COL, i * 1200 * 1000L);
+
+        return null;
+      }
+
+      @Override
+      public void rewind() {
+        _strings.clear();
+        _supplier.reset();
+      }
+    };
   }
 
   private void buildSegment(String segmentName)
       throws Exception {
-    List<GenericRow> rows = createTestData(_numRows);
+    LazyDataGenerator rows = createTestData(_numRows);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+    try (RecordReader recordReader = new GeneratedDataRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
+    //save generator state so that other segments are not identical to this one
+    _supplier.snapshot();
   }
 
   @Benchmark

@@ -60,6 +60,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -411,7 +412,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
 
           // TODO: Support forward index disabled derived column
-          if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
+          if (isForwardIndexDisabled(column)) {
             LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
             if (errorOnFailure) {
               throw new UnsupportedOperationException(
@@ -443,8 +444,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
-    return _indexLoadingConfig.getForwardIndexDisabledColumns() != null
-        && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column);
+    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    return fieldIndexConfig != null && fieldIndexConfig.getConfig(StandardIndexes.forward()).isDisabled();
   }
 
   /**
@@ -657,7 +658,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         nullValueVectorCreator.seal();
       }
 
-      boolean createDictionary = !_indexLoadingConfig.getNoDictionaryColumns().contains(column);
+      FieldIndexConfigs fieldIndexConfigs = _indexLoadingConfig.getFieldIndexConfig(column);
+      DictionaryIndexConfig dictionaryIndexConfig =
+          fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(StandardIndexes.dictionary())
+              : DictionaryIndexConfig.DEFAULT;
+      boolean createDictionary = dictionaryIndexConfig.isEnabled();
       StatsCollectorConfig statsCollectorConfig =
           new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
@@ -761,8 +766,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           statsCollector.seal();
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary,
-              _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column), true,
-              fieldSpec.getDefaultNullValue());
+              dictionaryIndexConfig.getUseVarLengthDictionary(), true, fieldSpec.getDefaultNullValue());
           break;
         }
         case BYTES: {
@@ -780,10 +784,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           if (!statsCollector.isFixedLength()) {
             useVarLengthDictionary = true;
           } else {
-            useVarLengthDictionary = _indexLoadingConfig.getVarLengthDictionaryColumns().contains(column);
+            useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary();
           }
-          indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary,
-              true, new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, createDictionary, useVarLengthDictionary, true,
+                  new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
           break;
         }
         default:

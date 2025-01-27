@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -144,5 +146,39 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
             "null"
         ).whenQuery("select 'literal', max(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 5");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", scenario.getDataType())
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", -1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", -2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, MAX(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | -1.0",
+            "tag2    | 0.0",
+            "tag3    | 0.0"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, MAX(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | -1.0",
+            "tag2    | -1.0",
+            "tag3    | null"
+        );
   }
 }

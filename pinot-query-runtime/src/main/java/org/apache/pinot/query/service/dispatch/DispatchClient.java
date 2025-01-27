@@ -23,10 +23,10 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
-import org.apache.pinot.common.config.GrpcConfig;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
@@ -45,17 +45,17 @@ class DispatchClient {
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
-  public DispatchClient(String host, int port) {
-    this(host, port, new GrpcConfig(Collections.emptyMap()));
-  }
-
-  public DispatchClient(String host, int port, GrpcConfig grpcConfig) {
-    if (grpcConfig.isUsePlainText()) {
-      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+  public DispatchClient(String host, int port, @Nullable TlsConfig tlsConfig) {
+    if (tlsConfig == null) {
+      _channel = ManagedChannelBuilder
+          .forAddress(host, port)
+          .usePlaintext()
+          .build();
     } else {
-      _channel =
-          NettyChannelBuilder.forAddress(host, port)
-              .sslContext(GrpcQueryClient.buildSslContext(grpcConfig.getTlsConfig())).build();
+      _channel = NettyChannelBuilder
+          .forAddress(host, port)
+          .sslContext(GrpcQueryClient.buildSslContext(tlsConfig))
+          .build();
     }
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
   }

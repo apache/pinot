@@ -55,9 +55,20 @@ public class AskingServerStageExplainer {
 
   public RelNode explainFragment(DispatchablePlanFragment fragment) {
     _relBuilder.clear();
-    Collection<PlanNode> planNodes = _onServerExplainer.explainOnServers(fragment);
+
+    PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
+    int stageId = fragmentRoot.getStageId();
+    DataSchema schema = fragmentRoot.getDataSchema();
 
     HashMap<PlanNode, Integer> planNodesMap = new HashMap<>();
+    if (fragment.getWorkerIdToSegmentsMap().isEmpty()) {
+      PlanNode mergedNode = new ExplainedNode(stageId, schema, null, Collections.emptyList(), "PlanWithNoSegments",
+          new ExplainAttributeBuilder()
+              .putString("table", fragment.getTableName())
+              .build());
+      return PlanNodeToRelConverter.convert(_relBuilder, mergedNode);
+    }
+    Collection<PlanNode> planNodes = _onServerExplainer.explainOnServers(fragment);
     for (PlanNode planNode : planNodes) {
       PlanNode simplifiedPlan = !_verbose ? ExplainNodeSimplifier.simplifyNode(planNode) : planNode;
       PlanNode sortedPlan = PlanNodeSorter.sort(simplifiedPlan);
@@ -66,9 +77,6 @@ public class AskingServerStageExplainer {
     }
 
     PlanNode mergedNode;
-    PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
-    int stageId = fragmentRoot.getStageId();
-    DataSchema schema = fragmentRoot.getDataSchema();
     switch (planNodesMap.size()) {
       case 0: {
         mergedNode = new ExplainedNode(stageId, schema, null, Collections.emptyList(), "NoPlanInformation",

@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.query.planner.explain;
 
+import com.google.common.base.CaseFormat;
 import com.google.common.collect.Streams;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
+import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -93,6 +97,8 @@ class PlanNodeMerger {
   }
 
   private static class Visitor implements PlanNodeVisitor<PlanNode, PlanNode> {
+    public static final String COMBINE
+        = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
     private final boolean _verbose;
 
     public Visitor(boolean verbose) {
@@ -136,6 +142,15 @@ class PlanNodeMerger {
         return null;
       }
       if (node.getAggType() != otherNode.getAggType()) {
+        return null;
+      }
+      if (node.isLeafReturnFinalResult() != otherNode.isLeafReturnFinalResult()) {
+        return null;
+      }
+      if (!node.getCollations().equals(otherNode.getCollations())) {
+        return null;
+      }
+      if (node.getLimit() != otherNode.getLimit()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);
@@ -441,7 +456,12 @@ class PlanNodeMerger {
       Map<String, Plan.ExplainNode.AttributeValue> selfAttributes = node.getAttributes();
       Map<String, Plan.ExplainNode.AttributeValue> otherAttributes = otherNode.getAttributes();
 
-      List<PlanNode> children = mergeChildren(node, context);
+      List<PlanNode> children;
+      if (node.getTitle().contains(COMBINE)) {
+        children = mergeCombineChildren(node, otherNode);
+      } else {
+        children = mergeChildren(node, context);
+      }
       if (children == null) {
         return null;
       }
@@ -486,23 +506,23 @@ class PlanNodeMerger {
               if (selfValue.hasLong() && otherValue.hasLong()) { // If both are long, add them
                 attributeBuilder.putLong(selfEntry.getKey(), selfValue.getLong() + otherValue.getLong());
               } else { // Otherwise behave as if they are idempotent
-                if (!Objects.equals(otherValue, selfEntry.getValue())) {
+                if (!Objects.equals(otherValue, selfValue)) {
                   return null;
                 }
-                attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+                attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               }
               break;
             }
             case IDEMPOTENT: {
-              if (!Objects.equals(otherValue, selfEntry.getValue())) {
+              if (!Objects.equals(otherValue, selfValue)) {
                 return null;
               }
-              attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+              attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               break;
             }
             case IGNORABLE: {
-              if (Objects.equals(otherValue, selfEntry.getValue())) {
-                attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+              if (Objects.equals(otherValue, selfValue)) {
+                attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               } else if (_verbose) {
                 // If mode is verbose, we will not merge the nodes when an ignorable attribute is different
                 return null;
@@ -518,13 +538,49 @@ class PlanNodeMerger {
         }
         for (Map.Entry<String, Plan.ExplainNode.AttributeValue> otherEntry : otherAttributes.entrySet()) {
           Plan.ExplainNode.AttributeValue selfValue = selfAttributes.get(otherEntry.getKey());
-          if (selfValue == null) { // otherwise it has already been merged
-            attributeBuilder.putAttribute(otherEntry.getKey(), otherEntry.getValue());
+          if (selfValue != null) { // it has already been merged
+            continue;
+          }
+          switch (otherEntry.getValue().getMergeType()) {
+            case DEFAULT:
+              attributeBuilder.putAttribute(otherEntry.getKey(), otherEntry.getValue());
+              break;
+            case IGNORABLE:
+              if (_verbose) {
+                return null;
+              }
+              break;
+            case IDEMPOTENT:
+            case UNRECOGNIZED:
+            default:
+              return null;
           }
         }
         return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), children, node.getTitle(),
             attributeBuilder.build());
       }
+    }
+
+    private List<PlanNode> mergeCombineChildren(ExplainedNode node1, ExplainedNode node2) {
+      List<PlanNode> mergedChildren = new ArrayList<>(node1.getInputs().size() + node2.getInputs().size());
+
+      Set<PlanNode> pendingOn2 = new HashSet<>(node2.getInputs());
+      for (PlanNode input1 : node1.getInputs()) {
+        PlanNode merged = null;
+        for (PlanNode input2 : pendingOn2) {
+          merged = mergePlans(input1, input2);
+          if (merged != null) {
+            pendingOn2.remove(input2);
+            break;
+          }
+        }
+        mergedChildren.add(merged != null ? merged : input1);
+      }
+      mergedChildren.addAll(pendingOn2);
+
+      mergedChildren.sort(PlanNodeSorter.DefaultComparator.INSTANCE);
+
+      return mergedChildren;
     }
   }
 }

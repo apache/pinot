@@ -38,12 +38,9 @@ import picocli.CommandLine;
  * Class to implement StartBroker command.
  *
  */
-@CommandLine.Command(name = "StartBroker")
+@CommandLine.Command(name = "StartBroker", mixinStandardHelpOptions = true)
 public class StartBrokerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartBrokerCommand.class);
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @CommandLine.Option(names = {"-brokerHost"}, required = false, description = "host name for broker.")
   private String _brokerHost;
@@ -69,10 +66,6 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @CommandLine.Option(names = {"-configOverrides"}, required = false, split = ",",
       description = "Proxy config overrides")
   private Map<String, Object> _configOverrides = new HashMap<>();
-
-  public boolean getHelp() {
-    return _help;
-  }
 
   public String getBrokerHost() {
     return _brokerHost;

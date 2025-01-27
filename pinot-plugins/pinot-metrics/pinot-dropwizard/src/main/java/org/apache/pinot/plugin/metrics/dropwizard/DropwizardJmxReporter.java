@@ -27,8 +27,10 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 public class DropwizardJmxReporter implements PinotJmxReporter {
   private final JmxReporter _jmxReporter;
 
-  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry) {
-    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry()).build();
+  public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry, String domainName) {
+    _jmxReporter = JmxReporter.forRegistry((MetricRegistry) metricsRegistry.getMetricsRegistry())
+        .inDomain(domainName)
+        .build();
   }
 
   @Override

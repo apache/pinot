@@ -18,31 +18,40 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.DataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredDataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredRowBasedBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -50,11 +59,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * AggregateOperator is used to aggregate values over a set of group by keys.
+ * AggregateOperator is used to aggregate values over a (potentially empty) set of group by keys in V2/MSQE.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
 public class AggregateOperator extends MultiStageOperator {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
@@ -64,11 +74,19 @@ public class AggregateOperator extends MultiStageOperator {
   private final DataSchema _resultSchema;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
+
   @Nullable
   private TransferableBlock _eosBlock;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedAggregateBlock;
+
+  private final boolean _errorOnNumGroupsLimit;
+
+  // trimming - related members
+  private final int _groupTrimSize;
+  @Nullable
+  private final PriorityQueue<Object[]> _priorityQueue;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {
     super(context);
@@ -88,9 +106,40 @@ public class AggregateOperator extends MultiStageOperator {
       maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
     }
 
-    // Initialize the appropriate executor.
     List<Integer> groupKeys = node.getGroupKeys();
+
+    //process order trimming hint
+    int groupTrimSize = getGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
+
+    if (groupTrimSize > -1) {
+      // limit is set to 0 if not pushed
+      int nodeLimit = node.getLimit() > 0 ? node.getLimit() : Integer.MAX_VALUE;
+      int limit = GroupByUtils.getTableCapacity(nodeLimit, groupTrimSize);
+      _groupTrimSize = limit;
+      if (limit == Integer.MAX_VALUE) {
+        // disable sorting because actual result can't realistically be bigger the limit
+        _priorityQueue = null;
+      } else {
+        List<RelFieldCollation> collations = node.getCollations();
+        if (collations != null && !collations.isEmpty()) {
+          // order needs to be reversed so that peek() can be used to compare with each output row
+          _priorityQueue =
+              new PriorityQueue<>(groupTrimSize, new SortUtils.SortComparator(_resultSchema, collations, true));
+        } else {
+          _priorityQueue = null;
+        }
+      }
+    } else {
+      _groupTrimSize = Integer.MAX_VALUE;
+      _priorityQueue = null;
+    }
+
+    _errorOnNumGroupsLimit = getErrorOnNumGroupsLimit(context.getOpChainMetadata(), node.getNodeHint());
+
+    // Initialize the appropriate executor.
     AggregateNode.AggType aggType = node.getAggType();
+    // TODO: Allow leaf return final result for non-group-by queries
+    boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     if (groupKeys.isEmpty()) {
       _aggregationExecutor =
           new MultistageAggregationExecutor(aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
@@ -98,9 +147,24 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       _groupByExecutor =
           new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
+  }
+
+  private int getGroupTrimSize(PlanNode.NodeHint nodeHint, Map<String, String> opChainMetadata) {
+    if (nodeHint != null) {
+      Map<String, String> options = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (options != null) {
+        String option = options.get(PinotHintOptions.AggregateOptions.GROUP_TRIM_SIZE);
+        if (option != null) {
+          return Integer.parseInt(option);
+        }
+      }
+    }
+
+    Integer groupTrimSize = QueryOptionsUtils.getGroupTrimSize(opChainMetadata);
+    return groupTrimSize != null ? groupTrimSize : InstancePlanMakerImplV2.DEFAULT_GROUP_TRIM_SIZE;
   }
 
   @Override
@@ -150,14 +214,25 @@ public class AggregateOperator extends MultiStageOperator {
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
-      List<Object[]> rows = _groupByExecutor.getResult();
+      List<Object[]> rows;
+      if (_priorityQueue != null) {
+        rows = _groupByExecutor.getResult(_priorityQueue, _groupTrimSize);
+      } else {
+        rows = _groupByExecutor.getResult(_groupTrimSize);
+      }
+
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
-          _input.earlyTerminate();
+          if (_errorOnNumGroupsLimit) {
+            _input.earlyTerminate();
+            throw new RuntimeException("NUM_GROUPS_LIMIT has been reached at " + _operatorId);
+          } else {
+            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
+            _input.earlyTerminate();
+          }
         }
         return dataBlock;
       }
@@ -381,5 +456,24 @@ public class AggregateOperator extends MultiStageOperator {
     public StatMap.Type getType() {
       return _type;
     }
+  }
+
+  private boolean getErrorOnNumGroupsLimit(Map<String, String> opChainMetadata, PlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> options = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (options != null) {
+        String option = options.get(PinotHintOptions.AggregateOptions.ERROR_ON_NUM_GROUPS_LIMIT);
+        if (option != null) {
+          return Boolean.parseBoolean(option);
+        }
+      }
+    }
+
+    return QueryOptionsUtils.getErrorOnNumGroupsLimit(opChainMetadata);
+  }
+
+  @VisibleForTesting
+  int getGroupTrimSize() {
+    return _groupTrimSize;
   }
 }

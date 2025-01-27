@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
  * Configs related to the MAP index:
  */
 public class MapIndexConfig extends IndexConfig {
+  public static final MapIndexConfig DEFAULT = new MapIndexConfig();
   public static final MapIndexConfig DISABLED = new MapIndexConfig(true);
 
   private final Map<String, Object> _configs;

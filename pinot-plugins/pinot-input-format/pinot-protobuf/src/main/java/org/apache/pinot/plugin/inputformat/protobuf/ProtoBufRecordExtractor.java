@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +35,7 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 /**
  * Extractor for ProtoBuf records
  */
+@SuppressWarnings("unchecked")
 public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   private Set<String> _fields;
@@ -47,9 +45,9 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
   }
 
@@ -126,32 +124,20 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    *              as a map field without checking
    */
   @Override
-  @Nullable
-  protected Object convertMap(Object value) {
+  protected Map<Object, Object> convertMap(Object value) {
     ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    Collection<Message> messages = (Collection<Message>) protoBufFieldInfo.getFieldValue();
-    if (messages.isEmpty()) {
-      return null;
-    }
-
     List<Descriptors.FieldDescriptor> fieldDescriptors =
         protoBufFieldInfo.getFieldDescriptor().getMessageType().getFields();
-    Descriptors.FieldDescriptor keyFieldDescriptor = fieldDescriptors.get(0);
-    Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
-    Map<Object, Object> convertedMap = new HashMap<>();
+    Descriptors.FieldDescriptor keyDescriptor = fieldDescriptors.get(0);
+    Descriptors.FieldDescriptor valueDescriptor = fieldDescriptors.get(1);
+    Collection<Message> messages = (Collection<Message>) protoBufFieldInfo.getFieldValue();
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(messages.size());
     for (Message message : messages) {
-      Object fieldKey = message.getField(keyFieldDescriptor);
-      Object fieldValue = message.getField(valueFieldDescriptor);
+      Object fieldKey = message.getField(keyDescriptor);
       if (fieldKey != null) {
-        Object convertedFieldValue = null;
-        if (fieldValue != null) {
-          convertedFieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
-        }
-
-        if (convertedFieldValue != null) {
-          convertedMap
-              .put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)), convertedFieldValue);
-        }
+        Object fieldValue = message.getField(valueDescriptor);
+        Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, valueDescriptor)) : null;
+        convertedMap.put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyDescriptor)), convertedValue);
       }
     }
     return convertedMap;
@@ -164,35 +150,18 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    *              be handled as a collection field without checking
    */
   @Override
-  @Nullable
-  protected Object convertMultiValue(Object value) {
+  protected Object[] convertMultiValue(Object value) {
     ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    Collection<Object> fieldValues = (Collection<Object>) protoBufFieldInfo.getFieldValue();
-
-    if (fieldValues.isEmpty()) {
-      return null;
-    }
-    int numValues = fieldValues.size();
-    Object[] array = new Object[numValues];
+    Descriptors.FieldDescriptor fieldDescriptor = protoBufFieldInfo.getFieldDescriptor();
+    Collection<Object> values = (Collection<Object>) protoBufFieldInfo.getFieldValue();
+    int numValues = values.size();
+    Object[] convertedValues = new Object[numValues];
     int index = 0;
-
-    for (Object fieldValue : fieldValues) {
-      Object convertedValue = null;
-      if (fieldValue != null) {
-        convertedValue = convert(new ProtoBufFieldInfo(fieldValue, protoBufFieldInfo.getFieldDescriptor()));
-      }
-      if (convertedValue != null) {
-        array[index++] = convertedValue;
-      }
+    for (Object fieldValue : values) {
+      Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor)) : null;
+      convertedValues[index++] = convertedValue;
     }
-
-    if (index == numValues) {
-      return array;
-    } else if (index == 0) {
-      return null;
-    } else {
-      return Arrays.copyOf(array, index);
-    }
+    return convertedValues;
   }
 
   /**
@@ -201,7 +170,6 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   protected Object convertSingleValue(Object value) {
     Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
-
     if (fieldValue instanceof ByteString) {
       return ((ByteString) fieldValue).toByteArray();
     } else if (fieldValue instanceof Number) {
@@ -217,22 +185,15 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
    *              handled as a Message without checking
    */
   @Override
-  @Nullable
-  protected Object convertRecord(Object value) {
+  protected Map<Object, Object> convertRecord(Object value) {
     ProtoBufFieldInfo record = (ProtoBufFieldInfo) value;
     Map<Descriptors.FieldDescriptor, Object> fields = ((Message) record.getFieldValue()).getAllFields();
-    if (fields.isEmpty()) {
-      return null;
-    }
-
-    Map<Object, Object> convertedMap = new HashMap<>();
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(fields.size());
     for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : fields.entrySet()) {
       Descriptors.FieldDescriptor fieldDescriptor = entry.getKey();
       Object fieldValue = entry.getValue();
-      if (fieldValue != null) {
-        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
-      }
-      convertedMap.put(fieldDescriptor.getName(), fieldValue);
+      Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor)) : null;
+      convertedMap.put(fieldDescriptor.getName(), convertedValue);
     }
     return convertedMap;
   }

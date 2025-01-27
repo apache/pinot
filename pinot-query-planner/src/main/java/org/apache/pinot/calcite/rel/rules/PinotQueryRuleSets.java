@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
+import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
+import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
 
 
 /**
@@ -34,20 +36,20 @@ public class PinotQueryRuleSets {
   //@formatter:off
   public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
-      CoreRules.FILTER_INTO_JOIN,
+      PinotFilterIntoJoinRule.INSTANCE,
       // push filter through an aggregation
       CoreRules.FILTER_AGGREGATE_TRANSPOSE,
       // push filter through set operation
       CoreRules.FILTER_SET_OP_TRANSPOSE,
       // push project through join,
-      CoreRules.PROJECT_JOIN_TRANSPOSE,
+      PinotProjectJoinTransposeRule.INSTANCE,
       // push project through set operation
       CoreRules.PROJECT_SET_OP_TRANSPOSE,
 
       // push a filter past a project
       CoreRules.FILTER_PROJECT_TRANSPOSE,
       // push parts of the join condition to its inputs
-      CoreRules.JOIN_CONDITION_PUSH,
+      PinotJoinConditionPushRule.INSTANCE,
       // remove identity project
       CoreRules.PROJECT_REMOVE,
 
@@ -71,7 +73,7 @@ public class PinotQueryRuleSets {
 
       // join and semi-join rules
       CoreRules.PROJECT_TO_SEMI_JOIN,
-      PinotAggregateToSemiJoinRule.INSTANCE,
+      PinotSeminJoinDistinctProjectRule.INSTANCE,
 
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
@@ -101,6 +103,14 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_PROJECT_TRANSPOSE
   );
 
+  // Project pushdown rules run using a RuleCollection since we want to push down a project as much as possible in a
+  // single HepInstruction.
+  public static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
+      CoreRules.PROJECT_FILTER_TRANSPOSE,
+      PinotProjectJoinTransposeRule.INSTANCE,
+      CoreRules.PROJECT_MERGE
+  );
+
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
   public static final List<RelOptRule> PRUNE_RULES = List.of(
       CoreRules.AGGREGATE_PROJECT_MERGE,
@@ -119,8 +129,6 @@ public class PinotQueryRuleSets {
 
   // Pinot specific rules that should be run AFTER all other rules
   public static final List<RelOptRule> PINOT_POST_RULES = List.of(
-      // Evaluate the Literal filter nodes
-      CoreRules.FILTER_REDUCE_EXPRESSIONS,
       // TODO: Merge the following 2 rules into a single rule
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
@@ -129,7 +137,9 @@ public class PinotQueryRuleSets {
 
       PinotSingleValueAggregateRemoveRule.INSTANCE,
       PinotJoinExchangeNodeInsertRule.INSTANCE,
-      PinotAggregateExchangeNodeInsertRule.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
       PinotSetOpExchangeNodeInsertRule.INSTANCE,
 
@@ -144,7 +154,9 @@ public class PinotQueryRuleSets {
       // NOTE: Keep this rule at the end because it can potentially create a lot of predicates joined by OR/AND for IN/
       //       NOT IN clause, which can be expensive to process in other rules.
       // TODO: Consider removing this rule and directly handle SEARCH in RexExpressionUtils.
-      PinotFilterExpandSearchRule.INSTANCE
+      PinotFilterExpandSearchRule.INSTANCE,
+      // Evaluate the Literal filter nodes
+      CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
   //@formatter:on
 }

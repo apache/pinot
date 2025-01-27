@@ -43,7 +43,7 @@ import picocli.CommandLine;
  * Given a set of input params, output a table of num hosts to num hours and the memory required per host
  *
  */
-@CommandLine.Command(name = "RealtimeProvisioningHelper")
+@CommandLine.Command(name = "RealtimeProvisioningHelper", mixinStandardHelpOptions = true)
 public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeProvisioningHelperCommand.class);
@@ -102,9 +102,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @CommandLine.Option(names = {"-maxUsableHostMemory"}, required = false,
       description = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, usageHelp = true)
-  private boolean _help = false;
 
   public RealtimeProvisioningHelperCommand setTableConfigFile(String tableConfigFile) {
     _tableConfigFile = tableConfigFile;
@@ -186,11 +183,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
         + "of hours to consume and hosts. "
         + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be "
         + "generated and used for memory estimation.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

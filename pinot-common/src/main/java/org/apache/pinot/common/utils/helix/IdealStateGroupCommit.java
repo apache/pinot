@@ -72,6 +72,7 @@ public class IdealStateGroupCommit {
     final Function<IdealState, IdealState> _updater;
     IdealState _updatedIdealState = null;
     AtomicBoolean _sent = new AtomicBoolean(false);
+    Throwable _exception;
 
     Entry(String resourceName, Function<IdealState, IdealState> updater) {
       _resourceName = resourceName;
@@ -106,8 +107,8 @@ public class IdealStateGroupCommit {
    * @param updater the idealState updater to be applied
    * @return IdealState if the update is successful, null if not
    */
-  public IdealState commit(HelixManager helixManager, String resourceName,
-      Function<IdealState, IdealState> updater, RetryPolicy retryPolicy, boolean noChangeOk) {
+  public IdealState commit(HelixManager helixManager, String resourceName, Function<IdealState, IdealState> updater,
+      RetryPolicy retryPolicy, boolean noChangeOk) {
     Queue queue = getQueue(resourceName);
     Entry entry = new Entry(resourceName, updater);
 
@@ -120,39 +121,41 @@ public class IdealStateGroupCommit {
             // All pending entries have been processed, the updatedIdealState should be set.
             return entry._updatedIdealState;
           }
-          // remove from queue
-          Entry first = queue._pending.poll();
-          processed.add(first);
-          String mergedResourceName = first._resourceName;
-          HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-          PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(resourceName);
-          IdealState idealState = dataAccessor.getProperty(idealStateKey);
-
-          // Make a copy of the idealState above to pass it to the updater
-          // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
-          // list fields
-          IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
-
-          /**
-           * If the local cache does not contain a value, need to check if there is a
-           * value in ZK; use it as initial value if exists
-           */
-          IdealState updatedIdealState = first._updater.apply(idealStateCopy);
-          first._updatedIdealState = updatedIdealState;
-          Iterator<Entry> it = queue._pending.iterator();
-          while (it.hasNext()) {
-            Entry ent = it.next();
-            if (!ent._resourceName.equals(mergedResourceName)) {
-              continue;
+          IdealState response = updateIdealState(helixManager, resourceName, idealState -> {
+            IdealState updatedIdealState = idealState;
+            if (!processed.isEmpty()) {
+              queue._pending.addAll(processed);
+              processed.clear();
             }
-            processed.add(ent);
-            updatedIdealState = ent._updater.apply(idealStateCopy);
-            ent._updatedIdealState = updatedIdealState;
-            it.remove();
+            Iterator<Entry> it = queue._pending.iterator();
+            while (it.hasNext()) {
+              Entry ent = it.next();
+              if (!ent._resourceName.equals(resourceName)) {
+                continue;
+              }
+              processed.add(ent);
+              it.remove();
+              updatedIdealState = ent._updater.apply(updatedIdealState);
+              ent._updatedIdealState = updatedIdealState;
+              ent._exception = null;
+            }
+            return updatedIdealState;
+          }, retryPolicy, noChangeOk);
+          if (response == null) {
+            RuntimeException ex = new RuntimeException("Failed to update IdealState");
+            for (Entry ent : processed) {
+              ent._exception = ex;
+              ent._updatedIdealState = null;
+            }
+            throw ex;
           }
-          IdealState finalUpdatedIdealState = updatedIdealState;
-          updateIdealState(helixManager, resourceName, anyIdealState -> finalUpdatedIdealState,
-              retryPolicy, noChangeOk);
+        } catch (Throwable e) {
+          // If there is an exception, set the exception for all processed entries
+          for (Entry ent : processed) {
+            ent._exception = e;
+            ent._updatedIdealState = null;
+          }
+          throw e;
         } finally {
           queue._running.set(null);
           for (Entry e : processed) {
@@ -175,6 +178,10 @@ public class IdealStateGroupCommit {
           }
         }
       }
+    }
+    if (entry._exception != null) {
+      throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName,
+          entry._exception);
     }
     return entry._updatedIdealState;
   }
@@ -298,7 +305,7 @@ public class IdealStateGroupCommit {
         controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS, 1L);
       }
       return idealStateWrapper._idealState;
-    } catch (Exception e) {
+    } catch (Throwable e) {
       if (controllerMetrics != null) {
         controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
       }

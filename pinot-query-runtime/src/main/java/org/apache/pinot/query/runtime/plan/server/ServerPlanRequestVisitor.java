@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -71,19 +73,32 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      if (pinotQuery.getGroupByList() == null) {
-        List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
+      List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
+      if (!groupByList.isEmpty()) {
         pinotQuery.setGroupByList(groupByList);
-        pinotQuery.setSelectList(
-            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
-                pinotQuery));
-        if (node.getAggType() == AggregateNode.AggType.DIRECT) {
-          pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
-              "true");
-        }
-        // there cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
-        context.setLeafStageBoundaryNode(node);
       }
+      List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
+          node.getFilterArgs(), pinotQuery);
+      for (Expression expression : selectList) {
+        applyTimestampIndex(expression, pinotQuery);
+      }
+      pinotQuery.setSelectList(selectList);
+      if (node.getAggType() == AggregateNode.AggType.DIRECT) {
+        pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+      } else if (node.isLeafReturnFinalResult()) {
+        pinotQuery.putToQueryOptions(
+            CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+      }
+      int limit = node.getLimit();
+      if (limit > 0) {
+        List<RelFieldCollation> collations = node.getCollations();
+        if (!collations.isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
+        }
+        pinotQuery.setLimit(limit);
+      }
+      // There cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
+      context.setLeafStageBoundaryNode(node);
     }
     return null;
   }
@@ -116,7 +131,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
-        pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery));
+        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery);
+        applyTimestampIndex(expression, pinotQuery);
+        pinotQuery.setFilterExpression(expression);
       } else {
         // if filter is already applied then it cannot have another one on leaf.
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
@@ -180,7 +197,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery));
+      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery);
+      for (Expression expression : selectList) {
+        applyTimestampIndex(expression, pinotQuery);
+      }
+      pinotQuery.setSelectList(selectList);
     }
     return null;
   }
@@ -190,8 +211,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getOrderByList() == null) {
-        if (!node.getCollations().isEmpty()) {
-          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
+        List<RelFieldCollation> collations = node.getCollations();
+        if (!collations.isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
         }
         if (node.getFetch() >= 0) {
           pinotQuery.setLimit(node.getFetch());
@@ -236,5 +258,15 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {
     node.visit(this, context);
     return context.getLeafStageBoundaryNode() == null;
+  }
+
+  private void applyTimestampIndex(Expression expression, PinotQuery pinotQuery) {
+    RequestUtils.applyTimestampIndexOverrideHints(expression, pinotQuery);
+    Function functionCall = expression.getFunctionCall();
+    if (expression.isSetFunctionCall()) {
+      for (Expression operand : functionCall.getOperands()) {
+        applyTimestampIndex(operand, pinotQuery);
+      }
+    }
   }
 }

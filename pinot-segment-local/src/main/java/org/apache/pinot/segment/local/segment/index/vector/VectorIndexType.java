@@ -110,7 +110,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
   }
 
   private static class ReaderFactory implements IndexReaderFactory<VectorIndexReader> {

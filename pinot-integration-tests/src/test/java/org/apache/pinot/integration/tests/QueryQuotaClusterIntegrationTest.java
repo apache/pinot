@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -79,14 +80,20 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
         .buildTransport();
     _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName(),
         _pinotClientTransport);
+
+    // create default application rate limiter manually, otherwise verifyQuotaUpdate will fail
+    setQueryQuotaForApplication(null);
   }
 
   @AfterMethod
   void resetQuotas()
       throws Exception {
     addQueryQuotaToClusterConfig(null);
+    addAppQueryQuotaToClusterConfig(null);
+    setQueryQuotaForApplication(null);
     addQueryQuotaToDatabaseConfig(null);
     addQueryQuotaToTableConfig(null);
+
     _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
     verifyQuotaUpdate(0);
   }
@@ -99,10 +106,24 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Test
+  public void testDefaultApplicationQueryQuota()
+      throws Exception {
+    addAppQueryQuotaToClusterConfig(50);
+    testQueryRate(50);
+  }
+
+  @Test
   public void testDatabaseConfigQueryQuota()
       throws Exception {
     addQueryQuotaToDatabaseConfig(10);
     testQueryRate(10);
+  }
+
+  @Test
+  public void testApplicationQueryQuota()
+      throws Exception {
+    setQueryQuotaForApplication(15);
+    testQueryRate(15);
   }
 
   @Test
@@ -118,9 +139,33 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   @Test
+  public void testDefaultApplicationQueryQuotaOverride()
+      throws Exception {
+    addAppQueryQuotaToClusterConfig(25);
+    // override lower than default quota
+    setQueryQuotaForApplication(10);
+    testQueryRate(10);
+    // override higher than default quota
+    setQueryQuotaForApplication(40);
+    testQueryRate(40);
+  }
+
+  @Test
   public void testDatabaseQueryQuotaWithTableQueryQuota()
       throws Exception {
     addQueryQuotaToDatabaseConfig(25);
+    // table quota within database quota. Queries should fail upon table quota (10 qps) breach
+    addQueryQuotaToTableConfig(10);
+    testQueryRate(10);
+    // table quota more than database quota. Queries should fail upon database quota (25 qps) breach
+    addQueryQuotaToTableConfig(50);
+    testQueryRate(25);
+  }
+
+  @Test
+  public void testApplicationQueryQuotaWithTableQueryQuota()
+      throws Exception {
+    setQueryQuotaForApplication(25);
     // table quota within database quota. Queries should fail upon table quota (10 qps) breach
     addQueryQuotaToTableConfig(10);
     testQueryRate(10);
@@ -152,75 +197,147 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     }
   }
 
+  @Test
+  public void testApplicationAndDatabaseQueryQuotaWithTableQueryQuotaWithExtraBroker()
+      throws Exception {
+    BaseBrokerStarter brokerStarter = null;
+    try {
+      addAppQueryQuotaToClusterConfig(null);
+      addQueryQuotaToClusterConfig(null);
+      setQueryQuotaForApplication(50);
+      addQueryQuotaToDatabaseConfig(25);
+      addQueryQuotaToTableConfig(10);
+      //
+      // Add one more broker such that quota gets distributed equally among them
+      brokerStarter = startOneBroker(2);
+      _brokerHostPort = LOCAL_HOST + ":" + brokerStarter.getPort();
+      // query only one broker across the divided quota
+      testQueryRateOnBroker(5);
+
+      // drop table level quota so that database quota comes into effect
+      addQueryQuotaToTableConfig(null);
+      // query only one broker across the divided quota
+      testQueryRateOnBroker(12.5f);
+
+      // drop database level quota so that app quota comes into effect
+      addQueryQuotaToDatabaseConfig(null);
+      // query only one broker across the divided quota
+      testQueryRateOnBroker(25f);
+    } finally {
+      if (brokerStarter != null) {
+        brokerStarter.stop();
+      }
+    }
+  }
+
   /**
    * Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
    * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
    * @param maxRate max rate allowed by the quota
    */
-  void testQueryRate(float maxRate)
-      throws Exception {
+  void testQueryRate(int maxRate) {
     verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);
     //increase the qps and some of the queries should be throttled.
     runQueries(maxRate * 2, true);
   }
 
-  void testQueryRateOnBroker(float maxRate)
-      throws Exception {
+  void testQueryRateOnBroker(float maxRate) {
     verifyQuotaUpdate(maxRate);
     runQueriesOnBroker(maxRate, false);
     //increase the qps and some of the queries should be throttled.
     runQueriesOnBroker(maxRate * 2, true);
   }
 
+  // adjust sleep time depending on deadline and number of iterations left
+  private static void sleep(long deadline, double iterationsLeft) {
+    long time = System.currentTimeMillis();
+    long sleepDeadline = time + (long) Math.max(Math.ceil((deadline - time) / iterationsLeft), 0);
+
+    while (time < sleepDeadline) {
+      try {
+        Thread.sleep(sleepDeadline - time);
+      } catch (InterruptedException ie) {
+        throw new RuntimeException(ie);
+      }
+      time = System.currentTimeMillis();
+    }
+  }
+
   // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
   // is not comparable to sleepMillis, else the actual qps would end up being much lower than required qps
-  private void runQueries(double qps, boolean shouldFail)
-      throws Exception {
+  private void runQueries(int qps, boolean shouldFail) {
     int failCount = 0;
-    long sleepMillis = (long) (1000 / qps);
-    Thread.sleep(sleepMillis);
-    for (int i = 0; i < qps * 2; i++) {
-      ResultSetGroup resultSetGroup = _pinotConnection.execute("SELECT COUNT(*) FROM " + getTableName());
+    long deadline = System.currentTimeMillis() + 1000;
+
+    for (int i = 0; i < qps; i++) {
+      sleep(deadline, qps - i);
+      ResultSetGroup resultSetGroup =
+          _pinotConnection.execute("SET applicationName='default'; SELECT COUNT(*) FROM " + getTableName());
       for (PinotClientException exception : resultSetGroup.getExceptions()) {
         if (exception.getMessage().contains("QuotaExceededError")) {
           failCount++;
           break;
         }
       }
-      Thread.sleep(sleepMillis);
     }
-    assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
+
+    if (shouldFail) {
+      assertTrue(failCount != 0, "Expected nonzero failures for qps: " + qps);
+    } else {
+      Assert.assertEquals(failCount, 0, "Expected zero failures for qps: " + qps);
+    }
   }
 
+  private static volatile float _quota;
+  private static volatile String _quotaSource;
+
   private void verifyQuotaUpdate(float quotaQps) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        float tableQuota = Float.parseFloat(sendGetRequest(String.format("http://%s/debug/tables/queryQuota/%s_OFFLINE",
-            _brokerHostPort, getTableName())));
-        tableQuota = tableQuota == 0 ? Long.MAX_VALUE : tableQuota;
-        float dbQuota = Float.parseFloat(sendGetRequest(String.format("http://%s/debug/databases/queryQuota/default",
-            _brokerHostPort)));
-        dbQuota = dbQuota == 0 ? Long.MAX_VALUE : dbQuota;
-        return quotaQps == Math.min(tableQuota, dbQuota)
-            || (quotaQps == 0 && tableQuota == Long.MAX_VALUE && dbQuota == Long.MAX_VALUE);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 5000, "Failed to reflect query quota on rate limiter in 5s");
+    try {
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          float tableQuota = Float.parseFloat(sendGetRequest(
+              String.format("http://%s/debug/tables/queryQuota/%s_OFFLINE", _brokerHostPort, getTableName())));
+          tableQuota = tableQuota == 0 ? Long.MAX_VALUE : tableQuota;
+          float dbQuota = Float.parseFloat(
+              sendGetRequest(String.format("http://%s/debug/databases/queryQuota/default", _brokerHostPort)));
+          float appQuota = Float.parseFloat(
+              sendGetRequest(String.format("http://%s/debug/applicationQuotas/default", _brokerHostPort)));
+          dbQuota = dbQuota == 0 ? Long.MAX_VALUE : dbQuota;
+          appQuota = appQuota == 0 ? Long.MAX_VALUE : appQuota;
+          float actualQuota = Math.min(Math.min(tableQuota, dbQuota), appQuota);
+          _quota = actualQuota;
+          if (_quota == dbQuota) {
+            _quotaSource = "database";
+          } else if (_quota == tableQuota) {
+            _quotaSource = "table";
+          } else {
+            _quotaSource = "application";
+          }
+          return quotaQps == actualQuota || (quotaQps == 0 && tableQuota == Long.MAX_VALUE && dbQuota == Long.MAX_VALUE
+              && appQuota == Long.MAX_VALUE);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 5000, "Failed to reflect query quota on rate limiter in 5s.");
+    } catch (AssertionError ae) {
+      throw new AssertionError(
+          ae.getMessage() + " Expected quota:" + quotaQps + " but is: " + _quota + " set on: " + _quotaSource, ae);
+    }
   }
 
   private BrokerResponse executeQueryOnBroker(String query) {
     return _pinotClientTransport.executeQuery(_brokerHostPort, query);
   }
 
-  private void runQueriesOnBroker(double qps, boolean shouldFail)
-      throws Exception {
+  private void runQueriesOnBroker(float qps, boolean shouldFail) {
     int failCount = 0;
-    long sleepMillis = (long) (1000 / qps);
-    Thread.sleep(sleepMillis);
-    for (int i = 0; i < qps * 2; i++) {
-      BrokerResponse resultSetGroup = executeQueryOnBroker("SELECT COUNT(*) FROM " + getTableName());
+    long deadline = System.currentTimeMillis() + 1000;
+
+    for (int i = 0; i < qps; i++) {
+      sleep(deadline, qps - i);
+      BrokerResponse resultSetGroup =
+          executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + getTableName());
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
         if (exception.toPrettyString().contains("QuotaExceededError")) {
@@ -228,9 +345,13 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
           break;
         }
       }
-      Thread.sleep(sleepMillis);
     }
-    assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
+
+    if (shouldFail) {
+      assertTrue(failCount != 0, "Expected nonzero failures for qps: " + qps);
+    } else {
+      Assert.assertEquals(failCount, 0, "Expected 0 failures for qps: " + qps);
+    }
   }
 
   public void addQueryQuotaToTableConfig(Integer maxQps)
@@ -251,6 +372,16 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     // to allow change propagation to QueryQuotaManager
   }
 
+  public void setQueryQuotaForApplication(Integer maxQps)
+      throws Exception {
+    String url = _controllerRequestURLBuilder.getBaseUrl() + "/applicationQuotas/default";
+    if (maxQps != null) {
+      url += "?maxQueriesPerSecond=" + maxQps;
+    }
+    HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
+    // to allow change propagation to QueryQuotaManager
+  }
+
   public void addQueryQuotaToClusterConfig(Integer maxQps)
       throws Exception {
     if (maxQps == null) {
@@ -259,6 +390,20 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
             + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
     } else {
       String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
+    }
+    // to allow change propagation to QueryQuotaManager
+  }
+
+  public void addAppQueryQuotaToClusterConfig(Integer maxQps)
+      throws Exception {
+    if (maxQps == null) {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
+          _controllerRequestURLBuilder.forClusterConfigs() + "/"
+              + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND)));
+    } else {
+      String payload = "{\"" + CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
       HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
     }

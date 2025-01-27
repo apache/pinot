@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -32,10 +33,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
 
 
-public class LuceneFSTIndexCreatorTest {
+public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneFSTIndex");
 
   @BeforeClass
@@ -62,16 +63,18 @@ public class LuceneFSTIndexCreatorTest {
     LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(
         INDEX_DIR, "testFSTColumn", uniqueValues);
     creator.seal();
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V99_FST_INDEX_FILE_EXTENSION);
-    PinotDataBuffer pinotDataBuffer =
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "fstIndexFile");
-    LuceneFSTIndexReader reader = new LuceneFSTIndexReader(pinotDataBuffer);
-    int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
-    Assert.assertEquals(2, matchedDictIds.length);
-    Assert.assertEquals(0, matchedDictIds[0]);
-    Assert.assertEquals(1, matchedDictIds[1]);
+        LuceneFSTIndexReader reader = new LuceneFSTIndexReader(pinotDataBuffer)) {
 
-    matchedDictIds = reader.getDictIds(".*llo").toArray();
-    Assert.assertEquals(0, matchedDictIds.length);
+      int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
+      Assert.assertEquals(2, matchedDictIds.length);
+      Assert.assertEquals(0, matchedDictIds[0]);
+      Assert.assertEquals(1, matchedDictIds[1]);
+
+      matchedDictIds = reader.getDictIds(".*llo").toArray();
+      Assert.assertEquals(0, matchedDictIds.length);
+    }
   }
 }

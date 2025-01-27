@@ -81,14 +81,16 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a";
 
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
         + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
-        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
+        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
   }
 
   private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableSubPlan, boolean shouldRewrite) {
@@ -390,6 +392,97 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
     RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
     assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
+  }
+
+  @Test
+  public void testWindowFunctions() {
+    String queryWithDefaultWindow = "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2) FROM a";
+    _queryEnvironment.planQuery(queryWithDefaultWindow);
+
+    String sumQueryWithCustomRowsWindow =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING)"
+            + " FROM a";
+    _queryEnvironment.planQuery(sumQueryWithCustomRowsWindow);
+
+    String queryWithUnboundedFollowingAsLowerBound =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED FOLLOWING AND "
+            + "UNBOUNDED FOLLOWING) FROM a";
+    RuntimeException e = expectThrows(RuntimeException.class,
+        () -> _queryEnvironment.planQuery(queryWithUnboundedFollowingAsLowerBound));
+    assertTrue(
+        e.getCause().getMessage().contains("UNBOUNDED FOLLOWING cannot be specified for the lower frame boundary"));
+
+    String queryWithUnboundedPrecedingAsUpperBound =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
+            + "UNBOUNDED PRECEDING) FROM a";
+    e = expectThrows(RuntimeException.class,
+        () -> _queryEnvironment.planQuery(queryWithUnboundedPrecedingAsUpperBound));
+    assertTrue(
+        e.getCause().getMessage().contains("UNBOUNDED PRECEDING cannot be specified for the upper frame boundary"));
+
+    String queryWithOffsetFollowingAsLowerBoundAndOffsetPrecedingAsUpperBound =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 1 FOLLOWING AND 1 PRECEDING) "
+            + "FROM a";
+    e = expectThrows(RuntimeException.class,
+        () -> _queryEnvironment.planQuery(queryWithOffsetFollowingAsLowerBoundAndOffsetPrecedingAsUpperBound));
+    assertTrue(e.getCause().getMessage()
+        .contains("Upper frame boundary cannot be PRECEDING when lower boundary is FOLLOWING"));
+
+    String queryWithValidBounds =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 2 FOLLOWING AND 3 FOLLOWING) "
+            + "FROM a";
+    _queryEnvironment.planQuery(queryWithValidBounds);
+
+    // Custom RANGE window frame is not currently supported by Pinot
+    String sumQueryWithCustomRangeWindow =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col3 RANGE BETWEEN UNBOUNDED PRECEDING AND 1 "
+            + "FOLLOWING) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(sumQueryWithCustomRangeWindow));
+    assertTrue(e.getCause().getCause().getMessage()
+        .contains("RANGE window frame with offset PRECEDING / FOLLOWING is not supported"));
+
+    // RANK, DENSE_RANK, ROW_NUMBER, NTILE, LAG, LEAD with custom window frame are invalid
+    String rankQuery =
+        "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) "
+            + "FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rankQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String denseRankQuery =
+        "SELECT col1, col2, DENSE_RANK() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "1 FOLLOWING) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(denseRankQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String rowNumberQuery =
+        "SELECT col1, col2, ROW_NUMBER() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rowNumberQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String ntileQuery =
+        "SELECT col1, col2, NTILE(10) OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String lagQuery =
+        "SELECT col1, col2, LAG(col2, 1) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
+            + "UNBOUNDED FOLLOWING) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(lagQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String leadQuery =
+        "SELECT col1, col2, LEAD(col2, 1) OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN CURRENT ROW AND "
+            + "UNBOUNDED FOLLOWING) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(leadQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String ntileQueryWithNoArg =
+        "SELECT col1, col2, NTILE() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQueryWithNoArg));
+    assertTrue(e.getCause().getMessage().contains("expecting 1 argument"));
   }
 
   // --------------------------------------------------------------------------

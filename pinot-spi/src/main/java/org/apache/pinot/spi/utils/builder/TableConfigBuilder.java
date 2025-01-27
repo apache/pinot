@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +79,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
+  @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -105,10 +107,13 @@ public class TableConfigBuilder {
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
   private boolean _aggregateMetrics;
+  private boolean _optimizeDictionary;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
   // only when _optimizeDictionaryForMetrics is set to true.
+  private boolean _optimizeDictionaryType;
   private double _noDictionarySizeRatioThreshold;
+  private double _noDictionaryCardinalityRatioThreshold;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -139,6 +144,14 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setIsDimTable(boolean isDimTable) {
     _isDimTable = isDimTable;
+    return this;
+  }
+
+  public TableConfigBuilder addFieldConfig(FieldConfig config) {
+    if (_fieldConfigList == null) {
+      _fieldConfigList = new ArrayList<>();
+    }
+    _fieldConfigList.add(config);
     return this;
   }
 
@@ -259,13 +272,28 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setOptimizeDictionary(boolean optimizeDictionary) {
+    _optimizeDictionary = optimizeDictionary;
+    return this;
+  }
+
   public TableConfigBuilder setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
     _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
     return this;
   }
 
+  public TableConfigBuilder setOptimizeDictionaryType(boolean optimizeDictionaryType) {
+    _optimizeDictionaryType = optimizeDictionaryType;
+    return this;
+  }
+
   public TableConfigBuilder setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
     _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
+    return this;
+  }
+
+  public TableConfigBuilder setNoDictionaryCardinalityRatioThreshold(double noDictionaryCardinalityRatioThreshold) {
+    _noDictionaryCardinalityRatioThreshold = noDictionaryCardinalityRatioThreshold;
     return this;
   }
 
@@ -464,8 +492,11 @@ public class TableConfigBuilder {
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
+    indexingConfig.setOptimizeDictionary(_optimizeDictionary);
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
+    indexingConfig.setOptimizeDictionaryType(_optimizeDictionaryType);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
+    indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
 
     if (_customConfig == null) {

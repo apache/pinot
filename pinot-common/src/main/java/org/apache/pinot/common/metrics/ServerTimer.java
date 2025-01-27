@@ -58,6 +58,7 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired dedup primary keys based on metadataTTL or deletedKeysTTL"),
+  DEDUP_PRELOAD_TIME_MS("milliseconds", false, "Total time taken to preload a table partition of a dedup table"),
 
   SECONDARY_Q_WAIT_TIME_MS("milliseconds", false,
       "Time spent waiting in the secondary queue when BinaryWorkloadScheduler is used."),
@@ -89,7 +90,10 @@ public enum ServerTimer implements AbstractMetrics.Timer {
    * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
    * reading from. This is the sum of all time waiting.
    */
-  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true);
+  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS("millis", true),
+  STARTUP_FAILURE_DURATION_MS("millis", true);
 
   private final String _timerName;
   private final boolean _global;

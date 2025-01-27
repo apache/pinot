@@ -28,8 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.JsonIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -56,8 +54,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<JsonIndexConfig> {
+public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexReader, JsonIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "json";
   private static final List<String> EXTENSIONS =
       Collections.singletonList(V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
@@ -72,11 +69,6 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
   }
 
   @Override
-  public Map<String, JsonIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getJsonIndexConfigs();
-  }
-
-  @Override
   public JsonIndexConfig getDefaultConfig() {
     return JsonIndexConfig.DISABLED;
   }
@@ -88,17 +80,14 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   public ColumnConfigDeserializer<JsonIndexConfig> createDeserializer() {
-    // reads tableConfig.indexingConfig.jsonIndexConfigs
-    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexConf =
+    ColumnConfigDeserializer<JsonIndexConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexConfigs =
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getJsonIndexConfigs());
-    // reads tableConfig.indexingConfig.jsonIndexColumns
-    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexCols =
-        IndexConfigDeserializer.fromCollection(
-            tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
-            (accum, column) -> accum.put(column, new JsonIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(fromJsonIndexCols.withExclusiveAlternative(fromJsonIndexConf)));
+    ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexColumns =
+        IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
+            (accum, column) -> accum.put(column, JsonIndexConfig.DEFAULT));
+    return fromIndexes.withExclusiveAlternative(fromJsonIndexConfigs.withFallbackAlternative(fromJsonIndexColumns));
   }
 
   @Override
@@ -108,8 +97,8 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
         "Json index is currently only supported on single-value columns");
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "Json index is currently only supported on STRING columns");
-    return context.isOnHeap()
-        ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), indexConfig)
+    return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+        indexConfig)
         : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), indexConfig);
   }
 

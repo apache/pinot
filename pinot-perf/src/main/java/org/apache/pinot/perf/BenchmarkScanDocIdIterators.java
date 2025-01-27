@@ -88,7 +88,7 @@ public class BenchmarkScanDocIdIterators {
     FileUtils.forceMkdir(INDEX_DIR);
     File indexFile = new File(INDEX_DIR, "index-file");
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    LongSupplier supplier = Distribution.createLongSupplier(_seed, _distribution);
+    LongSupplier supplier = Distribution.createSupplier(_seed, _distribution);
     int[] values = new int[_numDocs];
     int max = Integer.MIN_VALUE;
     for (int i = 0; i < values.length; i++) {

@@ -32,6 +32,12 @@
 <!--    <Logger name="org.apache.pinot.query" level="trace" additivity="false">-->
 <!--      <AppenderRef ref="console"/>-->
 <!--    </Logger>-->
+
+    <!-- Change level to DEBUG in order to log the optimization process -->
+    <logger name="org.apache.calcite.plan.RelOptPlanner" level="ERROR" additivity="false">
+      <!--    Change onMatch to ACCEPT, to see the produced plan after every rule invocation using the EXPLAIN format-->
+      <MarkerFilter marker="FULL_PLAN" onMatch="DENY" onMismatch="NEUTRAL"/>
+    </logger>
     <Root level="error">
       <AppenderRef ref="console"/>
     </Root>

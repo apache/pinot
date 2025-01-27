@@ -91,10 +91,10 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   public String selectBroker(String... tableNames) {
     if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
       // getting list of brokers hosting all the tables.
-      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+      String randomBroker = BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
-      if (list != null && !list.isEmpty()) {
-        return list.get(ThreadLocalRandom.current().nextInt(list.size()));
+      if (randomBroker != null) {
+        return randomBroker;
       }
     }
 
