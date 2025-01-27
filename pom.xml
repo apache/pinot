@@ -262,7 +262,7 @@
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
     <paranamer.version>2.8</paranamer.version>
-    <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.1.10</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
     <okio.version>3.10.2</okio.version>
     <kryo.version>2.24.0</kryo.version>
