@@ -70,6 +70,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -84,6 +85,8 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -259,6 +262,22 @@ public class ReIngestionResource {
 
         String controllerUrl = getControllerUrl(tableNameWithType, protocolHandler);
 
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        String segmentStoreUri = indexLoadingConfig.getSegmentStoreURI();
+        String destUriStr = StringUtil.join(File.separator, segmentStoreUri, rawTableName,
+            SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+        try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
+          // copy segment to deep store
+          URI destUri = new URI(destUriStr);
+          if (pinotFS.exists(destUri)) {
+            pinotFS.delete(destUri, true);
+          }
+          pinotFS.copyFromLocalFile(segmentTarFile, destUri);
+        } catch (Exception e) {
+          throw new IOException("Failed to copy segment to deep store: " + destUriStr, e);
+        }
+
+        headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
         pushSegmentMetadata(tableNameWithType, controllerUrl, segmentTarFile, headers, segmentName, protocolHandler);
 
         LOGGER.info("Segment metadata pushed, waiting for segment to be uploaded");
@@ -380,8 +399,6 @@ public class ReIngestionResource {
       headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
           FileUploadDownloadClient.FileUploadType.METADATA.toString()));
 
-      // The DOWNLOAD_URI header specifies where the controller can fetch the segment if needed
-      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, segmentFile.toURI().toString()));
       headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE, "true"));
 
       // Set table name parameter
