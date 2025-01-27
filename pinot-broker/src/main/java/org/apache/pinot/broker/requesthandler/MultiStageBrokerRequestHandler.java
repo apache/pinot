@@ -255,12 +255,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     }
 
+    String clientRequestId = maybeSaveQuery(requestId, sqlNodeAndOptions, query);
+
     try {
       Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
-      String clientRequestId = null;
       try {
         queryResults =
             _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimer.getRemainingTime(),
@@ -280,6 +281,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
       } finally {
         Tracing.getThreadAccountant().clear();
+        maybeRemoveQuery(requestId);
       }
       long executionEndTimeNs = System.nanoTime();
       updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
