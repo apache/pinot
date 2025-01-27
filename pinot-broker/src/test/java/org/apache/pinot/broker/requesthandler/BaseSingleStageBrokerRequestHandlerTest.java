@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -37,6 +36,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.ServerExecutionInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -167,8 +167,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.routingExists(tableName)).thenReturn(true);
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
-    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
-        Map.of(new ServerInstance(new InstanceConfig("server01_9000")), Pair.of(List.of("segment01"), List.of())));
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+        new ServerExecutionInfo(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -194,9 +194,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
               BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+              @Nullable Map<ServerInstance, ServerExecutionInfo> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+              @Nullable Map<ServerInstance, ServerExecutionInfo> realtimeRoutingTable, long timeoutMs,
               ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;
