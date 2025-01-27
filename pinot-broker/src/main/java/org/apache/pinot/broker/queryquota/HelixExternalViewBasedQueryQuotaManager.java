@@ -825,6 +825,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
         quota.setNumOnlineBrokers(onlineBrokerCount);
       }
       if (quota.getOverallRate() >= MIN_APP_QUOTA) {
+        // number of permits must be positive but dividing by broker's count can result in 0
         double qpsQuota = Math.max(quota.getOverallRate() / onlineBrokerCount, MIN_APP_QUOTA);
         quota.setRateLimiter(RateLimiter.create(qpsQuota));
       }
