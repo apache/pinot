@@ -208,8 +208,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.level.validation.intervalInSeconds";
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD =
         "controller.segment.level.validation.intervalPeriod";
-    private static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
-            "controller.segment.error.autoReset";
+    public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
+        "controller.segment.error.autoReset";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
