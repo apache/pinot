@@ -96,9 +96,6 @@
                     <descriptor>${pinot.root}/pinot-distribution/pinot-source-assembly.xml</descriptor>
                   </descriptors>
                   <appendAssemblyId>false</appendAssemblyId>
-                  <archiverConfig>
-                    <compress>${archiver.compress}</compress>
-                  </archiverConfig>
                   <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
                 </configuration>
               </execution>
