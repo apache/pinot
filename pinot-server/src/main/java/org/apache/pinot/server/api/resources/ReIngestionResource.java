@@ -128,6 +128,8 @@ public class ReIngestionResource {
 
   // Keep track of jobs by jobId => job info
   private static final ConcurrentHashMap<String, ReIngestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
+  public static final long CONSUMPTION_END_TIMEOUT_MS = 300000L;
+  public static final long UPLOAD_END_TIMEOUT_MS = 300000L;
 
   @Inject
   private ServerInstance _serverInstance;
@@ -290,7 +292,7 @@ public class ReIngestionResource {
       throws Exception {
     try {
       manager.startConsumption();
-      waitForCondition((Void) -> manager.isDoneConsuming(), 1000, 300_000, 0);
+      waitForCondition((Void) -> manager.isDoneConsuming(), 1000, CONSUMPTION_END_TIMEOUT_MS, 0);
       manager.stopConsumption();
 
       if (!manager.isSuccess()) {
@@ -338,7 +340,7 @@ public class ReIngestionResource {
         }
         SegmentDataManager segDataManager = tableDataManager.acquireSegment(segmentName);
         return segDataManager instanceof ImmutableSegmentDataManager;
-      }, 5000, 300_000, 0);
+      }, 5000, UPLOAD_END_TIMEOUT_MS, 0);
 
       // Trigger segment reset
       HttpClient httpClient = HttpClient.getInstance();

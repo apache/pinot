@@ -2199,8 +2199,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Re-ingests segments that are in DONE status with a missing download URL, but also
-   * have no peer copy on any server. This method will call the server reIngestSegment API
+   * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
+   * will call the server reIngestSegment API
    * on one of the alive servers that are supposed to host that segment according to IdealState.
    *
    * API signature:
@@ -2208,9 +2208,7 @@ public class PinotLLCRealtimeSegmentManager {
    *   Request body (JSON):
    *   {
    *     "tableNameWithType": [tableName],
-   *     "segmentName": [segmentName],
-   *     "uploadURI": [leadControllerUrl],
-   *     "uploadSegment": true
+   *     "segmentName": [segmentName]
    *   }
    *
    * @param tableNameWithType The table name with type, e.g. "myTable_REALTIME"
