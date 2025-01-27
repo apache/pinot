@@ -72,6 +72,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
    */
   private long _maxRowsInOperator;
   private String _requestId;
+  private String _clientRequestId;
   private String _brokerId;
   private int _numServersQueried;
   private int _numServersResponded;
@@ -184,13 +185,12 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public String getClientRequestId() {
-    // TODO: support cqid for MSQE
-    return null;
+    return _clientRequestId;
   }
 
   @Override
   public void setClientRequestId(String clientRequestId) {
-    // TODO: support cqid for MSQE
+    _clientRequestId = clientRequestId;
   }
 
   @Override

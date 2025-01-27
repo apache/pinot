@@ -105,18 +105,24 @@ public class QueryDispatcher {
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
+  private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
 
   public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null);
+    this(mailboxService, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig) {
+  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig, boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    if (enableCancellation) {
+      _serversByQuery = new ConcurrentHashMap<>();
+    } else {
+      _serversByQuery = null;
+    }
   }
 
   public void start() {
@@ -127,13 +133,13 @@ public class QueryDispatcher {
       Map<String, String> queryOptions)
       throws Exception {
     long requestId = context.getRequestId();
-    List<DispatchablePlanFragment> plans = dispatchableSubPlan.getQueryStageList();
+    Set<QueryServerInstance> servers = null;
     try {
-      submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
+      servers = submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
       return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, plans);
+      cancel(requestId, servers);
       throw e;
     }
   }
@@ -145,11 +151,13 @@ public class QueryDispatcher {
     List<PlanNode> planNodes = new ArrayList<>();
 
     List<DispatchablePlanFragment> plans = Collections.singletonList(fragment);
+    final Set<QueryServerInstance>[] servers = new Set[1];
     try {
       SendRequest<List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
-      execute(requestId, plans, timeoutMs, queryOptions, requestSender, (responses, serverInstance) -> {
+      servers[0] = execute(requestId, plans, timeoutMs, queryOptions, requestSender, (responses, serverInstance) -> {
         for (Worker.ExplainResponse response : responses) {
           if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
+            cancel(requestId, servers[0]);
             throw new RuntimeException(
                 String.format("Unable to explain query plan for request: %d on server: %s, ERROR: %s", requestId,
                     serverInstance,
@@ -162,6 +170,7 @@ public class QueryDispatcher {
               Plan.PlanNode planNode = Plan.PlanNode.parseFrom(rootNode);
               planNodes.add(PlanNodeDeserializer.process(planNode));
             } catch (InvalidProtocolBufferException e) {
+              cancel(requestId, servers[0]);
               throw new RuntimeException("Failed to parse explain plan node for request " + requestId + " from server "
                   + serverInstance, e);
             }
@@ -170,20 +179,24 @@ public class QueryDispatcher {
       });
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, plans);
+      cancel(requestId, servers[0]);
       throw e;
     }
     return planNodes;
   }
 
   @VisibleForTesting
-  void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
+  Set<QueryServerInstance> submit(
+      long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     SendRequest<Worker.QueryResponse> requestSender = DispatchClient::submit;
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     List<DispatchablePlanFragment> plansWithoutRoot = stagePlans.subList(1, stagePlans.size());
-    execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, (response, serverInstance) -> {
+    final Set<QueryServerInstance>[] servers = new Set[1];
+    servers[0] = execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender,
+        (response, serverInstance) -> {
       if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
+        cancel(requestId, servers[0]);
         throw new RuntimeException(
             String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
                 serverInstance,
@@ -191,10 +204,19 @@ public class QueryDispatcher {
                     "null")));
       }
     });
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.put(requestId, servers[0]);
+    }
+    return servers[0];
   }
 
-  private <E> void execute(long requestId, List<DispatchablePlanFragment> stagePlans, long timeoutMs,
-      Map<String, String> queryOptions, SendRequest<E> sendRequest, BiConsumer<E, QueryServerInstance> resultConsumer)
+  private boolean isQueryCancellationEnabled() {
+    return _serversByQuery != null;
+  }
+
+  private <E> Set<QueryServerInstance> execute(long requestId, List<DispatchablePlanFragment> stagePlans,
+      long timeoutMs, Map<String, String> queryOptions,
+      SendRequest<E> sendRequest, BiConsumer<E, QueryServerInstance> resultConsumer)
       throws ExecutionException, InterruptedException, TimeoutException {
 
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
@@ -253,6 +275,8 @@ public class QueryDispatcher {
     if (deadline.isExpired()) {
       throw new TimeoutException("Timed out waiting for response of async query-dispatch");
     }
+
+    return serverInstances;
   }
 
   Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs,
@@ -359,20 +383,29 @@ public class QueryDispatcher {
     }
   }
 
-  private void cancel(long requestId, List<DispatchablePlanFragment> stagePlans) {
-    int numStages = stagePlans.size();
-    // Skip the reduce stage (stage 0)
-    Set<QueryServerInstance> serversToCancel = new HashSet<>();
-    for (int stageId = 1; stageId < numStages; stageId++) {
-      serversToCancel.addAll(stagePlans.get(stageId).getServerInstanceToWorkerIdMap().keySet());
+  public boolean cancel(long requestId) {
+    if (isQueryCancellationEnabled()) {
+      return cancel(requestId, _serversByQuery.remove(requestId));
+    } else {
+      return false;
     }
-    for (QueryServerInstance queryServerInstance : serversToCancel) {
+  }
+
+  private boolean cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return false;
+    }
+    for (QueryServerInstance queryServerInstance : servers) {
       try {
         getOrCreateDispatchClient(queryServerInstance).cancel(requestId);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
     }
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.remove(requestId);
+    }
+    return true;
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {

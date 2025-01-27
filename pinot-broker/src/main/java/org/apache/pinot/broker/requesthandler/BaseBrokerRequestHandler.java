@@ -19,11 +19,16 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -31,6 +36,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -51,6 +57,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -74,6 +81,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
+  protected final Map<Long, String> _queriesById;
+  protected final Map<Long, String> _clientQueryIds;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -90,6 +99,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryLogger = new QueryLogger(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
+
+    boolean enableQueryCancellation =
+        Boolean.parseBoolean(config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
+    if (enableQueryCancellation) {
+      _queriesById = new ConcurrentHashMap<>();
+      _clientQueryIds = new ConcurrentHashMap<>();
+    } else {
+      _queriesById = null;
+      _clientQueryIds = null;
+    }
   }
 
   @Override
@@ -179,6 +198,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception;
 
+  protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
     // TODO: Add partial result flag to RequestContext
@@ -222,5 +244,66 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setTraceInfo(response.getTraceInfo());
+  }
+
+  @Override
+  public Map<Long, String> getRunningQueries() {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    return new HashMap<>(_queriesById);
+  }
+
+  @Override
+  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+      Map<String, Integer> serverResponses)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    try {
+      return handleCancel(queryId, timeoutMs, executor, connMgr, serverResponses);
+    } finally {
+      maybeRemoveQuery(queryId);
+    }
+  }
+
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    Optional<Long> requestId = _clientQueryIds.entrySet().stream()
+        .filter(e -> clientQueryId.equals(e.getValue())).map(Map.Entry::getKey).findFirst();
+    if (requestId.isPresent()) {
+      return cancelQuery(requestId.get(), timeoutMs, executor, connMgr, serverResponses);
+    } else {
+      LOGGER.warn("Query cancellation cannot be performed due to unknown client query id: {}", clientQueryId);
+      return false;
+    }
+  }
+
+  protected String maybeSaveQuery(long requestId, SqlNodeAndOptions sqlNodeAndOptions, String query) {
+    if (isQueryCancellationEnabled()) {
+      String clientRequestId = sqlNodeAndOptions.getOptions() != null
+          ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
+      _queriesById.put(requestId, query);
+      if (StringUtils.isNotBlank(clientRequestId)) {
+        _clientQueryIds.put(requestId, clientRequestId);
+        LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
+      } else {
+        LOGGER.debug("Keep track of running query: {}", requestId);
+      }
+      return clientRequestId;
+    }
+    return null;
+  }
+
+  protected void maybeRemoveQuery(long requestId) {
+    if (isQueryCancellationEnabled()) {
+      _queriesById.remove(requestId);
+      _clientQueryIds.remove(requestId);
+      LOGGER.debug("Remove track of running query: {}", requestId);
+    }
+  }
+
+  protected boolean isQueryCancellationEnabled() {
+    return _queriesById != null;
   }
 }

@@ -294,6 +294,8 @@ public class MultistageEngineQuickStart extends Quickstart {
   protected Map<String, Object> getConfigOverrides() {
     Map<String, Object> configOverrides = new HashMap<>();
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, true);
+    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, true);
     return configOverrides;
   }
 
