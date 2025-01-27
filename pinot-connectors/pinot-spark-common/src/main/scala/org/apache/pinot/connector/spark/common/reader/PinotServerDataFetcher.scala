@@ -106,10 +106,10 @@ private[reader] class PinotServerDataFetcher(
   }
 
   private def submitRequestToPinotServer(
-                                          offlineBrokerRequest: BrokerRequest,
-                                          offlineRoutingTable: JMap[ServerInstance, ServerRouteInfo],
-                                          realtimeBrokerRequest: BrokerRequest,
-                                          realtimeRoutingTable: JMap[ServerInstance, ServerRouteInfo]): AsyncQueryResponse = {
+      offlineBrokerRequest: BrokerRequest,
+      offlineRoutingTable: JMap[ServerInstance, ServerRouteInfo],
+      realtimeBrokerRequest: BrokerRequest,
+      realtimeRoutingTable: JMap[ServerInstance, ServerRouteInfo]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,
