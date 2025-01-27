@@ -271,13 +271,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       } catch (Throwable t) {
-        for (String table : tableNames) {
-          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
-        }
         ProcessingException queryException = QueryException.QUERY_EXECUTION_ERROR;
         if (t instanceof BadQueryRequestException) {
           // provide more specific error code if available
           queryException = QueryException.QUERY_VALIDATION_ERROR;
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
         }
 
         String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
