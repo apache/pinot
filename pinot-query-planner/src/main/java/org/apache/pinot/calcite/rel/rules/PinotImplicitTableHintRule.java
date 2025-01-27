@@ -57,16 +57,8 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   public boolean matches(RelOptRuleCall call) {
     LogicalTableScan tableScan = call.rel(0);
 
-    RelHint explicitHint = getTableOptionHint(tableScan);
-
-    if (explicitHint == null) {
-      return true;
-    }
     // we don't want to apply this rule if the explicit hint is complete
-    Map<String, String> kvOptions = explicitHint.kvOptions;
-    return kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
+    return !isHintComplete(getTableOptionHint(tableScan));
   }
 
   @Override
@@ -85,6 +77,20 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     TableOptions tableOptions = calculateTableOptions(explicitHint, implicitTableOptions, tableScan);
     RelNode newRel = withNewTableOptions(tableScan, tableOptions);
     call.transformTo(newRel);
+  }
+
+  /**
+   * Determines is the provided hint is complete.
+   * A hint is considered complete if it provides explicit config for key, function and partition size.
+   */
+  private boolean isHintComplete(@Nullable RelHint hint) {
+    if (hint == null || hint.kvOptions == null) {
+      return false;
+    }
+    Map<String, String> kvOptions = hint.kvOptions;
+    return kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)
+        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION)
+        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
   }
 
   /**
