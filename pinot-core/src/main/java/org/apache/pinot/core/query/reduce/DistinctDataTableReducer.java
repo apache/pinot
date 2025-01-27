@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
@@ -53,7 +54,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
@@ -61,8 +62,10 @@ public class DistinctDataTableReducer implements DataTableReducer {
       brokerResponseNative.setResultTable(new ResultTable(dataSchema, List.of()));
       return;
     }
+
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
     DistinctTable distinctTable = null;
-    for (DataTable dataTable : dataTableMap.values()) {
+    for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       if (distinctTable == null) {
         distinctTable = createDistinctTable(dataSchema, dataTable);

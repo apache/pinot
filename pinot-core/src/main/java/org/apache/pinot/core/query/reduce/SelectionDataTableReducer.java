@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -48,18 +49,20 @@ public class SelectionDataTableReducer implements DataTableReducer {
    */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     Pair<DataSchema, int[]> pair =
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
-    if (dataTableMap.isEmpty() || limit == 0) {
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
+
+    if (dataTables.isEmpty() || limit == 0) {
       brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), Collections.emptyList()));
       return;
     }
     if (_queryContext.getOrderByExpressions() == null) {
       // Selection only
-      List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
+      List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTables, limit,
           _queryContext.isNullHandlingEnabled());
       brokerResponseNative.setResultTable(
           SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, pair.getLeft(), pair.getRight()));
@@ -67,7 +70,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
       // Selection order-by
       SelectionOperatorService selectionService =
           new SelectionOperatorService(_queryContext, pair.getLeft(), pair.getRight());
-      selectionService.reduceWithOrdering(dataTableMap.values());
+      selectionService.reduceWithOrdering(dataTables);
       brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
     }
   }

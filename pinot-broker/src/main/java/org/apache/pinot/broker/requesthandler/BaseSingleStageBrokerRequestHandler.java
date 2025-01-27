@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +88,7 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerQueryRoutingContext;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -484,7 +486,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (realtimeTableName == null) {
         realtimeTableConfig = null;
       }
-
       HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
       if (handlerContext._disableGroovy) {
         rejectGroovyQuery(serverPinotQuery);
@@ -617,53 +618,35 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Calculate routing table for the query
       // TODO: Modify RoutingManager interface to directly take PinotQuery
       long routingStartTimeNs = System.nanoTime();
-      Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
-      Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable = new HashMap<>();
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
-      boolean offlineTableDisabled = false;
-      boolean realtimeTableDisabled = false;
+      boolean offlineTableDisabled =
+          offlineTableName == null ? false : _routingManager.isTableDisabled(offlineTableName);
+      boolean realtimeTableDisabled =
+          realtimeTableName == null ? false : _routingManager.isTableDisabled(realtimeTableName);
       List<ProcessingException> exceptions = new ArrayList<>();
-      if (offlineBrokerRequest != null) {
-        offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
-        // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = null;
-        if (!offlineTableDisabled) {
-          routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
-        }
-        if (routingTable != null) {
-          unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
-              routingTable.getServerInstanceToSegmentsMap();
-          if (!serverInstanceToSegmentsMap.isEmpty()) {
-            offlineRoutingTable = serverInstanceToSegmentsMap;
-          } else {
-            offlineBrokerRequest = null;
-          }
-          numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
-        } else {
+
+      if (offlineBrokerRequest != null && !offlineTableDisabled) {
+        Integer numPrunedSegments =
+            updateRoutingTable(requestId, offlineBrokerRequest, queryRoutingTable, unavailableSegments);
+        if (numPrunedSegments == null) {
           offlineBrokerRequest = null;
+        } else {
+          numPrunedSegmentsTotal += numPrunedSegments;
         }
       }
-      if (realtimeBrokerRequest != null) {
-        realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
-        // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = null;
-        if (!realtimeTableDisabled) {
-          routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
-        }
-        if (routingTable != null) {
-          unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
-              routingTable.getServerInstanceToSegmentsMap();
-          if (!serverInstanceToSegmentsMap.isEmpty()) {
-            realtimeRoutingTable = serverInstanceToSegmentsMap;
-          } else {
-            realtimeBrokerRequest = null;
-          }
-          numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
-        } else {
+
+      // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
+      if (realtimeBrokerRequest != null && !realtimeTableDisabled && (!pinotQuery.isExplain()
+          || offlineBrokerRequest != null)) {
+        // Don't send explain queries to realtime for OFFLINE or HYBRID tables
+        Integer numPrunedSegments =
+            updateRoutingTable(requestId, realtimeBrokerRequest, queryRoutingTable, unavailableSegments);
+        if (numPrunedSegments == null) {
           realtimeBrokerRequest = null;
+        } else {
+          numPrunedSegmentsTotal += numPrunedSegments;
         }
       }
 
@@ -747,18 +730,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Set the maximum serialized response size per server, and ask server to directly return final response when only
       // one server is queried
-      int numServers = 0;
-      if (offlineRoutingTable != null) {
-        numServers += offlineRoutingTable.size();
-      }
-      if (realtimeRoutingTable != null) {
-        numServers += realtimeRoutingTable.size();
-      }
+      int numQueriesIssued = queryRoutingTable.values().stream().mapToInt(List::size).sum();
+
       if (offlineBrokerRequest != null) {
         Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+        setMaxServerResponseSizeBytes(numQueriesIssued, queryOptions, offlineTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
-        if (numServers == 1) {
+        if (numQueriesIssued == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && offlineBrokerRequest != serverBrokerRequest) {
@@ -769,9 +747,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       if (realtimeBrokerRequest != null) {
         Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+        setMaxServerResponseSizeBytes(numQueriesIssued, queryOptions, realtimeTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
-        if (numServers == 1) {
+        if (numQueriesIssued == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && realtimeBrokerRequest != serverBrokerRequest) {
@@ -789,15 +767,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       //       - Compile time function invocation
       //       - Literal only queries
       //       - Any rewrites
-      if (pinotQuery.isExplain()) {
-        // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
-        // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
-        if (offlineRoutingTable != null) {
-          // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
-          realtimeBrokerRequest = null;
-          realtimeRoutingTable = null;
-        }
-      }
+
       BrokerResponseNative brokerResponse;
       if (_queriesById != null) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
@@ -808,20 +778,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         //       can always list the running queries and cancel query again until it ends. Just that such race
         //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
         //       servers takes time, but will address later if needed.
-        _queriesById.put(requestId, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
+        _queriesById.put(requestId, new QueryServers(query, queryRoutingTable));
         LOGGER.debug("Keep track of running query: {}", requestId);
         try {
-          brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-              offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-              requestContext);
+          brokerResponse =
+              processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, queryRoutingTable, remainingTimeMs,
+                  serverStats, requestContext);
         } finally {
           _queriesById.remove(requestId);
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
-        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-            requestContext);
+        brokerResponse =
+            processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, queryRoutingTable, remainingTimeMs,
+                serverStats, requestContext);
       }
       brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -868,6 +838,33 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return brokerResponse;
     } finally {
       Tracing.ThreadAccountantOps.clear();
+    }
+  }
+
+  private Integer updateRoutingTable(long requestId, BrokerRequest brokerRequest,
+      Map<ServerInstance, List<ServerQueryRoutingContext>> routingTableResult, List<String> unavailableSegments) {
+    // NOTE: Routing table might be null if table is just removed
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, requestId);
+    if (routingTable != null) {
+      unavailableSegments.addAll(routingTable.getUnavailableSegments());
+      Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+          routingTable.getServerInstanceToSegmentsMap();
+      if (!serverInstanceToSegmentsMap.isEmpty()) {
+        for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> serverMap
+            : serverInstanceToSegmentsMap.entrySet()) {
+          ServerInstance serverInstance = serverMap.getKey();
+          Pair<List<String>, List<String>> segmentsToQuery = serverMap.getValue();
+
+          routingTableResult.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(
+              new ServerQueryRoutingContext(brokerRequest, segmentsToQuery,
+                  serverInstance.toServerRoutingInstance(serverInstance.isTlsEnabled())));
+        }
+      } else {
+        return null;
+      }
+      return routingTable.getNumPrunedSegments();
+    } else {
+      return null;
     }
   }
 
@@ -1778,7 +1775,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * 5. BrokerConfig -> maxServerResponseSizeBytes
    * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
-  private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
+  private void setMaxServerResponseSizeBytes(int numQueriesIssued, Map<String, String> queryOptions,
       @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
@@ -1787,7 +1784,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Long maxQueryResponseSizeQueryOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
     if (maxQueryResponseSizeQueryOption != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxQueryResponseSizeQueryOption / numServers));
+          Long.toString(maxQueryResponseSizeQueryOption / numQueriesIssued));
       return;
     }
 
@@ -1801,7 +1798,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       if (queryConfig.getMaxQueryResponseSizeBytes() != null) {
         queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numServers));
+            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numQueriesIssued));
         return;
       }
     }
@@ -1817,7 +1814,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String maxQueryResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
     if (maxQueryResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(DataSizeUtils.toBytes(maxQueryResponseSizeBrokerConfig) / numServers));
+          Long.toString(DataSizeUtils.toBytes(maxQueryResponseSizeBrokerConfig) / numQueriesIssued));
     }
   }
 
@@ -1871,11 +1868,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+      BrokerRequest serverBrokerRequest, Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable,
+      long timeoutMs, ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
   private String getGlobalQueryId(long requestId) {
@@ -1904,14 +1898,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
 
-    QueryServers(String query, @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
-        @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable) {
+    QueryServers(String query, @Nullable Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable) {
       _query = query;
-      if (offlineRoutingTable != null) {
-        _servers.addAll(offlineRoutingTable.keySet());
-      }
-      if (realtimeRoutingTable != null) {
-        _servers.addAll(realtimeRoutingTable.keySet());
+      if (queryRoutingTable != null) {
+        _servers.addAll(queryRoutingTable.keySet());
       }
     }
   }

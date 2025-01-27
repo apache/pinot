@@ -65,6 +65,9 @@ import org.slf4j.LoggerFactory;
  * The {@code InstanceRequestHandler} is the Netty inbound handler on Pinot Server side to handle the serialized
  * instance requests sent from Pinot Broker.
  */
+
+// TODO(egalpin): server-side handler for responding to requests sent from broker
+
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);

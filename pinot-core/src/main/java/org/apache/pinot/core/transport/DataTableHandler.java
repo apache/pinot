@@ -49,15 +49,15 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   }
 
   @Override
-  public void channelActive(ChannelHandlerContext ctx) {
-    LOGGER.info("Channel for server: {} is now active", _serverRoutingInstance);
-  }
-
-  @Override
   public void channelInactive(ChannelHandlerContext ctx) {
     LOGGER.error("Channel for server: {} is now inactive, marking server down", _serverRoutingInstance);
     _queryRouter.markServerDown(_serverRoutingInstance,
         new RuntimeException(String.format("Channel for server: %s is inactive", _serverRoutingInstance)));
+  }
+
+  @Override
+  public void channelActive(ChannelHandlerContext ctx) {
+    LOGGER.info("Channel for server: {} is now active", _serverRoutingInstance);
   }
 
   @Override

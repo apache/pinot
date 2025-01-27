@@ -20,12 +20,11 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
 import org.apache.pinot.broker.failuredetector.FailureDetectorFactory;
@@ -47,6 +46,7 @@ import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerQueryRoutingContext;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -98,13 +98,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      BrokerRequest serverBrokerRequest,
+      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
+    assert !queryRoutingTable.isEmpty();
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
@@ -112,10 +110,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
-            realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
+        _queryRouter.submitQuery(requestId, rawTableName, queryRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
-    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, List<ServerResponse>> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
           ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
@@ -129,16 +126,17 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
     int numServersQueried = finalResponses.size();
     long totalResponseSize = 0;
-    Map<ServerRoutingInstance, DataTable> dataTableMap = Maps.newHashMapWithExpectedSize(numServersQueried);
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = Maps.newHashMapWithExpectedSize(numServersQueried);
     List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
-    for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : finalResponses.entrySet()) {
-      ServerResponse serverResponse = entry.getValue();
-      DataTable dataTable = serverResponse.getDataTable();
-      if (dataTable != null) {
-        dataTableMap.put(entry.getKey(), dataTable);
-        totalResponseSize += serverResponse.getResponseSize();
-      } else {
-        serversNotResponded.add(entry.getKey());
+    for (Map.Entry<ServerRoutingInstance, List<ServerResponse>> serverResponses : finalResponses.entrySet()) {
+      for (ServerResponse response : serverResponses.getValue()) {
+        DataTable dataTable = response.getDataTable();
+        if (dataTable != null) {
+          dataTableMap.computeIfAbsent(serverResponses.getKey(), k -> new ArrayList<>()).add(dataTable);
+          totalResponseSize += response.getResponseSize();
+        } else {
+          serversNotResponded.add(serverResponses.getKey());
+        }
       }
     }
     int numServersResponded = dataTableMap.size();
