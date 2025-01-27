@@ -38,7 +38,7 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessThrottler.class);
 
   /**
-   * _maxPreprocessConcurrency and _maxConcurrentPreprocessesBeforeServingQueries must be >= 0. To effectively disable
+   * _maxPreprocessConcurrency and _maxConcurrentPreprocessesBeforeServingQueries must be > 0. To effectively disable
    * throttling, this can be set to a very high value
    */
   private int _maxPreprocessConcurrency;
@@ -67,12 +67,11 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
     _isServingQueries = isServingQueries;
 
     // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
-    // ready to serve queries this is not used again. Thus, it is safe to only pick up this configuration during
-    // server startup. There is no need to allow updates to this via the ZK CLUSTER config handler
-    int preServeQueryParallelism = Math.max(_maxPreprocessConcurrency, _maxPreprocessConcurrencyBeforeServingQueries);
+    // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
+    // server is starting up.
     int preprocessConcurrency = _maxPreprocessConcurrency;
     if (!isServingQueries) {
-      preprocessConcurrency = preServeQueryParallelism;
+      preprocessConcurrency = _maxPreprocessConcurrencyBeforeServingQueries;
       LOGGER.info("Serving queries is disabled, setting preprocess concurrency to: {}", preprocessConcurrency);
     }
     _semaphore = new AdjustableSemaphore(preprocessConcurrency, true);

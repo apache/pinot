@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.spi.config.provider;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 
 
@@ -50,10 +48,9 @@ public interface PinotClusterConfigProvider {
    * @param newProperties map of newly fetched ZK cluster configs
    * @return set of changed (added/deleted/updated) cluster config keys
    */
-  default Set<String> getChangedProperties(@Nullable Map<String, String> oldProperties,
-      @Nullable Map<String, String> newProperties) {
+  default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
     if (MapUtils.isEmpty(oldProperties)) {
-      return newProperties == null ? Collections.emptySet() : newProperties.keySet();
+      return newProperties.keySet();
     }
 
     if (MapUtils.isEmpty(newProperties)) {
@@ -71,8 +68,7 @@ public interface PinotClusterConfigProvider {
     }
 
     // Add all properties that were deleted
-    Set<String> originalPropertyKeys = new HashSet<>();
-    originalPropertyKeys.addAll(oldProperties.keySet());
+    Set<String> originalPropertyKeys = new HashSet<>(oldProperties.keySet());
     originalPropertyKeys.removeAll(newProperties.keySet());
     changedProperties.addAll(originalPropertyKeys);
 
