@@ -140,6 +140,7 @@ public class SegmentPushUtils implements Serializable {
     List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
     List<NameValuePair> parameters = FileUploadDownloadClient.makeTableParam(tableName);
     PushJobSpec pushJobSpec = spec.getPushJobSpec();
+    parameters.add(FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec));
     if (pushJobSpec != null && pushJobSpec.isBatchSegmentUpload()) {
       // segments are uploaded in batch when batch mode is enabled.
       sendSegmentsUriAndMetadata(spec, fileSystem, segmentUriToTarPathMap, headers, parameters);
