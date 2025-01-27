@@ -83,6 +83,13 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
+  protected boolean handleCancel(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+      Map<String, Integer> serverResponses)
+      throws Exception {
+    throw new IllegalArgumentException("Not supported yet");
+  }
+
+  @Override
   public void start() {
     LOGGER.info("Starting time-series request handler");
   }
