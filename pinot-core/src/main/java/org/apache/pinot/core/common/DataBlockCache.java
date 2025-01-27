@@ -129,7 +129,11 @@ public class DataBlockCache {
         intValues = new int[_length];
         putValues(FieldSpec.DataType.INT, column, intValues);
       }
-      _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
+      try {
+        _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
+      } catch (RuntimeException re) {
+        throw PinotRuntimeException.create(re).withColumnName(column);
+      }
     }
     return intValues;
   }
@@ -147,7 +151,11 @@ public class DataBlockCache {
         longValues = new long[_length];
         putValues(FieldSpec.DataType.LONG, column, longValues);
       }
-      _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
+      try {
+        _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
+      } catch (RuntimeException re) {
+        throw PinotRuntimeException.create(re).withColumnName(column);
+      }
     }
     return longValues;
   }
@@ -165,7 +173,11 @@ public class DataBlockCache {
         floatValues = new float[_length];
         putValues(FieldSpec.DataType.FLOAT, column, floatValues);
       }
-      _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
+      try {
+        _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
+      } catch (RuntimeException re) {
+        throw PinotRuntimeException.create(re).withColumnName(column);
+      }
     }
     return floatValues;
   }
@@ -183,7 +195,11 @@ public class DataBlockCache {
         doubleValues = new double[_length];
         putValues(FieldSpec.DataType.DOUBLE, column, doubleValues);
       }
-      _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
+      try {
+        _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
+      } catch (RuntimeException re) {
+        throw PinotRuntimeException.create(re).withColumnName(column);
+      }
     }
     return doubleValues;
   }
@@ -201,7 +217,11 @@ public class DataBlockCache {
         bigDecimalValues = new BigDecimal[_length];
         putValues(FieldSpec.DataType.BIG_DECIMAL, column, bigDecimalValues);
       }
-      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+      try {
+        _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+      } catch (RuntimeException re) {
+        throw PinotRuntimeException.create(re).withColumnName(column);
+      }
     }
     return bigDecimalValues;
   }

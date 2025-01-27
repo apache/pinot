@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -123,12 +124,13 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
             // NOTE: We need to handle Error here, or the execution threads will die without adding the execution
             //       exception into the query response, and the main thread might wait infinitely (until timeout) or
             //       throw unexpected exceptions (such as NPE).
+            PinotRuntimeException pe = PinotRuntimeException.create(t).withTableName(_queryContext.getTableName());
             if (t instanceof Exception) {
-              LOGGER.error("Caught exception while processing query: {}", _queryContext, t);
+              LOGGER.error("Caught exception while processing query: {}", _queryContext, pe);
             } else {
-              LOGGER.error("Caught serious error while processing query: {}", _queryContext, t);
+              LOGGER.error("Caught serious error while processing query: {}", _queryContext, pe);
             }
-            onProcessSegmentsException(t);
+            onProcessSegmentsException(pe);
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();

@@ -35,11 +35,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -502,6 +504,34 @@ public class FluentQueryTest {
           tableText
       );
       thenResultIs(rows);
+
+      return this;
+    }
+
+    public QueryExecuted thenResultIsException(String messagePattern) {
+      return thenResultIsException(messagePattern, -1);
+    }
+
+    public QueryExecuted thenResultIsException(String messagePattern, int exceptionsNumber) {
+      if (_brokerResponse.getExceptionsSize() == 0) {
+        Assert.fail("Expected exception " + messagePattern + " but query didn't throw one.");
+      }
+
+      List<QueryProcessingException> exceptions = _brokerResponse.getExceptions();
+
+      Pattern pattern = Pattern.compile(messagePattern);
+
+      for (int i = 0, n = exceptions.size(); i < n; i++) {
+        if (!pattern.matcher(exceptions.get(i).getMessage()).find()) {
+          Assert.fail(
+              "Exception number: " + i + " doesn't match pattern: "
+                  + messagePattern + "\n exception: " + exceptions.get(i).getMessage());
+        }
+      }
+
+      if (exceptionsNumber > 0 && exceptionsNumber != _brokerResponse.getExceptionsSize()) {
+        Assert.fail("Expected " + exceptionsNumber + " exceptions but found " + _brokerResponse.getExceptionsSize());
+      }
 
       return this;
     }

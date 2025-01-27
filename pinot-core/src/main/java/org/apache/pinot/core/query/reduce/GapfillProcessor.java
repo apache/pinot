@@ -273,7 +273,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
-          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i,
+          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i, dataSchema.getColumnName(i),
               _queryContext.isNullHandlingEnabled()));
     }
 

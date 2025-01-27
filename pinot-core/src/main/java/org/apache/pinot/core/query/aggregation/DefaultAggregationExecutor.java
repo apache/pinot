@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -45,8 +46,13 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      aggregationFunction.aggregate(length, _aggregationResultHolders[i],
-          AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock));
+      try {
+        aggregationFunction.aggregate(length, _aggregationResultHolders[i],
+            AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock));
+      } catch (RuntimeException re) {
+        // resultColumnName could be max(some_col)
+        throw PinotRuntimeException.create(re).withColumnName(aggregationFunction.getResultColumnName());
+      }
     }
   }
 

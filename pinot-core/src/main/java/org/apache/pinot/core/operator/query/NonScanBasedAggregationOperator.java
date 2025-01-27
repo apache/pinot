@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -153,26 +154,30 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
   private static Double getMinValue(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
-      return toDouble(dictionary.getMinVal());
+      return toDouble(dictionary.getMinVal(), dataSource);
     }
-    return toDouble(dataSource.getDataSourceMetadata().getMinValue());
+    return toDouble(dataSource.getDataSourceMetadata().getMinValue(), dataSource);
   }
 
   private static Double getMaxValue(DataSource dataSource) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary != null) {
-      return toDouble(dictionary.getMaxVal());
+      return toDouble(dictionary.getMaxVal(), dataSource);
     }
-    return toDouble(dataSource.getDataSourceMetadata().getMaxValue());
+    return toDouble(dataSource.getDataSourceMetadata().getMaxValue(), dataSource);
   }
 
-  private static Double toDouble(Comparable<?> value) {
-    if (value instanceof Double) {
-      return (Double) value;
-    } else if (value instanceof Number) {
-      return ((Number) value).doubleValue();
-    } else {
-      return Double.parseDouble(value.toString());
+  private static Double toDouble(Comparable<?> value, DataSource dataSource) {
+    try {
+      if (value instanceof Double) {
+        return (Double) value;
+      } else if (value instanceof Number) {
+        return ((Number) value).doubleValue();
+      } else {
+        return Double.parseDouble(value.toString());
+      }
+    } catch (RuntimeException e) {
+      throw PinotRuntimeException.create(e).withColumnName(dataSource.getColumnName());
     }
   }
 

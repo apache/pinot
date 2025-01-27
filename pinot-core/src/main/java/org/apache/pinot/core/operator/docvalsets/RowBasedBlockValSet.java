@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
@@ -43,15 +44,17 @@ public class RowBasedBlockValSet implements BlockValSet {
   private final DataType _storedType;
   private final List<Object[]> _rows;
   private final int _colId;
+  private final String _colName;
   private final RoaringBitmap _nullBitmap;
   private final Object _nullPlaceHolder;
 
-  public RowBasedBlockValSet(ColumnDataType columnDataType, List<Object[]> rows, int colId,
+  public RowBasedBlockValSet(ColumnDataType columnDataType, List<Object[]> rows, int colId, String colName,
       boolean nullHandlingEnabled) {
     _dataType = columnDataType.toDataType();
     _storedType = _dataType.getStoredType();
     _rows = rows;
     _colId = colId;
+    _colName = colName;
     _nullPlaceHolder = columnDataType.getNullPlaceholder();
 
     if (nullHandlingEnabled) {
@@ -114,8 +117,12 @@ public class RowBasedBlockValSet implements BlockValSet {
           values[i] = ((Number) _rows.get(i)[_colId]).intValue();
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          values[i] = Integer.parseInt((String) _rows.get(i)[_colId]);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            values[i] = Integer.parseInt((String) _rows.get(i)[_colId]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read int values from data type: " + _dataType);
@@ -129,11 +136,15 @@ public class RowBasedBlockValSet implements BlockValSet {
           }
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          String value = (String) _rows.get(i)[_colId];
-          if (value != null) {
-            values[i] = Integer.parseInt(value);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            String value = (String) _rows.get(i)[_colId];
+            if (value != null) {
+              values[i] = Integer.parseInt(value);
+            }
           }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read int values from data type: " + _dataType);
@@ -155,8 +166,12 @@ public class RowBasedBlockValSet implements BlockValSet {
           values[i] = ((Number) _rows.get(i)[_colId]).longValue();
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          values[i] = Long.parseLong((String) _rows.get(i)[_colId]);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            values[i] = Long.parseLong((String) _rows.get(i)[_colId]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read long values from data type: " + _dataType);
@@ -170,11 +185,15 @@ public class RowBasedBlockValSet implements BlockValSet {
           }
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          String value = (String) _rows.get(i)[_colId];
-          if (value != null) {
-            values[i] = Long.parseLong(value);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            String value = (String) _rows.get(i)[_colId];
+            if (value != null) {
+              values[i] = Long.parseLong(value);
+            }
           }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read long values from data type: " + _dataType);
@@ -196,8 +215,12 @@ public class RowBasedBlockValSet implements BlockValSet {
           values[i] = ((Number) _rows.get(i)[_colId]).floatValue();
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          values[i] = Float.parseFloat((String) _rows.get(i)[_colId]);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            values[i] = Float.parseFloat((String) _rows.get(i)[_colId]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read float values from data type: " + _dataType);
@@ -211,11 +234,15 @@ public class RowBasedBlockValSet implements BlockValSet {
           }
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          String value = (String) _rows.get(i)[_colId];
-          if (value != null) {
-            values[i] = Float.parseFloat(value);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            String value = (String) _rows.get(i)[_colId];
+            if (value != null) {
+              values[i] = Float.parseFloat(value);
+            }
           }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read float values from data type: " + _dataType);
@@ -237,8 +264,12 @@ public class RowBasedBlockValSet implements BlockValSet {
           values[i] = ((Number) _rows.get(i)[_colId]).doubleValue();
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          values[i] = Double.parseDouble((String) _rows.get(i)[_colId]);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            values[i] = Double.parseDouble((String) _rows.get(i)[_colId]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
@@ -252,11 +283,15 @@ public class RowBasedBlockValSet implements BlockValSet {
           }
         }
       } else if (_storedType == DataType.STRING) {
-        for (int i = 0; i < numRows; i++) {
-          String value = (String) _rows.get(i)[_colId];
-          if (value != null) {
-            values[i] = Double.parseDouble(value);
+        try {
+          for (int i = 0; i < numRows; i++) {
+            String value = (String) _rows.get(i)[_colId];
+            if (value != null) {
+              values[i] = Double.parseDouble(value);
+            }
           }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
@@ -287,8 +322,12 @@ public class RowBasedBlockValSet implements BlockValSet {
         case FLOAT:
         case DOUBLE:
         case STRING:
-          for (int i = 0; i < numRows; i++) {
-            values[i] = new BigDecimal(_rows.get(i)[_colId].toString());
+          try {
+            for (int i = 0; i < numRows; i++) {
+              values[i] = new BigDecimal(_rows.get(i)[_colId].toString());
+            }
+          } catch (RuntimeException re) {
+            throw PinotRuntimeException.create(re).withColumnName(_colName);
           }
           break;
         case BIG_DECIMAL:
@@ -316,9 +355,13 @@ public class RowBasedBlockValSet implements BlockValSet {
         case FLOAT:
         case DOUBLE:
         case STRING:
-          for (int i = 0; i < numRows; i++) {
-            Object value = _rows.get(i)[_colId];
-            values[i] = value != null ? new BigDecimal(value.toString()) : NullValuePlaceHolder.BIG_DECIMAL;
+          try {
+            for (int i = 0; i < numRows; i++) {
+              Object value = _rows.get(i)[_colId];
+              values[i] = value != null ? new BigDecimal(value.toString()) : NullValuePlaceHolder.BIG_DECIMAL;
+            }
+          } catch (RuntimeException re) {
+            throw PinotRuntimeException.create(re).withColumnName(_colName);
           }
           break;
         case BIG_DECIMAL:
@@ -432,8 +475,12 @@ public class RowBasedBlockValSet implements BlockValSet {
       } else if (storedValue instanceof String[]) {
         String[] stringArray = (String[]) storedValue;
         values[i] = new int[stringArray.length];
-        for (int j = 0; j < stringArray.length; j++) {
-          values[i][j] = Integer.parseInt(stringArray[j]);
+        try {
+          for (int j = 0; j < stringArray.length; j++) {
+            values[i][j] = Integer.parseInt(stringArray[j]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
@@ -472,8 +519,12 @@ public class RowBasedBlockValSet implements BlockValSet {
       } else if (storedValue instanceof String[]) {
         String[] stringArray = (String[]) storedValue;
         values[i] = new long[stringArray.length];
-        for (int j = 0; j < stringArray.length; j++) {
-          values[i][j] = Long.parseLong(stringArray[j]);
+        try {
+          for (int j = 0; j < stringArray.length; j++) {
+            values[i][j] = Long.parseLong(stringArray[j]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
@@ -512,8 +563,12 @@ public class RowBasedBlockValSet implements BlockValSet {
       } else if (storedValue instanceof String[]) {
         String[] stringArray = (String[]) storedValue;
         values[i] = new float[stringArray.length];
-        for (int j = 0; j < stringArray.length; j++) {
-          values[i][j] = Float.parseFloat(stringArray[j]);
+        try {
+          for (int j = 0; j < stringArray.length; j++) {
+            values[i][j] = Float.parseFloat(stringArray[j]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
@@ -552,8 +607,12 @@ public class RowBasedBlockValSet implements BlockValSet {
       } else if (storedValue instanceof String[]) {
         String[] stringArray = (String[]) storedValue;
         values[i] = new double[stringArray.length];
-        for (int j = 0; j < stringArray.length; j++) {
-          values[i][j] = Double.parseDouble(stringArray[j]);
+        try {
+          for (int j = 0; j < stringArray.length; j++) {
+            values[i][j] = Double.parseDouble(stringArray[j]);
+          }
+        } catch (RuntimeException re) {
+          throw PinotRuntimeException.create(re).withColumnName(_colName);
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
