@@ -61,6 +61,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.ServerExecutionInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -635,15 +636,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
-  private Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap(String tableNameWithType,
+  private Map<ServerInstance, ServerExecutionInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    Map<ServerInstance, ServerExecutionInfo> merged = new HashMap<>();
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair =
-            merged.computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), new ArrayList<>()));
-        pair.getLeft().add(entry.getKey());
+        ServerExecutionInfo executionInfo =
+            merged.computeIfAbsent(serverInstance, k -> new ServerExecutionInfo(new ArrayList<>(), new ArrayList<>()));
+        executionInfo.getSegmentList().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
@@ -652,12 +653,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair = merged.get(serverInstance);
+        ServerExecutionInfo executionInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
-        if (pair != null) {
-          pair.getRight().add(entry.getKey());
+        if (executionInfo != null) {
+          executionInfo.getOptionalSegmentList().add(entry.getKey());
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.

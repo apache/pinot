@@ -58,7 +58,7 @@ public class TableScanVisitor {
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
       for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
-        List<String> segments = entry.getValue().getLeft();
+        List<String> segments = entry.getValue().getSegmentList();
         context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
             .put(sfpNode.getId(), segments);
       }
