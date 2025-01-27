@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.calcite.rel.hint;
 
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.hint.RelHint;
@@ -83,6 +86,9 @@ public class PinotHintOptions {
     // "lookup" can be used when the right table is a dimension table replicated to all workers
     public static final String LOOKUP_JOIN_STRATEGY = "lookup";
 
+    public static final String LEFT_DISTRIBUTION_TYPE = "left_distribution_type";
+    public static final String RIGHT_DISTRIBUTION_TYPE = "right_distribution_type";
+
     /**
      * Max rows allowed to build the right table hash collection.
      */
@@ -105,19 +111,71 @@ public class PinotHintOptions {
      */
     public static final String APPEND_DISTINCT_TO_SEMI_JOIN_PROJECT = "append_distinct_to_semi_join_project";
 
+    @Nullable
+    public static Map<String, String> getJoinHintOptions(Join join) {
+      return PinotHintStrategyTable.getHintOptions(join.getHints(), JOIN_HINT_OPTIONS);
+    }
+
+    @Nullable
+    public static String getJoinStrategyHint(Join join) {
+      return PinotHintStrategyTable.getHintOption(join.getHints(), JOIN_HINT_OPTIONS, JOIN_STRATEGY);
+    }
+
     // TODO: Consider adding a Join implementation with join strategy.
     public static boolean useLookupJoinStrategy(Join join) {
-      return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(
-          PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-              PinotHintOptions.JoinHintOptions.JOIN_STRATEGY));
+      return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(getJoinStrategyHint(join));
+    }
+
+    @Nullable
+    public static DistributionType getLeftDistributionType(Map<String, String> joinHintOptions) {
+      return DistributionType.fromHint(joinHintOptions.get(LEFT_DISTRIBUTION_TYPE));
+    }
+
+    @Nullable
+    public static DistributionType getRightDistributionType(Map<String, String> joinHintOptions) {
+      return DistributionType.fromHint(joinHintOptions.get(RIGHT_DISTRIBUTION_TYPE));
+    }
+  }
+
+  /**
+   * Similar to {@link RelDistribution.Type}, it contains the distribution types to be used to shuffle data.
+   */
+  public enum DistributionType {
+    LOCAL,      // Distribute data locally without ser/de
+    HASH,       // Distribute data by hash partitioning
+    BROADCAST,  // Distribute data by broadcasting the data to all workers
+    RANDOM;     // Distribute data randomly
+
+    public static final String LOCAL_HINT = "local";
+    public static final String HASH_HINT = "hash";
+    public static final String BROADCAST_HINT = "broadcast";
+    public static final String RANDOM_HINT = "random";
+
+    @Nullable
+    public static DistributionType fromHint(@Nullable String hint) {
+      if (hint == null) {
+        return null;
+      }
+      if (hint.equalsIgnoreCase(LOCAL_HINT)) {
+        return LOCAL;
+      }
+      if (hint.equalsIgnoreCase(HASH_HINT)) {
+        return HASH;
+      }
+      if (hint.equalsIgnoreCase(BROADCAST_HINT)) {
+        return BROADCAST;
+      }
+      if (hint.equalsIgnoreCase(RANDOM_HINT)) {
+        return RANDOM;
+      }
+      throw new IllegalArgumentException("Unsupported distribution type hint: " + hint);
     }
   }
 
   public static class TableHintOptions {
     /**
-     * Indicates how many partitions the table must be partitioned by.
-     * This must be equal to the partition count of the table in
-     * {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     * Indicates the key to partition the table by.
+     * This must be equal to the keyset in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
      */
     public static final String PARTITION_KEY = "partition_key";
     /**
@@ -132,7 +190,6 @@ public class PinotHintOptions {
     public static final String PARTITION_SIZE = "partition_size";
     /**
      * The number of workers per partition.
-     *
      * How many threads to use in the following stage after partition is joined.
      * When partition info is set, each partition is processed as a separate query in the leaf stage.
      */

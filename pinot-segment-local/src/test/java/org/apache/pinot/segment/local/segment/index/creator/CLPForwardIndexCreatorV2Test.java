@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
@@ -46,7 +47,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class CLPForwardIndexCreatorV2Test {
+public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheckRule {
   private static final String COLUMN_NAME = "column1";
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), CLPForwardIndexCreatorV2Test.class.getSimpleName());
@@ -76,6 +77,7 @@ public class CLPForwardIndexCreatorV2Test {
   @AfterClass
   public void tearDown()
       throws IOException {
+    _memoryManager.close();
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
   }
 
@@ -83,49 +85,51 @@ public class CLPForwardIndexCreatorV2Test {
   public void testCLPWriter()
       throws IOException {
     // Create and ingest into a clp mutable forward indexes
-    CLPMutableForwardIndexV2 clpMutableForwardIndexV2 = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager);
-    int rawSizeBytes = 0;
-    int maxLength = 0;
-    for (int i = 0; i < _logMessages.size(); i++) {
-      String logMessage = _logMessages.get(i);
-      clpMutableForwardIndexV2.setString(i, logMessage);
-      rawSizeBytes += logMessage.length();
-      maxLength = Math.max(maxLength, logMessage.length());
+    try (
+        CLPMutableForwardIndexV2 clpMutableForwardIndexV2 = new CLPMutableForwardIndexV2(COLUMN_NAME, _memoryManager)) {
+      int rawSizeBytes = 0;
+      int maxLength = 0;
+      for (int i = 0; i < _logMessages.size(); i++) {
+        String logMessage = _logMessages.get(i);
+        clpMutableForwardIndexV2.setString(i, logMessage);
+        rawSizeBytes += logMessage.length();
+        maxLength = Math.max(maxLength, logMessage.length());
+      }
+
+      // LZ4 compression type
+      long rawStringFwdIndexSizeLZ4 = createStringRawForwardIndex(ChunkCompressionType.LZ4, maxLength);
+      long clpFwdIndexSizeLZ4 =
+          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.LZ4);
+      // For LZ4 compression:
+      // 1. CLP raw forward index should achieve at least 40x compression
+      // 2. at least 25% smaller file size compared to standard raw forward index with LZ4 compression
+      Assert.assertTrue((float) rawSizeBytes / clpFwdIndexSizeLZ4 >= 40);
+      Assert.assertTrue((float) rawStringFwdIndexSizeLZ4 / clpFwdIndexSizeLZ4 >= 0.25);
+
+      // ZSTD compression type
+      long rawStringFwdIndexSizeZSTD = createStringRawForwardIndex(ChunkCompressionType.ZSTANDARD, maxLength);
+      long clpFwdIndexSizeZSTD =
+          createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD);
+      // For ZSTD compression
+      // 1. CLP raw forward index should achieve at least 66x compression
+      // 2. at least 19% smaller file size compared to standard raw forward index with ZSTD compression
+      Assert.assertTrue((float) rawSizeBytes / clpFwdIndexSizeZSTD >= 66);
+      Assert.assertTrue((float) rawStringFwdIndexSizeZSTD / clpFwdIndexSizeZSTD >= 0.19);
     }
-
-    // LZ4 compression type
-    long rawStringFwdIndexSizeLZ4 = createStringRawForwardIndex(ChunkCompressionType.LZ4, maxLength);
-    long clpFwdIndexSizeLZ4 =
-        createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.LZ4);
-    // For LZ4 compression:
-    // 1. CLP raw forward index should achieve at least 40x compression
-    // 2. at least 25% smaller file size compared to standard raw forward index with LZ4 compression
-    Assert.assertTrue((float) rawSizeBytes / clpFwdIndexSizeLZ4 >= 40);
-    Assert.assertTrue((float) rawStringFwdIndexSizeLZ4 / clpFwdIndexSizeLZ4 >= 0.25);
-
-    // ZSTD compression type
-    long rawStringFwdIndexSizeZSTD = createStringRawForwardIndex(ChunkCompressionType.ZSTANDARD, maxLength);
-    long clpFwdIndexSizeZSTD =
-        createAndValidateClpImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD);
-    // For ZSTD compression
-    // 1. CLP raw forward index should achieve at least 66x compression
-    // 2. at least 19% smaller file size compared to standard raw forward index with ZSTD compression
-    Assert.assertTrue((float) rawSizeBytes / clpFwdIndexSizeZSTD >= 66);
-    Assert.assertTrue((float) rawStringFwdIndexSizeZSTD / clpFwdIndexSizeZSTD >= 0.19);
   }
 
   private long createStringRawForwardIndex(ChunkCompressionType chunkCompressionType, int maxLength)
       throws IOException {
     // Create a raw string immutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
-    SingleValueVarByteRawIndexCreator index =
+    try (SingleValueVarByteRawIndexCreator index =
         new SingleValueVarByteRawIndexCreator(TEMP_DIR, chunkCompressionType, COLUMN_NAME, _logMessages.size(),
-            FieldSpec.DataType.STRING, maxLength);
-    for (String logMessage : _logMessages) {
-      index.putString(logMessage);
+            FieldSpec.DataType.STRING, maxLength)) {
+      for (String logMessage : _logMessages) {
+        index.putString(logMessage);
+      }
+      index.seal();
     }
-    index.seal();
-    index.close();
 
     File indexFile = new File(TEMP_DIR, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     return indexFile.length();
@@ -138,11 +142,16 @@ public class CLPForwardIndexCreatorV2Test {
 
     // Read from immutable forward index and validate the content
     File indexFile = new File(TEMP_DIR, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
-    CLPForwardIndexReaderV2 clpForwardIndexReaderV2 = new CLPForwardIndexReaderV2(pinotDataBuffer, _logMessages.size());
-    CLPForwardIndexReaderV2.CLPReaderContext clpForwardIndexReaderV2Context = clpForwardIndexReaderV2.createContext();
-    for (int i = 0; i < _logMessages.size(); i++) {
-      Assert.assertEquals(clpForwardIndexReaderV2.getString(i, clpForwardIndexReaderV2Context), _logMessages.get(i));
+    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+      CLPForwardIndexReaderV2 clpForwardIndexReaderV2 =
+          new CLPForwardIndexReaderV2(pinotDataBuffer, _logMessages.size());
+      try (CLPForwardIndexReaderV2.CLPReaderContext clpForwardIndexReaderV2Context =
+          clpForwardIndexReaderV2.createContext()) {
+        for (int i = 0; i < _logMessages.size(); i++) {
+          Assert.assertEquals(clpForwardIndexReaderV2.getString(i, clpForwardIndexReaderV2Context),
+              _logMessages.get(i));
+        }
+      }
     }
 
     return indexSize;

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.realtime.impl.dictionary;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -33,7 +34,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
-public class MultiValueDictionaryTest {
+public class MultiValueDictionaryTest implements PinotBuffersAfterClassCheckRule {
   private static final int NROWS = 1000;
   private static final int MAX_N_VALUES = 1000;
   private PinotDataBufferMemoryManager _memoryManager;
@@ -52,10 +53,11 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithDictionary() {
     long seed = System.nanoTime();
+
     try (LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
+        DirectMemoryManager memManager = new DirectMemoryManager("test");
         FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
-            true, FieldSpec.DataType.INT)) {
+            NROWS / 3, Integer.BYTES, memManager, "indexer", true, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer and dictionary
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -89,9 +91,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawInt() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-            NROWS / 3, Integer.BYTES, new DirectMemoryManager("test"), "indexer",
-            false, FieldSpec.DataType.INT)) {
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Integer.BYTES, memManager, "indexer", false, FieldSpec.DataType.INT)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -122,9 +125,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawLong() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-        NROWS / 3, Long.BYTES, new DirectMemoryManager("test"), "indexer",
-        false, FieldSpec.DataType.LONG)) {
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Long.BYTES, memManager, "indexer", false, FieldSpec.DataType.LONG)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -155,9 +159,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawFloat() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-        NROWS / 3, Float.BYTES, new DirectMemoryManager("test"), "indexer",
-        false, FieldSpec.DataType.FLOAT)) {
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Float.BYTES, memManager, "indexer", false, FieldSpec.DataType.FLOAT)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -188,9 +193,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawDouble() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-        NROWS / 3, Double.BYTES, new DirectMemoryManager("test"), "indexer",
-        false, FieldSpec.DataType.DOUBLE)) {
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, Double.BYTES, memManager, "indexer", false, FieldSpec.DataType.DOUBLE)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -221,9 +227,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawString() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-        NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
-        false, FieldSpec.DataType.STRING)) {
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, 24, memManager, "indexer", false, FieldSpec.DataType.STRING)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {
@@ -251,8 +258,10 @@ public class MultiValueDictionaryTest {
   @Test
   public void testMultiValueIndexingWithRawByte() {
     long seed = System.nanoTime();
-    try (FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
-        NROWS / 3, 24, new DirectMemoryManager("test"), "indexer",
+
+    try (DirectMemoryManager memManager = new DirectMemoryManager("test");
+        FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
+            NROWS / 3, 24, memManager, "indexer",
         false, FieldSpec.DataType.BYTES)) {
       // Insert rows into the indexer
       Random random = new Random(seed);

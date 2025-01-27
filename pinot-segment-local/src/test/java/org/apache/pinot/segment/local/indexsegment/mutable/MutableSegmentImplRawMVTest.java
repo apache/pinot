@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -60,7 +61,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-public class MutableSegmentImplRawMVTest {
+public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckRule {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplRawMVTest");
 
@@ -262,6 +263,8 @@ public class MutableSegmentImplRawMVTest {
 
   @AfterClass
   public void tearDown() {
+    _mutableSegmentImpl.destroy();
+    _immutableSegment.destroy();
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 }
