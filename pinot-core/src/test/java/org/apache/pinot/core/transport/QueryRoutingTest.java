@@ -34,7 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
@@ -65,9 +65,9 @@ public class QueryRoutingTest {
       SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
-  private static final Map<ServerInstance, ServerExecutionInfo> ROUTING_TABLE =
+  private static final Map<ServerInstance, ServerRouteInfo> ROUTING_TABLE =
       Collections.singletonMap(SERVER_INSTANCE,
-          new ServerExecutionInfo(Collections.emptyList(), Collections.emptyList()));
+          new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
   private QueryRouter _queryRouter;
   private ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -481,9 +481,9 @@ public class QueryRoutingTest {
         serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     ServerRoutingInstance serverRoutingInstance2 =
         serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-    Map<ServerInstance, ServerExecutionInfo> routingTable =
-        Map.of(serverInstance1, new ServerExecutionInfo(Collections.emptyList(), Collections.emptyList()),
-            serverInstance2, new ServerExecutionInfo(Collections.emptyList(), Collections.emptyList()));
+    Map<ServerInstance, ServerRouteInfo> routingTable =
+        Map.of(serverInstance1, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()),
+            serverInstance2, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
     long requestId = 123;
     DataSchema dataSchema =

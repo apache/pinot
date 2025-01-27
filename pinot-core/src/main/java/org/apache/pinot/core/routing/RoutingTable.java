@@ -28,18 +28,18 @@ public class RoutingTable {
   // the newly created consuming segments. Such segments were simply skipped by brokers at query routing time, but that
   // had caused wrong query results, particularly for upsert tables. Instead, we should pass such segments to servers
   // and let them decide how to handle them, e.g. skip them upon issues or include them for better query results.
-  private final Map<ServerInstance, ServerExecutionInfo> _serverInstanceToSegmentsMap;
+  private final Map<ServerInstance, ServerRouteInfo> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegments;
 
-  public RoutingTable(Map<ServerInstance, ServerExecutionInfo> serverInstanceToSegmentsMap,
+  public RoutingTable(Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap,
       List<String> unavailableSegments, int numPrunedSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
     _numPrunedSegments = numPrunedSegments;
   }
 
-  public Map<ServerInstance, ServerExecutionInfo> getServerInstanceToSegmentsMap() {
+  public Map<ServerInstance, ServerRouteInfo> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
   }
 

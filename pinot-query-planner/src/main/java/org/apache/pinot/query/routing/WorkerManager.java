@@ -36,7 +36,7 @@ import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -332,8 +332,8 @@ public class WorkerManager {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       // for each server instance, attach all table types and their associated segment list.
-      Map<ServerInstance, ServerExecutionInfo> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, ServerExecutionInfo> serverEntry : segmentsMap.entrySet()) {
+      Map<ServerInstance, ServerRouteInfo> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
         Map<String, List<String>> tableTypeToSegmentListMap =
             serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
         // TODO: support optional segments for multi-stage engine.

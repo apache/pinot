@@ -55,7 +55,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -157,11 +157,11 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, ServerExecutionInfo>> getRoutingTableWithOptionalSegments(
+  public Map<String, Map<ServerInstance, ServerRouteInfo>> getRoutingTableWithOptionalSegments(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Map<String, Map<ServerInstance, ServerExecutionInfo>> result = new TreeMap<>();
+    Map<String, Map<ServerInstance, ServerRouteInfo>> result = new TreeMap<>();
     getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
         routingTable.getServerInstanceToSegmentsMap()));
     if (!result.isEmpty()) {
@@ -192,7 +192,7 @@ public class PinotBrokerDebug {
   }
 
   private static Map<ServerInstance, List<String>> removeOptionalSegments(
-      Map<ServerInstance, ServerExecutionInfo> serverInstanceToSegmentsMap) {
+      Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap) {
     Map<ServerInstance, List<String>> ret = new HashMap<>();
     serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, v.getSegmentList()));
     return ret;
@@ -231,7 +231,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, ServerExecutionInfo> getRoutingTableForQueryWithOptionalSegments(
+  public Map<ServerInstance, ServerRouteInfo> getRoutingTableForQueryWithOptionalSegments(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);

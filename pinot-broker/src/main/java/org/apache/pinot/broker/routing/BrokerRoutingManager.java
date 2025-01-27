@@ -61,7 +61,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -636,14 +636,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
-  private Map<ServerInstance, ServerExecutionInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
+  private Map<ServerInstance, ServerRouteInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, ServerExecutionInfo> merged = new HashMap<>();
+    Map<ServerInstance, ServerRouteInfo> merged = new HashMap<>();
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        ServerExecutionInfo executionInfo =
-            merged.computeIfAbsent(serverInstance, k -> new ServerExecutionInfo(new ArrayList<>(), new ArrayList<>()));
+        ServerRouteInfo executionInfo =
+            merged.computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), new ArrayList<>()));
         executionInfo.getSegmentList().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
@@ -653,7 +653,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        ServerExecutionInfo executionInfo = merged.get(serverInstance);
+        ServerRouteInfo executionInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments

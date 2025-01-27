@@ -42,7 +42,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
@@ -99,9 +99,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerExecutionInfo> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerExecutionInfo> realtimeRoutingTable, long timeoutMs,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;

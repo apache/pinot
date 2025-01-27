@@ -24,7 +24,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics
 import org.apache.pinot.common.request.BrokerRequest
 import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import org.apache.pinot.connector.spark.common.{Logging, PinotDataSourceReadOptions, PinotException}
-import org.apache.pinot.core.routing.ServerExecutionInfo
+import org.apache.pinot.core.routing.ServerRouteInfo
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager
 import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance}
 import org.apache.pinot.spi.config.table.TableType
@@ -93,7 +93,7 @@ private[reader] class PinotServerDataFetcher(
     dataTables.filter(_.getNumberOfRows > 0)
   }
 
-  private def createRoutingTableForRequest(): JMap[ServerInstance, ServerExecutionInfo] = {
+  private def createRoutingTableForRequest(): JMap[ServerInstance, ServerRouteInfo] = {
     val nullZkId: String = null
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
@@ -101,15 +101,15 @@ private[reader] class PinotServerDataFetcher(
     // TODO: support netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
-      serverInstance -> new ServerExecutionInfo(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
+      serverInstance -> new ServerRouteInfo(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
     ).asJava
   }
 
   private def submitRequestToPinotServer(
-      offlineBrokerRequest: BrokerRequest,
-      offlineRoutingTable: JMap[ServerInstance, ServerExecutionInfo],
-      realtimeBrokerRequest: BrokerRequest,
-      realtimeRoutingTable: JMap[ServerInstance, ServerExecutionInfo]): AsyncQueryResponse = {
+                                          offlineBrokerRequest: BrokerRequest,
+                                          offlineRoutingTable: JMap[ServerInstance, ServerRouteInfo],
+                                          realtimeBrokerRequest: BrokerRequest,
+                                          realtimeRoutingTable: JMap[ServerInstance, ServerRouteInfo]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,

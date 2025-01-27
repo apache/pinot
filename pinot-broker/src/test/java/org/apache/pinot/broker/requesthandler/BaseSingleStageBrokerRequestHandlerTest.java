@@ -36,7 +36,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -168,7 +168,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
-        new ServerExecutionInfo(List.of("segment01"), List.of())));
+        new ServerRouteInfo(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -194,9 +194,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
               BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, ServerExecutionInfo> offlineRoutingTable,
+              @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, ServerExecutionInfo> realtimeRoutingTable, long timeoutMs,
+              @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
               ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;

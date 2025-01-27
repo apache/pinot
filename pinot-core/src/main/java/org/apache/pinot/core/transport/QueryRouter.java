@@ -34,7 +34,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.core.routing.ServerExecutionInfo;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -88,9 +88,9 @@ public class QueryRouter {
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
       @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerExecutionInfo> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerExecutionInfo> realtimeRoutingTable, long timeoutMs) {
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
@@ -103,7 +103,7 @@ public class QueryRouter {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, ServerExecutionInfo> entry : offlineRoutingTable.entrySet()) {
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : offlineRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
@@ -112,7 +112,7 @@ public class QueryRouter {
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, ServerExecutionInfo> entry : realtimeRoutingTable.entrySet()) {
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : realtimeRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
         InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
@@ -212,7 +212,7 @@ public class QueryRouter {
   }
 
   private InstanceRequest getInstanceRequest(long requestId, BrokerRequest brokerRequest,
-      ServerExecutionInfo segments) {
+      ServerRouteInfo segments) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setQuery(brokerRequest);

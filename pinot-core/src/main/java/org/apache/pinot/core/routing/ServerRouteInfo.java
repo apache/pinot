@@ -23,21 +23,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Class representing the execution information for a server.
+ * Class representing the route information for a server.
  * It contains the list of segments and optional segments assigned to the server.
  */
-public class ServerExecutionInfo {
+public class ServerRouteInfo {
   private final List<String> _segmentList;
   private final List<String> _optionalSegmentList;
 
   /**
-   * Constructor for ServerExecutionInfo.
+   * Constructor for ServerRouteInfo.
    *
    * @param segmentList List of segments assigned to the server.
    * @param optionalSegmentList List of optional segments assigned to the server.
    */
   @JsonCreator
-  public ServerExecutionInfo(
+  public ServerRouteInfo(
       @JsonProperty("segmentList") List<String> segmentList,
       @JsonProperty("optionalSegmentList") List<String> optionalSegmentList) {
     _segmentList = segmentList;
