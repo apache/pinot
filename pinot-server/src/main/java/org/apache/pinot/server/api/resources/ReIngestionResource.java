@@ -40,12 +40,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -112,213 +114,242 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class ReIngestionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReIngestionResource.class);
-  public static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
-  //TODO: Maximum number of concurrent re-ingestions allowed should be configurable
-  private static final int MAX_PARALLEL_REINGESTIONS = 10;
 
-  // Map to track ongoing ingestion per segment
-  private static final ConcurrentHashMap<String, AtomicBoolean> SEGMENT_INGESTION_MAP = new ConcurrentHashMap<>();
+  //TODO: Make this configurable
+  private static final int MAX_PARALLEL_REINGESTIONS = 8;
 
-  // Semaphore to enforce global concurrency limit
-  private static final Semaphore REINGESTION_SEMAPHORE = new Semaphore(MAX_PARALLEL_REINGESTIONS);
+  // Tracks if a particular segment is currently being re-ingested
+  private static final ConcurrentHashMap<String, AtomicBoolean>
+      SEGMENT_INGESTION_MAP = new ConcurrentHashMap<>();
+
+  // Executor for asynchronous re-ingestion
+  private static final ExecutorService REINGESTION_EXECUTOR =
+      Executors.newFixedThreadPool(MAX_PARALLEL_REINGESTIONS);
+
+  // Keep track of jobs by jobId => job info
+  private static final ConcurrentHashMap<String, ReIngestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
 
   @Inject
   private ServerInstance _serverInstance;
+
+  /**
+   * Simple data class to hold job details.
+   */
+  private static class ReIngestionJob {
+    private final String _jobId;
+    private final String _tableNameWithType;
+    private final String _segmentName;
+    private final long _startTimeMs;
+
+    ReIngestionJob(String jobId, String tableNameWithType, String segmentName) {
+      _jobId = jobId;
+      _tableNameWithType = tableNameWithType;
+      _segmentName = segmentName;
+      _startTimeMs = System.currentTimeMillis();
+    }
+
+    public String getJobId() {
+      return _jobId;
+    }
+
+    public String getTableNameWithType() {
+      return _tableNameWithType;
+    }
+
+    public String getSegmentName() {
+      return _segmentName;
+    }
+
+    public long getStartTimeMs() {
+      return _startTimeMs;
+    }
+  }
+
+  /**
+   * New API to get all running re-ingestion jobs.
+   */
+  @GET
+  @Path("/reingestSegment/jobs")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get all running re-ingestion jobs along with job IDs")
+  public Response getAllRunningReingestionJobs() {
+    // Filter only the jobs still marked as running
+    List<ReIngestionJob> runningJobs = new ArrayList<>(RUNNING_JOBS.values());
+    return Response.ok(runningJobs).build();
+  }
 
   @POST
   @Path("/reingestSegment")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Re-ingest segment", notes = "Re-ingest data for a segment from startOffset to endOffset and "
-      + "upload the segment")
+  @ApiOperation(value = "Re-ingest segment asynchronously", notes = "Returns a jobId immediately; ingestion runs in "
+      + "background.")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = ReIngestionResponse.class), @ApiResponse(code = 500,
-      message = "Internal server error", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success", response = ReIngestionResponse.class),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
   })
   public Response reIngestSegment(ReIngestionRequest request) {
-    try {
-      String tableNameWithType = request.getTableNameWithType();
-      String segmentName = request.getSegmentName();
+    String tableNameWithType = request.getTableNameWithType();
+    String segmentName = request.getSegmentName();
 
-      // Try to acquire a permit from the semaphore to ensure we don't exceed max concurrency
-      if (!REINGESTION_SEMAPHORE.tryAcquire()) {
-        return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-            .entity("Too many re-ingestions in progress. Please try again later.")
-            .build();
-      }
+    if (RUNNING_JOBS.size() >= MAX_PARALLEL_REINGESTIONS) {
+      return Response.status(Response.Status.TOO_MANY_REQUESTS)
+          .entity("Reingestion jobs parallel limit " + MAX_PARALLEL_REINGESTIONS + " reached.").build();
+    }
 
-      // Check if the segment is already being re-ingested
-      AtomicBoolean isIngesting = SEGMENT_INGESTION_MAP.computeIfAbsent(segmentName, k -> new AtomicBoolean(false));
-      if (!isIngesting.compareAndSet(false, true)) {
-        // The segment is already being ingested
-        REINGESTION_SEMAPHORE.release();
-        return Response.status(Response.Status.CONFLICT)
-            .entity("Re-ingestion for segment: " + segmentName + " is already in progress.")
-            .build();
-      }
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
 
-      InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-      if (instanceDataManager == null) {
-        throw new WebApplicationException(new RuntimeException("Invalid server initialization"),
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
+    if (tableDataManager == null) {
+      throw new WebApplicationException("Table data manager not found for table: " + tableNameWithType,
+          Response.Status.NOT_FOUND);
+    }
 
-      TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
-      if (tableDataManager == null) {
-        throw new WebApplicationException("Table data manager not found for table: " + tableNameWithType,
-            Response.Status.NOT_FOUND);
-      }
+    IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();
+    LOGGER.info("Executing re-ingestion for table: {}, segment: {}", tableNameWithType, segmentName);
 
-      IndexLoadingConfig indexLoadingConfig = tableDataManager.fetchIndexLoadingConfig();
-      LOGGER.info("Executing re-ingestion for table: {}, segment: {}", tableNameWithType, segmentName);
+    // Get TableConfig, Schema, ZK metadata
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    if (tableConfig == null) {
+      throw new WebApplicationException("Table config not found for table: " + tableNameWithType,
+          Response.Status.NOT_FOUND);
+    }
+    Schema schema = indexLoadingConfig.getSchema();
+    if (schema == null) {
+      throw new WebApplicationException("Schema not found for table: " + tableNameWithType,
+          Response.Status.NOT_FOUND);
+    }
 
-      // Get TableConfig and Schema
-      TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-      if (tableConfig == null) {
-        throw new WebApplicationException("Table config not found for table: " + tableNameWithType,
-            Response.Status.NOT_FOUND);
-      }
+    SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segmentName);
+    if (segmentZKMetadata == null) {
+      throw new WebApplicationException("Segment metadata not found for segment: " + segmentName,
+          Response.Status.NOT_FOUND);
+    }
 
-      Schema schema = indexLoadingConfig.getSchema();
-      if (schema == null) {
-        throw new WebApplicationException("Schema not found for table: " + tableNameWithType,
-            Response.Status.NOT_FOUND);
-      }
+    // Grab start/end offsets
+    String startOffsetStr = segmentZKMetadata.getStartOffset();
+    String endOffsetStr = segmentZKMetadata.getEndOffset();
+    if (startOffsetStr == null || endOffsetStr == null) {
+      throw new WebApplicationException("Null start/end offset for segment: " + segmentName,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
 
-      // Fetch SegmentZKMetadata
-      SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segmentName);
-      if (segmentZKMetadata == null) {
-        throw new WebApplicationException("Segment metadata not found for segment: " + segmentName,
-            Response.Status.NOT_FOUND);
-      }
+    // Check if this segment is already being re-ingested
+    AtomicBoolean isIngesting = SEGMENT_INGESTION_MAP.computeIfAbsent(segmentName, k -> new AtomicBoolean(false));
+    if (!isIngesting.compareAndSet(false, true)) {
+      return Response.status(Response.Status.CONFLICT)
+          .entity("Re-ingestion for segment: " + segmentName + " is already in progress.")
+          .build();
+    }
 
-      // Get startOffset, endOffset, partitionGroupId
-      String startOffsetStr = segmentZKMetadata.getStartOffset();
-      String endOffsetStr = segmentZKMetadata.getEndOffset();
+    // Generate a jobId for tracking
+    String jobId = UUID.randomUUID().toString();
+    ReIngestionJob job = new ReIngestionJob(jobId, tableNameWithType, segmentName);
+    RUNNING_JOBS.put(jobId, job);
 
-      if (startOffsetStr == null || endOffsetStr == null) {
-        return Response.serverError().entity("Start offset or end offset is null for segment: " + segmentName).build();
-      }
+    // Send immediate success response with jobId
+    ReIngestionResponse immediateResponse = new ReIngestionResponse(
+        "Re-ingestion job submitted successfully with jobId: " + jobId);
+    Response response = Response.ok(immediateResponse).build();
 
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      int partitionGroupId = llcSegmentName.getPartitionGroupId();
-
-      Map<String, String> streamConfigMap;
+    // Kick off the actual work asynchronously
+    REINGESTION_EXECUTOR.submit(() -> {
       try {
-        streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        int partitionGroupId = llcSegmentName.getPartitionGroupId();
+
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
+        StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+
+        SimpleRealtimeSegmentDataManager manager = new SimpleRealtimeSegmentDataManager(
+            segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata, tableConfig, schema,
+            indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, _serverInstance.getServerMetrics());
+
+        doReIngestSegment(manager, segmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
       } catch (Exception e) {
-        return Response.serverError().entity("Failed to get stream config for table: " + tableNameWithType).build();
-      }
-
-      StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-
-      // Set up directories
-      File resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
-      File resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());
-
-      if (!resourceTmpDir.exists()) {
-        resourceTmpDir.mkdirs();
-      }
-      if (!resourceDataDir.exists()) {
-        resourceDataDir.mkdirs();
-      }
-
-      LOGGER.info("Starting SimpleRealtimeSegmentDataManager...");
-      // Instantiate SimpleRealtimeSegmentDataManager
-      SimpleRealtimeSegmentDataManager manager =
-          new SimpleRealtimeSegmentDataManager(segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata,
-              tableConfig, schema, indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, resourceTmpDir,
-              resourceDataDir, _serverInstance.getServerMetrics());
-
-      try {
-
-        manager.startConsumption();
-
-        waitForCondition((Void) -> manager.isDoneConsuming(), 1000, 300000, 0);
-
-        manager.stopConsumption();
-
-        // After ingestion is complete, get the segment
-        if (!manager.isSuccess()) {
-          throw new Exception("Consumer failed to reingest data: " + manager.getConsumptionException());
-        }
-
-        LOGGER.info("Starting build for segment {}", segmentName);
-        SimpleRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
-            manager.buildSegmentInternal();
-
-        // Get the segment directory
-        File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
-
-        if (segmentTarFile == null) {
-          throw new Exception("Failed to build segment: " + segmentName);
-        }
-
-        ServerSegmentCompletionProtocolHandler protocolHandler =
-            new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), tableNameWithType);
-
-        AuthProvider authProvider = protocolHandler.getAuthProvider();
-        List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
-
-        String controllerUrl = getControllerUrl(tableNameWithType, protocolHandler);
-
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-        String segmentStoreUri = indexLoadingConfig.getSegmentStoreURI();
-        String destUriStr = StringUtil.join(File.separator, segmentStoreUri, rawTableName,
-            SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
-        try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
-          // copy segment to deep store
-          URI destUri = new URI(destUriStr);
-          if (pinotFS.exists(destUri)) {
-            pinotFS.delete(destUri, true);
-          }
-          pinotFS.copyFromLocalFile(segmentTarFile, destUri);
-        } catch (Exception e) {
-          throw new IOException("Failed to copy segment to deep store: " + destUriStr, e);
-        }
-
-        headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
-        pushSegmentMetadata(tableNameWithType, controllerUrl, segmentTarFile, headers, segmentName, protocolHandler);
-
-        LOGGER.info("Segment metadata pushed, waiting for segment to be uploaded");
-        // wait for segment metadata to have status as UPLOADED
-        waitForCondition((Void) -> {
-          SegmentZKMetadata zkMetadata = tableDataManager.fetchZKMetadata(segmentName);
-          if (zkMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.UPLOADED) {
-            return false;
-          }
-
-          SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-          return segmentDataManager instanceof ImmutableSegmentDataManager;
-        }, 5000, 300000, 0);
-
-        // trigger segment reset call on API
-        LOGGER.info("Triggering segment reset for uploaded segment {}", segmentName);
-        HttpClient httpClient = HttpClient.getInstance();
-        Map<String, String> headersMap = headers.stream().collect(Collectors.toMap(Header::getName, Header::getValue));
-        resetSegment(httpClient, controllerUrl, tableNameWithType, segmentName, null, headersMap);
-
-        LOGGER.info("Re-ingested Segment {} uploaded successfully", segmentName);
-      } catch (Exception e) {
-        return Response.serverError().entity("Error during re-ingestion: " + e.getMessage()).build();
+        LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
       } finally {
-        // Clean up
-        manager.offload();
-        manager.destroy();
-
-        // Delete temporary directories
-        FileUtils.deleteQuietly(resourceTmpDir);
-        FileUtils.deleteQuietly(resourceDataDir);
-
         isIngesting.set(false);
+        RUNNING_JOBS.remove(jobId);
       }
-      // Return success response
-      return Response.ok().entity(new ReIngestionResponse("Segment re-ingested and uploaded successfully")).build();
-    } catch (Exception e) {
-      LOGGER.error("Error during re-ingestion", e);
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    });
+
+    // Return immediately with the jobId
+    return response;
+  }
+
+  /**
+   * The actual re-ingestion logic, moved into a separate method for clarity.
+   * This is essentially the old synchronous logic you had in reIngestSegment.
+   */
+  private void doReIngestSegment(SimpleRealtimeSegmentDataManager manager, String segmentName, String tableNameWithType,
+      IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
+      throws Exception {
+    try {
+      manager.startConsumption();
+      waitForCondition((Void) -> manager.isDoneConsuming(), 1000, 300_000, 0);
+      manager.stopConsumption();
+
+      if (!manager.isSuccess()) {
+        throw new Exception("Consumer failed: " + manager.getConsumptionException());
+      }
+
+      LOGGER.info("Starting build for segment {}", segmentName);
+      SimpleRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
+          manager.buildSegmentInternal();
+
+      File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
+      if (segmentTarFile == null) {
+        throw new Exception("Failed to build segment: " + segmentName);
+      }
+
+      ServerSegmentCompletionProtocolHandler protocolHandler =
+          new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), tableNameWithType);
+
+      AuthProvider authProvider = protocolHandler.getAuthProvider();
+      List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
+
+      String controllerUrl = getControllerUrl(tableNameWithType, protocolHandler);
+
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      String segmentStoreUri = indexLoadingConfig.getSegmentStoreURI();
+      String destUriStr = StringUtil.join(File.separator, segmentStoreUri, rawTableName,
+          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+
+      try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
+        URI destUri = new URI(destUriStr);
+        if (pinotFS.exists(destUri)) {
+          pinotFS.delete(destUri, true);
+        }
+        pinotFS.copyFromLocalFile(segmentTarFile, destUri);
+      }
+
+      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
+      pushSegmentMetadata(tableNameWithType, controllerUrl, segmentTarFile, headers, segmentName, protocolHandler);
+
+      // Wait for segment to be uploaded
+      waitForCondition((Void) -> {
+        SegmentZKMetadata zkMetadata = tableDataManager.fetchZKMetadata(segmentName);
+        if (zkMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.UPLOADED) {
+          return false;
+        }
+        SegmentDataManager segDataManager = tableDataManager.acquireSegment(segmentName);
+        return segDataManager instanceof ImmutableSegmentDataManager;
+      }, 5000, 300_000, 0);
+
+      // Trigger segment reset
+      HttpClient httpClient = HttpClient.getInstance();
+      Map<String, String> headersMap = headers.stream()
+          .collect(Collectors.toMap(Header::getName, Header::getValue));
+      resetSegment(httpClient, controllerUrl, tableNameWithType, segmentName, null, headersMap);
+
+      LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     } finally {
-      REINGESTION_SEMAPHORE.release();
+      manager.offload();
+      manager.destroy();
     }
   }
 
@@ -355,7 +386,6 @@ public class ReIngestionResource {
       String targetInstance, Map<String, String> headers)
       throws IOException {
     try {
-      //TODO: send correct headers
       HttpClient.wrapAndThrowHttpException(httpClient.sendJsonPostRequest(
           new URI(getURLForSegmentReset(controllerVipUrl, tableNameWithType, segmentName, targetInstance)), null,
           headers));

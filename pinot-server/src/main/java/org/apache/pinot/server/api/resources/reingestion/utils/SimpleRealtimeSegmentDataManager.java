@@ -119,7 +119,7 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
   public SimpleRealtimeSegmentDataManager(String segmentName, String tableNameWithType, int partitionGroupId,
       SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Schema schema,
       IndexLoadingConfig indexLoadingConfig, StreamConfig streamConfig, String startOffsetStr, String endOffsetStr,
-      File resourceTmpDir, File resourceDataDir, ServerMetrics serverMetrics)
+      ServerMetrics serverMetrics)
       throws Exception {
 
     _segmentName = segmentName;
@@ -130,8 +130,8 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
     _schema = schema;
     _segmentStoreUriStr = indexLoadingConfig.getSegmentStoreURI();
     _streamConfig = streamConfig;
-    _resourceTmpDir = resourceTmpDir;
-    _resourceDataDir = resourceDataDir;
+    _resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
+    _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());;
     _serverMetrics = serverMetrics;
     _logger = LoggerFactory.getLogger(SimpleRealtimeSegmentDataManager.class.getName() + "_" + _segmentName);
 
@@ -140,6 +140,10 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
     _endOffset = _offsetFactory.create(endOffsetStr);
 
     String clientId = getClientId();
+
+    // Temp dirs
+    _resourceTmpDir.mkdirs();
+    _resourceDataDir.mkdirs();
 
     _consumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(clientId, _partitionGroupId);
@@ -168,7 +172,7 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
     // much more efficient in allocating buffers. It also works with empty file
     String tableDataDir = indexLoadingConfig.getInstanceDataManagerConfig() != null
         ? indexLoadingConfig.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator + _tableNameWithType
-        : resourceTmpDir.getAbsolutePath();
+        : _resourceTmpDir.getAbsolutePath();
     File statsHistoryFile = new File(tableDataDir, "segment-stats.ser");
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsHistoryFile);
 
@@ -327,6 +331,8 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
   @Override
   protected void doDestroy() {
     _realtimeSegment.destroy();
+    FileUtils.deleteQuietly(_resourceTmpDir);
+    FileUtils.deleteQuietly(_resourceDataDir);
   }
 
   @Override
