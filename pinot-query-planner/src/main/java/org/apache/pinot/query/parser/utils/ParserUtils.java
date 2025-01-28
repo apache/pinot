@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.parser.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -25,6 +26,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -53,95 +55,87 @@ public class ParserUtils {
   }
 
   /**
-   * Tries to fill an empty or not properly filled schema when no rows have been returned.
+   * Tries to fill an empty or not properly filled {@link DataSchema} when no row has been returned.
+   *
+   * Response data schema can be inaccurate or incomplete in several forms:
+   * 1. No result table at all (when all segments have been pruned on broker).
+   * 2. Data schema has all columns set to default type (STRING) (when all segments pruned on server).
    *
    * Priority is:
-   * - Types in schema provided by V2 validation for the given query.
-   * - Types in schema provided by V1 for the given table (only appliable to selection fields).
-   * - Types in response provided by V1 server (no action).
+   * - Types from multi-stage engine validation for the given query.
+   * - Types from schema for the given table (only applicable to selection fields).
+   * - Types from single-stage engine response (no action).
+   *
+   * Multi-stage engine schema will be available only if query compiles.
    */
-  public static void fillEmptyResponseSchema(
-      BrokerResponse response, TableCache tableCache, Schema schema, String database, String query
-  ) {
-    if (response == null || response.getNumRowsResultSet() > 0) {
+  public static void fillEmptyResponseSchema(BrokerResponse response, TableCache tableCache, Schema schema,
+      String database, String query) {
+    Preconditions.checkState(response.getNumRowsResultSet() == 0, "Cannot fill schema for non-empty response");
+
+    DataSchema dataSchema = response.getResultTable() != null ? response.getResultTable().getDataSchema() : null;
+
+    List<RelDataTypeField> dataTypeFields = null;
+    try {
+      QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
+      RelRoot node = queryEnvironment.getRelRootIfCanCompile(query);
+      if (node != null && node.validatedRowType != null) {
+        dataTypeFields = node.validatedRowType.getFieldList();
+      }
+    } catch (Exception ignored) {
+      // Ignored
+    }
+
+    if (dataSchema == null && dataTypeFields == null) {
+      // No schema available, nothing we can do
       return;
     }
 
-    QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
-    RelRoot node = queryEnvironment.getRelRootIfCanCompile(query);
-    DataSchema.ColumnDataType resolved;
-
-    // V1 schema info for the response can be inaccurate or incomplete in several forms:
-    // 1) No schema provided at all (when no segments have been even pruned).
-    // 2) Schema provided but all columns set to default type (STRING) (when no segments have been matched).
-    // V2 schema will be available only if query compiles.
-
-    boolean hasV1Schema = response.getResultTable() != null;
-    boolean hasV2Schema = node != null && node.validatedRowType != null;
-
-    if (hasV1Schema && hasV2Schema) {
-      // match v1 column types with v2 column types using column names
-      // if no match, rely on v1 schema based on column name
-      // if no match either, just leave it as it is
-      DataSchema responseSchema = response.getResultTable().getDataSchema();
-      List<RelDataTypeField> fields = node.validatedRowType.getFieldList();
-      for (int i = 0; i < responseSchema.size(); i++) {
-        resolved = RelToPlanNodeConverter.convertToColumnDataType(fields.get(i).getType());
-        if (resolved == null || resolved.isUnknown()) {
-          FieldSpec spec = schema.getFieldSpecFor(responseSchema.getColumnName(i));
-          try {
-            resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), false);
-          } catch (Exception e) {
-            try {
-              resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), true);
-            } catch (Exception e2) {
-              resolved = DataSchema.ColumnDataType.UNKNOWN;
-            }
-          }
-        }
-        if (resolved == null || resolved.isUnknown()) {
-          resolved = responseSchema.getColumnDataType(i);
-        }
-        responseSchema.getColumnDataTypes()[i] = resolved;
-      }
-    } else if (hasV1Schema) {
-      // match v1 column types with v1 schema columns using column names
-      // if no match, just leave it as it is
-      DataSchema responseSchema = response.getResultTable().getDataSchema();
-      for (int i = 0; i < responseSchema.size(); i++) {
-        FieldSpec spec = schema.getFieldSpecFor(responseSchema.getColumnName(i));
+    if (dataSchema == null || (dataTypeFields != null && dataSchema.size() != dataTypeFields.size())) {
+      // If data schema is not available or has different number of columns than the validated row type, we use the
+      // validated row type to populate the schema.
+      int numColumns = dataTypeFields.size();
+      String[] columnNames = new String[numColumns];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        RelDataTypeField dataTypeField = dataTypeFields.get(i);
+        columnNames[i] = dataTypeField.getName();
+        ColumnDataType columnDataType;
         try {
-          // try single value first
-          resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), true);
-        } catch (Exception e) {
-          try {
-            // fallback to multi value
-            resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), false);
-          } catch (Exception e2) {
-            resolved = DataSchema.ColumnDataType.UNKNOWN;
-          }
+          columnDataType = RelToPlanNodeConverter.convertToColumnDataType(dataTypeField.getType());
+        } catch (Exception ignored) {
+          columnDataType = ColumnDataType.UNKNOWN;
         }
-        if (resolved == null || resolved.isUnknown()) {
-          resolved = responseSchema.getColumnDataType(i);
-        }
-        responseSchema.getColumnDataTypes()[i] = resolved;
-      }
-    } else if (hasV2Schema) {
-      // trust v2 column types blindly
-      // if a type cannot be resolved, leave it as UNKNOWN
-      List<RelDataTypeField> fields = node.validatedRowType.getFieldList();
-      String[] columnNames = new String[fields.size()];
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[fields.size()];
-      for (int i = 0; i < fields.size(); i++) {
-        columnNames[i] = fields.get(i).getName();
-        resolved = RelToPlanNodeConverter.convertToColumnDataType(fields.get(i).getType());
-        if (resolved == null) {
-          resolved = DataSchema.ColumnDataType.UNKNOWN;
-        }
-        columnDataTypes[i] = resolved;
+        columnDataTypes[i] = columnDataType;
       }
       response.setResultTable(new ResultTable(new DataSchema(columnNames, columnDataTypes), List.of()));
+      return;
     }
-    // else { /* nothing else we can do */ }
+
+    // When data schema is available, try to fix the data types within it.
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
+    if (dataTypeFields != null) {
+      // Fill data type with the validated row type when it is available.
+      for (int i = 0; i < numColumns; i++) {
+        try {
+          columnDataTypes[i] = RelToPlanNodeConverter.convertToColumnDataType(dataTypeFields.get(i).getType());
+        } catch (Exception ignored) {
+          // Ignore exception and keep the type from response
+        }
+      }
+    } else {
+      // Fill data type with the schema when validated row type is not available.
+      String[] columnNames = dataSchema.getColumnNames();
+      for (int i = 0; i < numColumns; i++) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(columnNames[i]);
+        if (fieldSpec != null) {
+          try {
+            columnDataTypes[i] = ColumnDataType.fromDataType(fieldSpec.getDataType(), fieldSpec.isSingleValueField());
+          } catch (Exception ignored) {
+            // Ignore exception and keep the type from response
+          }
+        }
+      }
+    }
   }
 }
