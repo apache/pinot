@@ -65,7 +65,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SimpleSegmentMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -1065,7 +1064,7 @@ public class TablesResource {
                 segmentName), Response.Status.INTERNAL_SERVER_ERROR);
       }
       segmentZKMetadata.setDownloadUrl(segmentDownloadUrl.toString());
-      return JsonUtils.objectToPrettyString(SimpleSegmentMetadata.fromZKMetadata(segmentZKMetadata));
+      return segmentZKMetadata.toJsonString();
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
