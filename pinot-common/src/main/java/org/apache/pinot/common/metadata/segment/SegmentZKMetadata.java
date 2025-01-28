@@ -395,6 +395,16 @@ public class SegmentZKMetadata implements ZKMetadata {
     return new SegmentZKMetadata(znRecord);
   }
 
+  public void copySimpleFieldsFrom(SegmentZKMetadata segmentZKMetadata) {
+    ZNRecord znRecord = segmentZKMetadata.toZNRecord();
+    _simpleFields.clear();
+    _simpleFields.putAll(znRecord.getSimpleFields());
+
+    // Reset the cached values
+    _startTimeMsCached = false;
+    _endTimeMsCached = false;
+  }
+
   @Override
   public ZNRecord toZNRecord() {
     // Convert to TreeMap to keep the keys sorted. The de-serialized ZNRecord has simple fields stored as LinkedHashMap.

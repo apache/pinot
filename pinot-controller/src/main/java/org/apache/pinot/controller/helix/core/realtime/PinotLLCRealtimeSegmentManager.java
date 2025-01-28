@@ -1398,17 +1398,19 @@ public class PinotLLCRealtimeSegmentManager {
     //       not have the same offset).
     //       In latter case, report data loss.
     long currentTimeMs = getCurrentTimeMs();
+
+    // This is the expected segment status after completion of first of the 3 steps of the segment commit protocol
+    // The status in step one is updated to
+    // 1. DONE for normal consumption
+    // 2. COMMITTING for pauseless consumption
+    Status statusPostSegmentMetadataUpdate =
+        PauselessConsumptionUtils.isPauselessEnabled(tableConfig) ? Status.COMMITTING : Status.DONE;
+
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
       int partitionId = entry.getKey();
       SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
       String latestSegmentName = latestSegmentZKMetadata.getSegmentName();
       LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentName);
-      // This is the expected segment status after completion of first of the 3 steps of the segment commit protocol
-      // The status in step one is updated to
-      // 1. DONE for normal consumption
-      // 2. COMMITTING for pauseless consumption
-      Status statusPostSegmentMetadataUpdate =
-          PauselessConsumptionUtils.isPauselessEnabled(tableConfig) ? Status.COMMITTING : Status.DONE;
 
       Map<String, String> instanceStateMap = instanceStatesMap.get(latestSegmentName);
       if (instanceStateMap != null) {
@@ -1837,15 +1839,15 @@ public class PinotLLCRealtimeSegmentManager {
       PinotFS pinotFS)
       throws Exception {
 
-    String downloadUrl = moveSegmentFile(rawTableName, segmentName, uploadedMetadata.getDownloadUrl(), pinotFS);
-    LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, downloadUrl);
-    currentMetadata.setDownloadUrl(downloadUrl);
-
     if (uploadedMetadata.getCrc() != currentMetadata.getCrc()) {
       LOGGER.info("Updating segment {} crc in ZK to be {} from previous {}", segmentName,
           uploadedMetadata.getCrc(), currentMetadata.getCrc());
       updateSegmentMetadata(currentMetadata, uploadedMetadata);
     }
+
+    String downloadUrl = moveSegmentFile(rawTableName, segmentName, uploadedMetadata.getDownloadUrl(), pinotFS);
+    LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, downloadUrl);
+    currentMetadata.setDownloadUrl(downloadUrl);
   }
 
   private void handleLLCUpload(String segmentName, String rawTableName,
@@ -1890,21 +1892,8 @@ public class PinotLLCRealtimeSegmentManager {
     if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
       LOGGER.info("Updating additional metadata in ZK for segment {} as pauseless is enabled",
           segmentZKMetadata.getSegmentName());
-      segmentZKMetadata.setStartTime(uploadedSegmentZKMetadata.getStartTimeMs());
-      segmentZKMetadata.setEndTime(uploadedSegmentZKMetadata.getEndTimeMs());
-      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-
-      if (uploadedSegmentZKMetadata.getIndexVersion() != null) {
-        segmentZKMetadata.setIndexVersion(uploadedSegmentZKMetadata.getIndexVersion());
-      }
-      segmentZKMetadata.setTotalDocs(uploadedSegmentZKMetadata.getTotalDocs());
-      segmentZKMetadata.setPartitionMetadata(uploadedSegmentZKMetadata.getPartitionMetadata());
-
-      // set the size that can be utilized for size based segment thresholds.
-      segmentZKMetadata.setSizeInBytes(uploadedSegmentZKMetadata.getSizeInBytes());
-
-      // The segment is now ONLINE on the server, so marking its status as DONE.
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+      // Copy all the simple fields from the uploaded segment
+      segmentZKMetadata.copySimpleFieldsFrom(uploadedSegmentZKMetadata);
     }
     segmentZKMetadata.setCrc(uploadedSegmentZKMetadata.getCrc());
   }
