@@ -59,7 +59,8 @@ public class InstancePartitionsUtils {
   /**
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
-  public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager,
+  public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
+InstancePartitionsType instancePartitionsType) {
       TableConfig tableConfig, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
