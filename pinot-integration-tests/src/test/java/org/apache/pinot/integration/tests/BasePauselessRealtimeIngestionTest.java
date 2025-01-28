@@ -154,15 +154,13 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void injectFailure() {
-    _helixResourceManager.getPinotLLCRealtimeSegmentManager()
-        .enableTestFault(getFailurePoint());
+    _helixResourceManager.getRealtimeSegmentManager().enableTestFault(getFailurePoint());
     _failureEnabled = true;
   }
 
   protected void disableFailure() {
     _failureEnabled = false;
-    _helixResourceManager.getPinotLLCRealtimeSegmentManager()
-        .disableTestFault(getFailurePoint());
+    _helixResourceManager.getRealtimeSegmentManager().disableTestFault(getFailurePoint());
   }
 
   @AfterClass
