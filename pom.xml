@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.5</aws.sdk.version>
+    <aws.sdk.version>2.30.6</aws.sdk.version>
     <azure.sdk.version>1.2.30</azure.sdk.version>
     <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
@@ -250,7 +250,7 @@
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.0.1</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.2</dnsjava.version>
+    <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
     <curator.version>5.7.1</curator.version>
@@ -2454,7 +2454,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.1</version>
+            <version>10.21.2</version>
           </dependency>
         </dependencies>
         <executions>
