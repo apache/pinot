@@ -35,7 +35,7 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    return !query.isDistinct() && query.getAggregationFunctions() == null && !isTimeSeriesQuery(query);
+    return !query.isDistinct() && query.getAggregationFunctions() == null;
   }
 
   /**
@@ -51,14 +51,7 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    return query.getAggregationFunctions() != null && !isTimeSeriesQuery(query);
-  }
-
-  /**
-   * Returns {@code true} if the given query is a time series query, {@code false} otherwise.
-   */
-  public static boolean isTimeSeriesQuery(QueryContext query) {
-    return query.getTimeSeriesContext() != null;
+    return query.getAggregationFunctions() != null;
   }
 
   /**
