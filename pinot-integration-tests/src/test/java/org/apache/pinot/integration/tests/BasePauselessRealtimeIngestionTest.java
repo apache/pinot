@@ -27,8 +27,12 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -65,6 +69,11 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected abstract int getExpectedZKMetadataWithFailure();
 
   protected abstract long getCountStarResultWithFailure();
+
+  @Override
+  public BaseControllerStarter createControllerStarter() {
+    return new FailureInjectingControllerStarter();
+  }
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -154,13 +163,19 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   protected void injectFailure() {
-    _helixResourceManager.getRealtimeSegmentManager().enableTestFault(getFailurePoint());
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).enableTestFault(getFailurePoint());
+    }
     _failureEnabled = true;
   }
 
   protected void disableFailure() {
     _failureEnabled = false;
-    _helixResourceManager.getRealtimeSegmentManager().disableTestFault(getFailurePoint());
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).disableTestFault(getFailurePoint());
+    }
   }
 
   @AfterClass
