@@ -78,7 +78,7 @@ public class PauselessRealtimeTestUtils {
 
   private static void compareSegmentZkMetadata(SegmentZKMetadata segmentZKMetadata,
       SegmentZKMetadata segmentZKMetadata1) {
-    if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.DONE) {
+    if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
       return;
     }
     assertEquals(segmentZKMetadata.getStatus(), segmentZKMetadata1.getStatus());
