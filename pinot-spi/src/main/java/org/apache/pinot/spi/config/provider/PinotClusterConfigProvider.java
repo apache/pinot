@@ -21,7 +21,7 @@ package org.apache.pinot.spi.config.provider;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 
 /**
