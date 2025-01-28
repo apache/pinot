@@ -847,7 +847,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
       // this is an attempt to return more faithful information based on other sources
-      ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+      if (brokerResponse.getNumRowsResultSet() == 0) {
+        ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+      }
 
       // Set total query processing time
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
