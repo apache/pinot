@@ -89,7 +89,7 @@ public class MockRoutingManagerFactory {
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
     _tableServerSegmentsMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
-        .computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), null)).getSegmentList()
+        .computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), null)).getSegments()
         .add(segmentName);
   }
 

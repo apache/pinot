@@ -194,7 +194,7 @@ public class PinotBrokerDebug {
   private static Map<ServerInstance, List<String>> removeOptionalSegments(
       Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap) {
     Map<ServerInstance, List<String>> ret = new HashMap<>();
-    serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, v.getSegmentList()));
+    serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, v.getSegments()));
     return ret;
   }
 

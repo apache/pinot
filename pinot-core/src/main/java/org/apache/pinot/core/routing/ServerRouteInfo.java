@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
@@ -27,21 +26,20 @@ import java.util.List;
  * It contains the list of segments and optional segments assigned to the server.
  */
 public class ServerRouteInfo {
-  private final List<String> _segmentList;
-  private final List<String> _optionalSegmentList;
+  private final List<String> _segments;
+  private final List<String> _optionalSegments;
 
   /**
    * Constructor for ServerRouteInfo.
    *
-   * @param segmentList List of segments assigned to the server.
-   * @param optionalSegmentList List of optional segments assigned to the server.
+   * @param segments List of segments assigned to the server.
+   * @param optionalSegments List of optional segments assigned to the server.
    */
-  @JsonCreator
   public ServerRouteInfo(
-      @JsonProperty("segmentList") List<String> segmentList,
-      @JsonProperty("optionalSegmentList") List<String> optionalSegmentList) {
-    _segmentList = segmentList;
-    _optionalSegmentList = optionalSegmentList;
+      @JsonProperty("segmentList") List<String> segments,
+      @JsonProperty("optionalSegmentList") List<String> optionalSegments) {
+    _segments = segments;
+    _optionalSegments = optionalSegments;
   }
 
   /**
@@ -49,9 +47,8 @@ public class ServerRouteInfo {
    *
    * @return List of segments.
    */
-  @JsonProperty("segmentList")
-  public List<String> getSegmentList() {
-    return _segmentList;
+  public List<String> getSegments() {
+    return _segments;
   }
 
   /**
@@ -59,8 +56,7 @@ public class ServerRouteInfo {
    *
    * @return List of optional segments.
    */
-  @JsonProperty("optionalSegmentList")
-  public List<String> getOptionalSegmentList() {
-    return _optionalSegmentList;
+  public List<String> getOptionalSegments() {
+    return _optionalSegments;
   }
 }

@@ -111,7 +111,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     for (Map.Entry<ServerInstance, ServerRouteInfo> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
       // TODO: support optional segments for GrpcQueryServer.
-      List<String> segments = routingEntry.getValue().getSegmentList();
+      List<String> segments = routingEntry.getValue().getSegments();
       String serverHost = serverInstance.getHostname();
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.

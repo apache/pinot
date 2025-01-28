@@ -220,13 +220,13 @@ public class QueryRouter {
     if (queryOptions != null) {
       instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
     }
-    instanceRequest.setSearchSegments(segments.getSegmentList());
+    instanceRequest.setSearchSegments(segments.getSegments());
     instanceRequest.setBrokerId(_brokerId);
-    if (CollectionUtils.isNotEmpty(segments.getOptionalSegmentList())) {
+    if (CollectionUtils.isNotEmpty(segments.getOptionalSegments())) {
       // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
       // compatible, as there are places like in multi-stage query engine where this field is not set today when
       // creating the InstanceRequest.
-      instanceRequest.setOptionalSegments(segments.getOptionalSegmentList());
+      instanceRequest.setOptionalSegments(segments.getOptionalSegments());
     }
     return instanceRequest;
   }

@@ -338,7 +338,7 @@ public class WorkerManager {
             serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
         // TODO: support optional segments for multi-stage engine.
         Preconditions.checkState(
-            tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegmentList()) == null,
+            tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
             "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
       }
 

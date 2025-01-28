@@ -642,9 +642,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        ServerRouteInfo executionInfo =
+        ServerRouteInfo serverRouteInfoInfo =
             merged.computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), new ArrayList<>()));
-        executionInfo.getSegmentList().add(entry.getKey());
+        serverRouteInfoInfo.getSegments().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
@@ -653,12 +653,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        ServerRouteInfo executionInfo = merged.get(serverInstance);
+        ServerRouteInfo serverRouteInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
-        if (executionInfo != null) {
-          executionInfo.getOptionalSegmentList().add(entry.getKey());
+        if (serverRouteInfo != null) {
+          serverRouteInfo.getOptionalSegments().add(entry.getKey());
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.
