@@ -18,7 +18,13 @@
  */
 package org.apache.pinot.controller.api.access;
 
+/**
+ * An access control factory for controllers that allows all requests. This is the default access control.
+ */
 public class AllowAllAccessFactory implements AccessControlFactory {
+  /**
+   * We inherit methods from the AccessControl interface, hence we don't need to implement them.
+   */
   private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
   };
 

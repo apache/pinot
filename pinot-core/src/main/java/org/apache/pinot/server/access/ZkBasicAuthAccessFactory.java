@@ -18,20 +18,14 @@
  */
 package org.apache.pinot.server.access;
 
-import io.netty.channel.ChannelHandlerContext;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
+import java.util.Optional;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
-import org.apache.pinot.common.utils.BcryptUtils;
+import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
-import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
+import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -44,78 +38,32 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  *
  */
 public class ZkBasicAuthAccessFactory implements AccessControlFactory {
-  private static final String AUTHORIZATION_KEY = "authorization";
-
-  private HelixManager _helixManager;
   private AccessControl _accessControl;
 
   @Override
-  public void init(PinotConfiguration configuration, HelixManager helixManager) {
-    _helixManager = helixManager;
+  public void init(PinotConfiguration pinotConfiguration, HelixManager helixManager) {
+    _accessControl =
+        new BasicAuthAccessControl(new AccessControlUserCache(helixManager.getHelixPropertyStore()));
   }
 
   @Override
   public AccessControl create() {
-    if (_accessControl == null) {
-      _accessControl = new BasicAuthAccessControl(_helixManager);
-    }
     return _accessControl;
   }
 
   /**
    * Access Control using metadata-based basic grpc authentication
    */
-  private static class BasicAuthAccessControl implements AccessControl {
-    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+  private static class BasicAuthAccessControl extends AbstractBasicAuthAccessControl {
     private AccessControlUserCache _userCache;
-    private HelixManager _innerHelixManager;
 
-    public BasicAuthAccessControl(HelixManager helixManager) {
-      _innerHelixManager = helixManager;
-    }
-
-    public void initUserCache() {
-      if (_userCache == null) {
-        _userCache = new AccessControlUserCache(_innerHelixManager.getHelixPropertyStore());
-      }
+    public BasicAuthAccessControl(AccessControlUserCache userCache) {
+      _userCache = userCache;
     }
 
     @Override
-    public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
-      return true;
-    }
-
-    @Override
-    public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
-      if (_userCache == null) {
-        initUserCache();
-      }
-      Collection<String> tokens = getTokens(requesterIdentity);
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig()).stream()
-          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
-
-      Map<String, String> name2password = tokens.stream().collect(
-          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
-              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal =
-          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
-      return password2principal.entrySet().stream().filter(
-          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
-              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst().map(
-          zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
-              TableNameBuilder.extractRawTableName(tableName))).orElse(false);
-    }
-
-    private Collection<String> getTokens(RequesterIdentity requesterIdentity) {
-      if (requesterIdentity instanceof GrpcRequesterIdentity) {
-        GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
-        return identity.getGrpcMetadata().get(AUTHORIZATION_KEY);
-      }
-      if (requesterIdentity instanceof HttpRequesterIdentity) {
-        HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-        return identity.getHttpHeaders().get(AUTHORIZATION_KEY);
-      }
-      throw new UnsupportedOperationException("GrpcRequesterIdentity or HttpRequesterIdentity is required");
+    protected Optional<? extends BasicAuthPrincipal> getPrincipal(RequesterIdentity requesterIdentity) {
+      return BasicAuthUtils.getPrincipal(getTokens(requesterIdentity), _userCache, ComponentType.SERVER);
     }
   }
 }

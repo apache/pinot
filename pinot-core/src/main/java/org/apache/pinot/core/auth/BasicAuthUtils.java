@@ -22,10 +22,16 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.config.provider.AccessControlUserCache;
+import org.apache.pinot.common.utils.BcryptUtils;
+import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -81,6 +87,12 @@ public final class BasicAuthUtils {
     }).collect(Collectors.toList());
   }
 
+  /**
+   * Extracts basic auth principals from a list of user configurations.
+   *
+   * @param userConfigList list of user configurations
+   * @return list of ZkBasicAuthPrincipals
+   */
   public static List<ZkBasicAuthPrincipal> extractBasicAuthPrincipals(List<UserConfig> userConfigList) {
     return userConfigList.stream()
         .map(user -> {
@@ -113,5 +125,81 @@ public final class BasicAuthUtils {
       return Arrays.stream(input.split(",")).map(String::trim).collect(Collectors.toSet());
     }
     return Collections.emptySet();
+  }
+
+  /**
+   * Retrieves a ZkBasicAuthPrincipal based on the provided authentication headers, user cache, and component type.
+   *
+   * @param authHeaders list of authentication headers
+   * @param userCache access control user cache
+   * @param componentType component type whose cache is passed
+   * @return an optional ZkBasicAuthPrincipal if the authentication headers are valid, empty otherwise
+   */
+  public static Optional<ZkBasicAuthPrincipal> getPrincipal(List<String> authHeaders, AccessControlUserCache userCache,
+      ComponentType componentType) {
+    if (CollectionUtils.isEmpty(authHeaders)) {
+      return Optional.empty();
+    }
+
+    // Based on component type, get the user configurations
+    List<UserConfig> userConfigs;
+    if (componentType == ComponentType.CONTROLLER) {
+      userConfigs = userCache.getAllControllerUserConfig();
+    } else if (componentType == ComponentType.BROKER) {
+      userConfigs = userCache.getAllBrokerUserConfig();
+    } else if (componentType == ComponentType.SERVER) {
+      userConfigs = userCache.getAllServerUserConfig();
+    } else {
+      throw new IllegalArgumentException("Unsupported component type: " + componentType);
+    }
+
+    // Build a lookup map of <username -> ZkBasicAuthPrincipal>
+    Map<String, ZkBasicAuthPrincipal> name2principal = extractBasicAuthPrincipals(userConfigs)
+        .stream()
+        .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
+
+    // Build a map of <username -> password>
+    Map<String, String> name2password = authHeaders
+        .stream()
+        .collect(
+            Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+                org.apache.pinot.common.auth.BasicAuthUtils::extractPassword)
+        );
+
+    // Convert <password -> principal>, then verify each password with Bcrypt.
+    Map<String, ZkBasicAuthPrincipal> password2principal = name2password
+        .keySet()
+        .stream()
+        .collect(Collectors.toMap(name2password::get, name2principal::get));
+
+    return password2principal
+        .entrySet()
+        .stream()
+        .filter(entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+            userCache.getUserPasswordAuthCache()))
+        .map(Map.Entry::getValue)
+        .filter(Objects::nonNull)
+        .findFirst();
+  }
+
+  /**
+   * Retrieves a BasicAuthPrincipal based on the provided authentication headers and token to principal map.
+   *
+   * @param authHeaders list of authentication headers
+   * @param token2principal map of tokens to principals
+   * @return an optional ZkBasicAuthPrincipal if the authentication headers are valid, empty otherwise
+   */
+  public static Optional<BasicAuthPrincipal> getPrincipal(List<String> authHeaders,
+      Map<String, BasicAuthPrincipal> token2principal) {
+    if (CollectionUtils.isEmpty(authHeaders)) {
+      return Optional.empty();
+    }
+
+    return authHeaders
+        .stream()
+        .map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+        .map(token2principal::get)
+        .filter(Objects::nonNull)
+        .findFirst();
   }
 }
