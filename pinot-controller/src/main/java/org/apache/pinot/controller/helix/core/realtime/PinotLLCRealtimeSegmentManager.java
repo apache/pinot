@@ -76,6 +76,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -159,9 +160,6 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
-  private static final int FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS = 15000;
-  private static final RetryPolicy DEFAULT_RETRY_POLICY =
-      RetryPolicies.fixedDelayRetryPolicy(10, FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
 
   // TODO: make this configurable with default set to 10
   /**
@@ -1862,42 +1860,53 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit, int batchSize) {
+      @Nullable String segmentsToCommit, ForceCommitBatchConfig forceCommitBatchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
 
-    List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+    List<Set<String>> segmentBatchList =
+        getSegmentBatchList(idealState, targetConsumingSegments, forceCommitBatchConfig.getBatchSize());
 
-    _forceCommitExecutorService.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType));
+    _forceCommitExecutorService.submit(
+        () -> processBatchesSequentially(segmentBatchList, tableNameWithType, forceCommitBatchConfig));
 
     return targetConsumingSegments;
   }
 
-  private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType) {
+  private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
+      ForceCommitBatchConfig forceCommitBatchConfig) {
     Set<String> prevBatch = null;
-    for (Set<String> segmentBatchToCommit: segmentBatchList) {
+    for (Set<String> segmentBatchToCommit : segmentBatchList) {
       if (prevBatch != null) {
-        waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch);
+        waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
       }
       sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
       prevBatch = segmentBatchToCommit;
     }
   }
 
-  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit) {
+  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+      ForceCommitBatchConfig forceCommitBatchConfig) {
+    int batchStatusCheckIntervalSec = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
+    int batchStatusCheckTimeoutSec = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+
     try {
-      Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
+      Thread.sleep(batchStatusCheckIntervalSec);
     } catch (InterruptedException e) {
       LOGGER.error("Exception occurred while waiting for the forceCommit of segments: {}", segmentBatchToCommit, e);
       throw new RuntimeException(e);
     }
 
+    int maxAttempts = (batchStatusCheckTimeoutSec + batchStatusCheckIntervalSec - 1) / batchStatusCheckIntervalSec;
+    RetryPolicy retryPolicy =
+        RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalSec);
     int attemptCount = 0;
     final Set<String>[] segmentsYetToBeCommitted = new Set[1];
+
     try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+      attemptCount = retryPolicy.attempt(() -> {
         segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
         return segmentsYetToBeCommitted[0].isEmpty();
       });

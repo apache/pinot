@@ -437,6 +437,10 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName(), 1);
     testForceCommitInternal(jobId, consumingSegments, 180000L);
+
+    consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
+    jobId = forceCommit(getTableName(), 1, 3, 50);
+    testForceCommitInternal(jobId, consumingSegments, 180000L);
   }
 
   private void testForceCommitInternal(String jobId, Set<String> consumingSegments, long timeoutMs) {
@@ -508,6 +512,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize, null);
+    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+  }
+
+  private String forceCommit(String tableName, int batchSize, int batchIntervalSec, int batchTimeoutSec)
+      throws Exception {
+    String response =
+        sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize
+            + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec, null);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 

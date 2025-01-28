@@ -172,16 +172,27 @@ public class PinotRealtimeTableResource {
       String consumingSegments,
       @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
       @QueryParam("batchSize")
-      Integer batchSize, @Context HttpHeaders headers) {
+      Integer batchSize,
+      @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
+          + " not (default = 5)")
+      @QueryParam("batchStatusCheckIntervalSec")
+      Integer batchStatusCheckIntervalSec,
+      @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
+          + " of segments and throw an exception. (default = 180)")
+      @QueryParam("batchStatusCheckTimeoutSec")
+      Integer batchStatusCheckTimeoutSec,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
     }
-    if (batchSize == null) {
-      batchSize = Integer.MAX_VALUE;
-    } else if (batchSize <= 0) {
-      throw new ControllerApplicationException(LOGGER, "Batch size should be greater than zero",
+    ForceCommitBatchConfig forceCommitBatchConfig;
+    try {
+      forceCommitBatchConfig =
+          ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Invalid batch config",
           Response.Status.BAD_REQUEST);
     }
     long startTimeMs = System.currentTimeMillis();
@@ -191,7 +202,7 @@ public class PinotRealtimeTableResource {
     try {
       Set<String> consumingSegmentsForceCommitted =
           _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments,
-              batchSize);
+              forceCommitBatchConfig);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
