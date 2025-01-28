@@ -1260,4 +1260,15 @@ public class DateTimeFunctions {
   public static int extract(String interval, long timestamp) {
     return DateTimeUtils.extract(DateTimeUtils.ExtractFieldType.valueOf(interval), timestamp);
   }
+
+  @ScalarFunction
+  public static long sleep(long ms) {
+    assert ms >= 0;
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return ms;
+  }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.function;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
@@ -40,10 +41,27 @@ public class ArithmeticFunctionsTest {
     Assert.assertEquals(evaluator.evaluate(row), expectedResult);
   }
 
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Consumer<Object> assertResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    Assert.assertEquals(evaluator.getArguments(), expectedArguments);
+    assertResult.accept(evaluator.evaluate(row));
+  }
+
   @Test(dataProvider = "arithmeticFunctionsDataProvider")
   public void testArithmeticFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
       Object expectedResult) {
     testFunction(functionExpression, expectedArguments, row, expectedResult);
+  }
+
+  @Test
+  public void testRandomFunction() {
+    GenericRow row = new GenericRow();
+    row.putValue("a", 1000L);
+    row.putValue("b", 2000L);
+    testFunction("rand(a,b)", Lists.newArrayList("a", "b"), row, result -> {
+      Assert.assertTrue((Long) result >= 1000L && (Long) result <= 2000L);
+    });
   }
 
   @DataProvider(name = "arithmeticFunctionsDataProvider")
