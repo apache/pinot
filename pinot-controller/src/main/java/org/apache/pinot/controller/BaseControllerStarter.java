@@ -555,15 +555,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
             new ControllerUserDefinedMessageHandlerFactory(_periodicTaskScheduler));
 
-    String accessControlFactoryClass = _config.getAccessControlFactoryClass();
-    LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
-    final AccessControlFactory accessControlFactory;
-    try {
-      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
-      accessControlFactory.init(_config, _helixResourceManager);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
-    }
+    final AccessControlFactory accessControlFactory = AccessControlFactory.loadFactory(_config, _helixResourceManager);
 
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);

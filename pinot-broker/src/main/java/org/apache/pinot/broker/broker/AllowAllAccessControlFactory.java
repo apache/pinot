@@ -25,24 +25,13 @@ import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
-
+/**
+ * An access control factory for brokers that allows all requests. This is the default access control.
+ */
 public class AllowAllAccessControlFactory extends AccessControlFactory {
-  private final AccessControl _accessControl;
 
-  public AllowAllAccessControlFactory() {
-    _accessControl = new AllowAllAccessControl();
-  }
-
-  public void init(PinotConfiguration configuration) {
-  }
-
-  public AccessControl create() {
-    return _accessControl;
-  }
-
-  private static class AllowAllAccessControl implements AccessControl {
+  private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
       return BasicAuthorizationResultImpl.success();
@@ -52,5 +41,9 @@ public class AllowAllAccessControlFactory extends AccessControlFactory {
     public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
       return TableAuthorizationResult.success();
     }
+  };
+
+  public AccessControl create() {
+    return ALLOW_ALL_ACCESS;
   }
 }

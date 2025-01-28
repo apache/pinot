@@ -31,14 +31,15 @@ public abstract class AccessControlFactory {
   public static final String ACCESS_CONTROL_CLASS_CONFIG = "class";
 
   public void init(PinotConfiguration configuration) {
-  };
+    // left blank
+  }
 
   /**
    * Extend original init method inorder to support Zookeeper BasicAuthAccessControlFactory
-   * Because ZKBasicAuthAccessControlFactory need to acquire users info from HelixPropertyStore
+   * Because ZKBasicAuthAccessControlFactory need to acquire users info from ZkHelixPropertyStore
    *
    * @param configuration pinot configuration
-   * @param propertyStore Helix PropertyStore
+   * @param propertyStore Helix property store
    */
   public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
      init(configuration);
@@ -46,6 +47,9 @@ public abstract class AccessControlFactory {
 
   public abstract AccessControl create();
 
+  /**
+   * Utility to load the desired AccessControlFactory, either from config or defaulting to AllowAllAccessControlFactory.
+   */
   public static AccessControlFactory loadFactory(PinotConfiguration configuration,
       ZkHelixPropertyStore<ZNRecord> propertyStore) {
     AccessControlFactory accessControlFactory;

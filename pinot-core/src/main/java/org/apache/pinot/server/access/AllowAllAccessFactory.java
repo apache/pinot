@@ -22,6 +22,9 @@ import io.netty.channel.ChannelHandlerContext;
 import org.apache.pinot.spi.auth.server.RequesterIdentity;
 
 
+/**
+ * An access control factory for servers that allows all requests. This is the default access control.
+ */
 public class AllowAllAccessFactory implements AccessControlFactory {
   private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
     @Override
