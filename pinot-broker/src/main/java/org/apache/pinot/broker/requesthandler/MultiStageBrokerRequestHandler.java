@@ -74,7 +74,6 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -272,7 +271,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       } catch (Throwable t) {
         ProcessingException queryException = QueryException.QUERY_EXECUTION_ERROR;
-        if (t instanceof BadQueryRequestException) {
+        if (t.equals(QueryException.QUERY_VALIDATION_ERROR)) {
           // provide more specific error code if available
           queryException = QueryException.QUERY_VALIDATION_ERROR;
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);

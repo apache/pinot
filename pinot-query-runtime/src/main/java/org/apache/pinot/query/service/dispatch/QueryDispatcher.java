@@ -50,6 +50,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -77,7 +78,6 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -91,6 +91,8 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.exception.QueryException.QUERY_VALIDATION_ERROR;
 
 
 /**
@@ -398,7 +400,7 @@ public class QueryDispatcher {
       DispatchableSubPlan subPlan,
       long timeoutMs,
       Map<String, String> queryOptions,
-      MailboxService mailboxService) {
+      MailboxService mailboxService) throws ProcessingException {
 
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
@@ -463,7 +465,7 @@ public class QueryDispatcher {
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
       if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        throw new BadQueryRequestException("Received error query execution result block: " + queryExceptions);
+        throw QUERY_VALIDATION_ERROR;
       }
 
       throw new RuntimeException("Received error query execution result block: " + queryExceptions);
