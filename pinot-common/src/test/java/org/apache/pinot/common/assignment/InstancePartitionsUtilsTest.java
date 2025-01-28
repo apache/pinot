@@ -37,11 +37,15 @@ public class InstancePartitionsUtilsTest {
 
   @Test
   public void testShouldFetchPreConfiguredInstancePartitions() {
+    Map<InstancePartitionsType, String> instancePartitionsMap = new HashMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.OFFLINE, "testPartitions");
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
+        .setInstancePartitionsMap(instancePartitionsMap)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
 
     Assert.assertTrue(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig,
         InstancePartitionsType.OFFLINE));
@@ -49,11 +53,15 @@ public class InstancePartitionsUtilsTest {
 
   @Test
   public void testShouldFetchPreConfiguredInstancePartitionsMirrorServerSet() {
+    Map<InstancePartitionsType, String> instancePartitionsMap = new HashMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.OFFLINE, "testPartitions");
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
+        .setInstancePartitionsMap(instancePartitionsMap)
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
 
     Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig,
         InstancePartitionsType.OFFLINE));
