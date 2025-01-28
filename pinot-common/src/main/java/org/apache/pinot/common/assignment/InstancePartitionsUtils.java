@@ -61,7 +61,6 @@ public class InstancePartitionsUtils {
    */
   public static InstancePartitions fetchOrComputeInstancePartitions(HelixManager helixManager, TableConfig tableConfig,
 InstancePartitionsType instancePartitionsType) {
-      TableConfig tableConfig, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
