@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
@@ -35,9 +34,7 @@ public class ServerRouteInfo {
    * @param segments List of segments assigned to the server.
    * @param optionalSegments List of optional segments assigned to the server.
    */
-  public ServerRouteInfo(
-      @JsonProperty("segmentList") List<String> segments,
-      @JsonProperty("optionalSegmentList") List<String> optionalSegments) {
+  public ServerRouteInfo(List<String> segments, List<String> optionalSegments) {
     _segments = segments;
     _optionalSegments = optionalSegments;
   }
