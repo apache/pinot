@@ -228,7 +228,7 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.3.2</httpcore5.version>
+    <httpcore5.version>5.3.3</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
