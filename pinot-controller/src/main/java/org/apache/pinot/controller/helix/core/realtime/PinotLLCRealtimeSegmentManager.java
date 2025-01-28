@@ -28,9 +28,11 @@ import java.net.URI;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -222,7 +224,7 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
-    _forceCommitExecutorService = Executors.newFixedThreadPool(4);
+    _forceCommitExecutorService = Executors.newCachedThreadPool();
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -1885,14 +1887,15 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit) {
-
     try {
       Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
-    } catch (InterruptedException ignored) {
+    } catch (InterruptedException e) {
+      LOGGER.error("Exception occurred while waiting for the forceCommit of segments: {}", segmentBatchToCommit, e);
+      throw new RuntimeException(e);
     }
 
     int attemptCount = 0;
-    final Set<String>[] segmentsYetToBeCommitted = new Set[]{new HashSet<>()};
+    final Set<String>[] segmentsYetToBeCommitted = new Set[1];
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
         segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
@@ -1900,7 +1903,7 @@ public class PinotLLCRealtimeSegmentManager {
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
       String errorMsg = String.format(
-          "Exception occurred while executing the forceCommit batch of segments: %s, attempt count: %d, "
+          "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
               + "segmentsYetToBeCommitted: %s",
           segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
       LOGGER.error(errorMsg, e);
@@ -1917,27 +1920,27 @@ public class PinotLLCRealtimeSegmentManager {
     List<Set<String>> segmentBatchList = new ArrayList<>();
     Set<String> currentBatch = new HashSet<>();
     Set<String> segmentsAdded = new HashSet<>();
-    boolean segmentsRemaining = true;
+    Collection<Queue<String>> instanceSegmentsCollection = instanceToConsumingSegments.values();
 
-    while (segmentsRemaining) {
-      segmentsRemaining = false;
+    while (!instanceSegmentsCollection.isEmpty()) {
+      Iterator<Queue<String>> instanceCollectionIterator = instanceSegmentsCollection.iterator();
       // pick segments in round-robin fashion to parallelize
       // forceCommit across max servers
-      for (Queue<String> queue : instanceToConsumingSegments.values()) {
-        if (!queue.isEmpty()) {
-          segmentsRemaining = true;
-          String segmentName = queue.poll();
+      while (instanceCollectionIterator.hasNext()) {
+        Queue<String> consumingSegments = instanceCollectionIterator.next();
+        String segmentName = consumingSegments.poll();
+        if (consumingSegments.isEmpty()) {
+          instanceCollectionIterator.remove();
+        }
+        if (!segmentsAdded.add(segmentName)) {
           // there might be a segment replica hosted on
           // another instance added before
-          if (segmentsAdded.contains(segmentName)) {
-            continue;
-          }
-          currentBatch.add(segmentName);
-          segmentsAdded.add(segmentName);
-          if (currentBatch.size() == batchSize) {
-            segmentBatchList.add(currentBatch);
-            currentBatch = new HashSet<>();
-          }
+          continue;
+        }
+        currentBatch.add(segmentName);
+        if (currentBatch.size() == batchSize) {
+          segmentBatchList.add(currentBatch);
+          currentBatch = new HashSet<>();
         }
       }
     }
@@ -1952,27 +1955,19 @@ public class PinotLLCRealtimeSegmentManager {
   Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
       Set<String> targetConsumingSegments) {
     Map<String, Queue<String>> instanceToConsumingSegments = new HashMap<>();
-
     Map<String, Map<String, String>> segmentNameToInstanceToStateMap = idealState.getRecord().getMapFields();
-    for (String segmentName : segmentNameToInstanceToStateMap.keySet()) {
-      if (!targetConsumingSegments.contains(segmentName)) {
-        continue;
-      }
+
+    for (String segmentName: targetConsumingSegments) {
       Map<String, String> instanceToStateMap = segmentNameToInstanceToStateMap.get(segmentName);
-      for (String instance : instanceToStateMap.keySet()) {
-        String state = instanceToStateMap.get(instance);
+
+      for (Map.Entry<String, String> instanceToState : instanceToStateMap.entrySet()) {
+        String instance = instanceToState.getKey();
+        String state = instanceToState.getValue();
         if (state.equals(SegmentStateModel.CONSUMING)) {
-          instanceToConsumingSegments.compute(instance, (key, value) -> {
-            if (value == null) {
-              value = new LinkedList<>();
-            }
-            value.add(segmentName);
-            return value;
-          });
+          instanceToConsumingSegments.computeIfAbsent(instance, k -> new LinkedList<>()).add(segmentName);
         }
       }
     }
-
     return instanceToConsumingSegments;
   }
 
