@@ -1032,7 +1032,10 @@ public class TablesResource {
     ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
     SegmentMetadataImpl segmentMetadata =
         (SegmentMetadataImpl) immutableSegmentDataManager.getSegment().getSegmentMetadata();
-    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(segmentMetadata);
+    SegmentZKMetadata existingSegmentZkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
+            realtimeTableNameWithType, segmentName);
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(segmentMetadata, existingSegmentZkMetadata);
     segmentZKMetadata.setSizeInBytes(immutableSegmentDataManager.getSegment().getSegmentSizeBytes());
     File segmentTarFile = null;
     try {
@@ -1071,8 +1074,15 @@ public class TablesResource {
     }
   }
 
-  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata) {
+  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata,
+      SegmentZKMetadata existingSegmentZKMetadata) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+
+    // fetch the creation time and num replicas from the existing segment zk metadata
+    // these fields are set when the segment ZK is created.
+    segmentZKMetadata.setCreationTime(existingSegmentZKMetadata.getCreationTime());
+    segmentZKMetadata.setNumReplicas(existingSegmentZKMetadata.getNumReplicas());
+
     // set offsets for segment
     segmentZKMetadata.setStartOffset(segmentMetadata.getStartOffset());
     segmentZKMetadata.setEndOffset(segmentMetadata.getEndOffset());
