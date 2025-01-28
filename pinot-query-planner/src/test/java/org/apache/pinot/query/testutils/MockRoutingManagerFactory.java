@@ -22,18 +22,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -57,7 +56,7 @@ public class MockRoutingManagerFactory {
   private final Map<String, Schema> _schemaMap;
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
-  private final Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> _tableServerSegmentsMap;
+  private final Map<String, Map<ServerInstance, ServerRouteInfo>> _tableServerSegmentsMap;
 
   public MockRoutingManagerFactory(int... ports) {
     _tableNameMap = new HashMap<>();
@@ -90,7 +89,8 @@ public class MockRoutingManagerFactory {
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
     _tableServerSegmentsMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
-        .computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), null)).getLeft().add(segmentName);
+        .computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), null)).getSegments()
+        .add(segmentName);
   }
 
   public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
