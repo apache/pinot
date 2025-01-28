@@ -176,7 +176,7 @@
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.30.6</aws.sdk.version>
-    <azure.sdk.version>1.2.30</azure.sdk.version>
+    <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
