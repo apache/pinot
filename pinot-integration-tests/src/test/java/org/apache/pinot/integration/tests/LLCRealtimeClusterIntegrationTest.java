@@ -439,7 +439,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     testForceCommitInternal(jobId, consumingSegments, 180000L);
 
     consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
-    jobId = forceCommit(getTableName(), 1, 3, 50);
+    jobId = forceCommit(getTableName(), 1, 3, 90);
     testForceCommitInternal(jobId, consumingSegments, 180000L);
   }
 

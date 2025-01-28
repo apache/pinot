@@ -1889,19 +1889,19 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
       ForceCommitBatchConfig forceCommitBatchConfig) {
-    int batchStatusCheckIntervalSec = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
-    int batchStatusCheckTimeoutSec = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+    int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
+    int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
 
     try {
-      Thread.sleep(batchStatusCheckIntervalSec);
+      Thread.sleep(batchStatusCheckIntervalMs);
     } catch (InterruptedException e) {
       LOGGER.error("Exception occurred while waiting for the forceCommit of segments: {}", segmentBatchToCommit, e);
       throw new RuntimeException(e);
     }
 
-    int maxAttempts = (batchStatusCheckTimeoutSec + batchStatusCheckIntervalSec - 1) / batchStatusCheckIntervalSec;
+    int maxAttempts = (batchStatusCheckTimeoutMs + batchStatusCheckIntervalMs - 1) / batchStatusCheckIntervalMs;
     RetryPolicy retryPolicy =
-        RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalSec);
+        RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
     int attemptCount = 0;
     final Set<String>[] segmentsYetToBeCommitted = new Set[1];
 
