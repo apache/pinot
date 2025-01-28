@@ -88,7 +88,6 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -194,8 +193,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
-  @VisibleForTesting
-  private final Map<String, String> _failureConfig;
 
   private volatile boolean _isStopping = false;
 
@@ -220,7 +217,6 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
-    _failureConfig = new HashMap<>();
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -555,10 +551,7 @@ public class PinotLLCRealtimeSegmentManager {
     SegmentZKMetadata committingSegmentZKMetadata =
         updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, isStartMetadata);
 
-    // Used to inject failure for testing. RealtimeSegmentValidationManager should be able to fix the
-    // segment that encounter failure at this stage of commit protocol.
-    FailureInjectionUtils.injectFailure(FailureInjectionUtils.FAULT_BEFORE_NEW_SEGMENT_METADATA_CREATION,
-        _failureConfig);
+    preProcessNewSegmentZKMetadata();
 
     // Step-2: Create new segment metadata if needed
     LOGGER.info("Creating new segment metadata with status IN_PROGRESS: {}", committingSegmentName);
@@ -567,9 +560,7 @@ public class PinotLLCRealtimeSegmentManager {
         createNewSegmentMetadata(tableConfig, idealState, committingSegmentDescriptor, committingSegmentZKMetadata,
             instancePartitions);
 
-    // Used to inject failure for testing. RealtimeSegmentValidationManager should be able to fix the
-    // segment that encounter failure at this stage of commit protocol.
-    FailureInjectionUtils.injectFailure(FailureInjectionUtils.FAULT_BEFORE_IDEAL_STATE_UPDATE, _failureConfig);
+    preProcessCommitIdealStateUpdate();
 
     // Step-3: Update IdealState
     LOGGER.info("Updating Idealstate for previous: {} and new segment: {}", committingSegmentName,
@@ -607,6 +598,21 @@ public class PinotLLCRealtimeSegmentManager {
       handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
           newConsumingSegmentName);
     }
+  }
+
+  @VisibleForTesting
+  protected void preProcessNewSegmentZKMetadata() {
+    // No-op
+  }
+
+  @VisibleForTesting
+  protected void preProcessCommitIdealStateUpdate() {
+    // No-op
+  }
+
+  @VisibleForTesting
+  protected void preProcessCommitSegmentEndMetadata() {
+    // No-op
   }
 
   // Step 1: Update committing segment metadata
@@ -704,7 +710,7 @@ public class PinotLLCRealtimeSegmentManager {
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     // Used to inject failure for testing. RealtimeSegmentValidationManager should be able to fix the
     // segment that encounter failure at this stage of commit protocol.
-    FailureInjectionUtils.injectFailure(FailureInjectionUtils.FAULT_BEFORE_COMMIT_END_METADATA, _failureConfig);
+    preProcessCommitSegmentEndMetadata();
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
     try {
       _numCompletingSegments.addAndGet(1);
@@ -2325,16 +2331,6 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.warn("Failed to get Helix instance data admin endpoints for servers: {}", candidateServers, e);
     }
     return null;
-  }
-
-  @VisibleForTesting
-  public void enableTestFault(String faultType) {
-    _failureConfig.put(faultType, "true");
-  }
-
-  @VisibleForTesting
-  public void disableTestFault(String faultType) {
-    _failureConfig.remove(faultType);
   }
 
   public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
