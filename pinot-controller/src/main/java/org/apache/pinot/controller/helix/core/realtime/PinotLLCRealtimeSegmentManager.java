@@ -64,7 +64,6 @@ import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SimpleSegmentMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -1782,7 +1781,7 @@ public class PinotLLCRealtimeSegmentManager {
           String serverUploadRequestUrl = getUploadUrl(uri, "uploadLLCSegmentToDeepStore");
           LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
               serverUploadRequestUrl);
-          SimpleSegmentMetadata uploadedMetadata = _fileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
+          SegmentZKMetadata uploadedMetadata = _fileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
               serverUploadRequestUrl);
           handleMetadataUpload(segmentName, rawTableName, segmentZKMetadata, uploadedMetadata, pinotFS);
         },
@@ -1827,8 +1826,8 @@ public class PinotLLCRealtimeSegmentManager {
         uri.toString(), endpoint, _deepstoreUploadRetryTimeoutMs);
   }
 
-  private void handleMetadataUpload(String segmentName, String rawTableName,
-      SegmentZKMetadata currentMetadata, SimpleSegmentMetadata uploadedMetadata,
+  private void handleMetadataUpload(String segmentName, String rawTableName, SegmentZKMetadata currentMetadata,
+      SegmentZKMetadata uploadedMetadata,
       PinotFS pinotFS)
       throws Exception {
 
@@ -1881,8 +1880,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param segmentZKMetadata Current segment metadata stored in ZooKeeper that needs to be updated
    * @param uploadedSegmentZKMetadata New metadata from the successfully uploaded segment
    */
-  private void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata,
-      SimpleSegmentMetadata uploadedSegmentZKMetadata) {
+  private void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentZKMetadata uploadedSegmentZKMetadata) {
     if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
       LOGGER.info("Updating additional metadata in ZK for segment {} as pauseless is enabled",
           segmentZKMetadata.getSegmentName());
