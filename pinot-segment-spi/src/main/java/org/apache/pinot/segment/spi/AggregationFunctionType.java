@@ -145,8 +145,10 @@ public enum AggregationFunctionType {
   FOURTHMOMENT("fourthMoment", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
 
   // Datasketches Frequent Items support
-  FREQUENTSTRINGSSKETCH("frequentStringsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
-  FREQUENTLONGSSKETCH("frequentLongsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
+  FREQUENTSTRINGSSKETCH("frequentStringsSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  FREQUENTLONGSSKETCH("frequentLongsSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
 
   // Geo aggregation functions
   STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
