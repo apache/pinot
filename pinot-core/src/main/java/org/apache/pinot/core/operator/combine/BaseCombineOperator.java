@@ -191,15 +191,12 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     // Otherwise, try to get the segment name to help locate the segment when debugging query errors.
     // Not all operators have associated segment, so do this at best effort.
     IndexSegment segment = operator.getIndexSegment();
-    if (segment == null) {
-      if (e instanceof IllegalArgumentException) {
-        return new BadQueryRequestException(e);
-      }
-      return e;
+    String errorMessage = null;
+    if (segment != null) {
+      errorMessage = "Caught exception while doing operator: " + operator.getClass()
+          + " on segment: " + segment.getSegmentName();
     }
 
-    String errorMessage = "Caught exception while doing operator: " + operator.getClass()
-        + " on segment: " + segment.getSegmentName();
     if (e instanceof IllegalArgumentException) {
       throw new BadQueryRequestException(errorMessage, e);
     }
