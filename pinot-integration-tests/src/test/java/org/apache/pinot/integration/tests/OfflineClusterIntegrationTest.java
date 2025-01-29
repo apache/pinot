@@ -1031,7 +1031,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
     }
 
     // invalid argument
@@ -1040,7 +1040,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
     }
 
     // invalid argument

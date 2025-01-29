@@ -46,6 +46,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -459,7 +461,15 @@ public class QueryDispatcher {
     }
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
-      throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
+      Map<Integer, String> queryExceptions = block.getExceptions();
+      String errorMessage = "Received error query execution result block: " + queryExceptions;
+      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
+        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
+        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
+        throw queryInfoException;
+      }
+
+      throw new RuntimeException(errorMessage);
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
