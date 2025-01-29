@@ -187,8 +187,8 @@ public class PinotClusterConfigs {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     Map<String, String> configs = helixAdmin.getConfig(configScope,
-        List.of(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG));
-    String json = configs.get(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG);
+        List.of(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+    String json = configs.get(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG);
     if (json != null) {
       return GroovyStaticAnalyzerConfig.fromJson(json);
     } else {
@@ -215,7 +215,7 @@ public class PinotClusterConfigs {
               _pinotHelixResourceManager.getHelixClusterName()).build();
       Map<String, String> properties = new TreeMap<>();
       GroovyStaticAnalyzerConfig groovyConfig = GroovyStaticAnalyzerConfig.fromJson(body);
-      properties.put(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG,
+      properties.put(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG,
           groovyConfig == null ? null : groovyConfig.toJson());
       admin.setConfig(configScope, properties);
       GroovyFunctionEvaluator.setConfig(groovyConfig);

@@ -61,6 +61,7 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -271,6 +272,10 @@ public abstract class BaseMinionStarter implements ServiceStartable {
           new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       minionContext.setSSLContext(sslContext);
     }
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(_config.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+    GroovyFunctionEvaluator.setMetrics(minionMetrics, MinionMeter.GROOVY_SECURITY_VIOLATIONS);
 
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
