@@ -270,6 +270,14 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     assert response.isSuccessful();
     allOfflineSegments = _helixResourceManager.getSegmentsFor(_offlineTableName, true);
     assertEquals(allOfflineSegments.size(), 0);
+    _helixResourceManager.getSegmentDeletionManager().removeSegmentsFromStore(_offlineTableName, allOfflineSegments);
+    TestUtils.waitForCondition(k -> {
+      try {
+        return _helixResourceManager.getSegmentsZKMetadata(_offlineTableName).isEmpty();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 90000L, "Unable to delete all offline segments before timeout!");
     expectedWatermark -= 86400000;
 
     // Schedule task
