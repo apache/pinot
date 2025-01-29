@@ -1501,7 +1501,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+    protected SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
+        @Nullable Stat stat) {
       Preconditions.checkState(_segmentZKMetadataMap.containsKey(segmentName));
       if (stat != null) {
         stat.setVersion(_segmentZKMetadataVersionMap.get(segmentName));
@@ -1561,7 +1562,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
+    protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
+        long currentTimeMs) {
       return _exceededMaxSegmentCompletionTime;
     }
 
@@ -1584,7 +1586,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+    protected SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName,
+        @Nullable Stat stat) {
       SegmentZKMetadata segmentZKMetadata = super.getSegmentZKMetadata(realtimeTableName, segmentName, stat);
       switch (_scenario) {
         case ZK_VERSION_CHANGED:

@@ -406,7 +406,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
+  protected SegmentZKMetadata getSegmentZKMetadata(String realtimeTableName, String segmentName, @Nullable Stat stat) {
     try {
       ZNRecord znRecord =
           _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName),
@@ -1253,7 +1253,8 @@ public class PinotLLCRealtimeSegmentManager {
    * elapsed since segment metadata update
    */
   @VisibleForTesting
-  boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
+  protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
+      long currentTimeMs) {
     Stat stat = new Stat();
     getSegmentZKMetadata(realtimeTableName, segmentName, stat);
     if (currentTimeMs > stat.getMtime() + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
