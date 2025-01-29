@@ -66,6 +66,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
     brokerConf.setProperty(FailureDetector.CONFIG_OF_TYPE, FailureDetector.Type.CONNECTION.name());
   }
 
