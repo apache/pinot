@@ -16,32 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.restlet.resources;
+package org.apache.pinot.integration.tests.realtime.utils;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 
 
-public class TableLLCSegmentUploadResponse {
-  private final String _segmentName;
-  private final long _crc;
-  private final String _downloadUrl;
-
-  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") long crc,
-      @JsonProperty("downloadUrl") String downloadUrl) {
-    _segmentName = segmentName;
-    _crc = crc;
-    _downloadUrl = downloadUrl;
-  }
-
-  public String getSegmentName() {
-    return _segmentName;
-  }
-
-  public long getCrc() {
-    return _crc;
-  }
-
-  public String getDownloadUrl() {
-    return _downloadUrl;
+public class FailureInjectingControllerStarter extends ControllerStarter {
+  @Override
+  protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
+    return new FailureInjectingPinotLLCRealtimeSegmentManager(_helixResourceManager, getConfig(), _controllerMetrics);
   }
 }

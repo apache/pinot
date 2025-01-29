@@ -110,12 +110,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
         streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
     ).collect(Collectors.toList());
-    if (context._runSegmentLevelValidation) {
-      runSegmentLevelValidation(tableConfig);
-    }
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
+    }
+
+    if (context._runSegmentLevelValidation) {
+      runSegmentLevelValidation(tableConfig);
+    } else {
+      LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
   }
 

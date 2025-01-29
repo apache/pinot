@@ -18,44 +18,40 @@
  */
 package org.apache.pinot.integration.tests;
 
+import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
 import org.testng.annotations.Test;
 
 
-public class PauselessRealtimeIngestionIntegrationTest extends BasePauselessRealtimeIngestionTest {
+public class PauselessRealtimeIngestionIdealStateUpdateFailureTest
+    extends BasePauselessRealtimeIngestionTest {
+
+  private static final int NUM_REALTIME_SEGMENTS_WITH_FAILURE = 2;
+  private static final int NUM_REALTIME_SEGMENTS_ZK_METADATA_WITH_FAILURE = 4;
+  private static final long DEFAULT_COUNT_STAR_RESULT_WITH_FAILURE = 5000;
 
   @Override
   protected String getFailurePoint() {
-    return null;  // No failure point for basic test
+    return FailureInjectionUtils.FAULT_BEFORE_IDEAL_STATE_UPDATE;
   }
 
   @Override
   protected int getExpectedSegmentsWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full segments
+    return NUM_REALTIME_SEGMENTS_WITH_FAILURE;
   }
 
   @Override
   protected int getExpectedZKMetadataWithFailure() {
-    return NUM_REALTIME_SEGMENTS;  // Always expect full metadata
+    return NUM_REALTIME_SEGMENTS_ZK_METADATA_WITH_FAILURE;
   }
 
   @Override
   protected long getCountStarResultWithFailure() {
-    return DEFAULT_COUNT_STAR_RESULT;  // Always expect full count
+    return DEFAULT_COUNT_STAR_RESULT_WITH_FAILURE;
   }
 
-  @Override
-  protected void injectFailure() {
-    // Do nothing - no failure to inject
-  }
-
-  @Override
-  protected void disableFailure() {
-    // Do nothing - no failure to disable
-  }
-
-  @Test(description = "Ensure that all the segments are ingested, built and uploaded when pauseless consumption is "
-      + "enabled")
-  public void testSegmentAssignment() {
-    testBasicSegmentAssignment();
+  @Test
+  public void testSegmentAssignment()
+      throws Exception {
+    runValidationAndVerify();
   }
 }
