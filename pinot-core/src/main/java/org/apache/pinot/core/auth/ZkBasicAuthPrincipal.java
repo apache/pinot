@@ -31,8 +31,8 @@ public class ZkBasicAuthPrincipal extends BasicAuthPrincipal {
     private final String _role;
 
     public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
-        Set<String> tables, Set<String> permissions) {
-        super(name, token, tables, permissions);
+        Set<String> tables, Set<String> excludeTables, Set<String> permissions) {
+        super(name, token, tables, excludeTables, permissions);
         _component = component;
         _role = role;
         _password = password;

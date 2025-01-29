@@ -35,6 +35,7 @@ public class UserConfig extends BaseJsonConfig {
     public static final String ROLE_KEY = "role";
     public static final String AUTH_TOKEN_KEY = "authToken";
     public static final String TABLES_KEY = "tables";
+    public static final String EXCLUDE_TABLES_KEY = "excludeTables";
     public static final String PERMISSIONS_KEY = "permissions";
 
     @JsonPropertyDescription("The name of User")
@@ -52,6 +53,9 @@ public class UserConfig extends BaseJsonConfig {
     @JsonPropertyDescription("The tables owned of User")
     private List<String> _tables;
 
+    @JsonPropertyDescription("The tables excluded for User")
+    private List<String> _excludeTables;
+
     @JsonPropertyDescription("The table permission of User")
     private List<AccessType> _permissions;
 
@@ -61,6 +65,7 @@ public class UserConfig extends BaseJsonConfig {
         @JsonProperty(value = COMPONET_KEY, required = true) String component,
         @JsonProperty(value = ROLE_KEY, required = true) String role,
         @JsonProperty(value = TABLES_KEY) @Nullable List<String> tableList,
+        @JsonProperty(value = EXCLUDE_TABLES_KEY) @Nullable List<String> excludeTableList,
         @JsonProperty(value = PERMISSIONS_KEY) @Nullable List<AccessType> permissionList
     ) {
         Preconditions.checkArgument(username != null, "'username' must be configured");
@@ -72,6 +77,7 @@ public class UserConfig extends BaseJsonConfig {
         _componentType = ComponentType.valueOf(component.toUpperCase());
         _roleType = RoleType.valueOf(role.toUpperCase());
         _tables = tableList;
+        _excludeTables = excludeTableList;
         _permissions = permissionList;
     }
 
@@ -96,6 +102,11 @@ public class UserConfig extends BaseJsonConfig {
     @JsonProperty(TABLES_KEY)
     public List<String> getTables() {
         return _tables;
+    }
+
+    @JsonProperty(EXCLUDE_TABLES_KEY)
+    public List<String> getExcludeTables() {
+        return _excludeTables;
     }
 
     @JsonProperty(PERMISSIONS_KEY)
