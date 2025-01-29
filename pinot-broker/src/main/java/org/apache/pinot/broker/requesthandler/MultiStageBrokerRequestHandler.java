@@ -318,8 +318,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // Log query and stats
       _queryLogger.log(
-          new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity,
-              null));
+          new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, true,
+              requesterIdentity, null));
 
       return brokerResponse;
     } finally {

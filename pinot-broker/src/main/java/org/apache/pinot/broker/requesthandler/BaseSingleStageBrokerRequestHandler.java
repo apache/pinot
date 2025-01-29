@@ -863,7 +863,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Log query and stats
       _queryLogger.log(
-          new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, serverStats));
+          new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, false, requesterIdentity,
+              serverStats));
 
       return brokerResponse;
     } finally {
@@ -908,7 +909,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
-        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, null));
+        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, false, requesterIdentity, null));
     return brokerResponse;
   }
 

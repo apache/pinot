@@ -120,17 +120,19 @@ public class QueryLogger {
     private final RequestContext _requestContext;
     private final String _table;
     private final BrokerResponse _response;
+    private boolean _isMultiStageQueryEngine;
     @Nullable
     private final RequesterIdentity _identity;
     @Nullable
     private final ServerStats _serverStats;
 
     public QueryLogParams(RequestContext requestContext, String table, BrokerResponse response,
-        @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
+        boolean isMultiStageQueryEngine, @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
       _requestContext = requestContext;
       // NOTE: Passing table name separately because table name within request context is always raw table name.
       _table = table;
       _response = response;
+      _isMultiStageQueryEngine = isMultiStageQueryEngine;
       _identity = identity;
       _serverStats = serverStats;
     }
@@ -254,6 +256,12 @@ public class QueryLogger {
         } else {
           builder.append(CommonConstants.UNKNOWN);
         }
+      }
+    },
+    IS_MULTI_STAGE_QUERY_ENGINE("isMultiStageQueryEngine") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._isMultiStageQueryEngine);
       }
     };
 
