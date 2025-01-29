@@ -92,8 +92,6 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.exception.QueryException.QUERY_VALIDATION_ERROR;
-
 
 /**
  * {@code QueryDispatcher} dispatch a query to different workers.
@@ -465,7 +463,7 @@ public class QueryDispatcher {
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
       if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        throw QUERY_VALIDATION_ERROR;
+        throw QueryException.QUERY_VALIDATION_ERROR;
       }
 
       throw new RuntimeException("Received error query execution result block: " + queryExceptions);
