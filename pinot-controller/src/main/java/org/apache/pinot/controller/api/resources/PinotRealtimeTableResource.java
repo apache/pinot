@@ -178,7 +178,7 @@ public class PinotRealtimeTableResource {
       @QueryParam("batchStatusCheckIntervalSec")
       Integer batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
-          + " of segments and throw an exception. (default = 180)")
+          + " of segments (if not committed) and throw an exception. (default = 180)")
       @QueryParam("batchStatusCheckTimeoutSec")
       Integer batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
