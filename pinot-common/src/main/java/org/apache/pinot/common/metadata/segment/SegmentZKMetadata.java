@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
+  private static final String SEGMENT_NAME_KEY = "segmentName";
+  private static final String SIMPLE_FIELDS_KEY = "simpleFields";
   private static final String NULL = "null";
 
   private final ZNRecord _znRecord;
@@ -56,6 +62,16 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public String getSegmentName() {
     return _znRecord.getId();
+  }
+
+  public Map<String, String> getSimpleFields() {
+    return _simpleFields;
+  }
+
+  public void setSimpleFields(Map<String, String> simpleFields) {
+    _simpleFields = simpleFields;
+    _startTimeMsCached = false;
+    _endTimeMsCached = false;
   }
 
   public long getStartTimeMs() {
@@ -368,6 +384,25 @@ public class SegmentZKMetadata implements ZKMetadata {
       }
     }
     return metadataMap;
+  }
+
+  public String toJsonString() {
+    ObjectNode objectNode = JsonUtils.newObjectNode();
+    objectNode.put(SEGMENT_NAME_KEY, getSegmentName());
+    objectNode.set(SIMPLE_FIELDS_KEY, JsonUtils.objectToJsonNode(_simpleFields));
+    return objectNode.toString();
+  }
+
+  public static SegmentZKMetadata fromJsonString(String jsonString)
+      throws IOException {
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    String segmentName = jsonNode.get(SEGMENT_NAME_KEY).asText();
+    JsonNode simpleFieldsJsonNode = jsonNode.get(SIMPLE_FIELDS_KEY);
+    Map<String, String> simpleFields = JsonUtils.jsonNodeToObject(simpleFieldsJsonNode, new TypeReference<>() {
+    });
+    ZNRecord znRecord = new ZNRecord(segmentName);
+    znRecord.setSimpleFields(simpleFields);
+    return new SegmentZKMetadata(znRecord);
   }
 
   @Override
