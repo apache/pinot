@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -38,12 +38,12 @@ public class PredownloadMetrics {
 
   public void segmentDownloaded(boolean succeed, String segmentName, long segmentSizeBytes, long downloadTimeMs) {
     if (succeed) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_COUNT, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT, 1);
       // Report download speed in MB/s, avoid divide by 0
       _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_DOWNLOAD_SPEED,
           (segmentSizeBytes / BYTES_TO_MB) / (downloadTimeMs / 1000 + 1));
     } else {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.SEGMENT_DOWNLOAD_FAILURE_COUNT, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT, 1);
     }
   }
 
@@ -53,7 +53,7 @@ public class PredownloadMetrics {
     _serverMetrics.addTimedValue(ServerTimer.PREDOWNLOAD_TIME, totalDownloadTimeMs, TimeUnit.MILLISECONDS);
   }
 
-  public void preDownloadComplete(PredownloadCompleteReason reason) {
+  public void preDownloadComplete(PredownloadCompletionReason reason) {
     if (reason.isSucceed()) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_SUCCEED, 1);
     } else {

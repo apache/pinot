@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -23,7 +23,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class TestUtil {
+public class PredownloadTestUtil {
   public static final String SAMPLE_PROPERTIES_FILE_NAME = "data/sample_pinot_server.properties";
   public static final String SEGMENT_NAME = "segmentName";
   public static final String SECOND_SEGMENT_NAME = "secondSegmentName";
@@ -42,7 +42,7 @@ public class TestUtil {
   public static final long DISK_SIZE_BYTES = 1000;
   public static final String SESSION_ID = "sessionId";
 
-  private TestUtil() {
+  private PredownloadTestUtil() {
     throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
   }
 

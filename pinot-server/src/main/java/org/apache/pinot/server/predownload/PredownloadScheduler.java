@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -58,6 +58,7 @@ public class PredownloadScheduler {
   private static final String TMP_DIR_NAME = "tmp";
   // Segment download dir in format of "tmp-" + segmentName + "-" + UUID.randomUUID()
   private static final String TMP_DIR_FORMAT = "tmp-%s-%s";
+  // TODO: make download timeout configurable
   private static final long DOWNLOAD_SEGMENTS_TIMEOUT_MIN = 60;
   private static final long LOAD_SEGMENTS_TIMEOUT_MIN = 5;
   private final PropertiesConfiguration _properties;
@@ -70,18 +71,14 @@ public class PredownloadScheduler {
   Executor _executor;
   @VisibleForTesting
   Set<String> _failedSegments;
-  @SuppressWarnings("NullAway.Init")
   private PredownloadMetrics _predownloadMetrics;
   private int _numOfSkippedSegments;
   private int _numOfUnableToDownloadSegments;
   private int _numOfDownloadSegments;
   private long _totalDownloadedSizeBytes;
-  @SuppressWarnings("NullAway.Init")
-  private ZKClient _zkClient;
-  @SuppressWarnings("NullAway.Init")
-  private List<SegmentInfo> _segmentInfoList;
-  @SuppressWarnings("NullAway.Init")
-  private Map<String, TableInfo> _tableInfoMap;
+  private PredownloadZKClient _predownloadZkClient;
+  private List<PredownloadSegmentInfo> _predownloadSegmentInfoList;
+  private Map<String, PredownloadTableInfo> _tableInfoMap;
 
   public PredownloadScheduler(PropertiesConfiguration properties)
       throws Exception {
@@ -111,7 +108,6 @@ public class PredownloadScheduler {
           LOGGER.info("Trying to stop predownload process!");
           stop();
         } catch (Exception e) {
-          e.printStackTrace();
           LOGGER.error("error shutting down predownload process : ", e);
         }
       }
@@ -123,7 +119,7 @@ public class PredownloadScheduler {
     initializeSegmentFetcher();
     getSegmentsInfo();
     loadSegmentsFromLocal();
-    PredownloadCompleteReason reason = downloadSegments();
+    PredownloadCompletionReason reason = downloadSegments();
     long timeTaken = System.currentTimeMillis() - startTime;
     LOGGER.info(
         "Predownload process took {} sec, tried to download {} segments, skipped {} segments "
@@ -134,12 +130,12 @@ public class PredownloadScheduler {
     if (reason.isSucceed()) {
       _predownloadMetrics.preDownloadSucceed(_totalDownloadedSizeBytes, timeTaken);
     }
-    StatusRecorder.predownloadComplete(reason, _clusterName, _instanceId, String.join(",", _failedSegments));
+    PredownloadStatusRecorder.predownloadComplete(reason, _clusterName, _instanceId, String.join(",", _failedSegments));
   }
 
   public void stop() {
-    if (_zkClient != null) {
-      _zkClient.close();
+    if (_predownloadZkClient != null) {
+      _predownloadZkClient.close();
     }
     if (_executor != null) {
       ((ThreadPoolExecutor) _executor).shutdownNow();
@@ -148,27 +144,28 @@ public class PredownloadScheduler {
 
   void initializeZK() {
     LOGGER.info("Initializing ZK client with address: {} and instanceId: {}", _zkAddress, _instanceId);
-    _zkClient = new ZKClient(_zkAddress, _clusterName, _instanceId);
-    _zkClient.start();
+    _predownloadZkClient = new PredownloadZKClient(_zkAddress, _clusterName, _instanceId);
+    _predownloadZkClient.start();
   }
 
   void initializeMetricsReporter() {
     LOGGER.info("Initializing metrics reporter");
 
     _predownloadMetrics = new PredownloadMetrics();
-    StatusRecorder.registerMetrics(_predownloadMetrics);
+    PredownloadStatusRecorder.registerMetrics(_predownloadMetrics);
   }
 
   @VisibleForTesting
   void getSegmentsInfo() {
     LOGGER.info("Getting segments info from ZK");
-    _segmentInfoList = _zkClient.getSegmentsOfInstance(_zkClient.getDataAccessor());
-    if (_segmentInfoList.isEmpty()) {
-      PredownloadCompleteReason reason = PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD;
-      StatusRecorder.predownloadComplete(reason, _clusterName, _instanceId, "");
+    _predownloadSegmentInfoList = _predownloadZkClient.getSegmentsOfInstance(_predownloadZkClient.getDataAccessor());
+    if (_predownloadSegmentInfoList.isEmpty()) {
+      PredownloadCompletionReason reason = PredownloadCompletionReason.NO_SEGMENT_TO_PREDOWNLOAD;
+      PredownloadStatusRecorder.predownloadComplete(reason, _clusterName, _instanceId, "");
     }
     _tableInfoMap = new HashMap<>();
-    _zkClient.updateSegmentMetadata(_segmentInfoList, _tableInfoMap, _instanceDataManagerConfig);
+    _predownloadZkClient.updateSegmentMetadata(_predownloadSegmentInfoList, _tableInfoMap,
+        _instanceDataManagerConfig);
   }
 
   @VisibleForTesting
@@ -178,20 +175,21 @@ public class PredownloadScheduler {
     List<CompletableFuture<Void>> futures = new ArrayList<>();
 
     // Submit tasks to the executor
-    for (SegmentInfo segmentInfo : _segmentInfoList) {
+    for (PredownloadSegmentInfo predownloadSegmentInfo : _predownloadSegmentInfoList) {
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         boolean loadSegmentSuccess = false;
         try {
-          TableInfo tableInfo = _tableInfoMap.get(segmentInfo.getTableNameWithType());
-          if (tableInfo != null) {
-            loadSegmentSuccess = tableInfo.loadSegmentFromLocal(segmentInfo, _instanceDataManagerConfig);
+          PredownloadTableInfo predownloadTableInfo = _tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType());
+          if (predownloadTableInfo != null) {
+            loadSegmentSuccess =
+                predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, _instanceDataManagerConfig);
           }
         } catch (Exception e) {
           LOGGER.error("Failed to load from local for segment: {} of table: {} with issue ",
-              segmentInfo.getSegmentName(), segmentInfo.getTableNameWithType(), e);
+              predownloadSegmentInfo.getSegmentName(), predownloadSegmentInfo.getTableNameWithType(), e);
         }
-        if (!loadSegmentSuccess && segmentInfo.canBeDownloaded()) {
-          _failedSegments.add(segmentInfo.getSegmentName());
+        if (!loadSegmentSuccess && predownloadSegmentInfo.canBeDownloaded()) {
+          _failedSegments.add(predownloadSegmentInfo.getSegmentName());
         }
       }, _executor);
 
@@ -231,22 +229,23 @@ public class PredownloadScheduler {
       PinotCrypterFactory.init(pinotCrypterConfig);
     } catch (Exception e) {
       LOGGER.error("Failed to initialize segment fetcher factory: {}", e);
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.CANNOT_CONNECT_TO_DEEPSTORE, _clusterName,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.CANNOT_CONNECT_TO_DEEPSTORE,
+          _clusterName,
           _instanceId, "");
     }
   }
 
-  public PredownloadCompleteReason downloadSegments() {
+  public PredownloadCompletionReason downloadSegments() {
     LOGGER.info("Downloading segments from deep store");
     long startTime = System.currentTimeMillis();
     List<CompletableFuture<Void>> futures = new ArrayList<>();
 
     // Submit tasks to the executor
-    for (SegmentInfo segmentInfo : _segmentInfoList) {
-      if (segmentInfo.isDownloaded()) {
+    for (PredownloadSegmentInfo predownloadSegmentInfo : _predownloadSegmentInfoList) {
+      if (predownloadSegmentInfo.isDownloaded()) {
         _numOfSkippedSegments++;
         continue;
-      } else if (!segmentInfo.canBeDownloaded()) {
+      } else if (!predownloadSegmentInfo.canBeDownloaded()) {
         _numOfUnableToDownloadSegments++;
         continue;
       } else {
@@ -254,10 +253,11 @@ public class PredownloadScheduler {
       }
       CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
         try {
-          downloadSegment(segmentInfo);
+          downloadSegment(predownloadSegmentInfo);
         } catch (Exception e) {
-          LOGGER.error("Failed to download segment: {} of table: {} with issue ", segmentInfo.getSegmentName(),
-              segmentInfo.getTableNameWithType(), e);
+          LOGGER.error("Failed to download segment: {} of table: {} with issue ",
+              predownloadSegmentInfo.getSegmentName(),
+              predownloadSegmentInfo.getTableNameWithType(), e);
         }
       }, _executor);
 
@@ -281,59 +281,63 @@ public class PredownloadScheduler {
     }
     long timeTaken = System.currentTimeMillis() - startTime;
     LOGGER.info("Download segments from deep store took {} sec", timeTaken / 1000);
-    return _failedSegments.isEmpty() ? PredownloadCompleteReason.ALL_SEGMENTS_DOWNLOADED
-        : PredownloadCompleteReason.SOME_SEGMENTS_DOWNLOAD_FAILED;
+    return _failedSegments.isEmpty() ? PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED
+        : PredownloadCompletionReason.SOME_SEGMENTS_DOWNLOAD_FAILED;
   }
 
-  void downloadSegment(SegmentInfo segmentInfo)
+  void downloadSegment(PredownloadSegmentInfo predownloadSegmentInfo)
       throws Exception {
     try {
       long startTime = System.currentTimeMillis();
-      File tempRootDir = getTmpSegmentDataDir(segmentInfo);
-      if (_instanceDataManagerConfig.isStreamSegmentDownloadUntar() && segmentInfo.getCrypterName() == null) {
+      File tempRootDir = getTmpSegmentDataDir(predownloadSegmentInfo);
+      if (_instanceDataManagerConfig.isStreamSegmentDownloadUntar()
+          && predownloadSegmentInfo.getCrypterName() == null) {
         try {
           // TODO: increase rate limit here
-          File untaredSegDir = downloadAndStreamUntarWithRateLimit(segmentInfo, tempRootDir,
+          File untaredSegDir = downloadAndStreamUntarWithRateLimit(predownloadSegmentInfo, tempRootDir,
               _instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit());
-          moveSegment(segmentInfo, untaredSegDir);
+          moveSegment(predownloadSegmentInfo, untaredSegDir);
         } finally {
           FileUtils.deleteQuietly(tempRootDir);
         }
       } else {
         try {
-          File tarFile = downloadAndDecrypt(segmentInfo, tempRootDir);
-          untarAndMoveSegment(segmentInfo, tarFile, tempRootDir);
+          File tarFile = downloadAndDecrypt(predownloadSegmentInfo, tempRootDir);
+          untarAndMoveSegment(predownloadSegmentInfo, tarFile, tempRootDir);
         } finally {
           FileUtils.deleteQuietly(tempRootDir);
         }
       }
-      _failedSegments.remove(segmentInfo.getSegmentName());
-      TableInfo tableInfo = _tableInfoMap.get(segmentInfo.getTableNameWithType());
-      if (tableInfo != null) {
-        tableInfo.loadSegmentFromLocal(segmentInfo, _instanceDataManagerConfig);
+      _failedSegments.remove(predownloadSegmentInfo.getSegmentName());
+      PredownloadTableInfo predownloadTableInfo = _tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType());
+      if (predownloadTableInfo != null) {
+        predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, _instanceDataManagerConfig);
       }
-      _totalDownloadedSizeBytes += segmentInfo.getLocalSizeBytes();
-      _predownloadMetrics.segmentDownloaded(true, segmentInfo.getSegmentName(), segmentInfo.getLocalSizeBytes(),
+      _totalDownloadedSizeBytes += predownloadSegmentInfo.getLocalSizeBytes();
+      _predownloadMetrics.segmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),
+          predownloadSegmentInfo.getLocalSizeBytes(),
           System.currentTimeMillis() - startTime);
     } catch (Exception e) {
-      _failedSegments.add(segmentInfo.getSegmentName());
-      _predownloadMetrics.segmentDownloaded(false, segmentInfo.getSegmentName(), 0, 0);
+      _failedSegments.add(predownloadSegmentInfo.getSegmentName());
+      _predownloadMetrics.segmentDownloaded(false, predownloadSegmentInfo.getSegmentName(), 0, 0);
       throw e;
     }
   }
 
-  private File getTmpSegmentDataDir(SegmentInfo segmentInfo)
+  private File getTmpSegmentDataDir(PredownloadSegmentInfo predownloadSegmentInfo)
       throws Exception {
-    TableInfo tableInfo = _tableInfoMap.get(segmentInfo.getTableNameWithType());
-    if (tableInfo == null) {
-      throw new PredownloadException("Table info not found for segment: " + segmentInfo.getSegmentName());
+    PredownloadTableInfo predownloadTableInfo = _tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType());
+    if (predownloadTableInfo == null) {
+      throw new PredownloadException("Table info not found for segment: " + predownloadSegmentInfo.getSegmentName());
     }
     String tableDataDir =
-        tableInfo.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator + tableInfo.getTableConfig()
+        predownloadTableInfo.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator
+            + predownloadTableInfo.getTableConfig()
             .getTableName();
     File resourceTmpDir = new File(tableDataDir, TMP_DIR_NAME);
     File tmpDir =
-        new File(resourceTmpDir, String.format(TMP_DIR_FORMAT, segmentInfo.getSegmentName(), UUID.randomUUID()));
+        new File(resourceTmpDir,
+            String.format(TMP_DIR_FORMAT, predownloadSegmentInfo.getSegmentName(), UUID.randomUUID()));
     if (tmpDir.exists()) {
       FileUtils.deleteQuietly(tmpDir);
     }
@@ -343,13 +347,14 @@ public class PredownloadScheduler {
 
   // Reference: {#link
   // org.apache.pinot.core.data.manager.BaseTableDataManager#downloadAndStreamUntarWithRateLimit}
-  private File downloadAndStreamUntarWithRateLimit(SegmentInfo segmentInfo, File tempRootDir, long maxStreamRateInByte)
+  private File downloadAndStreamUntarWithRateLimit(PredownloadSegmentInfo predownloadSegmentInfo, File tempRootDir,
+      long maxStreamRateInByte)
       throws Exception {
-    String segmentName = segmentInfo.getSegmentName();
-    String tableNameWithType = segmentInfo.getTableNameWithType();
+    String segmentName = predownloadSegmentInfo.getSegmentName();
+    String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
     LOGGER.info("Trying to download segment {} using streamed download-untar with maxStreamRateInByte {}", segmentName,
         maxStreamRateInByte);
-    String uri = segmentInfo.getDownloadUrl();
+    String uri = predownloadSegmentInfo.getDownloadUrl();
     try {
       File ret =
           SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte, new AtomicInteger(0));
@@ -363,15 +368,15 @@ public class PredownloadScheduler {
   }
 
   // Reference: {#link org.apache.pinot.core.data.manager.BaseTableDataManager#downloadAndDecrypt}
-  File downloadAndDecrypt(SegmentInfo segmentInfo, File tempRootDir)
+  File downloadAndDecrypt(PredownloadSegmentInfo predownloadSegmentInfo, File tempRootDir)
       throws Exception {
-    String segmentName = segmentInfo.getSegmentName();
-    String tableNameWithType = segmentInfo.getTableNameWithType();
+    String segmentName = predownloadSegmentInfo.getSegmentName();
+    String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
     File tarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    String uri = segmentInfo.getDownloadUrl();
+    String uri = predownloadSegmentInfo.getDownloadUrl();
     try {
       LOGGER.info("Trying to download segment {}", segmentName);
-      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(uri, tarFile, segmentInfo.getCrypterName());
+      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(uri, tarFile, predownloadSegmentInfo.getCrypterName());
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableNameWithType, uri, tarFile, tarFile.length());
       return tarFile;
@@ -383,24 +388,25 @@ public class PredownloadScheduler {
     }
   }
 
-  private File moveSegment(SegmentInfo segmentInfo, File untaredSegDir)
+  private File moveSegment(PredownloadSegmentInfo predownloadSegmentInfo, File untaredSegDir)
       throws IOException {
     try {
-      File indexDir = segmentInfo.getSegmentDataDir(_tableInfoMap.get(segmentInfo.getTableNameWithType()));
+      File indexDir =
+          predownloadSegmentInfo.getSegmentDataDir(_tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType()));
       FileUtils.deleteDirectory(indexDir);
       FileUtils.moveDirectory(untaredSegDir, indexDir);
       return indexDir;
     } catch (Exception e) {
-      LOGGER.error("Failed to move segment: {} of table: {}", segmentInfo.getSegmentName(),
-          segmentInfo.getTableNameWithType());
+      LOGGER.error("Failed to move segment: {} of table: {}", predownloadSegmentInfo.getSegmentName(),
+          predownloadSegmentInfo.getTableNameWithType());
       throw e;
     }
   }
 
-  File untarAndMoveSegment(SegmentInfo segmentInfo, File tarFile, File tempRootDir)
+  File untarAndMoveSegment(PredownloadSegmentInfo predownloadSegmentInfo, File tarFile, File tempRootDir)
       throws IOException {
-    String segmentName = segmentInfo.getSegmentName();
-    String tableNameWithType = segmentInfo.getTableNameWithType();
+    String segmentName = predownloadSegmentInfo.getSegmentName();
+    String tableNameWithType = predownloadSegmentInfo.getTableNameWithType();
     File untarDir = new File(tempRootDir, segmentName);
     try {
       // If an exception is thrown when untarring, it means the tar file is broken
@@ -408,7 +414,8 @@ public class PredownloadScheduler {
       File untaredSegDir = TarCompressionUtils.untar(tarFile, untarDir).get(0);
       LOGGER.info("Uncompressed tar file: {} into target dir: {}", tarFile, untarDir);
       // Replace the existing index directory.
-      File indexDir = segmentInfo.getSegmentDataDir(_tableInfoMap.get(segmentInfo.getTableNameWithType()));
+      File indexDir =
+          predownloadSegmentInfo.getSegmentDataDir(_tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType()));
       FileUtils.deleteDirectory(indexDir);
       FileUtils.moveDirectory(untaredSegDir, indexDir);
       LOGGER.info("Successfully downloaded segment: {} of table: {} to index dir: {}", segmentName, tableNameWithType,

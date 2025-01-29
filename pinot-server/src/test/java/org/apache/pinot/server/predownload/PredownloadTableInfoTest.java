@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -34,7 +34,7 @@ import org.mockito.MockedStatic;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.server.predownload.TestUtil.*;
+import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -43,8 +43,8 @@ import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
 
 
-public class TableInfoTest {
-  private TableInfo _tableInfo;
+public class PredownloadTableInfoTest {
+  private PredownloadTableInfo _predownloadTableInfo;
   private TableConfig _tableConfig;
   private InstanceDataManagerConfig _instanceDataManagerConfig;
   private PinotConfiguration _pinotConfiguration;
@@ -57,20 +57,20 @@ public class TableInfoTest {
     Schema schema = new Schema();
     _instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(_instanceDataManagerConfig.getConfig()).thenReturn(_pinotConfiguration);
-    _tableInfo = new TableInfo(TABLE_NAME, _tableConfig, schema, _instanceDataManagerConfig);
+    _predownloadTableInfo = new PredownloadTableInfo(TABLE_NAME, _tableConfig, schema, _instanceDataManagerConfig);
   }
 
   @Test
   public void testGetter() {
-    assertEquals(_tableConfig, _tableInfo.getTableConfig());
+    assertEquals(_tableConfig, _predownloadTableInfo.getTableConfig());
   }
 
   @Test
   public void testLoadSegmentFromLocal()
       throws Exception {
-    SegmentInfo segmentInfo = new SegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    PredownloadSegmentInfo predownloadSegmentInfo = new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME);
     SegmentZKMetadata metadata = createSegmentZKMetadata();
-    segmentInfo.updateSegmentInfo(metadata);
+    predownloadSegmentInfo.updateSegmentInfo(metadata);
     InstanceDataManagerConfig instanceDataManagerConfig = spy(new HelixInstanceDataManagerConfig(_pinotConfiguration));
 
     SegmentDirectoryLoader segmentDirectoryLoader = mock(SegmentDirectoryLoader.class);
@@ -88,10 +88,10 @@ public class TableInfoTest {
           .thenReturn(segmentDirectoryLoader);
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(CRC));
 
-      assertTrue(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
-      assertEquals(segmentInfo.getLocalCrc(), String.valueOf(CRC));
-      assertTrue(segmentInfo.isDownloaded());
-      assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
+      assertTrue(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(CRC));
+      assertTrue(predownloadSegmentInfo.isDownloaded());
+      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
     }
 
     // Has segment with different CRC
@@ -103,10 +103,10 @@ public class TableInfoTest {
       long newCrc = CRC + 1;
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(newCrc));
 
-      assertFalse(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
-      assertEquals(segmentInfo.getLocalCrc(), String.valueOf(newCrc));
-      assertFalse(segmentInfo.isDownloaded());
-      assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(newCrc));
+      assertFalse(predownloadSegmentInfo.isDownloaded());
+      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
     }
 
     // Does not have segment
@@ -118,9 +118,9 @@ public class TableInfoTest {
       when(segmentMetadataImpl.getCrc()).thenReturn(null);
       doThrow(IOException.class).when(segmentDirectory).close();
 
-      assertFalse(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
-      assertFalse(segmentInfo.isDownloaded());
-      assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertFalse(predownloadSegmentInfo.isDownloaded());
+      assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
     }
   }
 }

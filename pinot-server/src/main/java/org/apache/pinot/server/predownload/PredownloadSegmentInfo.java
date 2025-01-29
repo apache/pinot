@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -33,8 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentInfo {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentInfo.class);
+public class PredownloadSegmentInfo {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PredownloadSegmentInfo.class);
   private final String _segmentName;
   private final String _tableNameWithType;
 
@@ -54,7 +54,7 @@ public class SegmentInfo {
   @SuppressWarnings("NullAway.Init")
   private String _tier;
 
-  public SegmentInfo(String tableNameWithType, String segmentName) {
+  public PredownloadSegmentInfo(String tableNameWithType, String segmentName) {
     _segmentName = segmentName;
     _tableNameWithType = tableNameWithType;
     _localSizeBytes = 0;
@@ -113,7 +113,8 @@ public class SegmentInfo {
   }
 
   @Nullable
-  public SegmentDirectory initSegmentDirectory(IndexLoadingConfig indexLoadingConfig, TableInfo tableInfo) {
+  public SegmentDirectory initSegmentDirectory(IndexLoadingConfig indexLoadingConfig,
+      PredownloadTableInfo predownloadTableInfo) {
     try {
       SegmentDirectoryLoaderContext loaderContext =
           new SegmentDirectoryLoaderContext.Builder().setTableConfig(indexLoadingConfig.getTableConfig())
@@ -124,7 +125,7 @@ public class SegmentInfo {
               .setSegmentDirectoryConfigs(indexLoadingConfig.getSegmentDirectoryConfigs()).build();
       SegmentDirectoryLoader segmentDirectoryLoader =
           SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
-      File indexDir = getSegmentDataDir(tableInfo, true);
+      File indexDir = getSegmentDataDir(predownloadTableInfo, true);
       return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
     } catch (Exception e) {
       LOGGER.warn("Failed to initialize SegmentDirectory for segment: {} of table: {}", _segmentName,
@@ -133,32 +134,33 @@ public class SegmentInfo {
     }
   }
 
-  public File getSegmentDataDir(@Nullable TableInfo tableInfo) {
-    if (tableInfo == null) {
+  public File getSegmentDataDir(@Nullable PredownloadTableInfo predownloadTableInfo) {
+    if (predownloadTableInfo == null) {
       throw new PredownloadException("Table info not found for segment: " + _segmentName);
     }
     String tableDataDir =
-        tableInfo.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator + tableInfo.getTableConfig()
+        predownloadTableInfo.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator
+            + predownloadTableInfo.getTableConfig()
             .getTableName();
     return new File(tableDataDir, _segmentName);
   }
 
-  File getSegmentDataDir(@Nullable TableInfo tableInfo, boolean withTier) {
+  File getSegmentDataDir(@Nullable PredownloadTableInfo predownloadTableInfo, boolean withTier) {
     if (_tier == null || !withTier) {
-      return getSegmentDataDir(tableInfo);
+      return getSegmentDataDir(predownloadTableInfo);
     }
     try {
-      if (tableInfo == null) {
+      if (predownloadTableInfo == null) {
         throw new PredownloadException("Table info not found for segment: " + _segmentName);
       }
-      String tierDataDir = TierConfigUtils.getDataDirForTier(tableInfo.getTableConfig(), _tier,
-          tableInfo.getInstanceDataManagerConfig().getTierConfigs());
+      String tierDataDir = TierConfigUtils.getDataDirForTier(predownloadTableInfo.getTableConfig(), _tier,
+          predownloadTableInfo.getInstanceDataManagerConfig().getTierConfigs());
       File tierTableDataDir = new File(tierDataDir, _tableNameWithType);
       return new File(tierTableDataDir, _segmentName);
     } catch (Exception e) {
       LOGGER.warn("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}", _segmentName,
           _tableNameWithType, _tier, e.getMessage());
-      return getSegmentDataDir(tableInfo);
+      return getSegmentDataDir(predownloadTableInfo);
     }
   }
 
