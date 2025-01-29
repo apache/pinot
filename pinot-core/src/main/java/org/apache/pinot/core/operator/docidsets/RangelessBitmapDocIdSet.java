@@ -25,13 +25,15 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   private final RangelessBitmapDocIdIterator _iterator;
+  private final boolean _isAlwaysFalse;
 
   public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
-    _iterator = new RangelessBitmapDocIdIterator(docIds);
+    this(new RangelessBitmapDocIdIterator(docIds));
   }
 
   public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
     _iterator = iterator;
+    _isAlwaysFalse = !_iterator.hasNext();
   }
 
   @Override
@@ -42,5 +44,10 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public boolean isAlwaysFalse() {
+    return _isAlwaysFalse;
   }
 }
