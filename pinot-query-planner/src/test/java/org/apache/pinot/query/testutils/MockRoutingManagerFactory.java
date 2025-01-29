@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.query.testutils;
 
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -56,14 +57,14 @@ public class MockRoutingManagerFactory {
   private final Map<String, Schema> _schemaMap;
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
-  private final Map<String, Map<ServerInstance, ServerRouteInfo>> _tableServerSegmentsMap;
+  private final Map<String, Map<String, List<ServerInstance>>> _tableSegmentServersMap;
 
   public MockRoutingManagerFactory(int... ports) {
     _tableNameMap = new HashMap<>();
     _schemaMap = new HashMap<>();
     _hybridTables = new HashSet<>();
     _serverInstances = new HashMap<>();
-    _tableServerSegmentsMap = new HashMap<>();
+    _tableSegmentServersMap = new HashMap<>();
     for (int port : ports) {
       _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
     }
@@ -88,18 +89,39 @@ public class MockRoutingManagerFactory {
 
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
-    _tableServerSegmentsMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
-        .computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), null)).getSegments()
-        .add(segmentName);
+    _tableSegmentServersMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
+        .computeIfAbsent(segmentName, k -> new ArrayList<>())
+        .add(serverInstance);
   }
 
   public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
-    Map<String, RoutingTable> routingTableMap = new HashMap<>();
-    _tableServerSegmentsMap.forEach((tableNameWithType, serverSegmentsMap) -> {
-      RoutingTable fakeRoutingTable = new RoutingTable(serverSegmentsMap, Collections.emptyList(), 0);
-      routingTableMap.put(tableNameWithType, fakeRoutingTable);
-    });
-    return new FakeRoutingManager(routingTableMap, _hybridTables, partitionInfoMap, _serverInstances);
+    int numTables = _tableSegmentServersMap.size();
+    Map<String, RoutingTable> routingTableMap = Maps.newHashMapWithExpectedSize(numTables);
+    Map<String, List<String>> tableSegmentsMap = Maps.newHashMapWithExpectedSize(numTables);
+    int serverId = 0;
+    for (Map.Entry<String, Map<String, List<ServerInstance>>> entry : _tableSegmentServersMap.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      Map<String, List<ServerInstance>> segmentServersMap = entry.getValue();
+      Map<ServerInstance, ServerRouteInfo> serverRouteInfoMap = new HashMap<>();
+      for (Map.Entry<String, List<ServerInstance>> segmentServersEntry : segmentServersMap.entrySet()) {
+        String segment = segmentServersEntry.getKey();
+        List<ServerInstance> servers = segmentServersEntry.getValue();
+        ServerInstance server;
+        int numServers = servers.size();
+        if (numServers == 1) {
+          server = servers.get(0);
+        } else {
+          server = servers.get(serverId % numServers);
+          serverId++;
+        }
+        serverRouteInfoMap.computeIfAbsent(server, k -> new ServerRouteInfo(new ArrayList<>(), null))
+            .getSegments()
+            .add(segment);
+      }
+      routingTableMap.put(tableNameWithType, new RoutingTable(serverRouteInfoMap, List.of(), 0));
+      tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
+    }
+    return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, partitionInfoMap, _serverInstances);
   }
 
   public TableCache buildTableCache() {
@@ -136,12 +158,15 @@ public class MockRoutingManagerFactory {
 
   private static class FakeRoutingManager implements RoutingManager {
     private final Map<String, RoutingTable> _routingTableMap;
+    private final Map<String, List<String>> _segmentsMap;
     private final Set<String> _hybridTables;
     private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
 
-    public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Set<String> hybridTables,
-        @Nullable Map<String, TablePartitionInfo> partitionInfoMap, Map<String, ServerInstance> serverInstances) {
+    public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
+        Set<String> hybridTables, @Nullable Map<String, TablePartitionInfo> partitionInfoMap,
+        Map<String, ServerInstance> serverInstances) {
+      _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
       _partitionInfoMap = partitionInfoMap;
@@ -153,10 +178,18 @@ public class MockRoutingManagerFactory {
       return _serverInstances;
     }
 
+    @Nullable
     @Override
     public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
       String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
       return _routingTableMap.get(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
+    public List<String> getSegments(BrokerRequest brokerRequest) {
+      String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
+      return _segmentsMap.get(tableNameWithType);
     }
 
     @Override

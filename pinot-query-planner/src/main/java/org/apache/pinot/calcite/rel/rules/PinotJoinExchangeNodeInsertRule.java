@@ -102,7 +102,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       List<Integer> keys, RelNode child) {
     switch (distributionType) {
       case LOCAL:
-        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON);
+        // NOTE: We use SINGLETON to represent local distribution. Add keys to the exchange because we might want to
+        //       switch it to HASH distribution to increase parallelism. See MailboxAssignmentVisitor for details.
+        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON, keys);
       case HASH:
         Preconditions.checkArgument(!keys.isEmpty(), "Hash distribution requires join keys");
         return PinotLogicalExchange.create(child, RelDistributions.hash(keys));
@@ -117,7 +119,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       List<Integer> keys, RelNode child) {
     switch (distributionType) {
       case LOCAL:
-        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON);
+        // NOTE: We use SINGLETON to represent local distribution. Add keys to the exchange because we might want to
+        //       switch it to HASH distribution to increase parallelism. See MailboxAssignmentVisitor for details.
+        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON, keys);
       case HASH:
         Preconditions.checkArgument(!keys.isEmpty(), "Hash distribution requires join keys");
         return PinotLogicalExchange.create(child, RelDistributions.hash(keys));
