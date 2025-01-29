@@ -122,6 +122,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -382,7 +383,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public void start() {
+  public void start()
+      throws Exception {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -406,6 +408,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         LOGGER.error("Invalid mode: {}", _controllerMode);
         break;
     }
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(
+        _config.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+    GroovyFunctionEvaluator.setMetrics(_controllerMetrics, ControllerMeter.GROOVY_SECURITY_VIOLATIONS);
+
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));

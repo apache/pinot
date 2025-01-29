@@ -26,13 +26,14 @@ import java.util.Map;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
 import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -61,7 +62,7 @@ public class GroovyFunctionEvaluatorTest {
       GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
       GenericRow row = new GenericRow();
       Object result = groovyFunctionEvaluator.evaluate(row);
-      Assert.assertEquals(2, result);
+      assertEquals(2, result);
     }
   }
 
@@ -92,10 +93,8 @@ public class GroovyFunctionEvaluatorTest {
 
     for (String script : scripts) {
       try {
-        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
-        GenericRow row = new GenericRow();
-        groovyFunctionEvaluator.evaluate(row);
-        Assert.fail("Groovy analyzer failed to catch malicious script");
+        new GroovyFunctionEvaluator(script);
+        fail("Groovy analyzer failed to catch malicious script");
       } catch (Exception ignored) {
       }
     }
@@ -121,7 +120,7 @@ public class GroovyFunctionEvaluatorTest {
         GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
         GenericRow row = new GenericRow();
         groovyFunctionEvaluator.evaluate(row);
-        Assert.fail(String.format("Groovy analyzer failed to catch malicious script: %s", script));
+        fail(String.format("Groovy analyzer failed to catch malicious script: %s", script));
       } catch (Exception ignored) {
       }
     }
@@ -132,10 +131,10 @@ public class GroovyFunctionEvaluatorTest {
       Object expectedResult) {
 
     GroovyFunctionEvaluator groovyExpressionEvaluator = new GroovyFunctionEvaluator(transformFunction);
-    Assert.assertEquals(groovyExpressionEvaluator.getArguments(), arguments);
+    assertEquals(groovyExpressionEvaluator.getArguments(), arguments);
 
     Object result = groovyExpressionEvaluator.evaluate(genericRow);
-    Assert.assertEquals(result, expectedResult);
+    assertEquals(result, expectedResult);
   }
 
   @DataProvider(name = "groovyFunctionEvaluationDataProvider")

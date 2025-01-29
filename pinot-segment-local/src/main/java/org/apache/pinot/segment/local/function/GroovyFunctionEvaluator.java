@@ -28,8 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.control.CompilerConfiguration;
@@ -64,7 +63,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
   private static GroovyStaticAnalyzerConfig _config;
-  private static ServerMetrics _metrics;
+  private static AbstractMetrics _metrics;
+  private static AbstractMetrics.Meter _securityViolationCounter;
 
   private final List<String> _arguments;
   private final int _numArguments;
@@ -201,16 +201,32 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static void incrementSecurityViolationCounter() {
     synchronized (GroovyFunctionEvaluator.class) {
       if (_metrics != null) {
-        _metrics.addMeteredGlobalValue(ServerMeter.GROOVY_SECURITY_VIOLATIONS, 1);
+        _metrics.addMeteredGlobalValue(_securityViolationCounter, 1);
       }
     }
   }
 
-  public static void setServerMetrics(ServerMetrics metrics) {
+  public static void setMetrics(AbstractMetrics metrics, AbstractMetrics.Meter securityViolationCounter) {
     synchronized (GroovyFunctionEvaluator.class) {
       _metrics = metrics;
+      _securityViolationCounter = securityViolationCounter;
     }
   }
+
+  public static void configureGroovySecurity(String groovyASTConfig) throws Exception {
+    try {
+      if (groovyASTConfig != null) {
+        setConfig(GroovyStaticAnalyzerConfig.fromJson(groovyASTConfig));
+      } else {
+        LOGGER.info("No Groovy Security Configuration found, Groovy static analysis is disabled");
+      }
+    } catch (Exception ex) {
+      // If there was an issue reading the security configuration then send an exception to the startup routine.
+      LOGGER.error("Failed to read config from ZK");
+      throw ex;
+    }
+  }
+
 
   /**
    * Initialize or update the configuration for the Groovy Static Analyzer.

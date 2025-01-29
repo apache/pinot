@@ -89,6 +89,7 @@ public class GroovyStaticAnalyzerConfigTest {
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertEquals(GroovyStaticAnalyzerConfig.getDefaultAllowedImports(), decodedConfig.getAllowedStaticImports());
     Assert.assertNull(decodedConfig.getDisallowedMethodNames());
+    Assert.assertFalse(decodedConfig.isMethodDefinitionAllowed());
   }
 
   @Test
