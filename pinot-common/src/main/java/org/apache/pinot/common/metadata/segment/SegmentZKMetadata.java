@@ -64,6 +64,16 @@ public class SegmentZKMetadata implements ZKMetadata {
     return _znRecord.getId();
   }
 
+  public Map<String, String> getSimpleFields() {
+    return _simpleFields;
+  }
+
+  public void setSimpleFields(Map<String, String> simpleFields) {
+    _simpleFields = simpleFields;
+    _startTimeMsCached = false;
+    _endTimeMsCached = false;
+  }
+
   public long getStartTimeMs() {
     if (!_startTimeMsCached) {
       long startTimeMs = -1;
@@ -393,16 +403,6 @@ public class SegmentZKMetadata implements ZKMetadata {
     ZNRecord znRecord = new ZNRecord(segmentName);
     znRecord.setSimpleFields(simpleFields);
     return new SegmentZKMetadata(znRecord);
-  }
-
-  public void copySimpleFieldsFrom(SegmentZKMetadata segmentZKMetadata) {
-    ZNRecord znRecord = segmentZKMetadata.toZNRecord();
-    _simpleFields.clear();
-    _simpleFields.putAll(znRecord.getSimpleFields());
-
-    // Reset the cached values
-    _startTimeMsCached = false;
-    _endTimeMsCached = false;
   }
 
   @Override
