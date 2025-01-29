@@ -547,6 +547,17 @@ public class DateTimeFunctions {
     return System.currentTimeMillis();
   }
 
+  @ScalarFunction
+  public static long sleep(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      //TODO: handle interruption
+      //Thread.currentThread().interrupt();
+    }
+    return millis;
+  }
+
   /**
    * Return time as epoch millis before the given period (in ISO-8601 duration format).
    * Examples:
@@ -1259,16 +1270,5 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static int extract(String interval, long timestamp) {
     return DateTimeUtils.extract(DateTimeUtils.ExtractFieldType.valueOf(interval), timestamp);
-  }
-
-  @ScalarFunction
-  public static long sleep(long ms) {
-    assert ms >= 0;
-    try {
-      Thread.sleep(ms);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    return ms;
   }
 }

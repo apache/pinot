@@ -20,7 +20,6 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Random;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -219,12 +218,5 @@ public class ArithmeticFunctions {
   public static long byteswapLong(long a) {
     // Skip the heading 0s in the long value
     return Long.reverseBytes(a);
-  }
-
-  @ScalarFunction(names = {"rand", "random"})
-  public static long random(long min, long max) {
-    assert max >= min;
-    Random rnd = new Random();
-    return min + (long) (rnd.nextDouble() * (max - min));
   }
 }

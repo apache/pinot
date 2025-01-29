@@ -54,16 +54,6 @@ public class ArithmeticFunctionsTest {
     testFunction(functionExpression, expectedArguments, row, expectedResult);
   }
 
-  @Test
-  public void testRandomFunction() {
-    GenericRow row = new GenericRow();
-    row.putValue("a", 1000L);
-    row.putValue("b", 2000L);
-    testFunction("rand(a,b)", Lists.newArrayList("a", "b"), row, result -> {
-      Assert.assertTrue((Long) result >= 1000L && (Long) result <= 2000L);
-    });
-  }
-
   @DataProvider(name = "arithmeticFunctionsDataProvider")
   public Object[][] arithmeticFunctionsDataProvider() {
     List<Object[]> inputs = new ArrayList<>();

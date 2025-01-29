@@ -880,20 +880,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  private boolean maybeRemoveClientQueryId(long requestId) {
-    if (!isQueryCancellationEnabled()) {
-      return false;
-    }
-    // we protected insertion with isBlank, so null is enough to assume that no entry exists
-    String clientQueryId = _clientQueryIds.remove(requestId);
-    if (clientQueryId != null) {
-      LOGGER.debug("client query id {} removed for requestId {}", clientQueryId, requestId);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
   @VisibleForTesting
   static String addRoutingPolicyInErrMsg(String errorMessage, String realtimeRoutingPolicy,
       String offlineRoutingPolicy) {
