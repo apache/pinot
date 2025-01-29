@@ -46,7 +46,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -111,7 +110,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
    */
-  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) throws ProcessingException {
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult = _queryEnvironment.planQuery(sql, sqlNodeAndOptions,

@@ -47,10 +47,10 @@ import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -398,7 +398,7 @@ public class QueryDispatcher {
       DispatchableSubPlan subPlan,
       long timeoutMs,
       Map<String, String> queryOptions,
-      MailboxService mailboxService) throws ProcessingException {
+      MailboxService mailboxService) {
 
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
@@ -462,11 +462,14 @@ public class QueryDispatcher {
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
+      String errorMessage = "Received error query execution result block: " + queryExceptions;
       if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        throw QueryException.QUERY_VALIDATION_ERROR;
+        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
+        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
+        throw queryInfoException;
       }
 
-      throw new RuntimeException("Received error query execution result block: " + queryExceptions);
+      throw new RuntimeException(errorMessage);
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();

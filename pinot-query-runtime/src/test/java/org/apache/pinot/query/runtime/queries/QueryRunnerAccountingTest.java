@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.queries;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -92,7 +91,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
   }
 
   @Test
-  void testWithDefaultThreadAccountant() throws ProcessingException {
+  void testWithDefaultThreadAccountant() {
     Tracing.DefaultThreadResourceUsageAccountant accountant = new Tracing.DefaultThreadResourceUsageAccountant();
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
@@ -107,7 +106,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
   }
 
   @Test
-  void testWithPerQueryAccountantFactory() throws ProcessingException {
+  void testWithPerQueryAccountantFactory() {
     HashMap<String, Object> configs = getAccountingConfig();
 
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
@@ -128,7 +127,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
   }
 
   @Test
-  void testDisableSamplingForMSE() throws ProcessingException {
+  void testDisableSamplingForMSE() {
     HashMap<String, Object> configs = getAccountingConfig();
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
 
@@ -162,7 +161,7 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
   }
 
   @Test(expectedExceptions = EarlyTerminationException.class)
-  void testInterrupt() throws ProcessingException {
+  void testInterrupt() {
     HashMap<String, Object> configs = getAccountingConfig();
 
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);

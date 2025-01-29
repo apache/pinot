@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -167,7 +166,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares with expected row count only.
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
-  public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) throws ProcessingException {
+  public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
     ResultTable resultTable = queryRunner(sql, false).getResultTable();
     Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
@@ -207,7 +206,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       Assert.assertTrue(
           exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
               "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
-          "Exception message didn't start with proper heading: " + exceptionMessage);
+          "Exception message didn't start with proper heading: " + expectedError);
       Assert.assertTrue(exceptionMessage.contains(expectedError),
           "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
     }

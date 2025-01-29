@@ -45,6 +45,7 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -271,7 +272,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       } catch (Throwable t) {
         ProcessingException queryException = QueryException.QUERY_EXECUTION_ERROR;
-        if (t.equals(QueryException.QUERY_VALIDATION_ERROR)) {
+        if (t instanceof QueryInfoException
+            && ((QueryInfoException) t).getProcessingException().equals(QueryException.QUERY_VALIDATION_ERROR)) {
           // provide more specific error code if available
           queryException = QueryException.QUERY_VALIDATION_ERROR;
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
