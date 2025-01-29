@@ -519,7 +519,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize
-            + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec, null);
+                + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec,
+            null);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
