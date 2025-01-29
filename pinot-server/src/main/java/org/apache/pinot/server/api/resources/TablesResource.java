@@ -29,6 +29,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -61,6 +62,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
@@ -78,7 +80,6 @@ import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.helix.ZKMetadataUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -104,7 +105,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -825,33 +825,8 @@ public class TablesResource {
 
     File segmentTarFile = null;
     try {
-      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-      File segmentTarUploadDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
-      segmentTarUploadDir.mkdir();
-
-      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
-          "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
-
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
-
-      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
-      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl;
-      if (timeoutMs <= 0) {
-        // Use default timeout if passed timeout is not positive
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      } else {
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
-      }
-      if (segmentDownloadUrl == null) {
-        throw new WebApplicationException(
-            String.format("Failed to upload table %s segment %s to segment store", realtimeTableName, segmentName),
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      return segmentDownloadUrl.toString();
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      return uploadSegment(segmentTarFile, tableNameWithType, segmentName, timeoutMs);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
@@ -873,6 +848,7 @@ public class TablesResource {
    * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
    * @throws Exception if an error occurred during the segment upload.
    */
+  @Deprecated
   @POST
   @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
   @Produces(MediaType.APPLICATION_JSON)
@@ -919,38 +895,13 @@ public class TablesResource {
           String.format("Table %s segment %s does not exist", realtimeTableNameWithType, segmentName),
           Response.Status.NOT_FOUND);
     }
-    String crc = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
 
     File segmentTarFile = null;
     try {
-      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-      File segmentTarUploadDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
-      segmentTarUploadDir.mkdir();
-
-      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          realtimeTableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, "Invalid table / segment name: %s, %s",
-          realtimeTableNameWithType, segmentName);
-
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
-
-      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
-      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl;
-      if (timeoutMs <= 0) {
-        // Use default timeout if passed timeout is not positive
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      } else {
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
-      }
-      if (segmentDownloadUrl == null) {
-        throw new WebApplicationException(
-            String.format("Failed to upload table %s segment %s to segment store", realtimeTableNameWithType,
-                segmentName), Response.Status.INTERNAL_SERVER_ERROR);
-      }
-      return new TableLLCSegmentUploadResponse(segmentName, Long.parseLong(crc), segmentDownloadUrl.toString());
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableNameWithType, segmentName, timeoutMs);
+      return new TableLLCSegmentUploadResponse(segmentName,
+          Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc()), downloadUrl);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
@@ -958,122 +909,124 @@ public class TablesResource {
   }
 
   /**
-   * Upload a low level consumer segment to segment store and return the segment download url, crc and
-   * other segment metadata. This endpoint is used when segment store copy is unavailable for committed
-   * low level consumer segments.
-   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
-   * to upload it.
+   * Upload a real-time committed segment to segment store and return the segment ZK metadata in json format.
+   * This endpoint is used when segment store copy is unavailable for real-time committed segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment to
+   * upload it.
    *
    * @see <a href="https://tinyurl.com/f63ru4sb></a>
-   * @param realtimeTableNameWithType table name with type.
+   * @param realtimeTableName table name with type.
    * @param segmentName name of the segment to be uploaded
    * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
    *                  would be used.
-   * @return full url where the segment is uploaded, crc, segmentName and other segment metadata.
+   * @return segment ZK metadata in json format.
    * @throws Exception if an error occurred during the segment upload.
    */
   @POST
-  @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegmentToDeepStore")
+  @Path("/segments/{realtimeTableName}/{segmentName}/uploadCommittedSegment")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
-      + "crc and other segment metadata",
-      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
-          + "and other segment metadata")
+  @ApiOperation(value = "Upload a real-time committed segment to segment store and return the segment ZK metadata",
+      notes = "Upload a real-time committed segment to segment store and return the segment ZK metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class),
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
-      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
   })
-  public String uploadLLCSegmentToDeepStore(
-      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableNameWithType")
-      String realtimeTableNameWithType,
+  public String uploadCommittedSegment(
+      @ApiParam(value = "Name of the real-time table", required = true) @PathParam("realtimeTableName")
+      String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
-      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
-      @Context HttpHeaders headers)
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs, @Context HttpHeaders headers)
       throws Exception {
-    realtimeTableNameWithType = DatabaseUtils.translateTableName(realtimeTableNameWithType, headers);
-    LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
-        realtimeTableNameWithType);
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
+    LOGGER.info("Received a request to upload committed segment: {} for table: {}", segmentName, realtimeTableName);
 
-    // Check it's realtime table
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableNameWithType);
-    if (TableType.REALTIME != tableType) {
+    // Check it's real-time table
+    if (!TableNameBuilder.isRealtimeTableResource(realtimeTableName)) {
       throw new WebApplicationException(
-          String.format("Cannot upload low level consumer segment for a non-realtime table: %s",
-              realtimeTableNameWithType), Response.Status.BAD_REQUEST);
+          "Cannot upload committed segment for a non-realtime table: " + realtimeTableName,
+          Response.Status.BAD_REQUEST);
     }
 
     // Check the segment is low level consumer segment
     if (!LLCSegmentName.isLLCSegment(segmentName)) {
-      throw new WebApplicationException(String.format("Segment %s is not a low level consumer segment", segmentName),
+      throw new WebApplicationException(String.format("Segment: %s is not a low level consumer segment", segmentName),
           Response.Status.BAD_REQUEST);
     }
 
     TableDataManager tableDataManager =
-        ServerResourceUtils.checkGetTableDataManager(_serverInstance, realtimeTableNameWithType);
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, realtimeTableName);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     if (segmentDataManager == null) {
       throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist", realtimeTableNameWithType, segmentName),
+          String.format("Failed to find table: %s, segment: %s", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
     if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
       throw new WebApplicationException(
-          String.format("Table %s segment %s does not exist on the disk", realtimeTableNameWithType, segmentName),
+          String.format("Table: %s, segment: %s hasn't been sealed", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
 
     File segmentTarFile = null;
     try {
-      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
-      File segmentTarUploadDir =
-          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
-      segmentTarUploadDir.mkdir();
+      segmentTarFile = createSegmentTarFile(tableDataManager, segmentName);
+      String downloadUrl = uploadSegment(segmentTarFile, realtimeTableName, segmentName, timeoutMs);
 
-      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          realtimeTableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, "Invalid table / segment name: %s, %s",
-          realtimeTableNameWithType, segmentName);
-
-      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
-          segmentTarFile);
-
-      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
-      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
-      URI segmentDownloadUrl;
-      if (timeoutMs <= 0) {
-        // Use default timeout if passed timeout is not positive
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
-      } else {
-        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
-      }
-      if (segmentDownloadUrl == null) {
-        throw new WebApplicationException(
-            String.format("Failed to upload table %s segment %s to segment store", realtimeTableNameWithType,
-                segmentName), Response.Status.INTERNAL_SERVER_ERROR);
-      }
-
-      ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-      SegmentMetadataImpl segmentMetadata =
-          (SegmentMetadataImpl) immutableSegmentDataManager.getSegment().getSegmentMetadata();
-      // fetch existing ZK Metadata
+      // Fetch existing segment ZK Metadata
       SegmentZKMetadata segmentZKMetadata =
           ZKMetadataProvider.getSegmentZKMetadata(_serverInstance.getHelixManager().getHelixPropertyStore(),
-              realtimeTableNameWithType, segmentName);
+              realtimeTableName, segmentName);
+      Preconditions.checkState(segmentZKMetadata != null,
+          "Failed to find segment ZK metadata for table: %s, segment: %s", realtimeTableName, segmentName);
 
       // Update the Segment ZK Metadata with the segment metadata present on the server
-      // along with download url and segment size
-      ZKMetadataUtils.refreshSegmentZKMetadata(realtimeTableNameWithType, segmentZKMetadata, segmentMetadata,
-          segmentDownloadUrl.toString(), null, immutableSegmentDataManager.getSegment().getSegmentSizeBytes());
-      // mark the segment status as DONE
-      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-
+      ImmutableSegment segment = ((ImmutableSegmentDataManager) segmentDataManager).getSegment();
+      SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata,
+          segment.getSegmentMetadata(), downloadUrl, segment.getSegmentSizeBytes(), segmentZKMetadata.getEndOffset());
       return segmentZKMetadata.toJsonString();
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  /**
+   * Creates a tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
+   */
+  private File createSegmentTarFile(TableDataManager tableDataManager, String segmentName)
+      throws IOException {
+    File segmentTarUploadDir =
+        new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
+    segmentTarUploadDir.mkdir();
+    String tableNameWithType = tableDataManager.getTableName();
+    File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
+        tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
+        "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
+    TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+        segmentTarFile);
+    return segmentTarFile;
+  }
+
+  /**
+   * Uploads a segment tar file to the segment store and returns the segment download url.
+   */
+  private String uploadSegment(File segmentTarFile, String tableNameWithType, String segmentName, int timeoutMs) {
+    SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
+    URI segmentDownloadUrl;
+    if (timeoutMs <= 0) {
+      // Use default timeout if passed timeout is not positive
+      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+    } else {
+      segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
+    }
+    if (segmentDownloadUrl == null) {
+      throw new WebApplicationException(
+          String.format("Failed to upload table: %s, segment: %s to segment store", tableNameWithType, segmentName),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return segmentDownloadUrl.toString();
   }
 
   @GET
