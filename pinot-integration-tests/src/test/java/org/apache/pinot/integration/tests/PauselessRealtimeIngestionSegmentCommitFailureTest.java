@@ -24,18 +24,20 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
+import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -60,7 +62,7 @@ import static org.testng.Assert.assertNull;
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
 
   private static final int NUM_REALTIME_SEGMENTS = 48;
-  protected static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000L; // 5 MINUTES
+  protected static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000; // 5 MINUTES
   private static final Logger LOGGER =
       LoggerFactory.getLogger(PauselessRealtimeIngestionSegmentCommitFailureTest.class);
   private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
@@ -93,6 +95,11 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
         "org.apache.pinot.integration.tests.realtime.FailureInjectingTableDataManagerProvider");
   }
 
+  @Override
+  public BaseControllerStarter createControllerStarter() {
+    return new FailureInjectingControllerStarter();
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -110,6 +117,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     startKafka();
     pushAvroIntoKafka(_avroFiles);
 
+    setMaxSegmentCompletionTimeMillis();
     // create schema for non-pauseless table
     Schema schema = createSchema();
     schema.setSchemaName(DEFAULT_TABLE_NAME_2);
@@ -206,24 +214,12 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     return erroredSegments;
   }
 
-  /**
-   * Checks that all segments which were previously in ERROR state now have status == UPLOADED.
-   */
-  private boolean haveErroredSegmentsUploaded(
-      List<SegmentZKMetadata> segmentZKMetadataList, List<String> previouslyErroredSegments) {
-
-    // Convert to a Set for quick lookups
-    Set<String> erroredSegmentNames = new HashSet<>(previouslyErroredSegments);
-
-    for (SegmentZKMetadata metadata : segmentZKMetadataList) {
-      if (erroredSegmentNames.contains(metadata.getSegmentName())) {
-        // If it was previously ERROR, then we expect it to have transitioned to UPLOADED
-        if (metadata.getStatus() != CommonConstants.Segment.Realtime.Status.UPLOADED) {
-          return false;
-        }
-      }
+  private void setMaxSegmentCompletionTimeMillis() {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
+          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     }
-    return true;
   }
 
 

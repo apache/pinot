@@ -446,6 +446,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  public ExternalView getExternalView(String realtimeTableName) {
+    return _helixResourceManager.getTableExternalView(realtimeTableName);
+  }
+
   @VisibleForTesting
   void setIdealState(String realtimeTableName, IdealState idealState) {
     try {
