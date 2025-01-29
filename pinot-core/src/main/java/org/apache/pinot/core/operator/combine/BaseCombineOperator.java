@@ -197,7 +197,7 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           + " on segment: " + segment.getSegmentName();
     }
 
-    if (e instanceof IllegalArgumentException) {
+    if (e instanceof IllegalArgumentException || e instanceof BadQueryRequestException) {
       throw new BadQueryRequestException(errorMessage, e);
     }
     throw new RuntimeException(errorMessage, e);
