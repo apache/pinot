@@ -16,32 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.restlet.resources;
+package org.apache.pinot.controller.helix.core.util;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 
 
-public class TableLLCSegmentUploadResponse {
-  private final String _segmentName;
-  private final long _crc;
-  private final String _downloadUrl;
+public class FailureInjectionUtils {
+  public static final String FAULT_BEFORE_COMMIT_END_METADATA = "FaultBeforeCommitEndMetadata";
+  public static final String FAULT_BEFORE_IDEAL_STATE_UPDATE = "FaultBeforeIdealStateUpdate";
+  public static final String FAULT_BEFORE_NEW_SEGMENT_METADATA_CREATION = "FaultBeforeNewSegmentCreation";
 
-  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") long crc,
-      @JsonProperty("downloadUrl") String downloadUrl) {
-    _segmentName = segmentName;
-    _crc = crc;
-    _downloadUrl = downloadUrl;
+  private FailureInjectionUtils() {
   }
 
-  public String getSegmentName() {
-    return _segmentName;
-  }
-
-  public long getCrc() {
-    return _crc;
-  }
-
-  public String getDownloadUrl() {
-    return _downloadUrl;
+  public static void injectFailure(String faultTypeKey, Map<String, String> managerConfigs) {
+    String faultTypeConfig = managerConfigs.getOrDefault(faultTypeKey, "false");
+    if (Boolean.parseBoolean(faultTypeConfig)) {
+      throw new RuntimeException("Injecting failure: " + faultTypeKey);
+    }
   }
 }

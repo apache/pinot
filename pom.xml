@@ -175,8 +175,8 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.6</aws.sdk.version>
-    <azure.sdk.version>1.2.30</azure.sdk.version>
+    <aws.sdk.version>2.30.7</aws.sdk.version>
+    <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
@@ -204,7 +204,7 @@
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-beanutils.version>1.10.0</commons-beanutils.version>
     <commons-io.version>2.18.0</commons-io.version>
-    <commons-codec.version>1.17.2</commons-codec.version>
+    <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
@@ -228,7 +228,7 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.3.2</httpcore5.version>
+    <httpcore5.version>5.3.3</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>

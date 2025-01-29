@@ -114,6 +114,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -154,7 +155,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
-import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -403,6 +403,15 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
+  }
+
+  /**
+   * Get the realtime segment manager
+   *
+   * @return Realtime segment manager
+   */
+  public PinotLLCRealtimeSegmentManager getRealtimeSegmentManager() {
+    return _pinotLLCRealtimeSegmentManager;
   }
 
   /**
@@ -2329,9 +2338,9 @@ public class PinotHelixResourceManager {
   public void addNewSegment(String tableNameWithType, SegmentMetadata segmentMetadata, String downloadUrl) {
     // NOTE: must first set the segment ZK metadata before assigning segment to instances because segment assignment
     // might need them to determine the partition of the segment, and server will need them to download the segment
-    SegmentZKMetadata segmentZkmetadata =
-        ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, null, -1);
-    ZNRecord znRecord = segmentZkmetadata.toZNRecord();
+    SegmentZKMetadata segmentZKMetadata =
+        SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, downloadUrl, null, -1);
+    ZNRecord znRecord = segmentZKMetadata.toZNRecord();
 
     String segmentName = segmentMetadata.getName();
     String segmentZKMetadataPath =
@@ -2589,7 +2598,7 @@ public class PinotHelixResourceManager {
   }
 
   public void updateZkTimeInterval(SegmentZKMetadata segmentZKMetadata, DateTimeFieldSpec timeColumnFieldSpec) {
-    ZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
+    SegmentZKMetadataUtils.updateSegmentZKTimeInterval(segmentZKMetadata, timeColumnFieldSpec);
   }
 
   @VisibleForTesting
@@ -2601,8 +2610,8 @@ public class PinotHelixResourceManager {
     // ZK metadata to refresh the segment (server will compare the segment ZK metadata with the local metadata to decide
     // whether to download the new segment; broker will update the segment partition info & time boundary based on the
     // segment ZK metadata)
-    ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, null,
-        -1);
+    SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl,
+        null, -1);
     if (!ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
         expectedVersion)) {
       throw new RuntimeException(

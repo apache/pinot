@@ -46,12 +46,15 @@ public class DispatchablePlanMetadata implements Serializable {
   // --------------------------------------------------------------------------
   // Fields extracted with {@link DispatchablePlanVisitor}
   // --------------------------------------------------------------------------
-  // info from TableNode
-  private final List<String> _scannedTables;
+
+  // Info from TableNode
+  private final List<String> _scannedTables = new ArrayList<>();
   private Map<String, String> _tableOptions;
-  // info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
+
+  // Info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
   private boolean _isPrePartitioned;
-  // info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
+
+  // Info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
   private boolean _requiresSingletonInstance;
 
   // TODO: Change the following maps to lists
@@ -59,33 +62,23 @@ public class DispatchablePlanMetadata implements Serializable {
   // --------------------------------------------------------------------------
   // Fields extracted with {@link PinotDispatchPlanner}
   // --------------------------------------------------------------------------
-  // used for assigning server/worker nodes.
+
+  // The following fields are calculated in {@link WorkerManager}
+  // Available for both leaf and intermediate stage
   private Map<Integer, QueryServerInstance> _workerIdToServerInstanceMap;
-
-  // used for table scan stage - we use ServerInstance instead of VirtualServer
-  // here because all virtual servers that share a server instance will have the
-  // same segments on them
-  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
-
-  // used for build mailboxes between workers.
-  // workerId -> {planFragmentId -> mailbox list}
-  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap;
-
-  // used for tracking unavailable segments from routing table, then assemble missing segments exception.
-  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
-
-  // time boundary info
-  private TimeBoundaryInfo _timeBoundaryInfo;
-
-  // physical partition info
   private String _partitionFunction;
-  private int _partitionParallelism;
+  // Available for leaf stage only
+  // Map from workerId -> {tableType -> segments}
+  private Map<Integer, Map<String, List<String>>> _workerIdToSegmentsMap;
+  // Map from tableType -> segments, available when 'is_replicated' hint is set to true
+  private Map<String, List<String>> _replicatedSegments;
+  private TimeBoundaryInfo _timeBoundaryInfo;
+  private int _partitionParallelism = 1;
+  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap = new HashMap<>();
 
-  public DispatchablePlanMetadata() {
-    _scannedTables = new ArrayList<>();
-    _workerIdToMailboxesMap = new HashMap<>();
-    _tableToUnavailableSegmentsMap = new HashMap<>();
-  }
+  // Calculated in {@link MailboxAssignmentVisitor}
+  // Map from workerId -> {planFragmentId -> mailboxes}
+  private final Map<Integer, Map<Integer, MailboxInfos>> _workerIdToMailboxesMap = new HashMap<>();
 
   public List<String> getScannedTables() {
     return _scannedTables;
@@ -123,6 +116,15 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
+  }
+
+  @Nullable
+  public Map<String, List<String>> getReplicatedSegments() {
+    return _replicatedSegments;
+  }
+
+  public void setReplicatedSegments(Map<String, List<String>> replicatedSegments) {
+    _replicatedSegments = replicatedSegments;
   }
 
   public Map<Integer, Map<Integer, MailboxInfos>> getWorkerIdToMailboxesMap() {

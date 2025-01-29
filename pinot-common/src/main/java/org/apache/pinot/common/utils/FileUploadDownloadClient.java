@@ -55,6 +55,7 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -989,6 +990,30 @@ public class FileUploadDownloadClient implements AutoCloseable {
               uri), response.getStatusCode());
     }
     return tableLLCSegmentUploadResponse;
+  }
+
+  /**
+   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
+   * @param uri The uri to ask servers to upload segment to segment store
+   * @return {@link SegmentZKMetadata} - segment download url, crc, other metadata
+   * @throws URISyntaxException
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    // sendRequest checks the response status code
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    SegmentZKMetadata segmentZKMetadata = SegmentZKMetadata.fromJsonString(response.getResponse());
+    if (StringUtils.isEmpty(segmentZKMetadata.getDownloadUrl())) {
+      throw new HttpErrorStatusException(
+          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri), response.getStatusCode());
+    }
+    return segmentZKMetadata;
   }
 
   /**

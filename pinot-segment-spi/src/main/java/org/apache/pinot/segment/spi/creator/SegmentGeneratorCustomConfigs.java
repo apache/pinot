@@ -16,32 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.restlet.resources;
+package org.apache.pinot.segment.spi.creator;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+/**
+ * Class holds customizable configs for segment generation.
+ */
+public class SegmentGeneratorCustomConfigs {
+  private String _segmentName;
 
-
-public class TableLLCSegmentUploadResponse {
-  private final String _segmentName;
-  private final long _crc;
-  private final String _downloadUrl;
-
-  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") long crc,
-      @JsonProperty("downloadUrl") String downloadUrl) {
+  public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
-    _crc = crc;
-    _downloadUrl = downloadUrl;
   }
 
   public String getSegmentName() {
     return _segmentName;
-  }
-
-  public long getCrc() {
-    return _crc;
-  }
-
-  public String getDownloadUrl() {
-    return _downloadUrl;
   }
 }
