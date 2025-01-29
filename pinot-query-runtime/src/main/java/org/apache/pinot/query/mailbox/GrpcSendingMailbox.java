@@ -63,6 +63,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean isLocal() {
+    return false;
+  }
+
+  @Override
   public void send(TransferableBlock block)
       throws IOException {
     if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
