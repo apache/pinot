@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -26,16 +26,16 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.server.predownload.TestUtil.CLUSTER_NAME;
-import static org.apache.pinot.server.predownload.TestUtil.INSTANCE_ID;
-import static org.apache.pinot.server.predownload.TestUtil.SEGMENT_NAME;
+import static org.apache.pinot.server.predownload.PredownloadTestUtil.CLUSTER_NAME;
+import static org.apache.pinot.server.predownload.PredownloadTestUtil.INSTANCE_ID;
+import static org.apache.pinot.server.predownload.PredownloadTestUtil.SEGMENT_NAME;
 import static org.mockito.Mockito.mock;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
 
 
-public class StatusRecorderTest {
+public class PredownloadPredownloadStatusRecorderTest {
 
   private File _temporaryFolder;
 
@@ -62,10 +62,10 @@ public class StatusRecorderTest {
   @Test
   public void testPredownloadComplete()
       throws Exception {
-    StatusRecorder.registerMetrics(mock(PredownloadMetrics.class));
+    PredownloadStatusRecorder.registerMetrics(mock(PredownloadMetrics.class));
     File testFolder = new File(_temporaryFolder, "test");
     testFolder.mkdir();
-    StatusRecorder.setStatusRecordFolder(testFolder.getAbsolutePath());
+    PredownloadStatusRecorder.setStatusRecordFolder(testFolder.getAbsolutePath());
 
     SecurityManager originalSecurityManager = System.getSecurityManager();
     try {
@@ -83,7 +83,8 @@ public class StatusRecorderTest {
 
   private void trySucceed(File testFolder) {
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD, CLUSTER_NAME, INSTANCE_ID,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.NO_SEGMENT_TO_PREDOWNLOAD, CLUSTER_NAME,
+          INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
@@ -97,7 +98,8 @@ public class StatusRecorderTest {
     }
 
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.ALL_SEGMENTS_DOWNLOADED, CLUSTER_NAME, INSTANCE_ID,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED, CLUSTER_NAME,
+          INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
@@ -112,7 +114,8 @@ public class StatusRecorderTest {
   private void tryRetriableFailure(File testFolder)
       throws InterruptedException {
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.CANNOT_CONNECT_TO_DEEPSTORE, CLUSTER_NAME,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.CANNOT_CONNECT_TO_DEEPSTORE,
+          CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
@@ -126,7 +129,8 @@ public class StatusRecorderTest {
     }
 
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.SOME_SEGMENTS_DOWNLOAD_FAILED, CLUSTER_NAME,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.SOME_SEGMENTS_DOWNLOAD_FAILED,
+          CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
@@ -142,7 +146,8 @@ public class StatusRecorderTest {
 
   private void tryNonRetriableFailure(File testFolder) {
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.INSTANCE_NON_EXISTENT, CLUSTER_NAME, INSTANCE_ID,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.INSTANCE_NON_EXISTENT, CLUSTER_NAME,
+          INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {
@@ -154,7 +159,8 @@ public class StatusRecorderTest {
     }
 
     try {
-      StatusRecorder.predownloadComplete(PredownloadCompleteReason.INSTANCE_NOT_ALIVE, CLUSTER_NAME, INSTANCE_ID,
+      PredownloadStatusRecorder.predownloadComplete(PredownloadCompletionReason.INSTANCE_NOT_ALIVE, CLUSTER_NAME,
+          INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
     } catch (ExitException e) {

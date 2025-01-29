@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -40,7 +40,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.server.predownload.TestUtil.*;
+import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -50,14 +50,14 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.AssertJUnit.*;
 
 
-public class ZKClientTest {
-  private ZKClient _zkClient;
+public class PredownloadZKClientTest {
+  private PredownloadZKClient _predownloadZkClient;
   private HelixZkClient _helixZkClient;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _zkClient = new ZKClient(ZK_ADDRESS, INSTANCE_ID, CLUSTER_NAME);
+    _predownloadZkClient = new PredownloadZKClient(ZK_ADDRESS, INSTANCE_ID, CLUSTER_NAME);
     _helixZkClient = mock(HelixZkClient.class);
     when(_helixZkClient.waitUntilConnected(anyLong(), any())).thenReturn(true);
     SharedZkClientFactory sharedZkClientFactory = mock(SharedZkClientFactory.class);
@@ -68,22 +68,22 @@ public class ZKClientTest {
         SharedZkClientFactory.class)) {
       sharedZkClientFactoryMockedStatic.when(() -> SharedZkClientFactory.getInstance())
           .thenReturn(sharedZkClientFactory);
-      _zkClient.start();
-      assertTrue(_zkClient.isStarted());
+      _predownloadZkClient.start();
+      assertTrue(_predownloadZkClient.isStarted());
     }
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    _zkClient.close();
-    assertFalse(_zkClient.isStarted());
+    _predownloadZkClient.close();
+    assertFalse(_predownloadZkClient.isStarted());
   }
 
   @Test
   public void testGetDataAccessor() {
     try {
-      _zkClient.getDataAccessor();
+      _predownloadZkClient.getDataAccessor();
     } catch (Exception e) {
       Assert.fail("Expected no exception, but got: " + e.getMessage());
     }
@@ -94,12 +94,12 @@ public class ZKClientTest {
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
 
     when(_helixZkClient.exists(any())).thenReturn(false);
-    assertThrows(HelixException.class, () -> _zkClient.getInstanceConfig(dataAccessor));
+    assertThrows(HelixException.class, () -> _predownloadZkClient.getInstanceConfig(dataAccessor));
 
     when(_helixZkClient.exists(any())).thenReturn(true);
     when(dataAccessor.keyBuilder()).thenReturn(new org.apache.helix.PropertyKey.Builder(CLUSTER_NAME));
     try {
-      _zkClient.getInstanceConfig(dataAccessor);
+      _predownloadZkClient.getInstanceConfig(dataAccessor);
     } catch (Exception e) {
       Assert.fail("Expected no exception, but got: " + e.getMessage());
     }
@@ -113,13 +113,15 @@ public class ZKClientTest {
 
     // live instance null
     when(dataAccessor.getProperty(any(PropertyKey.class))).thenReturn(null);
-    try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
+    try (MockedStatic<PredownloadStatusRecorder> statusRecorderMockedStatic = mockStatic(
+        PredownloadStatusRecorder.class)) {
       when(_helixZkClient.exists(any())).thenReturn(true);
-      assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
+      assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
     }
-    try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
+    try (MockedStatic<PredownloadStatusRecorder> statusRecorderMockedStatic = mockStatic(
+        PredownloadStatusRecorder.class)) {
       when(_helixZkClient.exists(any())).thenReturn(false);
-      assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
+      assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
     }
 
     // live instance not null
@@ -129,25 +131,28 @@ public class ZKClientTest {
 
     // no segments
     when(dataAccessor.getChildValues(any(PropertyKey.class))).thenReturn(null);
-    assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
+    assertEquals(0, _predownloadZkClient.getSegmentsOfInstance(dataAccessor).size());
     // with segments
     CurrentState currentState = spy(new CurrentState(TABLE_NAME));
     currentState.setState(SEGMENT_NAME, "ONLINE");
     currentState.setState(SECOND_SEGMENT_NAME, "ONLINE");
     currentState.setState(THIRD_SEGMENT_NAME, "OFFLINE");
     when(dataAccessor.getChildValues(any(PropertyKey.class), anyBoolean())).thenReturn(List.of(currentState));
-    List<SegmentInfo> segmentInfoList = _zkClient.getSegmentsOfInstance(dataAccessor);
-    assertEquals(2, segmentInfoList.size());
-    assertTrue(Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(segmentInfoList.get(0).getSegmentName()));
-    assertTrue(Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(segmentInfoList.get(1).getSegmentName()));
+    List<PredownloadSegmentInfo> predownloadSegmentInfoList = _predownloadZkClient.getSegmentsOfInstance(dataAccessor);
+    assertEquals(2, predownloadSegmentInfoList.size());
+    assertTrue(
+        Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(predownloadSegmentInfoList.get(0).getSegmentName()));
+    assertTrue(
+        Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(predownloadSegmentInfoList.get(1).getSegmentName()));
   }
 
   @Test
   public void testUpdateSegmentMetadata()
       throws Exception {
-    List<SegmentInfo> segmentInfoList =
-        Arrays.asList(new SegmentInfo(TABLE_NAME, SEGMENT_NAME), new SegmentInfo(TABLE_NAME, SECOND_SEGMENT_NAME));
-    Map<String, TableInfo> tableInfoMap = new HashMap<>();
+    List<PredownloadSegmentInfo> predownloadSegmentInfoList =
+        Arrays.asList(new PredownloadSegmentInfo(TABLE_NAME, SEGMENT_NAME),
+            new PredownloadSegmentInfo(TABLE_NAME, SECOND_SEGMENT_NAME));
+    Map<String, PredownloadTableInfo> tableInfoMap = new HashMap<>();
     PinotConfiguration pinotConfiguration = getPinotConfiguration();
     InstanceDataManagerConfig instanceDataManagerConfig = new HelixInstanceDataManagerConfig(pinotConfiguration);
     TableConfig tableConfig = mock(TableConfig.class);
@@ -157,10 +162,10 @@ public class ZKClientTest {
       zkMetadataProviderMockedStatic.when(() -> ZKMetadataProvider.getTableConfig(any(), anyString())).thenReturn(null);
       zkMetadataProviderMockedStatic.when(
           () -> ZKMetadataProvider.getSegmentZKMetadata(any(), anyString(), anyString())).thenReturn(null);
-      _zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
+      _predownloadZkClient.updateSegmentMetadata(predownloadSegmentInfoList, tableInfoMap, instanceDataManagerConfig);
       assertNull(tableInfoMap.get(TABLE_NAME));
-      assertEquals(segmentInfoList.get(0).getCrc(), 0);
-      assertEquals(segmentInfoList.get(1).getCrc(), 0);
+      assertEquals(predownloadSegmentInfoList.get(0).getCrc(), 0);
+      assertEquals(predownloadSegmentInfoList.get(1).getCrc(), 0);
     }
 
     // config table not null, only one of two segments exists
@@ -173,10 +178,10 @@ public class ZKClientTest {
       zkMetadataProviderMockedStatic.when(
               () -> ZKMetadataProvider.getSegmentZKMetadata(any(), eq(TABLE_NAME), eq(SECOND_SEGMENT_NAME)))
           .thenReturn(null);
-      _zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
+      _predownloadZkClient.updateSegmentMetadata(predownloadSegmentInfoList, tableInfoMap, instanceDataManagerConfig);
       assertNotNull(tableInfoMap.get(TABLE_NAME));
-      assertEquals(segmentInfoList.get(0).getCrc(), CRC);
-      assertEquals(segmentInfoList.get(1).getCrc(), 0);
+      assertEquals(predownloadSegmentInfoList.get(0).getCrc(), CRC);
+      assertEquals(predownloadSegmentInfoList.get(1).getCrc(), 0);
     }
   }
 }

@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -28,46 +28,6 @@ import org.apache.commons.io.filefilter.FileFilterUtils;
 import org.apache.commons.io.filefilter.IOFileFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-
-enum PredownloadCompleteReason {
-  INSTANCE_NOT_ALIVE(false, false, "%s is not alive in cluster %s"),
-  INSTANCE_NON_EXISTENT(false, false, "%s does not exist in cluster %s"),
-  CANNOT_CONNECT_TO_DEEPSTORE(false, true, "cannot connect to deepstore for %s in cluster %s"),
-  SOME_SEGMENTS_DOWNLOAD_FAILED(false, true, "some segments failed to predownload for %s in cluster %s"),
-  NO_SEGMENT_TO_PREDOWNLOAD("no segment to predownload for %s in cluster %s"),
-  ALL_SEGMENTS_DOWNLOADED("all segments are predownloaded for %s in cluster %s");
-
-  private static final String FAIL_MESSAGE = "Failed to predownload segments for %s.%s, because ";
-  private static final String SUCCESS_MESSAGE = "Successfully predownloaded segments for %s.%s, because ";
-  private final boolean _retriable; // Whether the failure is retriable.
-  private final boolean _isSucceed; // Whether the predownload is successful.
-  private final String _message;
-  private final String _messageTemplate;
-
-  PredownloadCompleteReason(boolean isSucceed, boolean retriable, String message) {
-    _isSucceed = isSucceed;
-    _messageTemplate = isSucceed ? SUCCESS_MESSAGE : FAIL_MESSAGE;
-    _retriable = retriable;
-    _message = message;
-  }
-
-  PredownloadCompleteReason(String message) {
-    this(true, false, message);
-  }
-
-  public boolean isRetriable() {
-    return _retriable;
-  }
-
-  public boolean isSucceed() {
-    return _isSucceed;
-  }
-
-  public String getMessage(String clusterName, String instanceName, String segmentName) {
-    return String.format(_messageTemplate + _message, instanceName, segmentName, instanceName, clusterName);
-  }
-}
 
 
 // Helper class to test the System.exit() in UT
@@ -104,8 +64,8 @@ class ExitHelper {
 }
 
 // Record the status of the pre-download to be consumed by odin-pinot-worker.
-public class StatusRecorder {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StatusRecorder.class);
+public class PredownloadStatusRecorder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PredownloadStatusRecorder.class);
   private static final long STATUS_RECORD_EXPIRATION_SEC = 3600 * 6; // 6 hours
   // TODO: make those name configurable
   private static final String SUCCESS_STATUS = "SUCCESS_%s";
@@ -115,12 +75,12 @@ public class StatusRecorder {
   @Nullable
   private static PredownloadMetrics _predownloadMetrics;
 
-  private StatusRecorder() {
+  private PredownloadStatusRecorder() {
     throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
   }
 
   public static void registerMetrics(PredownloadMetrics predownloadMetrics) {
-    StatusRecorder._predownloadMetrics = predownloadMetrics;
+    PredownloadStatusRecorder._predownloadMetrics = predownloadMetrics;
   }
 
   @VisibleForTesting
@@ -128,7 +88,7 @@ public class StatusRecorder {
     _statusRecordFolder = statusRecordFolder;
   }
 
-  public static void predownloadComplete(PredownloadCompleteReason reason, String clusterName, String instanceName,
+  public static void predownloadComplete(PredownloadCompletionReason reason, String clusterName, String instanceName,
       String segmentName) {
     LOGGER.info(reason.getMessage(clusterName, instanceName, segmentName));
     if (_predownloadMetrics != null) {
@@ -141,13 +101,13 @@ public class StatusRecorder {
     }
   }
 
-  private static void predownloadSucceeded(PredownloadCompleteReason reason) {
+  private static void predownloadSucceeded(PredownloadCompletionReason reason) {
     File statusFolder = prepareStatusFolder();
     dumpSuccessfulStatus(statusFolder);
     ExitHelper.exit(0);
   }
 
-  private static void predownloadFailed(PredownloadCompleteReason reason) {
+  private static void predownloadFailed(PredownloadCompletionReason reason) {
     if (reason.isRetriable()) {
       predownloadRetriableFailed(reason);
     } else {
@@ -155,13 +115,13 @@ public class StatusRecorder {
     }
   }
 
-  private static void predownloadRetriableFailed(PredownloadCompleteReason reason) {
+  private static void predownloadRetriableFailed(PredownloadCompletionReason reason) {
     File statusFolder = prepareStatusFolder();
     checkAndDumpRetriableFailureStatus(statusFolder);
     ExitHelper.exit(1);
   }
 
-  private static void predownloadNonRetriableFailed(PredownloadCompleteReason reason) {
+  private static void predownloadNonRetriableFailed(PredownloadCompletionReason reason) {
     File statusFolder = prepareStatusFolder();
     dumpNonRetriableFailureStatus(statusFolder);
     ExitHelper.exit(2);

@@ -172,8 +172,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
 
   // predownload metrics
-  SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
-  SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
   PREDOWNLOAD_FAILED("predownloadFailed", true);
 
