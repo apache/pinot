@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -51,7 +52,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks) {
+      SegmentLocks segmentLocks, @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
     _segmentLocks = segmentLocks;
@@ -87,7 +88,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
         throw new IllegalStateException();
     }
     tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, segmentPreloadExecutor,
-        errorCache);
+        errorCache, null);
     return tableDataManager;
   }
 }
