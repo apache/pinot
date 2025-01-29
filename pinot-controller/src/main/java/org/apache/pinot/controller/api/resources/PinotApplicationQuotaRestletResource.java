@@ -102,8 +102,9 @@ public class PinotApplicationQuotaRestletResource {
       return quotas.get(appName);
     }
 
-    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
-        _pinotHelixResourceManager.getHelixClusterName()).build();
+    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName())
+        .build();
 
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String defaultQuota =
