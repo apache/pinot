@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.logical;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -43,40 +44,51 @@ public class PinotLogicalExchange extends Exchange {
   // TODO: Revisit this as we add more custom distribution types.
   private final List<Integer> _keys;
 
+  // Can be used to override the partitioning info calculated from the distribution trait.
+  private final Boolean _prePartitioned;
+
   private PinotLogicalExchange(RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution distribution,
-      PinotRelExchangeType exchangeType, List<Integer> keys) {
+      PinotRelExchangeType exchangeType, List<Integer> keys, @Nullable Boolean prePartitioned) {
     super(cluster, traitSet, input, distribution);
+    assert traitSet.containsIfApplicable(Convention.NONE);
     _exchangeType = exchangeType;
     _keys = keys;
-    assert traitSet.containsIfApplicable(Convention.NONE);
+    _prePartitioned = prePartitioned;
   }
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution) {
-    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), distribution.getKeys());
+    return create(input, distribution, (Boolean) null);
   }
 
-  public static PinotLogicalExchange create(RelNode input, RelDistribution distribution, List<Integer> keys) {
-    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), keys);
+  public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,
+      @Nullable Boolean prePartitioned) {
+    return create(input, distribution, distribution.getKeys(), prePartitioned);
+  }
+
+  public static PinotLogicalExchange create(RelNode input, RelDistribution distribution, List<Integer> keys,
+      @Nullable Boolean prePartitioned) {
+    return create(input, distribution, PinotRelExchangeType.getDefaultExchangeType(), keys, prePartitioned);
   }
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,
       PinotRelExchangeType exchangeType) {
-    return create(input, distribution, exchangeType, distribution.getKeys());
+    return create(input, distribution, exchangeType, distribution.getKeys(), null);
   }
 
   public static PinotLogicalExchange create(RelNode input, RelDistribution distribution,
-      PinotRelExchangeType exchangeType, List<Integer> keys) {
+      PinotRelExchangeType exchangeType, List<Integer> keys, @Nullable Boolean prePartitioned) {
     RelOptCluster cluster = input.getCluster();
     distribution = RelDistributionTraitDef.INSTANCE.canonize(distribution);
     RelTraitSet traitSet = input.getTraitSet().replace(Convention.NONE).replace(distribution);
-    return new PinotLogicalExchange(cluster, traitSet, input, distribution, exchangeType, keys);
+    return new PinotLogicalExchange(cluster, traitSet, input, distribution, exchangeType, keys, prePartitioned);
   }
 
   //~ Methods ----------------------------------------------------------------
 
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-    return new PinotLogicalExchange(getCluster(), traitSet, newInput, newDistribution, _exchangeType, _keys);
+    return new PinotLogicalExchange(getCluster(), traitSet, newInput, newDistribution, _exchangeType, _keys,
+        _prePartitioned);
   }
 
   @Override
@@ -99,5 +111,10 @@ public class PinotLogicalExchange extends Exchange {
 
   public List<Integer> getKeys() {
     return _keys;
+  }
+
+  @Nullable
+  public Boolean getPrePartitioned() {
+    return _prePartitioned;
   }
 }
