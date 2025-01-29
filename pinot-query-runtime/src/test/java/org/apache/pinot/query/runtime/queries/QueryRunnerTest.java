@@ -206,7 +206,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       Assert.assertTrue(
           exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
               "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
-          "Exception message didn't start with proper heading: " + expectedError);
+          "Exception message didn't start with proper heading: " + exceptionMessage);
       Assert.assertTrue(exceptionMessage.contains(expectedError),
           "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
     }
