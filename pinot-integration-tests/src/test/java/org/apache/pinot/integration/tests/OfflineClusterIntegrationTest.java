@@ -187,6 +187,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
   }
 
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
