@@ -89,7 +89,6 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -188,12 +187,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Start the Pinot cluster
     startZk();
     startController();
-    // Set hyperloglog log2m value to 12.
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
             .build();
+    // Set hyperloglog log2m value to 12.
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+    // Set max segment preprocess parallelism to 8 to test that all segments can be processed
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
     startBrokers();
     startServers();
 
@@ -265,11 +267,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to reload table with force download");
-  }
-
-  @BeforeMethod
-  public void resetMultiStage() {
-    setUseMultiStageQueryEngine(false);
   }
 
   protected void startBrokers()

@@ -41,8 +41,9 @@ public class AdjustableSemaphore extends Semaphore {
 
   /**
    * Sets the total number of permits to the given value without blocking.
+   * Synchronized to allow multiple threads to update permits concurrently
    */
-  public void setPermits(int permits) {
+  public synchronized void setPermits(int permits) {
     Preconditions.checkArgument(permits > 0, "Permits must be a positive integer");
     if (permits < _totalPermits) {
       reducePermits(_totalPermits - permits);

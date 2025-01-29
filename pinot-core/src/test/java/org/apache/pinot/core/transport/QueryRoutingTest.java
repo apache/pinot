@@ -22,9 +22,7 @@ import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
@@ -36,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
@@ -66,8 +65,9 @@ public class QueryRoutingTest {
       SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
-  private static final Map<ServerInstance, Pair<List<String>, List<String>>> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE, Pair.of(Collections.emptyList(), Collections.emptyList()));
+  private static final Map<ServerInstance, ServerRouteInfo> ROUTING_TABLE =
+      Collections.singletonMap(SERVER_INSTANCE,
+          new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
   private QueryRouter _queryRouter;
   private ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -481,9 +481,9 @@ public class QueryRoutingTest {
         serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     ServerRoutingInstance serverRoutingInstance2 =
         serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-    Map<ServerInstance, Pair<List<String>, List<String>>> routingTable =
-        Map.of(serverInstance1, Pair.of(Collections.emptyList(), Collections.emptyList()), serverInstance2,
-            Pair.of(Collections.emptyList(), Collections.emptyList()));
+    Map<ServerInstance, ServerRouteInfo> routingTable =
+        Map.of(serverInstance1, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()),
+            serverInstance2, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
     long requestId = 123;
     DataSchema dataSchema =

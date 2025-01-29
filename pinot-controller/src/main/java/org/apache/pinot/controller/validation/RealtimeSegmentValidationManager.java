@@ -59,6 +59,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
 
@@ -74,6 +75,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _storageQuotaChecker = quotaChecker;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
@@ -184,6 +186,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
+    }
+
+    if (_segmentAutoResetOnErrorAtValidation) {
+      _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
     }
   }
 

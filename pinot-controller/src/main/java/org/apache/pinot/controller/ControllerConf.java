@@ -208,6 +208,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.level.validation.intervalInSeconds";
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD =
         "controller.segment.level.validation.intervalPeriod";
+    public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
+        "controller.segment.error.autoReset";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
@@ -983,6 +985,10 @@ public class ControllerConf extends PinotConfiguration {
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS));
+  }
+
+  public boolean isAutoResetErrorSegmentsOnValidationEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, false);
   }
 
   public long getStatusCheckerInitialDelayInSeconds() {

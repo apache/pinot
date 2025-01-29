@@ -32,6 +32,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -40,7 +41,6 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -54,6 +54,15 @@ import static org.testng.Assert.assertTrue;
 public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
+  private static final String[] SELECT_STAR_TYPES = new String[]{
+      "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT", "INT", "STRING", "INT",
+      "STRING", "INT", "INT", "INT", "INT", "INT", "DOUBLE", "FLOAT", "INT", "STRING", "INT", "STRING", "INT", "INT",
+      "INT", "STRING", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT_ARRAY", "INT", "INT_ARRAY",
+      "STRING_ARRAY", "INT", "INT", "FLOAT_ARRAY", "INT", "STRING_ARRAY", "LONG_ARRAY", "INT_ARRAY", "INT_ARRAY",
+      "INT", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "INT", "STRING", "INT", "INT", "INT", "STRING",
+      "STRING", "INT", "STRING", "INT", "INT", "STRING_ARRAY", "INT", "STRING", "INT", "INT", "INT", "STRING", "INT",
+      "INT", "INT", "INT"
+  };
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
       new ArrayList<>(getNumBrokers() + getNumServers());
@@ -133,11 +142,6 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     waitForAllDocsLoaded(600_000L);
   }
 
-  @BeforeMethod
-  public void resetMultiStage() {
-    setUseMultiStageQueryEngine(false);
-  }
-
   protected void startBrokers()
       throws Exception {
     startBrokers(getNumBrokers());
@@ -183,21 +187,17 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testCompiledByV2StarField() throws Exception {
+  public void testStarField()
+      throws Exception {
     String sqlQuery = "SELECT * FROM myTable WHERE AirlineID = 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
-    assertDataTypes(response, "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT",
-        "INT", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "DOUBLE", "FLOAT", "INT", "STRING", "INT",
-        "STRING", "INT", "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT_ARRAY",
-        "INT", "INT_ARRAY", "STRING_ARRAY", "INT", "INT", "FLOAT_ARRAY", "INT", "STRING_ARRAY", "LONG_ARRAY",
-        "INT_ARRAY", "INT_ARRAY", "INT", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "INT", "STRING", "INT",
-        "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT", "INT", "STRING_ARRAY", "INT", "STRING", "INT", "INT",
-        "INT", "STRING", "INT", "INT", "INT", "INT");
+    assertDataTypes(response, SELECT_STAR_TYPES);
   }
 
   @Test
-  public void testCompiledByV2SelectionFields() throws Exception {
+  public void testSelectionFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable WHERE AirlineID = 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
@@ -205,7 +205,8 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testCompiledByV2TrasformedFields() throws Exception {
+  public void testTransformedFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, ArrTime, ArrTime+1 FROM myTable WHERE AirlineID = 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
@@ -213,7 +214,8 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testCompiledByV2AggregatedFields() throws Exception {
+  public void testAggregatedFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, avg(ArrTime) FROM myTable WHERE AirlineID = 0 GROUP BY AirlineID LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
@@ -221,29 +223,27 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testSchemaFallbackStarField() throws Exception {
+  public void testSchemaFallbackStarField()
+      throws Exception {
     String sqlQuery = "SELECT * FROM myTable WHERE AirlineID = 0 AND add(AirTime, AirTime, ArrTime) > 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
-    assertDataTypes(response, "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT",
-        "INT", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "DOUBLE", "FLOAT", "INT", "STRING", "INT",
-        "STRING", "INT", "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "INT",
-        "INT", "STRING", "INT", "INT", "FLOAT", "INT", "STRING", "LONG", "INT", "INT", "INT", "INT", "STRING", "INT",
-        "INT", "INT", "INT", "INT", "INT", "STRING", "INT", "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT",
-        "INT", "STRING", "INT", "STRING", "INT", "INT", "INT", "STRING", "INT", "INT", "INT", "INT");
+    assertDataTypes(response, SELECT_STAR_TYPES);
   }
 
   @Test
-  public void testSchemaFallbackSelectionFields() throws Exception {
+  public void testSchemaFallbackSelectionFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable"
-      + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
+        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
     assertDataTypes(response, "LONG", "INT", "STRING");
   }
 
   @Test
-  public void testSchemaFallbackTransformedFields() throws Exception {
+  public void testSchemaFallbackTransformedFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, ArrTime, ArrTime+1 FROM myTable"
         + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
@@ -252,12 +252,39 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testSchemaFallbackAggregatedFields() throws Exception {
+  public void testSchemaFallbackAggregatedFields()
+      throws Exception {
     String sqlQuery = "SELECT AirlineID, avg(ArrTime) FROM myTable"
         + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 GROUP BY AirlineID LIMIT 1";
     JsonNode response = postQuery(sqlQuery);
     assertNoRowsReturned(response);
     assertDataTypes(response, "LONG", "DOUBLE");
+  }
+
+  @Test
+  public void testDataSchemaForBrokerPrunedEmptyResults()
+      throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setRoutingConfig(
+        new RoutingConfig(null, Collections.singletonList(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE), null, null));
+    updateTableConfig(tableConfig);
+
+    String query =
+        "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231 and FlightNum > 121231231231";
+
+    // Parse the Json response. Assert if DestAirportID has columnDatatype INT and Carrier has columnDatatype STRING.
+    JsonNode queryResponse = postQuery(query);
+    assertNoRowsReturned(queryResponse);
+    assertDataTypes(queryResponse, "INT", "STRING");
+
+    query = "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231";
+    queryResponse = postQuery(query);
+    assertNoRowsReturned(queryResponse);
+    assertDataTypes(queryResponse, "INT", "STRING");
+
+    // Reset the routing config
+    tableConfig.setRoutingConfig(null);
+    updateTableConfig(tableConfig);
   }
 
   private void assertNoRowsReturned(JsonNode response) {
@@ -266,7 +293,8 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     assertEquals(response.get("resultTable").get("rows").size(), 0);
   }
 
-  private void assertDataTypes(JsonNode response, String... types) throws Exception {
+  private void assertDataTypes(JsonNode response, String... types)
+      throws Exception {
     assertNotNull(response.get("resultTable"));
     assertNotNull(response.get("resultTable").get("dataSchema"));
     assertNotNull(response.get("resultTable").get("dataSchema").get("columnDataTypes"));
