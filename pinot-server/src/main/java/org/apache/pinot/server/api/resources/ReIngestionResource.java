@@ -34,6 +34,7 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -79,7 +80,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionRequest;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionResponse;
-import org.apache.pinot.server.api.resources.reingestion.utils.SimpleRealtimeSegmentDataManager;
+import org.apache.pinot.server.api.resources.reingestion.utils.StatelessRealtimeSegmentDataManager;
 import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -128,8 +129,9 @@ public class ReIngestionResource {
 
   // Keep track of jobs by jobId => job info
   private static final ConcurrentHashMap<String, ReIngestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
-  public static final long CONSUMPTION_END_TIMEOUT_MS = 300000L;
-  public static final long UPLOAD_END_TIMEOUT_MS = 300000L;
+  public static final long CONSUMPTION_END_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
+  public static final long UPLOAD_END_TIMEOUT_MS = Duration.ofMinutes(5).toMillis();
+  public static final long CHECK_INTERVAL_MS = Duration.ofSeconds(5).toMillis();
 
   @Inject
   private ServerInstance _serverInstance;
@@ -250,12 +252,6 @@ public class ReIngestionResource {
     // Generate a jobId for tracking
     String jobId = UUID.randomUUID().toString();
     ReIngestionJob job = new ReIngestionJob(jobId, tableNameWithType, segmentName);
-    RUNNING_JOBS.put(jobId, job);
-
-    // Send immediate success response with jobId
-    ReIngestionResponse immediateResponse = new ReIngestionResponse(
-        "Re-ingestion job submitted successfully with jobId: " + jobId);
-    Response response = Response.ok(immediateResponse).build();
 
     // Kick off the actual work asynchronously
     REINGESTION_EXECUTOR.submit(() -> {
@@ -266,10 +262,11 @@ public class ReIngestionResource {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
         StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
-        SimpleRealtimeSegmentDataManager manager = new SimpleRealtimeSegmentDataManager(
+        StatelessRealtimeSegmentDataManager manager = new StatelessRealtimeSegmentDataManager(
             segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata, tableConfig, schema,
             indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, _serverInstance.getServerMetrics());
 
+        RUNNING_JOBS.put(jobId, job);
         doReIngestSegment(manager, segmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
@@ -279,20 +276,22 @@ public class ReIngestionResource {
       }
     });
 
-    // Return immediately with the jobId
-    return response;
+    ReIngestionResponse immediateResponse = new ReIngestionResponse(
+        "Re-ingestion job submitted successfully with jobId: " + jobId);
+    return Response.ok(immediateResponse).build();
   }
 
   /**
    * The actual re-ingestion logic, moved into a separate method for clarity.
    * This is essentially the old synchronous logic you had in reIngestSegment.
    */
-  private void doReIngestSegment(SimpleRealtimeSegmentDataManager manager, String segmentName, String tableNameWithType,
-      IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
+  private void doReIngestSegment(StatelessRealtimeSegmentDataManager manager, String segmentName,
+      String tableNameWithType, IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
       throws Exception {
     try {
       manager.startConsumption();
-      waitForCondition((Void) -> manager.isDoneConsuming(), 1000, CONSUMPTION_END_TIMEOUT_MS, 0);
+      waitForCondition((Void) -> manager.isDoneConsuming(), CHECK_INTERVAL_MS,
+          CONSUMPTION_END_TIMEOUT_MS, 0);
       manager.stopConsumption();
 
       if (!manager.isSuccess()) {
@@ -300,7 +299,7 @@ public class ReIngestionResource {
       }
 
       LOGGER.info("Starting build for segment {}", segmentName);
-      SimpleRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
+      StatelessRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
           manager.buildSegmentInternal();
 
       File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
@@ -340,7 +339,7 @@ public class ReIngestionResource {
         }
         SegmentDataManager segDataManager = tableDataManager.acquireSegment(segmentName);
         return segDataManager instanceof ImmutableSegmentDataManager;
-      }, 5000, UPLOAD_END_TIMEOUT_MS, 0);
+      }, CHECK_INTERVAL_MS, UPLOAD_END_TIMEOUT_MS, 0);
 
       // Trigger segment reset
       HttpClient httpClient = HttpClient.getInstance();

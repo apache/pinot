@@ -79,7 +79,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Simplified Segment Data Manager for ingesting data from a start offset to an end offset.
  */
-public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
+public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
 
   private static final int DEFAULT_CAPACITY = 100_000;
   private static final int DEFAULT_FETCH_TIMEOUT_MS = 5000;
@@ -116,7 +116,7 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
   private volatile Throwable _consumptionException;
   private final ServerMetrics _serverMetrics;
 
-  public SimpleRealtimeSegmentDataManager(String segmentName, String tableNameWithType, int partitionGroupId,
+  public StatelessRealtimeSegmentDataManager(String segmentName, String tableNameWithType, int partitionGroupId,
       SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Schema schema,
       IndexLoadingConfig indexLoadingConfig, StreamConfig streamConfig, String startOffsetStr, String endOffsetStr,
       ServerMetrics serverMetrics)
@@ -133,7 +133,7 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
     _resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
     _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());;
     _serverMetrics = serverMetrics;
-    _logger = LoggerFactory.getLogger(SimpleRealtimeSegmentDataManager.class.getName() + "_" + _segmentName);
+    _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentDataManager.class.getName() + "_" + _segmentName);
 
     _offsetFactory = StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
     _startOffset = _offsetFactory.create(startOffsetStr);
