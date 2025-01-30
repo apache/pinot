@@ -129,6 +129,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public void shutDown() {
     _queryDispatcher.shutdown();
+    _queryCompileExecutor.shutdown();
   }
 
   @Override
