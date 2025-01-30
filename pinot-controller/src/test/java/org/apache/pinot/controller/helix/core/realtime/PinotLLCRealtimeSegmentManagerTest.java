@@ -1323,9 +1323,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     Random random = new Random();
     int numOfServers = 1 + random.nextInt(20);
-    int numOfSegments = Math.max(numOfServers, random.nextInt(500));
-    int rf = Math.min(numOfServers, random.nextInt(7));
-    int batchSize = random.nextInt(100);
+    int numOfSegments = Math.max(numOfServers, 1 + random.nextInt(500));
+    int rf = Math.min(numOfServers, 1 + random.nextInt(7));
+    int batchSize = 1 + random.nextInt(100);
 
     map = new HashMap<>();
     for (int segmentIndex = 0; segmentIndex < numOfSegments; segmentIndex++) {
