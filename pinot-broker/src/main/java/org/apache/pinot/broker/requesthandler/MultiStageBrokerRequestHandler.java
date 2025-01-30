@@ -26,7 +26,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -92,6 +96,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
+  private final ExecutorService _queryCompileExecutor;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -112,6 +117,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
+    _queryCompileExecutor = Executors.newCachedThreadPool();
   }
 
   @Override
@@ -135,11 +141,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
+    Timer queryTimer;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
     String database;
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
+      queryTimer = new Timer(queryTimeoutMs);
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -176,7 +184,28 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
+          // Run the query planning in a separate thread so that we can enforce a timeout on it (in some rare cases,
+          // we can see query compilation taking a very long time).
+          Future<QueryEnvironment.QueryPlannerResult> queryPlanResultFuture = _queryCompileExecutor.submit(
+              () -> queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId));
+
+          try {
+            queryPlanResult = queryPlanResultFuture.get(queryTimer.getRemainingTime(), TimeUnit.MILLISECONDS);
+          } catch (TimeoutException e) {
+            LOGGER.warn("Timed out while planning query {}: {}", requestId, query);
+            queryPlanResultFuture.cancel(true);
+            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
+          } catch (InterruptedException e) {
+            LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+            // re-set the thread's interrupt status
+            Thread.currentThread().interrupt();
+            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
+          } catch (ExecutionException e) {
+            // Handled in outer catch block
+            throw e.getCause();
+          }
           break;
       }
     } catch (DatabaseConflictException e) {
@@ -186,11 +215,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     } catch (WebApplicationException e) {
       throw e;
-    } catch (RuntimeException e) {
-      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
+    } catch (Throwable t) {
+      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      if (e.getMessage().matches(".* Column .* not found in any table'")) {
+      if (t.getMessage().matches(".* Column .* not found in any table'")) {
         requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
         return new BrokerResponseNative(
             QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, consolidatedMessage));
@@ -237,12 +266,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
-    Timer queryTimer = new Timer(queryTimeoutMs);
     int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
-      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimeoutMs, TimeUnit.MILLISECONDS)) {
+      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimer.getRemainingTime(),
+          TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
