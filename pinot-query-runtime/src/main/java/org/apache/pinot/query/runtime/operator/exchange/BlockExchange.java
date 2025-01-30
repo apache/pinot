@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -142,10 +141,13 @@ public abstract class BlockExchange {
       return;
     }
 
-    DataBlock.Type type = block.getType();
-    Iterator<TransferableBlock> splits = _splitter.split(block, type, MAX_MAILBOX_CONTENT_SIZE_BYTES);
-    while (splits.hasNext()) {
-      sendingMailbox.send(splits.next());
+    if (sendingMailbox.isLocal()) {
+      sendingMailbox.send(block);
+    } else {
+      Iterator<TransferableBlock> splits = _splitter.split(block, MAX_MAILBOX_CONTENT_SIZE_BYTES);
+      while (splits.hasNext()) {
+        sendingMailbox.send(splits.next());
+      }
     }
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Block sent: {} {} to {}", block.getType(), System.identityHashCode(block), sendingMailbox);
@@ -191,6 +193,11 @@ public abstract class BlockExchange {
 
     public BlockExchangeSendingMailbox(String id) {
       _id = id;
+    }
+
+    @Override
+    public boolean isLocal() {
+      return true;
     }
 
     @Override
