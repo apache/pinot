@@ -120,7 +120,7 @@ public class QueryLogger {
     private final RequestContext _requestContext;
     private final String _table;
     private final BrokerResponse _response;
-    private boolean _isMultiStageQueryEngine;
+    private final boolean _isMultiStageQueryEngine;
     @Nullable
     private final RequesterIdentity _identity;
     @Nullable
