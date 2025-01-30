@@ -1654,7 +1654,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     try {
       Instant acquireStart = Instant.now();
       while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
-        _segmentLogger.error("Failed to acquire partitionGroupConsumerSemaphore in: {} . Retrying.",
+        _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} . Retrying.",
             Duration.between(acquireStart, Instant.now()));
       }
       _acquiredConsumerSemaphore.set(true);
