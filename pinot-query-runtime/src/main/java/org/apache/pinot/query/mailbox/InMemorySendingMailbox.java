@@ -49,6 +49,11 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean isLocal() {
+    return true;
+  }
+
+  @Override
   public void send(TransferableBlock block)
       throws TimeoutException {
     if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
