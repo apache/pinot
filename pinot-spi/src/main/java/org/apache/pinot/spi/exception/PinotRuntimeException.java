@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common;
+package org.apache.pinot.spi.exception;
 
 /**
  * The base runtime exception for Pinot.
@@ -26,6 +26,7 @@ package org.apache.pinot.core.common;
  *
  */
 public class PinotRuntimeException extends RuntimeException {
+
   public PinotRuntimeException() {
   }
 

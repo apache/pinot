@@ -60,6 +60,7 @@ import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -269,8 +270,10 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
+    } catch (CalciteContextException e) {
+      throw new QException(QException.QUERY_VALIDATION_ERROR_CODE, e);
     } catch (Throwable t) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+      throw new QException("Error composing query plan for: " + sqlQuery, t);
     }
   }
 
@@ -459,8 +462,7 @@ public class QueryEnvironment {
     }
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
-//    return hepProgramBuilder.build();
-    throw new RuntimeException("lalala");
+    return hepProgramBuilder.build();
   }
 
   public static ImmutableQueryEnvironment.Config.Builder configBuilder() {
