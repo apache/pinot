@@ -112,14 +112,19 @@ public class QueryEnvironment {
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
   private final Config _envConfig;
+  private final PinotCatalog _catalog;
 
   public QueryEnvironment(Config config) {
     _envConfig = config;
     String database = config.getDatabase();
-    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
-        .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
+    _catalog = new PinotCatalog(config.getTableCache(), database);
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
+    _config = Frameworks.newConfigBuilder()
+        .traitDefs()
+        .operatorTable(PinotOperatorTable.instance())
+        .defaultSchema(rootSchema.plus())
+        .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG)
+        .build();
     _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
     _optProgram = getOptProgram();
   }
@@ -140,6 +145,10 @@ public class QueryEnvironment {
     HepProgram traitProgram = getTraitProgram(workerManager);
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
         sqlNodeAndOptions.getOptions());
+  }
+
+  public Set<String> getResolvedTables() {
+    return _catalog.getResolvedTables();
   }
 
   @Nullable
