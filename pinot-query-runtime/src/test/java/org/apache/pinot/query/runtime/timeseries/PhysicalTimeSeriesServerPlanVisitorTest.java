@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -43,6 +44,8 @@ import static org.testng.Assert.assertTrue;
 public class PhysicalTimeSeriesServerPlanVisitorTest {
   private static final String LANGUAGE = "m3ql";
   private static final int DUMMY_DEADLINE_MS = 10_000;
+  private static final int SERIES_LIMIT = 1000;
+  private static final Map<String, String> QUERY_OPTIONS = Collections.emptyMap();
 
   @BeforeClass
   public void setUp() {
@@ -65,7 +68,8 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
               DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
-              filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
+              filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"), SERIES_LIMIT,
+              QUERY_OPTIONS);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
@@ -78,7 +82,8 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
               DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
-              filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"));
+              filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"),
+              SERIES_LIMIT, QUERY_OPTIONS);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertNotNull(queryContext);
       assertNotNull(queryContext.getGroupByExpressions());

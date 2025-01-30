@@ -19,6 +19,7 @@
 package org.apache.pinot.tsdb.spi.plan.serde;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,9 @@ import static org.testng.Assert.assertTrue;
 
 
 public class TimeSeriesPlanSerdeTest {
+  private static final int SERIES_LIMIT = 1000;
+  private static final Map<String, String> QUERY_OPTIONS = Collections.emptyMap();
+
   @Test
   public void testSerdeForScanFilterProjectNode() {
     Map<String, String> aggParams = new HashMap<>();
@@ -41,7 +45,8 @@ public class TimeSeriesPlanSerdeTest {
 
     LeafTimeSeriesPlanNode leafTimeSeriesPlanNode =
         new LeafTimeSeriesPlanNode("sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS, 0L,
-            "myFilterExpression", "myValueExpression", new AggInfo("SUM", false, aggParams), new ArrayList<>());
+            "myFilterExpression", "myValueExpression", new AggInfo("SUM", false, aggParams), new ArrayList<>(),
+            SERIES_LIMIT, QUERY_OPTIONS);
     BaseTimeSeriesPlanNode planNode =
         TimeSeriesPlanSerde.deserialize(TimeSeriesPlanSerde.serialize(leafTimeSeriesPlanNode));
     assertTrue(planNode instanceof LeafTimeSeriesPlanNode);

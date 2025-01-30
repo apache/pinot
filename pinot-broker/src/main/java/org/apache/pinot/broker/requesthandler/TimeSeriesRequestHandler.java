@@ -150,6 +150,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     Long endTs = null;
     String step = null;
     String timeoutStr = null;
+    int limit = RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT;
+    int numGroupsLimit = RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT;
     for (NameValuePair nameValuePair : pairs) {
       switch (nameValuePair.getName()) {
         case "query":
@@ -167,6 +169,12 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
         case "timeout":
           timeoutStr = nameValuePair.getValue();
           break;
+        case "limit":
+          limit = Integer.parseInt(nameValuePair.getValue());
+          break;
+        case "numGroupsLimit":
+          numGroupsLimit = Integer.parseInt(nameValuePair.getValue());
+          break;
         default:
           /* Okay to ignore unknown parameters since the language implementor may be using them. */
           break;
@@ -182,7 +190,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       timeout = HumanReadableDuration.from(timeoutStr);
     }
     // TODO: Pass full raw query param string to the request
-    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout, queryParamString);
+    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout, limit, numGroupsLimit,
+        queryParamString);
   }
 
   public static Long getStepSeconds(@Nullable String step) {
