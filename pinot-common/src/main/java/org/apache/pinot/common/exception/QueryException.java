@@ -197,6 +197,7 @@ public class QueryException {
       case QueryException.QUERY_VALIDATION_ERROR_CODE:
       case QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE:
       case QueryException.SQL_PARSING_ERROR_CODE:
+      case QException.SQL_RUNTIME_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
       case QueryException.TABLE_IS_DISABLED_ERROR_CODE:

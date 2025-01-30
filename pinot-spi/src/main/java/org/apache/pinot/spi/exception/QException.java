@@ -32,6 +32,7 @@ package org.apache.pinot.spi.exception;
 public class QException extends PinotRuntimeException {
   public static final int JSON_PARSING_ERROR_CODE = 100;
   public static final int SQL_PARSING_ERROR_CODE = 150;
+  public static final int SQL_RUNTIME_ERROR_CODE = 160;
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int TABLE_IS_DISABLED_ERROR_CODE = 191;

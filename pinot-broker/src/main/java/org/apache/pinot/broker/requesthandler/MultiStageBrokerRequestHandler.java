@@ -154,7 +154,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           .defaultInferPartitionHint(inferPartitionHint)
           .defaultUseSpools(defaultUseSpool)
           .build());
-
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
