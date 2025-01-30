@@ -396,6 +396,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
+    Schema schema = indexLoadingConfig.getSchema();
+    String segmentTier = zkMetadata.getTier();
+    SegmentDirectory segmentDirectory =
+        initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
+    // We should first try to reuse existing segment directory
+    if (isDirectoryReusable(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig, schema)) {
+      _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
+      // No reprocessing needed, reuse the same segment
+      ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
+      addSegment(segment);
+      return;
+    }
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
         localMetadata.getCrc(), zkMetadata.getCrc());
     downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
@@ -676,7 +688,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         // We should first try to reuse existing segment directory
-        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig, schema)) {
+        if (isDirectoryReusable(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig, schema)) {
           _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
           // No reprocessing needed, reuse the same segment
           ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);
@@ -728,7 +740,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
-  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+  private boolean isDirectoryReusable(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
       SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
