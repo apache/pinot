@@ -51,6 +51,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -107,22 +108,26 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
-      for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+      for (Map.Entry<String, QueryTestCase.Table> entry : testCase._tables.entrySet()) {
         boolean allowEmptySegment = !testCase._extraProps.isNoEmptySegment();
-        String tableName = testCaseName + "_" + tableEntry.getKey();
+        String tableName = testCaseName + "_" + entry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
-        pinotSchema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableColumnBasedNullHandling());
-        schemaMap.put(tableName, pinotSchema);
-        factory1.registerTable(pinotSchema, offlineTableName);
-        factory2.registerTable(pinotSchema, offlineTableName);
-        List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
-        List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
+        QueryTestCase.Table table = entry.getValue();
+        Schema schema = constructSchema(tableName, table._schema);
+        schema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableColumnBasedNullHandling());
+        schemaMap.put(tableName, schema);
+        factory1.registerTable(schema, offlineTableName);
+        factory2.registerTable(schema, offlineTableName);
+        List<QueryTestCase.ColumnAndType> columnAndTypes = table._schema;
+        List<GenericRow> genericRows = toRow(columnAndTypes, table._inputs);
+        if (table._replicated) {
+          addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
+          continue;
+        }
         // generate segments and dump into server1 and server2
-        List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
-        int numPartitions = tableEntry.getValue()._partitionCount == null ? DEFAULT_NUM_PARTITIONS
-            : tableEntry.getValue()._partitionCount;
+        List<String> partitionColumns = table._partitionColumns;
+        int numPartitions = table._partitionCount == null ? DEFAULT_NUM_PARTITIONS : table._partitionCount;
         String partitionColumn = null;
         List<List<String>> partitionIdToSegmentsMap = null;
         if (partitionColumns != null && partitionColumns.size() == 1) {
@@ -232,13 +237,19 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       MockInstanceDataManagerFactory factory = i < (numPartitions / 2) ? factory1 : factory2;
       List<GenericRow> rows = partitionIdToRowsMap.get(i);
       if (allowEmptySegment || !rows.isEmpty()) {
-        String segmentName = factory.addSegment(offlineTableName, rows);
+        ImmutableSegment segment = factory.addSegment(offlineTableName, rows);
         if (partitionIdToSegmentsMap != null) {
-          partitionIdToSegmentsMap.get(i).add(segmentName);
+          partitionIdToSegmentsMap.get(i).add(segment.getSegmentName());
         }
         rows.clear();
       }
     }
+  }
+
+  private void addSegmentReplicated(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
+      String offlineTableName, List<GenericRow> rows) {
+    ImmutableSegment segment = factory1.addSegment(offlineTableName, rows);
+    factory2.addSegment(offlineTableName, segment);
   }
 
   @AfterClass

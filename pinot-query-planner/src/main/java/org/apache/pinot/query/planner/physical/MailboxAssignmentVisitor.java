@@ -19,12 +19,10 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -42,7 +40,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
   public Void process(PlanNode node, DispatchablePlanContext context) {
     if (node instanceof MailboxSendNode) {
       MailboxSendNode sendNode = (MailboxSendNode) node;
-      int senderStageId = sendNode.getStageId();
+      // NOTE: Using Integer to avoid boxing
+      Integer senderStageId = sendNode.getStageId();
       for (Integer receiverStageId : sendNode.getReceiverStageIds()) {
         Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
         DispatchablePlanMetadata senderMetadata = metadataMap.get(senderStageId);
@@ -55,34 +54,56 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         int numSenders = senderServerMap.size();
         int numReceivers = receiverServerMap.size();
         if (sendNode.getDistributionType() == RelDistribution.Type.SINGLETON) {
-          // For SINGLETON exchange type, send the data to the same instance (same worker id)
-          Preconditions.checkState(numSenders == numReceivers,
-              "Got different number of workers for SINGLETON distribution type, sender: %s, receiver: %s", numSenders,
-              numReceivers);
-          for (int workerId = 0; workerId < numSenders; workerId++) {
-            QueryServerInstance senderServer = senderServerMap.get(workerId);
-            QueryServerInstance receiverServer = receiverServerMap.get(workerId);
-            Preconditions.checkState(senderServer.equals(receiverServer),
-                "Got different server for SINGLETON distribution type for worker id: %s, sender: %s, receiver: %s",
-                workerId, senderServer, receiverServer);
-            MailboxInfos mailboxInfos = new SharedMailboxInfos(
-                new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(),
-                    ImmutableList.of(workerId)));
-            senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverStageId, mailboxInfos);
-            receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderStageId, mailboxInfos);
+          // NOTE: We use SINGLETON to represent local exchange. The actual distribution type is determined by the
+          //       parallelism.
+          if (numSenders == numReceivers) {
+            // Send the data to the same instance (same worker id) with SINGLETON distribution type
+            for (int workerId = 0; workerId < numSenders; workerId++) {
+              QueryServerInstance senderServer = senderServerMap.get(workerId);
+              QueryServerInstance receiverServer = receiverServerMap.get(workerId);
+              Preconditions.checkState(senderServer.equals(receiverServer),
+                  "Got different server for SINGLETON distribution type for worker id: %s, sender: %s, receiver: %s",
+                  workerId, senderServer, receiverServer);
+              MailboxInfos mailboxInfos = new SharedMailboxInfos(
+                  new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), List.of(workerId)));
+              senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverStageId, mailboxInfos);
+              receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderStageId, mailboxInfos);
+            }
+          } else {
+            // Hash distribute the data to multiple receivers on the same server instance
+            // TODO: Support local exchange with parallelism but no key
+            Preconditions.checkState(!sendNode.getKeys().isEmpty(), "Local exchange with parallelism requires keys");
+            sendNode.setDistributionType(RelDistribution.Type.HASH_DISTRIBUTED);
+
+            Preconditions.checkState(numReceivers % numSenders == 0,
+                "Number of receivers: %s should be a multiple of number of senders: %s for local exchange",
+                numReceivers, numSenders);
+            int parallelism = numReceivers / numSenders;
+            int receiverWorkerId = 0;
+            for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
+              QueryServerInstance senderServer = senderServerMap.get(senderWorkerId);
+              QueryServerInstance receiverServer = receiverServerMap.get(receiverWorkerId);
+              Preconditions.checkState(senderServer.equals(receiverServer),
+                  "Got different server for local exchange, sender %s: %s, receiver %s: %s", senderWorkerId,
+                  senderServer, receiverWorkerId, receiverServer);
+              computeDirectExchangeWithParallelism(senderMailboxesMap, receiverMailboxesMap, senderStageId,
+                  receiverStageId, senderWorkerId, receiverWorkerId, senderServer, receiverServer, parallelism);
+              receiverWorkerId += parallelism;
+            }
           }
         } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
-          // - direct exchange possible:
-          //   1. send the data to the worker with the same worker id (not necessary the same instance), 1-to-1 mapping
-          //   2. When partition parallelism is configured, fanout based on partition parallelism from each sender
-          //      workerID to sequentially increment receiver workerIDs
-          int partitionParallelism = numReceivers / numSenders;
-          if (partitionParallelism == 1) {
+          // Direct exchange possible:
+          // - Without parallelism:
+          //   Send the data to the worker with the same worker id (not necessary the same instance), 1-to-1 mapping
+          // - With parallelism:
+          //   Fanout based on parallelism from each sender workerID to sequentially increment receiver workerIDs
+          int parallelism = numReceivers / numSenders;
+          if (parallelism == 1) {
             // 1-to-1 mapping
             for (int workerId = 0; workerId < numSenders; workerId++) {
               QueryServerInstance senderServer = senderServerMap.get(workerId);
               QueryServerInstance receiverServer = receiverServerMap.get(workerId);
-              List<Integer> workerIds = ImmutableList.of(workerId);
+              List<Integer> workerIds = List.of(workerId);
               MailboxInfos senderMailboxInfos;
               MailboxInfos receiverMailboxInfos;
               if (senderServer.equals(receiverServer)) {
@@ -101,76 +122,70 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
                   .put(senderStageId, senderMailboxInfos);
             }
           } else {
-            // 1-to-<partition_parallelism> mapping
+            // 1-to-<parallelism> mapping
             int receiverWorkerId = 0;
             for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
               QueryServerInstance senderServer = senderServerMap.get(senderWorkerId);
               QueryServerInstance receiverServer = receiverServerMap.get(receiverWorkerId);
-              List<Integer> receiverWorkerIds = new ArrayList<>(partitionParallelism);
-              senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>()).put(receiverStageId,
-                  new MailboxInfos(new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(),
-                      receiverWorkerIds)));
-              MailboxInfos senderMailboxInfos = new SharedMailboxInfos(
-                  new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(),
-                      ImmutableList.of(senderWorkerId)));
-              for (int i = 0; i < partitionParallelism; i++) {
-                receiverWorkerIds.add(receiverWorkerId);
-                receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-                    .put(senderStageId, senderMailboxInfos);
-                receiverWorkerId++;
-              }
+              computeDirectExchangeWithParallelism(senderMailboxesMap, receiverMailboxesMap, senderStageId,
+                  receiverStageId, senderWorkerId, receiverWorkerId, senderServer, receiverServer, parallelism);
+              receiverWorkerId += parallelism;
             }
           }
         } else {
           // For other exchange types, send the data to all the instances in the receiver fragment
           // TODO: Add support for more exchange types
-          List<MailboxInfo> receiverMailboxInfoList = getMailboxInfos(receiverServerMap);
-          MailboxInfos receiverMailboxInfos = numSenders > 1 ? new SharedMailboxInfos(receiverMailboxInfoList)
-              : new MailboxInfos(receiverMailboxInfoList);
-          for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
-            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
-                .put(receiverStageId, receiverMailboxInfos);
-          }
-          List<MailboxInfo> senderMailboxInfoList = getMailboxInfos(senderServerMap);
-          MailboxInfos senderMailboxInfos =
-              numReceivers > 1 ? new SharedMailboxInfos(senderMailboxInfoList)
-                  : new MailboxInfos(senderMailboxInfoList);
-          for (int receiverWorkerId = 0; receiverWorkerId < numReceivers; receiverWorkerId++) {
-            receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-                .put(senderStageId, senderMailboxInfos);
-          }
+          connectWorkers(receiverStageId, receiverServerMap, senderMailboxesMap, numSenders);
+          connectWorkers(senderStageId, senderServerMap, receiverMailboxesMap, numReceivers);
         }
       }
     }
     return null;
   }
 
-  private static boolean isDirectExchangeCompatible(DispatchablePlanMetadata sender,
-      DispatchablePlanMetadata receiver) {
-    Map<Integer, QueryServerInstance> senderServerMap = sender.getWorkerIdToServerInstanceMap();
-    Map<Integer, QueryServerInstance> receiverServerMap = receiver.getWorkerIdToServerInstanceMap();
-
-    int numSenders = senderServerMap.size();
-    int numReceivers = receiverServerMap.size();
-    if (!sender.getScannedTables().isEmpty() && receiver.getScannedTables().isEmpty()) {
-      // leaf-to-intermediate condition
-      return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
-          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
-    } else {
-      // dynamic-broadcast condition || intermediate-to-intermediate
-      return numSenders == numReceivers && sender.getPartitionFunction() != null && sender.getPartitionFunction()
-          .equalsIgnoreCase(receiver.getPartitionFunction());
+  private void computeDirectExchangeWithParallelism(Map<Integer, Map<Integer, MailboxInfos>> senderMailboxesMap,
+      Map<Integer, Map<Integer, MailboxInfos>> receiverMailboxesMap, Integer senderStageId, Integer receiverStageId,
+      int senderWorkerId, int receiverWorkerId, QueryServerInstance senderServer, QueryServerInstance receiverServer,
+      int parallelism) {
+    List<Integer> receiverWorkerIds = new ArrayList<>(parallelism);
+    senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
+        .put(receiverStageId, new MailboxInfos(
+            new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(), receiverWorkerIds)));
+    MailboxInfos senderMailboxInfos = new SharedMailboxInfos(
+        new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), List.of(senderWorkerId)));
+    for (int i = 0; i < parallelism; i++) {
+      receiverWorkerIds.add(receiverWorkerId);
+      receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
+          .put(senderStageId, senderMailboxInfos);
+      receiverWorkerId++;
     }
   }
 
-  private static List<MailboxInfo> getMailboxInfos(Map<Integer, QueryServerInstance> workerIdToServerMap) {
+  private static boolean isDirectExchangeCompatible(DispatchablePlanMetadata sender,
+      DispatchablePlanMetadata receiver) {
+    int numSenders = sender.getWorkerIdToServerInstanceMap().size();
+    int numReceivers = receiver.getWorkerIdToServerInstanceMap().size();
+    return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
+        && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+  }
+
+  private void connectWorkers(int stageId, Map<Integer, QueryServerInstance> serverMap,
+      Map<Integer, Map<Integer, MailboxInfos>> mailboxesMap, int numWorkers) {
     Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = new HashMap<>();
-    int numServers = workerIdToServerMap.size();
-    for (int workerId = 0; workerId < numServers; workerId++) {
-      serverToWorkerIdsMap.computeIfAbsent(workerIdToServerMap.get(workerId), k -> new ArrayList<>()).add(workerId);
+    int numSourceWorkers = serverMap.size();
+    for (int workerId = 0; workerId < numSourceWorkers; workerId++) {
+      serverToWorkerIdsMap.computeIfAbsent(serverMap.get(workerId), k -> new ArrayList<>()).add(workerId);
     }
-    return serverToWorkerIdsMap.entrySet().stream()
-        .map(e -> new MailboxInfo(e.getKey().getHostname(), e.getKey().getQueryMailboxPort(), e.getValue()))
-        .collect(Collectors.toList());
+    List<MailboxInfo> mailboxInfoList = new ArrayList<>(serverToWorkerIdsMap.size());
+    for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverToWorkerIdsMap.entrySet()) {
+      QueryServerInstance server = entry.getKey();
+      List<Integer> workerIds = entry.getValue();
+      mailboxInfoList.add(new MailboxInfo(server.getHostname(), server.getQueryMailboxPort(), workerIds));
+    }
+    MailboxInfos mailboxInfos =
+        numWorkers > 1 ? new SharedMailboxInfos(mailboxInfoList) : new MailboxInfos(mailboxInfoList);
+    for (int workerId = 0; workerId < numWorkers; workerId++) {
+      mailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(stageId, mailboxInfos);
+    }
   }
 }

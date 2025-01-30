@@ -33,6 +33,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -40,7 +41,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.slf4j.Logger;
@@ -309,11 +309,11 @@ public class ZKOperator {
         if (customMapModifier == null) {
           // If no modifier is provided, use the custom map from the segment metadata
           segmentZKMetadata.setCustomMap(null);
-          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+          SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
               segmentDownloadURIStr, crypterName, segmentSizeInBytes);
         } else {
           // If modifier is provided, first set the custom map from the segment metadata, then apply the modifier
-          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+          SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
               segmentDownloadURIStr, crypterName, segmentSizeInBytes);
           segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
         }
@@ -446,11 +446,11 @@ public class ZKOperator {
           if (customMapModifier == null) {
             // If no modifier is provided, use the custom map from the segment metadata
             segmentZKMetadata.setCustomMap(null);
-            ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+            SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
                 segmentDownloadURIStr, crypterName, segmentSizeInBytes);
           } else {
             // If modifier is provided, first set the custom map from the segment metadata, then apply the modifier
-            ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+            SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
                 segmentDownloadURIStr, crypterName, segmentSizeInBytes);
             segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
           }
@@ -502,7 +502,7 @@ public class ZKOperator {
     SegmentZKMetadata newSegmentZKMetadata;
     try {
       newSegmentZKMetadata =
-          ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, segmentDownloadURIStr,
+          SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, segmentDownloadURIStr,
               crypterName, segmentSizeInBytes);
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER,
@@ -590,7 +590,7 @@ public class ZKOperator {
       long segmentSizeInBytes = segmentUploadMetadata.getSegmentSizeInBytes();
       File segmentFile = segmentUploadMetadata.getEncryptionInfo().getRight();
       try {
-        newSegmentZKMetadata = ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata,
+        newSegmentZKMetadata = SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata,
             segmentDownloadURIStr, crypterName, segmentSizeInBytes);
         segmentZKMetadataMap.put(segmentName, newSegmentZKMetadata);
         segmentNames.add(segmentName);
