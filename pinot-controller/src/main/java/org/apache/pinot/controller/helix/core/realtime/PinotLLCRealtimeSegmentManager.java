@@ -1902,21 +1902,25 @@ public class PinotLLCRealtimeSegmentManager {
     int maxAttempts = (batchStatusCheckTimeoutMs + batchStatusCheckIntervalMs - 1) / batchStatusCheckIntervalMs;
     RetryPolicy retryPolicy =
         RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
-    int attemptCount = 0;
     final Set<String>[] segmentsYetToBeCommitted = new Set[1];
 
     try {
-      attemptCount = retryPolicy.attempt(() -> {
+      retryPolicy.attempt(() -> {
         segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
+      int attemptCount;
+      if (e instanceof AttemptsExceededException) {
+        attemptCount = ((AttemptsExceededException) e).getAttempts();
+      } else {
+        attemptCount = ((RetriableOperationException) e).getAttempts();
+      }
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
               + "segmentsYetToBeCommitted: %s",
           segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(e);
+      throw new RuntimeException(errorMsg, e);
     }
   }
 
