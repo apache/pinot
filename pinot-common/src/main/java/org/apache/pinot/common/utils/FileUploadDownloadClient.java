@@ -55,6 +55,7 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -62,6 +63,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -991,6 +993,30 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
+   * to upload committed llc segment to segment store if missing.
+   * @param uri The uri to ask servers to upload segment to segment store
+   * @return {@link SegmentZKMetadata} - segment download url, crc, other metadata
+   * @throws URISyntaxException
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
+      throws URISyntaxException, IOException, HttpErrorStatusException {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    // sendRequest checks the response status code
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    SegmentZKMetadata segmentZKMetadata = SegmentZKMetadata.fromJsonString(response.getResponse());
+    if (StringUtils.isEmpty(segmentZKMetadata.getDownloadUrl())) {
+      throw new HttpErrorStatusException(
+          String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
+              uri), response.getStatusCode());
+    }
+    return segmentZKMetadata;
+  }
+
+  /**
    * Send segment uri.
    *
    * Note: table name has to be set as a parameter.
@@ -1262,6 +1288,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
       tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name()));
     }
     return tableParams;
+  }
+
+  public static NameValuePair makeParallelProtectionParam(PushJobSpec jobSpec) {
+    String enableParallelProtection = jobSpec.getPushParallelism() > 1 ? "true" : "false";
+    NameValuePair parallelProtectionParam =
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+            enableParallelProtection);
+    return parallelProtectionParam;
   }
 
   @Override

@@ -29,8 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
+import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -51,6 +55,21 @@ public class SegmentPushUtilsTest {
   @AfterMethod
   public void tearDown() throws IOException {
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Test
+  public void testSegmentParallelProtectionUploadParam() {
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    NameValuePair nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
+    Assert.assertEquals(nameValuePair.getName(),
+        FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
+    Assert.assertEquals(nameValuePair.getValue(), "false");
+    pushJobSpec.setPushParallelism(2);
+    nameValuePair = FileUploadDownloadClient.makeParallelProtectionParam(pushJobSpec);
+    Assert.assertEquals(nameValuePair.getName(),
+        FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION);
+    Assert.assertEquals(nameValuePair.getValue(), "true");
   }
 
   @Test

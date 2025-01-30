@@ -26,8 +26,8 @@ public class TableLLCSegmentUploadResponse {
   private final long _crc;
   private final String _downloadUrl;
 
-  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("crc") Long crc, @JsonProperty("downloadUrl") String downloadUrl) {
+  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") long crc,
+      @JsonProperty("downloadUrl") String downloadUrl) {
     _segmentName = segmentName;
     _crc = crc;
     _downloadUrl = downloadUrl;
@@ -37,7 +37,7 @@ public class TableLLCSegmentUploadResponse {
     return _segmentName;
   }
 
-  public Long getCrc() {
+  public long getCrc() {
     return _crc;
   }
 

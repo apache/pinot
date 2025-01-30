@@ -135,6 +135,12 @@ public class PinotHintOptions {
     public static DistributionType getRightDistributionType(Map<String, String> joinHintOptions) {
       return DistributionType.fromHint(joinHintOptions.get(RIGHT_DISTRIBUTION_TYPE));
     }
+
+    @Nullable
+    public static Boolean isColocatedByJoinKeys(Join join) {
+      String hint = PinotHintStrategyTable.getHintOption(join.getHints(), JOIN_HINT_OPTIONS, IS_COLOCATED_BY_JOIN_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
   }
 
   /**
@@ -173,26 +179,37 @@ public class PinotHintOptions {
   }
 
   public static class TableHintOptions {
+
     /**
      * Indicates the key to partition the table by.
      * This must be equal to the keyset in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
      */
     public static final String PARTITION_KEY = "partition_key";
+
     /**
      * The function to use to partition the table.
      * This must be equal to {@code functionName} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
      */
     public static final String PARTITION_FUNCTION = "partition_function";
+
     /**
      * The size of each partition.
      * This must be equal to {@code numPartition} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
      */
     public static final String PARTITION_SIZE = "partition_size";
+
     /**
      * The number of workers per partition.
      * How many threads to use in the following stage after partition is joined.
      * When partition info is set, each partition is processed as a separate query in the leaf stage.
+     * When partition info is not set, we count all data processed in the leaf stage as the same partition.
      */
     public static final String PARTITION_PARALLELISM = "partition_parallelism";
+
+    /**
+     * Indicates whether the table is replicated across all workers. When table is replicated across all workers, we can
+     * execute the same query on all workers to achieve broadcast without network shuffle.
+     */
+    public static final String IS_REPLICATED = "is_replicated";
   }
 }

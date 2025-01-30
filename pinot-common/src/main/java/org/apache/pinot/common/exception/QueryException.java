@@ -27,6 +27,7 @@ import org.apache.pinot.spi.exception.QException;
 
 
 // TODO: Clean up ProcessingException (thrift) because we don't send it through the wire
+// TODO: Rename this class to QueryExceptionUtil because it doesn't extend Exception
 public class QueryException {
   private QueryException() {
   }
