@@ -84,7 +84,7 @@ public class BenchmarkRegexpReplace {
   }
 
   @Benchmark
-  public void testRegexpReplaceConst(Blackhole blackhole) {
+  public void testRegexpReplace(Blackhole blackhole) {
     RegexpReplaceConstFunctions function = new RegexpReplaceConstFunctions();
     for (int i = 0, n = _input.size(); i < n; i++) {
       blackhole.consume(function.regexpReplace(_input.get(i), _regex, ""));

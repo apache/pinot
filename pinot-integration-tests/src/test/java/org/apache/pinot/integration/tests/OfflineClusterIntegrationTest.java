@@ -876,96 +876,96 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testRegexpReplaceConst(boolean useMultiStageQueryEngine)
+  public void testRegexpReplaceVar(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Correctness tests of regexpReplace.
 
     // Test replace all.
-    String sqlQuery = "SELECT regexpReplaceConst('CA', 'C', 'TEST')";
+    String sqlQuery = "SELECT regexpReplaceVar('CA', 'C', 'TEST')";
     JsonNode response = postQuery(sqlQuery);
     String result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "TESTA");
 
-    sqlQuery = "SELECT regexpReplaceConst('foobarbaz', 'b', 'X')";
+    sqlQuery = "SELECT regexpReplaceVar('foobarbaz', 'b', 'X')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "fooXarXaz");
 
-    sqlQuery = "SELECT regexpReplaceConst('foobarbaz', 'b', 'XY')";
+    sqlQuery = "SELECT regexpReplaceVar('foobarbaz', 'b', 'XY')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "fooXYarXYaz");
 
-    sqlQuery = "SELECT regexpReplaceConst('Argentina', '(.)', '$1 ')";
+    sqlQuery = "SELECT regexpReplaceVar('Argentina', '(.)', '$1 ')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "A r g e n t i n a ");
 
-    sqlQuery = "SELECT regexpReplaceConst('Pinot is  blazing  fast', '( ){2,}', ' ')";
+    sqlQuery = "SELECT regexpReplaceVar('Pinot is  blazing  fast', '( ){2,}', ' ')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "Pinot is blazing fast");
 
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, and wise','\\w+thy', 'something')";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, and wise','\\w+thy', 'something')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, something, and wise");
 
-    sqlQuery = "SELECT regexpReplaceConst('11234567898','(\\d)(\\d{3})(\\d{3})(\\d{4})', '$1-($2) $3-$4')";
+    sqlQuery = "SELECT regexpReplaceVar('11234567898','(\\d)(\\d{3})(\\d{3})(\\d{4})', '$1-($2) $3-$4')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "1-(123) 456-7898");
 
     // Test replace starting at index.
 
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 4)";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 4)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, something, something and wise");
 
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 1)";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 1)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
     // Test occurence
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, something and wise");
 
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 0)";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 0)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, wealthy, stealthy and wise");
 
     // Test flags
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 0, 0, 'i')";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 0, 0, 'i')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, wealthy, stealthy and wise");
 
     // Negative test. Pattern match not found.
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+tHy', 'something')";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+tHy', 'something')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Negative test. Pattern match not found.
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 21, 'i')";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 21, 'i')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Negative test - incorrect flag
-    sqlQuery = "SELECT regexpReplaceConst('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 12, 'xyz')";
+    sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 12, 'xyz')";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Test in select clause with column values
-    sqlQuery = "SELECT regexpReplaceConst(DestCityName, ' ', '', 0, -1, 'i') from mytable where OriginState = 'CA'";
+    sqlQuery = "SELECT regexpReplaceVar(DestCityName, ' ', '', 0, -1, 'i') from mytable where OriginState = 'CA'";
     response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -974,7 +974,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Test in where clause
-    sqlQuery = "SELECT count(*) from mytable where regexpReplaceConst(OriginState, '[VC]A', 'TEST') = 'TEST'";
+    sqlQuery = "SELECT count(*) from mytable where regexpReplaceVar(OriginState, '[VC]A', 'TEST') = 'TEST'";
     response = postQuery(sqlQuery);
     int count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     sqlQuery = "SELECT count(*) from mytable where OriginState='CA' or OriginState='VA'";
@@ -984,7 +984,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Test nested transform
     sqlQuery =
-        "SELECT count(*) from mytable where contains(regexpReplaceConst(OriginState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
+        "SELECT count(*) from mytable where contains(regexpReplaceVar(OriginState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
     response = postQuery(sqlQuery);
     count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     sqlQuery = "SELECT count(*) from mytable where OriginState='CA'";
