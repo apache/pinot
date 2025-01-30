@@ -30,6 +30,12 @@ import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 public interface SendingMailbox {
 
   /**
+   * Returns whether the mailbox is sending data to a local receiver, where blocks can be directly passed to the
+   * receiver.
+   */
+  boolean isLocal();
+
+  /**
    * Sends a block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call, and
    * they should <b>not</b> acquire any resources when they are created. This method should throw if there was an error
    * sending the data, since that would allow {@link BlockExchange} to exit early.
