@@ -24,7 +24,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Optimized regexp_like implementation that assumes that pattern is not constant.
+ * Optimized regexp_like implementation that assumes that pattern is not constant .
  */
 public class RegexpReplaceVarFunctions {
 
