@@ -195,7 +195,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + ".SSSZ tz(CET)', '1:DAYS'), 'yyyy-MM-dd HH:mm:ss.SSSZ') = 120000000";
 
   public static final String REGEXP_REPLACE_QUERY =
-      "  select regexp_replace_const(RAW_STRING_COL, '.*a.*', 'abc' ), count(*) \n"
+      "  select regexp_replace(RAW_STRING_COL, '.*a.*', 'abc' ), count(*) \n"
           + " from MyTable \n "
           + " group by 1 "
           + " limit 1000000\n";
