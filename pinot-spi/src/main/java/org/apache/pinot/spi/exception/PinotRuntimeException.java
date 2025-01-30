@@ -18,28 +18,27 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class BadQueryRequestException extends QException {
-  public BadQueryRequestException(String message) {
-    super(SQL_RUNTIME_ERROR_CODE, message);
+/**
+ * The base runtime exception for Pinot.
+ *
+ * Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
+ * {@link RuntimeException} directly. We should gradually migrate to this class.
+ *
+ */
+public class PinotRuntimeException extends RuntimeException {
+
+  public PinotRuntimeException() {
   }
 
-  public BadQueryRequestException(String message, Throwable cause) {
-    super(SQL_RUNTIME_ERROR_CODE, message, cause);
+  public PinotRuntimeException(String message) {
+    super(message);
   }
 
-  public BadQueryRequestException(Throwable cause) {
-    super(SQL_RUNTIME_ERROR_CODE, cause);
+  public PinotRuntimeException(String message, Throwable cause) {
+    super(message, cause);
   }
 
-  public BadQueryRequestException(int errorCode, String message) {
-    super(errorCode, message);
-  }
-
-  public BadQueryRequestException(int errorCode, String message, Throwable cause) {
-    super(errorCode, message, cause);
-  }
-
-  public BadQueryRequestException(int errorCode, Throwable cause) {
-    super(errorCode, cause);
+  public PinotRuntimeException(Throwable cause) {
+    super(cause);
   }
 }
