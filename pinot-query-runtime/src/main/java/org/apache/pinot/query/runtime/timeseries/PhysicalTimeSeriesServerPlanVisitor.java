@@ -111,7 +111,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
     ExpressionContext aggregation = TimeSeriesAggregationFunction.create(context.getLanguage(),
         leafNode.getValueExpression(), timeTransform, timeBuckets, leafNode.getAggInfo());
     Map<String, String> queryOptions = new HashMap<>(leafNode.getQueryOptions());
-    queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getRemainingTimeMs()));
+    queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(Math.max(0L, context.getRemainingTimeMs())));
     return new QueryContext.Builder()
         .setTableName(leafNode.getTableName())
         .setFilter(filterContext)
@@ -119,7 +119,6 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         .setSelectExpressions(List.of(aggregation))
         .setQueryOptions(queryOptions)
         .setAliasList(Collections.emptyList())
-        .setQueryOptions(leafNode.getQueryOptions())
         .setLimit(leafNode.getLimit())
         .build();
   }
