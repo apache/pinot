@@ -30,7 +30,6 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 
@@ -124,8 +123,7 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     Join join = call.rel(0);
 
     // Do not apply this rule if join strategy is explicitly set to something other than dynamic broadcast
-    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    String joinStrategy = PinotHintOptions.JoinHintOptions.getJoinStrategyHint(join);
     if (joinStrategy != null && !joinStrategy.equals(
         PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY)) {
       return false;
@@ -154,10 +152,8 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     // when colocated join hint is given, dynamic broadcast exchange can be hash-distributed b/c
     //    1. currently, dynamic broadcast only works against main table off leaf-stage; (e.g. receive node on leaf)
     //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
-    boolean isColocatedJoin =
-        PinotHintStrategyTable.isHintOptionTrue(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
-    RelDistribution relDistribution = isColocatedJoin ? RelDistributions.hash(join.analyzeCondition().rightKeys)
+    boolean colocatedByJoinKeys = Boolean.TRUE.equals(PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join));
+    RelDistribution relDistribution = colocatedByJoinKeys ? RelDistributions.hash(join.analyzeCondition().rightKeys)
         : RelDistributions.BROADCAST_DISTRIBUTED;
     PinotLogicalExchange dynamicBroadcastExchange =
         PinotLogicalExchange.create(right.getInput(), relDistribution, PinotRelExchangeType.PIPELINE_BREAKER);

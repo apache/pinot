@@ -160,7 +160,7 @@ public class MinionConstants {
             DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
             SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
             DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
-            DISTINCTCOUNTRAWULL);
+            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL);
   }
 
   // Generate segment and push to controller based on batch ingestion configs
@@ -220,6 +220,16 @@ public class MinionConstants {
     public static final String SNAPSHOT = "snapshot";
 
     /**
+     * key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
+     */
+    public static final String IGNORE_CRC_MISMATCH_KEY = "ignoreCrcMismatch";
+
+    /**
+     * default value for the key IGNORE_CRC_MISMATCH_KEY: false
+     */
+    public static final boolean DEFAULT_IGNORE_CRC_MISMATCH = false;
+
+    /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
@@ -271,6 +281,11 @@ public class MinionConstants {
      * maximum number of segments to process in a single task
      */
     public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
+
+    /**
+     * maximum size of output segments to produce
+     */
+    public static final String OUTPUT_SEGMENT_MAX_SIZE_KEY = "outputSegmentMaxSize";
 
     /**
      * default maximum number of segments to process in a single task

@@ -684,12 +684,11 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
 
-    // only 1 stream config allowed
+    // Multiple stream configs are allowed
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for more than 1 stream config");
     } catch (IllegalStateException e) {
-      // expected
+      Assert.fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
@@ -2068,7 +2067,7 @@ public class TableConfigUtilsTest {
           "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
     }
 
-    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMerge task
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2081,7 +2080,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask "
+              + "/ UpsertCompactMergeTask for upsert table");
     }
   }
 

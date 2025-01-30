@@ -46,7 +46,7 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
- * The <code>GroupByOperator</code> class provides the operator for group-by query on a single segment.
+ * The <code>GroupByOperator</code> class implements keyed aggregation on a single segment in V1/SSQE.
  */
 @SuppressWarnings("rawtypes")
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {

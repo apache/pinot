@@ -30,6 +30,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
@@ -47,7 +48,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class MultiValueFixedByteRawIndexCreatorTest {
+public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
   protected static String _outputDir;
 
@@ -173,25 +174,27 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     creator.close();
 
     //read
-    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    ForwardIndexReader reader = getForwardIndexReader(buffer, dataType, writerVersion);
+    try (final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN,
+        "")) {
+      ForwardIndexReader reader = getForwardIndexReader(buffer, dataType, writerVersion);
 
-    final ForwardIndexReaderContext context = reader.createContext();
-    T valueBuffer = constructor.apply(maxElements);
-    for (int i = 0; i < numDocs; i++) {
-      Assert.assertEquals(inputs.get(i), extractor.extract(reader, context, i, valueBuffer));
-    }
+      final ForwardIndexReaderContext context = reader.createContext();
+      T valueBuffer = constructor.apply(maxElements);
+      for (int i = 0; i < numDocs; i++) {
+        Assert.assertEquals(inputs.get(i), extractor.extract(reader, context, i, valueBuffer));
+      }
 
-    // Value byte range test
-    Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
-    Assert.assertFalse(reader.isFixedOffsetMappingType());
-    final ForwardIndexReaderContext valueRangeContext = reader.createContext();
-    List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
-    for (int i = 0; i < numDocs; i++) {
-      try {
-        reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
-      } catch (Exception e) {
-        Assert.fail("Failed to record byte ranges for docId: " + i, e);
+      // Value byte range test
+      Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
+      Assert.assertFalse(reader.isFixedOffsetMappingType());
+      final ForwardIndexReaderContext valueRangeContext = reader.createContext();
+      List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
+      for (int i = 0; i < numDocs; i++) {
+        try {
+          reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
+        } catch (Exception e) {
+          Assert.fail("Failed to record byte ranges for docId: " + i, e);
+        }
       }
     }
   }

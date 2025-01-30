@@ -89,7 +89,6 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -188,12 +187,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Start the Pinot cluster
     startZk();
     startController();
-    // Set hyperloglog log2m value to 12.
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
             .build();
+    // Set hyperloglog log2m value to 12.
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+    // Set max segment preprocess parallelism to 8 to test that all segments can be processed
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
     startBrokers();
     startServers();
 
@@ -265,11 +267,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to reload table with force download");
-  }
-
-  @BeforeMethod
-  public void resetMultiStage() {
-    setUseMultiStageQueryEngine(false);
   }
 
   protected void startBrokers()
@@ -2958,61 +2955,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  public void testCaseInsensitivityV1(boolean useMultiStageQueryEngine)
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseSensitivity(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     int hoursSinceEpoch = 16138 * 24;
     int secondsSinceEpoch = 16138 * 24 * 60 * 60;
-    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
+    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable limit 10000",
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
             + "limit 10000",
         "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
             + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
-        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch + " limit 10000",
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch
+            + " limit 10000",
+        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch
+            + " limit 10000",
+        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable limit 10000",
         "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
-            + "'1:HOURS')");
+            + "'1:HOURS') limit 10000");
     List<String> queries = new ArrayList<>();
     baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
     baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
+        q -> queries.add(q.replace("mytable", "DEFAULT.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
       JsonNode response = postQuery(query);
-      assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "Query: " + query + " failed");
-    }
-  }
-
-  @Test
-  public void testCaseSensitivityV2()
-      throws Exception {
-    setUseMultiStageQueryEngine(true);
-    int daysSinceEpoch = 16138;
-    int hoursSinceEpoch = 16138 * 24;
-    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
-    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
-            + "limit 10000",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
-            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
-        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
-            + "'1:HOURS')");
-    List<String> queries = new ArrayList<>();
-    baseQueries.forEach(q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-    baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
-
-    for (String query : queries) {
-      testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
+      assertNoError(response);
     }
   }
 
@@ -3044,9 +3015,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseInsensitivityWithColumnNameContainsTableNameV1()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseInsensitivityWithColumnNameContainsTableName(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     int hoursSinceEpoch = 16138 * 24;
     int secondsSinceEpoch = 16138 * 24 * 60 * 60;
@@ -3072,37 +3044,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     for (String query : queries) {
       JsonNode response = postQuery(query);
       assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "Query: " + query + " failed");
-    }
-  }
-
-  @Test
-  public void testCaseSensitivityWithColumnNameContainsTableNameV2()
-      throws Exception {
-    setUseMultiStageQueryEngine(true);
-    int daysSinceEpoch = 16138;
-    int hoursSinceEpoch = 16138 * 24;
-    int secondsSinceEpoch = 16138 * 24 * 60 * 60;
-    List<String> baseQueries = Arrays.asList("SELECT * FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch "
-            + "limit 10000",
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert"
-            + "(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000",
-        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','HOURS') = " + hoursSinceEpoch,
-        "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch,
-        "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable",
-        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH',"
-            + "'1:HOURS')");
-    List<String> queries = new ArrayList<>();
-    baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
-    // something like "SELECT MYDB.MYTABLE.DAYSSinceEpOch from MYDB.MYTABLE where MYDB.MYTABLE.DAYSSinceEpOch = 16138"
-    baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
-
-    for (String query : queries) {
-      testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
     }
   }
 
@@ -3658,7 +3599,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+
+    String sqlQuery = "SELECT Origin, AVG(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(1).asText(), "DOUBLE");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT AVG(ArrDelay) FROM mytable LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 1);
+    assertEquals(columnDataTypes.get(0).asText(), "DOUBLE");
   }
 
   @Test(dataProvider = "useBothQueryEngines")

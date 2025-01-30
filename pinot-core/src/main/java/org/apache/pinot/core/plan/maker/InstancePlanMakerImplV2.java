@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -45,7 +46,7 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
-import org.apache.pinot.core.plan.TimeSeriesPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
 import org.apache.pinot.core.query.prefetch.FetchPlannerRegistry;
@@ -76,6 +77,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String NUM_GROUPS_LIMIT_KEY = "num.groups.limit";
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
 
+  // By default, group trimming in AggregateOperator is disabled
+  public static final int DEFAULT_GROUP_TRIM_SIZE = -1;
+
   // Instance config key for minimum segment-level group trim size
   // Set as pinot.server.query.executor.min.segment.group.trim.size
   public static final String MIN_SEGMENT_GROUP_TRIM_SIZE_KEY = "min.segment.group.trim.size";
@@ -89,6 +93,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+  public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
+  public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
@@ -263,15 +269,28 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
       }
+      // Set numThreadsExtractFinalResult
+      Integer numThreadsExtractFinalResult = QueryOptionsUtils.getNumThreadsExtractFinalResult(queryOptions);
+      if (numThreadsExtractFinalResult != null) {
+        queryContext.setNumThreadsExtractFinalResult(numThreadsExtractFinalResult);
+      } else {
+        queryContext.setNumThreadsExtractFinalResult(DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT);
+      }
+      // Set chunkSizeExtractFinalResult
+      Integer chunkSizeExtractFinalResult =
+          QueryOptionsUtils.getChunkSizeExtractFinalResult(queryOptions);
+      if (chunkSizeExtractFinalResult != null) {
+        queryContext.setChunkSizeExtractFinalResult(chunkSizeExtractFinalResult);
+      } else {
+        queryContext.setChunkSizeExtractFinalResult(DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT);
+      }
     }
   }
 
   @Override
   public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
-    if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
-      return new TimeSeriesPlanNode(segmentContext, queryContext);
-    } else if (QueryContextUtils.isAggregationQuery(queryContext)) {
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Group-by query
@@ -321,6 +340,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext) && queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
+      rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
       return new StreamingSelectionPlanNode(segmentContext, queryContext);
     } else {
       return makeSegmentPlanNode(segmentContext, queryContext);
@@ -343,6 +363,17 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
     selectExpressions.replaceAll(
         expression -> overrideWithExpressionHints(expression, indexSegment, expressionOverrideHints));
+
+    List<Pair<AggregationFunction, FilterContext>> filtAggrFuns = queryContext.getFilteredAggregationFunctions();
+    if (filtAggrFuns != null) {
+      for (Pair<AggregationFunction, FilterContext> filteredAggregationFunction : filtAggrFuns) {
+        FilterContext right = filteredAggregationFunction.getRight();
+        if (right != null) {
+          Predicate predicate = right.getPredicate();
+          predicate.setLhs(overrideWithExpressionHints(predicate.getLhs(), indexSegment, expressionOverrideHints));
+        }
+      }
+    }
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (CollectionUtils.isNotEmpty(groupByExpressions)) {

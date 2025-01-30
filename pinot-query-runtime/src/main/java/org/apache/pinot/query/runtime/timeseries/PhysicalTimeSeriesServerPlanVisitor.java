@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -30,13 +31,15 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.TimeSeriesContext;
+import org.apache.pinot.core.operator.transform.function.TimeSeriesBucketTransformFunction;
+import org.apache.pinot.core.query.aggregation.function.TimeSeriesAggregationFunction;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
@@ -56,26 +59,35 @@ public class PhysicalTimeSeriesServerPlanVisitor {
   }
 
   public BaseTimeSeriesOperator compile(BaseTimeSeriesPlanNode rootNode, TimeSeriesExecutionContext context) {
-    // Step-1: Replace scan filter project with our physical plan node with Pinot Core and Runtime context
-    initLeafPlanNode(rootNode, context);
+    // Step-1: Replace leaf node with our physical plan node with Pinot Core and Runtime context
+    rootNode = initLeafPlanNode(rootNode, context);
     // Step-2: Trigger recursive operator generation
     return rootNode.run();
   }
 
-  public void initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
+  public BaseTimeSeriesPlanNode initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      return convertLeafToPhysicalTableScan((LeafTimeSeriesPlanNode) planNode, context);
+    }
+    List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
     for (int index = 0; index < planNode.getInputs().size(); index++) {
       BaseTimeSeriesPlanNode childNode = planNode.getInputs().get(index);
       if (childNode instanceof LeafTimeSeriesPlanNode) {
         LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) childNode;
-        List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
-        ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
-        TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
-            serverQueryRequest, _queryExecutor, _executorService);
-        planNode.getInputs().set(index, physicalTableScan);
+        newInputs.add(convertLeafToPhysicalTableScan(leafNode, context));
       } else {
-        initLeafPlanNode(childNode, context);
+        newInputs.add(initLeafPlanNode(childNode, context));
       }
     }
+    return planNode.withInputs(newInputs);
+  }
+
+  private TimeSeriesPhysicalTableScan convertLeafToPhysicalTableScan(LeafTimeSeriesPlanNode leafNode,
+      TimeSeriesExecutionContext context) {
+    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), Collections.emptyList());
+    ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
+    return new TimeSeriesPhysicalTableScan(context, leafNode.getId(), serverQueryRequest, _queryExecutor,
+        _executorService);
   }
 
   public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode, List<String> segments,
@@ -84,6 +96,9 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         segments, getServerQueryRequestMetadataMap(context), _serverMetrics);
   }
 
+  /**
+   * Create a transform expression, and link it with an aggregation function.
+   */
   @VisibleForTesting
   QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
     FilterContext filterContext =
@@ -91,18 +106,18 @@ public class PhysicalTimeSeriesServerPlanVisitor {
             leafNode.getEffectiveFilter(context.getInitialTimeBuckets())));
     List<ExpressionContext> groupByExpressions = leafNode.getGroupByExpressions().stream()
         .map(RequestContextUtils::getExpression).collect(Collectors.toList());
-    ExpressionContext valueExpression = RequestContextUtils.getExpression(leafNode.getValueExpression());
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(context.getLanguage(),
-        leafNode.getTimeColumn(), leafNode.getTimeUnit(), context.getInitialTimeBuckets(), leafNode.getOffsetSeconds(),
-        valueExpression, leafNode.getAggInfo());
+    TimeBuckets timeBuckets = context.getInitialTimeBuckets();
+    ExpressionContext timeTransform = TimeSeriesBucketTransformFunction.create(leafNode.getTimeColumn(),
+        leafNode.getTimeUnit(), timeBuckets, leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds());
+    ExpressionContext aggregation = TimeSeriesAggregationFunction.create(context.getLanguage(),
+        leafNode.getValueExpression(), timeTransform, timeBuckets, leafNode.getAggInfo());
     return new QueryContext.Builder()
         .setTableName(leafNode.getTableName())
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
-        .setSelectExpressions(Collections.emptyList())
+        .setSelectExpressions(List.of(aggregation))
         .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getRemainingTimeMs())))
         .setAliasList(Collections.emptyList())
-        .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
         .build();
   }

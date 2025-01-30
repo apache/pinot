@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
@@ -32,6 +32,8 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  * <b>Important:</b> Refer to {@link TimeSeries} for details on Series ID and how to use it in general.
  */
 public abstract class BaseTimeSeriesBuilder {
+  public static final List<String> UNINITIALISED_TAG_NAMES = Collections.emptyList();
+  public static final Object[] UNINITIALISED_TAG_VALUES = new Object[]{};
   protected final String _id;
   @Nullable
   protected final Long[] _timeValues;
@@ -41,8 +43,8 @@ public abstract class BaseTimeSeriesBuilder {
   protected final Object[] _tagValues;
 
   /**
-   * Note that ID should be hashed to a Long to become the key in the Map&lt;Long, List&lt;TimeSeries&gt;&gt; in
-   * {@link TimeSeriesBlock}. Refer to {@link TimeSeries} for more details.
+   * <b>Note:</b> The leaf stage will use {@link #UNINITIALISED_TAG_NAMES} and {@link #UNINITIALISED_TAG_VALUES} during
+   * the aggregation. This is because tag values are materialized after the Combine Operator.
    */
   public BaseTimeSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
       List<String> tagNames, Object[] tagValues) {
@@ -56,24 +58,19 @@ public abstract class BaseTimeSeriesBuilder {
   public abstract void addValueAtIndex(int timeBucketIndex, Double value);
 
   public void addValueAtIndex(int timeBucketIndex, String value) {
-    throw new IllegalStateException("This aggregation function does not support string input");
+    throw new UnsupportedOperationException("This aggregation function does not support string input");
   }
 
   public abstract void addValue(long timeValue, Double value);
 
-  public void mergeSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
-    Long[] timeValues = Objects.requireNonNull(series.getTimeValues(),
-        "Cannot merge series: found null timeValues");
-    for (int i = 0; i < numDataPoints; i++) {
-      addValue(timeValues[i], series.getValues()[i]);
-    }
-  }
-
+  /**
+   * Assumes Double[] values and attempts to merge the given series with this builder. Implementations are
+   * recommended to override this to either optimize, or add bytes[][] values from the input Series.
+   */
   public void mergeAlignedSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
+    int numDataPoints = series.getDoubleValues().length;
     for (int i = 0; i < numDataPoints; i++) {
-      addValueAtIndex(i, series.getValues()[i]);
+      addValueAtIndex(i, series.getDoubleValues()[i]);
     }
   }
 
@@ -87,4 +84,9 @@ public abstract class BaseTimeSeriesBuilder {
   }
 
   public abstract TimeSeries build();
+
+  /**
+   * Used by the leaf stage, because the leaf stage materializes tag values very late.
+   */
+  public abstract TimeSeries buildWithTagOverrides(List<String> tagNames, Object[] tagValues);
 }

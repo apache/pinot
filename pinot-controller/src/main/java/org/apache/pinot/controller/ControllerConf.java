@@ -51,6 +51,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
+  public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";
@@ -65,6 +66,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  public static final String CONSOLE_SWAGGER_ENABLE = "controller.swagger.enable";
   public static final String CONSOLE_SWAGGER_USE_HTTPS = "controller.swagger.use.https";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
@@ -206,6 +208,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segment.level.validation.intervalInSeconds";
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD =
         "controller.segment.level.validation.intervalPeriod";
+    public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
+        "controller.segment.error.autoReset";
 
     // Initial delays
     public static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
@@ -983,6 +987,10 @@ public class ControllerConf extends PinotConfiguration {
                 ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS));
   }
 
+  public boolean isAutoResetErrorSegmentsOnValidationEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, false);
+  }
+
   public long getStatusCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -1126,5 +1134,14 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isEnforcePoolBasedAssignmentEnabled() {
     return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
+  }
+
+  public void setEnableSwagger(boolean value) {
+    setProperty(ControllerConf.CONSOLE_SWAGGER_ENABLE, value);
+  }
+
+  public boolean isEnableSwagger() {
+    String enableSwagger = getProperty(ControllerConf.CONSOLE_SWAGGER_ENABLE);
+    return enableSwagger == null || Boolean.parseBoolean(enableSwagger);
   }
 }

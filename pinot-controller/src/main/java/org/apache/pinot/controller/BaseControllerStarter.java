@@ -91,6 +91,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
+import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -257,7 +258,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");
       _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
-              "tenant-rebalance-thread-%d");
+          "tenant-rebalance-thread-%d");
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
@@ -272,7 +273,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private ExecutorService createExecutorService(int numThreadPool, String threadNameFormat) {
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build();
     return (numThreadPool <= 0) ? Executors.newCachedThreadPool(threadFactory)
-            : Executors.newFixedThreadPool(numThreadPool, threadFactory);
+        : Executors.newFixedThreadPool(numThreadPool, threadFactory);
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {
@@ -486,8 +487,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
-    _pinotLLCRealtimeSegmentManager =
-        new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
+    _pinotLLCRealtimeSegmentManager = createPinotLLCRealtimeSegmentManager();
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
@@ -577,10 +577,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
         try {
-          StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-              streamConfigMap);
+          for (Map<String, String> streamConfigMap : streamConfigMaps) {
+            StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
+                streamConfigMap);
+          }
         } catch (Exception e) {
           existingHlcTables.add(rt);
         }
@@ -618,6 +620,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+  }
+
+  protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
+    return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
   }
 
   /**
@@ -893,6 +899,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
     periodicTasks.add(_taskMetricsEmitter);
+    PeriodicTask responseStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
+        _controllerMetrics, _executorService, _connectionManager);
+    periodicTasks.add(responseStoreCleaner);
+
     return periodicTasks;
   }
 
@@ -974,5 +984,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected ControllerAdminApiApplication createControllerAdminApp() {
     return new ControllerAdminApiApplication(_config);
+  }
+
+  /**
+   * Return the PeriodicTaskScheduler instance so that the periodic tasks can be tested.
+   * @return PeriodicTaskScheduler.
+   */
+  @VisibleForTesting
+  public PeriodicTaskScheduler getPeriodicTaskScheduler() {
+    return _periodicTaskScheduler;
   }
 }

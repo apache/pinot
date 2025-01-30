@@ -45,6 +45,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -185,6 +186,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
+        configs.put(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
+            taskConfigs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
+            String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -286,7 +290,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @Override
-  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
         "UpsertCompactionTask only supports realtime tables!");

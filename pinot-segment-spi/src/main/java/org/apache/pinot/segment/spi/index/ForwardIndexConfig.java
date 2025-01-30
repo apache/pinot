@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -35,14 +34,56 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
+  @Deprecated
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
-  public static final int DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES = 1024 * 1024; // 1MB
-  public static final String DEFAULT_TARGET_MAX_CHUNK_SIZE =
-      DataSizeUtils.fromBytes(DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES);
+  @Deprecated
+  public static final String DEFAULT_TARGET_MAX_CHUNK_SIZE = "1MB";
+  @Deprecated
+  public static final int DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES = 1024 * 1024;
+  @Deprecated
   public static final int DEFAULT_TARGET_DOCS_PER_CHUNK = 1000;
-  public static final ForwardIndexConfig DISABLED =
-      new ForwardIndexConfig(true, null, null, null, null, null, null, null);
-  public static final ForwardIndexConfig DEFAULT = new Builder().build();
+
+  private static int _defaultRawIndexWriterVersion = 2;
+  private static String _defaultTargetMaxChunkSize = "1MB";
+  private static int _defaultTargetMaxChunkSizeBytes = 1024 * 1024;
+  private static int _defaultTargetDocsPerChunk = 1000;
+
+  public static int getDefaultRawWriterVersion() {
+    return _defaultRawIndexWriterVersion;
+  }
+
+  public static void setDefaultRawIndexWriterVersion(int defaultRawIndexWriterVersion) {
+    _defaultRawIndexWriterVersion = defaultRawIndexWriterVersion;
+  }
+
+  public static String getDefaultTargetMaxChunkSize() {
+    return _defaultTargetMaxChunkSize;
+  }
+
+  public static int getDefaultTargetMaxChunkSizeBytes() {
+    return _defaultTargetMaxChunkSizeBytes;
+  }
+
+  public static void setDefaultTargetMaxChunkSize(String defaultTargetMaxChunkSize) {
+    _defaultTargetMaxChunkSize = defaultTargetMaxChunkSize;
+    _defaultTargetMaxChunkSizeBytes = (int) DataSizeUtils.toBytes(defaultTargetMaxChunkSize);
+  }
+
+  public static int getDefaultTargetDocsPerChunk() {
+    return _defaultTargetDocsPerChunk;
+  }
+
+  public static void setDefaultTargetDocsPerChunk(int defaultTargetDocsPerChunk) {
+    _defaultTargetDocsPerChunk = defaultTargetDocsPerChunk;
+  }
+
+  public static ForwardIndexConfig getDefault() {
+    return new Builder().build();
+  }
+
+  public static ForwardIndexConfig getDisabled() {
+    return new ForwardIndexConfig(true, null, null, null, null, null, null, null);
+  }
 
   @Nullable
   private final CompressionCodec _compressionCodec;
@@ -61,21 +102,22 @@ public class ForwardIndexConfig extends IndexConfig {
       @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion,
       @Nullable String targetMaxChunkSize, @Nullable Integer targetDocsPerChunk) {
     super(disabled);
-    _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
-    _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
     _compressionCodec = compressionCodec;
+    _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
 
-    _targetMaxChunkSizeBytes = targetMaxChunkSize == null ? DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES
-        : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
-    _targetMaxChunkSize =
-        targetMaxChunkSize == null ? DEFAULT_TARGET_MAX_CHUNK_SIZE : targetMaxChunkSize;
-    _targetDocsPerChunk = targetDocsPerChunk == null ? DEFAULT_TARGET_DOCS_PER_CHUNK : targetDocsPerChunk;
+    _rawIndexWriterVersion = rawIndexWriterVersion == null ? _defaultRawIndexWriterVersion : rawIndexWriterVersion;
+    _targetMaxChunkSize = targetMaxChunkSize == null ? _defaultTargetMaxChunkSize : targetMaxChunkSize;
+    _targetMaxChunkSizeBytes =
+        targetMaxChunkSize == null ? _defaultTargetMaxChunkSizeBytes : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
+    _targetDocsPerChunk = targetDocsPerChunk == null ? _defaultTargetDocsPerChunk : targetDocsPerChunk;
 
     if (compressionCodec != null) {
       switch (compressionCodec) {
         case PASS_THROUGH:
         case CLP:
         case CLPV2:
+        case CLPV2_ZSTD:
+        case CLPV2_LZ4:
           _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
           _dictIdCompressionType = null;
           break;
@@ -115,10 +157,10 @@ public class ForwardIndexConfig extends IndexConfig {
       @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion,
-      @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSizeBytes,
+      @JsonProperty("targetMaxChunkSize") @Nullable String targetMaxChunkSize,
       @JsonProperty("targetDocsPerChunk") @Nullable Integer targetDocsPerChunk) {
     this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
-        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSizeBytes, targetDocsPerChunk);
+        deriveNumDocsPerChunk, rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk);
   }
 
   public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
@@ -219,9 +261,9 @@ public class ForwardIndexConfig extends IndexConfig {
     @Nullable
     private CompressionCodec _compressionCodec;
     private boolean _deriveNumDocsPerChunk = false;
-    private int _rawIndexWriterVersion = DEFAULT_RAW_WRITER_VERSION;
-    private String _targetMaxChunkSize;
-    private int _targetDocsPerChunk = DEFAULT_TARGET_DOCS_PER_CHUNK;
+    private int _rawIndexWriterVersion = _defaultRawIndexWriterVersion;
+    private String _targetMaxChunkSize = _defaultTargetMaxChunkSize;
+    private int _targetDocsPerChunk = _defaultTargetDocsPerChunk;
 
     public Builder() {
     }

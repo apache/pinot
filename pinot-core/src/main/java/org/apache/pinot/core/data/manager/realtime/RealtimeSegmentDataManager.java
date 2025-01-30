@@ -50,6 +50,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -282,7 +283,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
+  // _partitionGroupId represents the Pinot's internal partition number which will eventually be used as part of
+  // segment name.
+  // _streamPatitionGroupId represents the partition number in the stream topic, which could be derived from the
+  // _partitionGroupId and identify which partition of the stream topic this consumer is consuming from.
+  // Note that in traditional single topic ingestion mode, those two concepts were identical which got separated
+  // in multi-topic ingestion mode.
   private final int _partitionGroupId;
+  private final int _streamPatitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
   private final TransformPipeline _transformPipeline;
@@ -838,6 +846,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                // For tables with pauseless consumption enabled we want to start the commit protocol that
+                // 1. Updates the endOffset in the ZK metadata for the committing segment
+                // 2. Creates ZK metadata for the new consuming segment
+                // 3. Updates the IdealState for committing and new consuming segment to ONLINE and CONSUMING
+                // respectively.
+                // Refer to the PR for the new commit protocol: https://github.com/apache/pinot/pull/14741
+                if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+                  if (!startSegmentCommit()) {
+                    // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                    // Change the state to HOLDING before looping around.
+                    _state = State.HOLDING;
+                    _segmentLogger.info("Could not commit segment: {}. Retrying after hold", _segmentNameStr);
+                    hold();
+                    break;
+                  }
+                }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
                 if (_segmentBuildDescriptor == null) {
@@ -898,6 +922,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
+  }
+
+  private boolean startSegmentCommit() {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    if (!segmentCommitStartResponse.getStatus()
+        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+      return false;
+    }
+    return true;
   }
 
   @VisibleForTesting
@@ -1496,12 +1536,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    _partitionGroupId = llcSegmentName.getPartitionGroupId();
+    _streamPatitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+    _streamConfig = new StreamConfig(
+        _tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMaps(_tableConfig)
+            .get(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId)));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
-    _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _partitionGroupConsumptionStatus =
         new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
@@ -1514,9 +1558,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + "-" + clientIdSuffix;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId + "-" + clientIdSuffix;
     } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId;
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
@@ -1762,7 +1806,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
           if (numPartitionGroups != numPartitions) {
             _segmentLogger.info(
@@ -1832,7 +1876,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+        _clientId, _streamPatitionGroupId);
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {

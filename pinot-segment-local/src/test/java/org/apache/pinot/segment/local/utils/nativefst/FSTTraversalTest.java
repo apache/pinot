@@ -29,12 +29,14 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -54,7 +56,7 @@ import static org.testng.Assert.assertEquals;
  *
  * This class also holds tests for {@link RegexpMatcher} since they both perform FST traversals
  */
-public class FSTTraversalTest {
+public class FSTTraversalTest implements PinotBuffersAfterClassCheckRule {
   private FST _fst;
   private FST _regexFST;
 
@@ -79,6 +81,19 @@ public class FSTTraversalTest {
     _regexFST = fstBuilder.complete();
   }
 
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    close(_fst);
+  }
+
+  private void close(FST fst)
+      throws IOException {
+    if (fst instanceof ImmutableFST) {
+      ((ImmutableFST) fst)._mutableBytesStore.close();
+    }
+  }
+
   @Test
   public void testAutomatonHasPrefixBug()
       throws Exception {
@@ -87,29 +102,33 @@ public class FSTTraversalTest {
             "bcd".getBytes(UTF_8), "bce".getBytes(UTF_8)), new int[]{10, 11, 12, 13, 14, 15});
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
 
-    FSTTraversal fstTraversal = new FSTTraversal(fst);
-    assertEquals(fstTraversal.match("a".getBytes(UTF_8))._kind, EXACT_MATCH);
-    assertEquals(fstTraversal.match("ab".getBytes(UTF_8))._kind, EXACT_MATCH);
-    assertEquals(fstTraversal.match("abc".getBytes(UTF_8))._kind, EXACT_MATCH);
-    assertEquals(fstTraversal.match("ad".getBytes(UTF_8))._kind, EXACT_MATCH);
+      FSTTraversal fstTraversal = new FSTTraversal(fst);
+      assertEquals(fstTraversal.match("a".getBytes(UTF_8))._kind, EXACT_MATCH);
+      assertEquals(fstTraversal.match("ab".getBytes(UTF_8))._kind, EXACT_MATCH);
+      assertEquals(fstTraversal.match("abc".getBytes(UTF_8))._kind, EXACT_MATCH);
+      assertEquals(fstTraversal.match("ad".getBytes(UTF_8))._kind, EXACT_MATCH);
 
-    assertEquals(fstTraversal.match("b".getBytes(UTF_8))._kind, SEQUENCE_IS_A_PREFIX);
-    assertEquals(fstTraversal.match("bc".getBytes(UTF_8))._kind, SEQUENCE_IS_A_PREFIX);
+      assertEquals(fstTraversal.match("b".getBytes(UTF_8))._kind, SEQUENCE_IS_A_PREFIX);
+      assertEquals(fstTraversal.match("bc".getBytes(UTF_8))._kind, SEQUENCE_IS_A_PREFIX);
 
-    MatchResult m = fstTraversal.match("abcd".getBytes(UTF_8));
-    assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
-    assertEquals(m._index, 3);
+      MatchResult m = fstTraversal.match("abcd".getBytes(UTF_8));
+      assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
+      assertEquals(m._index, 3);
 
-    m = fstTraversal.match("ade".getBytes(UTF_8));
-    assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
-    assertEquals(m._index, 2);
+      m = fstTraversal.match("ade".getBytes(UTF_8));
+      assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
+      assertEquals(m._index, 2);
 
-    m = fstTraversal.match("ax".getBytes(UTF_8));
-    assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
-    assertEquals(m._index, 1);
+      m = fstTraversal.match("ax".getBytes(UTF_8));
+      assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
+      assertEquals(m._index, 1);
 
-    assertEquals(fstTraversal.match("d".getBytes(UTF_8))._kind, NO_MATCH);
+      assertEquals(fstTraversal.match("d".getBytes(UTF_8))._kind, NO_MATCH);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -154,22 +173,26 @@ public class FSTTraversalTest {
       throws IOException {
     File file = new File("./src/test/resources/data/abc.native.fst");
     FST fst = FST.read(new FileInputStream(file), false, new DirectMemoryManager(FSTTraversalTest.class.getName()));
-    FSTTraversal traversalHelper = new FSTTraversal(fst);
+    try {
+      FSTTraversal traversalHelper = new FSTTraversal(fst);
 
-    MatchResult m = traversalHelper.match("ax".getBytes());
-    assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
-    assertEquals(m._index, 1);
-    assertEquals(suffixes(fst, m._node), Sets.newHashSet("ba", "c"));
+      MatchResult m = traversalHelper.match("ax".getBytes());
+      assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
+      assertEquals(m._index, 1);
+      assertEquals(suffixes(fst, m._node), Sets.newHashSet("ba", "c"));
 
-    assertEquals(traversalHelper.match("aba".getBytes())._kind, EXACT_MATCH);
+      assertEquals(traversalHelper.match("aba".getBytes())._kind, EXACT_MATCH);
 
-    m = traversalHelper.match("abalonger".getBytes());
-    assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
-    assertEquals("abalonger".substring(m._index), "longer");
+      m = traversalHelper.match("abalonger".getBytes());
+      assertEquals(m._kind, AUTOMATON_HAS_PREFIX);
+      assertEquals("abalonger".substring(m._index), "longer");
 
-    m = traversalHelper.match("ab".getBytes());
-    assertEquals(m._kind, SEQUENCE_IS_A_PREFIX);
-    assertEquals(suffixes(fst, m._node), Sets.newHashSet("a"));
+      m = traversalHelper.match("ab".getBytes());
+      assertEquals(m._kind, SEQUENCE_IS_A_PREFIX);
+      assertEquals(suffixes(fst, m._node), Sets.newHashSet("a"));
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -185,11 +208,15 @@ public class FSTTraversalTest {
     FST fst = builder.complete();
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
 
-    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    RegexpMatcher.regexMatch("h.*", fst, writer::add);
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch("h.*", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 2);
+      assertEquals(writer.get().getCardinality(), 2);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -205,11 +232,15 @@ public class FSTTraversalTest {
     FST fst = builder.complete();
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
 
-    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    RegexpMatcher.regexMatch(".*h", fst, writer::add);
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch(".*h", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 2);
+      assertEquals(writer.get().getCardinality(), 2);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -223,17 +254,21 @@ public class FSTTraversalTest {
     FST fst = FSTBuilder.buildFST(input);
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
 
-    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    RegexpMatcher.regexMatch(".*123", fst, writer::add);
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch(".*123", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 1);
+      assertEquals(writer.get().getCardinality(), 1);
 
-    writer.reset();
+      writer.reset();
 
-    RegexpMatcher.regexMatch(".till", fst, writer::add);
+      RegexpMatcher.regexMatch(".till", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 1);
+      assertEquals(writer.get().getCardinality(), 1);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -247,16 +282,20 @@ public class FSTTraversalTest {
     FST fst = FSTBuilder.buildFST(input);
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
 
-    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    RegexpMatcher.regexMatch("hello.*123", fst, writer::add);
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch("hello.*123", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 1);
+      assertEquals(writer.get().getCardinality(), 1);
 
-    writer.reset();
-    RegexpMatcher.regexMatch("hello.*", fst, writer::add);
+      writer.reset();
+      RegexpMatcher.regexMatch("hello.*", fst, writer::add);
 
-    assertEquals(writer.get().getCardinality(), 2);
+      assertEquals(writer.get().getCardinality(), 2);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -271,8 +310,11 @@ public class FSTTraversalTest {
     FST fst = FSTBuilder.buildFST(input);
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
-
-    ImmutableFST.printToString(fst);
+    try {
+      ImmutableFST.printToString(fst);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test
@@ -285,11 +327,14 @@ public class FSTTraversalTest {
     FST fst = FSTBuilder.buildFST(input);
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    try {
+      RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
+      RegexpMatcher.regexMatch("cars?", fst, writer::add);
 
-    RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
-    RegexpMatcher.regexMatch("cars?", fst, writer::add);
-
-    assertEquals(writer.get().getCardinality(), 2);
+      assertEquals(writer.get().getCardinality(), 2);
+    } finally {
+      close(fst);
+    }
   }
 
   @Test

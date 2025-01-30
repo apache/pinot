@@ -34,6 +34,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
@@ -55,10 +56,10 @@ public class PinotLogicalQueryPlanner {
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
   public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker).toPlanNode(relRoot.rel);
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, TableCache tableCache, boolean useSpools) {
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker, tableCache).toPlanNode(relRoot.rel);
 
-    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker);
+    PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
 
@@ -89,10 +90,16 @@ public class PinotLogicalQueryPlanner {
   }
 
   private static PlanFragment planNodeToPlanFragment(
-      PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+      PlanNode node, @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools) {
     PlanFragmenter fragmenter = new PlanFragmenter();
     PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
     node = node.visit(fragmenter, fragmenterContext);
+
+    if (useSpools) {
+      GroupedStages equivalentStages = EquivalentStagesFinder.findEquivalentStages(node);
+      EquivalentStagesReplacer.replaceEquivalentStages(node, equivalentStages, fragmenter);
+    }
+
     Int2ObjectOpenHashMap<PlanFragment> planFragmentMap = fragmenter.getPlanFragmentMap();
     Int2ObjectOpenHashMap<IntList> childPlanFragmentIdsMap = fragmenter.getChildPlanFragmentIdsMap();
 

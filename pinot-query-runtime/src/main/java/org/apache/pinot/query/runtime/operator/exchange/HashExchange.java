@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.EmptyKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -42,7 +44,7 @@ class HashExchange extends BlockExchange {
 
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-      throws Exception {
+      throws IOException, TimeoutException {
     int numMailboxes = destinations.size();
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
       sendBlock(destinations.get(0), block);

@@ -53,6 +53,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
     _queryEnvironment.init(config);
     _queryDispatcher = queryDispatcher;
+    TimeSeriesBuilderFactoryProvider.init(config);
   }
 
   @Override
@@ -117,6 +119,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       if (timeSeriesResponse == null
           || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+        final String errorMessage = timeSeriesResponse == null ? "null time-series response"
+            : timeSeriesResponse.getError();
+        // TODO(timeseries): Remove logging for failed queries.
+        LOGGER.warn("time-series query failed with error: {}", errorMessage);
       }
     }
   }

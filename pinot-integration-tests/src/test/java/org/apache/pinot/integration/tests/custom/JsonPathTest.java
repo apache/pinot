@@ -96,7 +96,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     List<org.apache.avro.Schema.Field> fields =
@@ -130,7 +130,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     }
     Collections.sort(_sortedSequenceIds);
 
-    return avroFile;
+    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

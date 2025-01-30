@@ -174,7 +174,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     RoutingTable routingTable = routingManager.getRoutingTable(brokerRequest, 0);
     assertNotNull(routingTable);
     assertEquals(routingTable.getServerInstanceToSegmentsMap().size(), NUM_SERVERS);
-    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getLeft().size(),
+    assertEquals(routingTable.getServerInstanceToSegmentsMap().values().iterator().next().getSegments().size(),
         NUM_OFFLINE_SEGMENTS);
     assertTrue(routingTable.getUnavailableSegments().isEmpty());
 
@@ -184,7 +184,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     TestUtils.waitForCondition(aVoid ->
             routingManager.getRoutingTable(brokerRequest, 0).getServerInstanceToSegmentsMap().values().iterator().next()
-                .getLeft().size() == NUM_OFFLINE_SEGMENTS + 1, 30_000L,
+                .getSegments().size() == NUM_OFFLINE_SEGMENTS + 1, 30_000L,
         "Failed to add the new segment " + "into the routing table");
 
     // Add a new table with different broker tenant

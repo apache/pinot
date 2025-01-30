@@ -27,6 +27,8 @@ import java.nio.charset.Charset;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
@@ -163,6 +165,16 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected boolean useMultiStageQueryEngine() {
     return true;
+  }
+
+  @Override
+  protected Map<String, String> getExtraQueryProperties() {
+    // Increase timeout for this test since it keeps failing in CI.
+    Map<String, String> timeoutProperties = new HashMap<>();
+    timeoutProperties.put("brokerReadTimeoutMs", "120000");
+    timeoutProperties.put("brokerConnectTimeoutMs", "60000");
+    timeoutProperties.put("brokerHandshakeTimeoutMs", "60000");
+    return timeoutProperties;
   }
 
   @AfterClass
