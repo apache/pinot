@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.concurrency.AdjustableSemaphore;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * Used to throttle the total concurrent startree index rebuilds that can happen on a given Pinot server.
  * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
  */
-public class SegmentStarTreePreprocessThrottler implements PinotClusterConfigChangeListener {
+public class SegmentStarTreePreprocessThrottler extends BaseSegmentPreprocessThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStarTreePreprocessThrottler.class);
 
   /**
@@ -42,22 +38,15 @@ public class SegmentStarTreePreprocessThrottler implements PinotClusterConfigCha
    * value
    */
   private int _maxStarTreePreprocessConcurrency;
-  private final AdjustableSemaphore _semaphore;
 
   /**
    * @param maxStarTreePreprocessConcurrency configured StarTree index preprocessing concurrency
    */
   public SegmentStarTreePreprocessThrottler(int maxStarTreePreprocessConcurrency) {
+    super(maxStarTreePreprocessConcurrency, LOGGER);
     LOGGER.info("Initializing SegmentStarTreePreprocessThrottler, maxStarTreePreprocessConcurrency: {}",
         maxStarTreePreprocessConcurrency);
-    Preconditions.checkArgument(maxStarTreePreprocessConcurrency > 0,
-        "Max StarTree preprocess parallelism must be > 0, but found to be: "
-            + maxStarTreePreprocessConcurrency);
-
     _maxStarTreePreprocessConcurrency = maxStarTreePreprocessConcurrency;
-    _semaphore = new AdjustableSemaphore(_maxStarTreePreprocessConcurrency, true);
-    LOGGER.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
-        availablePermits());
   }
 
   @Override
@@ -111,36 +100,5 @@ public class SegmentStarTreePreprocessThrottler implements PinotClusterConfigCha
 
     _semaphore.setPermits(_maxStarTreePreprocessConcurrency);
     LOGGER.info("Updated total StarTree index rebuild permits: {}", totalPermits());
-  }
-
-  /**
-   * Block trying to acquire the semaphore to perform the segment StarTree index rebuild steps unless interrupted.
-   * <p>
-   * {@link #release()} should be called after the segment preprocess completes. It is the responsibility of the caller
-   * to ensure that {@link #release()} is called exactly once for each call to this method.
-   *
-   * @throws InterruptedException if the current thread is interrupted
-   */
-  public void acquire()
-      throws InterruptedException {
-    _semaphore.acquire();
-  }
-
-  /**
-   * Should be called after the segment StarTree index build completes. It is the responsibility of the caller to
-   * ensure that this method is called exactly once for each call to {@link #acquire()}.
-   */
-  public void release() {
-    _semaphore.release();
-  }
-
-  @VisibleForTesting
-  int availablePermits() {
-    return _semaphore.availablePermits();
-  }
-
-  @VisibleForTesting
-  int totalPermits() {
-    return _semaphore.getTotalPermits();
   }
 }

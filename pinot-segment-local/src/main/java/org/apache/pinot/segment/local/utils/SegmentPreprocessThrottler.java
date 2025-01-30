@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.common.concurrency.AdjustableSemaphore;
-import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * Used to throttle the total concurrent index rebuilds that can happen on a given Pinot server.
  * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
  */
-public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListener {
+public class SegmentPreprocessThrottler extends BaseSegmentPreprocessThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessThrottler.class);
 
   /**
@@ -44,7 +41,6 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
   private int _maxPreprocessConcurrency;
   private int _maxPreprocessConcurrencyBeforeServingQueries;
   private boolean _isServingQueries;
-  private final AdjustableSemaphore _semaphore;
 
   /**
    * @param maxPreprocessConcurrency configured preprocessing concurrency
@@ -53,9 +49,15 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
    */
   public SegmentPreprocessThrottler(int maxPreprocessConcurrency, int maxPreprocessConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
+    // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
+    // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
+    // server is starting up.
+    super(isServingQueries ? maxPreprocessConcurrency : maxPreprocessConcurrencyBeforeServingQueries, LOGGER);
     LOGGER.info("Initializing SegmentPreprocessThrottler, maxPreprocessConcurrency: {}, "
             + "maxPreprocessConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
         maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries);
+    // Still checking both values are > 0 since only one will be utilized to initialize the sempahore, still want to
+    // ensure the other config is valid
     Preconditions.checkArgument(maxPreprocessConcurrency > 0,
         "Max preprocess parallelism must be > 0, but found to be: " + maxPreprocessConcurrency);
     Preconditions.checkArgument(maxPreprocessConcurrencyBeforeServingQueries > 0,
@@ -66,17 +68,10 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
     _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
     _isServingQueries = isServingQueries;
 
-    // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
-    // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
-    // server is starting up.
-    int preprocessConcurrency = _maxPreprocessConcurrency;
     if (!isServingQueries) {
-      preprocessConcurrency = _maxPreprocessConcurrencyBeforeServingQueries;
-      LOGGER.info("Serving queries is disabled, setting preprocess concurrency to: {}", preprocessConcurrency);
+      LOGGER.info("Serving queries is disabled, using preprocess concurrency as: {}",
+          _maxPreprocessConcurrencyBeforeServingQueries);
     }
-    _semaphore = new AdjustableSemaphore(preprocessConcurrency, true);
-    LOGGER.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
-        availablePermits());
   }
 
   public synchronized void startServingQueries() {
@@ -190,36 +185,5 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
       _semaphore.setPermits(_maxPreprocessConcurrencyBeforeServingQueries);
       LOGGER.info("Updated total permits: {}", totalPermits());
     }
-  }
-
-  /**
-   * Block trying to acquire the semaphore to perform the segment index rebuild steps unless interrupted.
-   * <p>
-   * {@link #release()} should be called after the segment preprocess completes. It is the responsibility of the caller
-   * to ensure that {@link #release()} is called exactly once for each call to this method.
-   *
-   * @throws InterruptedException if the current thread is interrupted
-   */
-  public void acquire()
-      throws InterruptedException {
-    _semaphore.acquire();
-  }
-
-  /**
-   * Should be called after the segment index build completes. It is the responsibility of the caller to ensure that
-   * this method is called exactly once for each call to {@link #acquire()}.
-   */
-  public void release() {
-    _semaphore.release();
-  }
-
-  @VisibleForTesting
-  int availablePermits() {
-    return _semaphore.availablePermits();
-  }
-
-  @VisibleForTesting
-  int totalPermits() {
-    return _semaphore.getTotalPermits();
   }
 }
