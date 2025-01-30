@@ -142,6 +142,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableDistinctCountBitmapOverride;
   protected final int _queryResponseLimit;
   protected final Map<Long, QueryServers> _serversById;
+  // if >= 0, then overrides default limit of 10, otherwise setting is ignored
+  protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
@@ -164,6 +166,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       _serversById = null;
     }
+    _defaultQueryLimit = config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT,
+        Broker.DEFAULT_BROKER_QUERY_LIMIT);
+    boolean enableQueryCancellation =
+        Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
@@ -172,10 +178,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
     }
 
-    LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, query log max length: {}, "
-            + "query log max rate: {}", getClass().getSimpleName(), _brokerId,
-        _brokerTimeoutMs, _queryResponseLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
-        this.isQueryCancellationEnabled());
+    LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
+            + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
+            + "enabled: {}", getClass().getSimpleName(), _brokerId, _brokerTimeoutMs, _queryResponseLimit,
+        _defaultQueryLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
+        enableQueryCancellation);
   }
 
   @Override
@@ -310,6 +317,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         } else {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
         }
+      }
+
+      if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
+        pinotQuery.setLimit(_defaultQueryLimit);
       }
 
       if (isLiteralOnlyQuery(pinotQuery)) {
@@ -885,6 +896,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private boolean isDefaultQueryResponseLimitEnabled() {
+    return _defaultQueryLimit > -1;
   }
 
   @VisibleForTesting
