@@ -94,8 +94,7 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testThrowExceptionOnSettingInvalidConfigValues()
-      throws Exception {
+  public void testThrowExceptionOnSettingInvalidConfigValues() {
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(-1, 4, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(0, 4, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(1, -4, true));
@@ -121,15 +120,14 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testPositiveToNegativeThrottleChange()
-      throws Exception {
+  public void testPositiveToNegativeThrottleChange() {
     int initialPermits = 2;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, true);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
     Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), initialPermits);
 
     // Change the value of cluster config for max segment preprocess parallelism to be a negative value
-    // If maxConcurrentQueries is <= 0, this is an invalid configuration change. Do nothing other than log a warning
+    // If config is <= 0, this is an invalid configuration change. Do nothing other than log a warning
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, "-1");
     _segmentPreprocessThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
@@ -351,8 +349,7 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testChangeConfigsEmpty()
-      throws Exception {
+  public void testChangeConfigsEmpty() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, true);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
@@ -364,8 +361,7 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testChangeConfigDeletedConfigsEmpty()
-      throws Exception {
+  public void testChangeConfigDeletedConfigsEmpty() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, true);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
@@ -379,8 +375,7 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testChangeConfigDeletedConfigsEmptyQueriesDisabled()
-      throws Exception {
+  public void testChangeConfigDeletedConfigsEmptyQueriesDisabled() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, false);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits * 2);
@@ -395,8 +390,7 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testChangeConfigsOtherThanRelevant()
-      throws Exception {
+  public void testChangeConfigsOtherThanRelevant() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, true);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
@@ -404,18 +398,18 @@ public class SegmentPreprocessThrottlerTest {
     // Add some random configs and call 'onChange'
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put("random.config.key", "random.config.value");
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, "42");
     _segmentPreprocessThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
   }
 
   @Test
-  public void testChangeConfigs()
-      throws Exception {
+  public void testChangeConfigs() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, true);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits);
 
-    // Add random configs and call 'onChange'
+    // Add random and relevant configs and call 'onChange'
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put("random.config.key", "random.config.value");
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
@@ -428,13 +422,12 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testChangeConfigsWithServingQueriesDisabled()
-      throws Exception {
+  public void testChangeConfigsWithServingQueriesDisabled() {
     int initialPermits = 4;
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, false);
     Assert.assertEquals(_segmentPreprocessThrottler.totalPermits(), initialPermits * 2);
 
-    // Add random configs and call 'onChange'
+    // Add random and relevant configs and call 'onChange'
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put("random.config.key", "random.config.value");
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,

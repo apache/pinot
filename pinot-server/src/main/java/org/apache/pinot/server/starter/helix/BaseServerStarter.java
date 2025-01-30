@@ -81,6 +81,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -155,6 +156,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  protected SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -635,8 +637,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Relax throttling until the server is ready to serve queries
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxPreprocessConcurrency,
         maxPreprocessConcurrencyBeforeServingQueries, false);
+    int maxStarTreePreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
+    _segmentStarTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency);
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler,
+        _segmentStarTreePreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -665,6 +672,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentPreprocessThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentStarTreePreprocessThrottler);
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

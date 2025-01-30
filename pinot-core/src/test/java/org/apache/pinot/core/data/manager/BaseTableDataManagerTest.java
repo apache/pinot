@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -99,6 +100,8 @@ public class BaseTableDataManagerTest {
           .addMetric(LONG_COLUMN, DataType.LONG).build();
   static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(2, 4,
       true);
+  static final SegmentStarTreePreprocessThrottler SEGMENT_STARTREE_PREPROCESS_THROTTLER =
+      new SegmentStarTreePreprocessThrottler(2);
 
   @BeforeClass
   public void setUp()
@@ -660,7 +663,7 @@ public class BaseTableDataManagerTest {
     SegmentLocks segmentLocks = new SegmentLocks();
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, helixManager, segmentLocks, DEFAULT_TABLE_CONFIG, null, null,
-        SEGMENT_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
     return tableDataManager;
   }
 

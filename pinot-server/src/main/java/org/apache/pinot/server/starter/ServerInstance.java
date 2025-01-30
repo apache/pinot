@@ -45,6 +45,7 @@ import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
@@ -77,6 +78,7 @@ public class ServerInstance {
   private final AccessControl _accessControl;
   private final HelixManager _helixManager;
   private final SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
@@ -85,7 +87,8 @@ public class ServerInstance {
   private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
+      @Nullable SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler)
       throws Exception {
     LOGGER.info("Initializing server instance");
     _helixManager = helixManager;
@@ -100,12 +103,13 @@ public class ServerInstance {
     ServerMetrics.register(_serverMetrics);
 
     _segmentPreprocessThrottler = segmentPreprocessThrottler;
+    _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
-        _segmentPreprocessThrottler);
+        _segmentPreprocessThrottler, _segmentStarTreePreprocessThrottler);
 
     // Initialize ServerQueryLogger and FunctionRegistry before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),

@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.Inverte
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -80,6 +81,11 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   public void process()
+      throws Exception {
+    process(null);
+  }
+
+  public void process(@Nullable SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler)
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
@@ -154,7 +160,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     // that the other required indices (e.g. forward index) are up-to-date.
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create/modify/remove star-trees if required.
-      processStarTrees(indexDir);
+      processStarTrees(indexDir, segmentStarTreePreprocessThrottler);
       _segmentDirectory.reloadMetadata();
       segmentWriter.save();
     }
@@ -238,7 +244,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     return !starTreeBuilderConfigs.isEmpty();
   }
 
-  private void processStarTrees(File indexDir)
+  private void processStarTrees(File indexDir,
+      @Nullable SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler)
       throws Exception {
     // Create/modify/remove star-trees if required
     if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
@@ -246,14 +253,13 @@ public class SegmentPreProcessor implements AutoCloseable {
           .generateBuilderConfigs(_indexLoadingConfig.getStarTreeIndexConfigs(),
               _indexLoadingConfig.isEnableDefaultStarTree(), _segmentMetadata);
       boolean shouldGenerateStarTree = !starTreeBuilderConfigs.isEmpty();
+      boolean shouldRemoveStarTree = false;
       List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
       if (starTreeMetadataList != null) {
         // There are existing star-trees
         if (!shouldGenerateStarTree) {
           // Newer config does not have star-trees. Delete all existing star-trees.
-          LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
-          StarTreeBuilderUtils.removeStarTrees(indexDir);
-          _segmentMetadata = new SegmentMetadataImpl(indexDir);
+          shouldRemoveStarTree = true;
         } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
           // Existing and newer both have star-trees, but they don't match. Rebuild the star-trees.
           LOGGER.info("Change detected in star-trees for segment: {}", _segmentMetadata.getName());
@@ -262,14 +268,30 @@ public class SegmentPreProcessor implements AutoCloseable {
           shouldGenerateStarTree = false;
         }
       }
-      // Generate the star-trees if needed
-      if (shouldGenerateStarTree) {
-        // NOTE: Always use OFF_HEAP mode on server side.
-        try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
-          builder.build();
+      // Generate/remove the star-trees if needed
+      if (shouldGenerateStarTree || shouldRemoveStarTree) {
+        if (segmentStarTreePreprocessThrottler != null) {
+          segmentStarTreePreprocessThrottler.acquire();
         }
-        _segmentMetadata = new SegmentMetadataImpl(indexDir);
+
+        try {
+          if (shouldRemoveStarTree) {
+            // 'shouldGenerateStarTree' should be false if they need to be removed
+            LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
+            StarTreeBuilderUtils.removeStarTrees(indexDir);
+          } else {
+            // NOTE: Always use OFF_HEAP mode on server side.
+            try (MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
+                MultipleTreesBuilder.BuildMode.OFF_HEAP)) {
+              builder.build();
+            }
+          }
+          _segmentMetadata = new SegmentMetadataImpl(indexDir);
+        } finally {
+          if (segmentStarTreePreprocessThrottler != null) {
+            segmentStarTreePreprocessThrottler.release();
+          }
+        }
       }
     }
   }
