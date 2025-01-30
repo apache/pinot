@@ -140,7 +140,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultHllLog2m;
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
-  protected final int _queryResponseLimitOverride;
+  protected final int _queryResponseLimit;
   // if >= 0, then overrides default limit of 10, otherwise setting is ignored
   protected final int _defaultQueryLimit;
   protected final Map<Long, QueryServers> _queriesById;
@@ -159,8 +159,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _enableQueryLimitOverride = _config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false);
     _enableDistinctCountBitmapOverride =
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
-    _queryResponseLimitOverride =
-        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_LIMIT_OVERRIDE);
+    _queryResponseLimit =
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _defaultQueryLimit = config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT,
         Broker.DEFAULT_BROKER_QUERY_LIMIT);
     boolean enableQueryCancellation =
@@ -176,7 +176,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
-            + "enabled: {}", getClass().getSimpleName(), _brokerId, _brokerTimeoutMs, _queryResponseLimitOverride,
+            + "enabled: {}", getClass().getSimpleName(), _brokerId, _brokerTimeoutMs, _queryResponseLimit,
         _defaultQueryLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
         enableQueryCancellation);
   }
@@ -400,7 +400,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
       }
       if (_enableQueryLimitOverride) {
-        handleQueryLimitOverride(serverPinotQuery, _queryResponseLimitOverride);
+        handleQueryLimitOverride(serverPinotQuery, _queryResponseLimit);
       }
       handleSegmentPartitionedDistinctCountOverride(serverPinotQuery,
           getSegmentPartitionedColumns(_tableCache, tableName));
@@ -523,7 +523,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Validate the request
       try {
-        validateRequest(serverPinotQuery, _queryResponseLimitOverride);
+        validateRequest(serverPinotQuery, _queryResponseLimit);
       } catch (Exception e) {
         LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
         requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
