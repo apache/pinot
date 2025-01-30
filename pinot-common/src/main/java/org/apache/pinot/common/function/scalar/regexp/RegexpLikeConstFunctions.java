@@ -40,6 +40,7 @@ public class RegexpLikeConstFunctions {
     return _matcher.reset(inputStr).find();
   }
 
+  @ScalarFunction
   public boolean like(String inputStr, String likePatternStr) {
     if (_matcher == null) {
       String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
