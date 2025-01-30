@@ -36,8 +36,8 @@ public class RegexpExtractConstFunctions {
    * @return the matched result.
    */
   @ScalarFunction
-  public String regexpExtractConst(String value, String regexp) {
-    return regexpExtractConst(value, regexp, 0, "");
+  public String regexpExtract(String value, String regexp) {
+    return regexpExtract(value, regexp, 0, "");
   }
 
   /**
@@ -47,8 +47,8 @@ public class RegexpExtractConstFunctions {
    * @return the matched result.
    */
   @ScalarFunction
-  public String regexpExtractConst(String value, String regexp, int group) {
-    return regexpExtractConst(value, regexp, group, "");
+  public String regexpExtract(String value, String regexp, int group) {
+    return regexpExtract(value, regexp, group, "");
   }
 
   /**
@@ -61,7 +61,7 @@ public class RegexpExtractConstFunctions {
    * @return the matched result
    */
   @ScalarFunction
-  public String regexpExtractConst(String value, String regexp, int group, String defaultValue) {
+  public String regexpExtract(String value, String regexp, int group, String defaultValue) {
     if (_matcher == null) {
       Pattern p = Pattern.compile(regexp);
       _matcher = p.matcher("");

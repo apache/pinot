@@ -32,14 +32,14 @@ public class RegexpLikeVarFunctions {
   }
 
   @ScalarFunction
-  public static boolean regexpLike(String inputStr, String regexPatternStr) {
+  public static boolean regexpLikeVar(String inputStr, String regexPatternStr) {
     Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
     return pattern.matcher(inputStr).find();
   }
 
   @ScalarFunction
-  public static boolean like(String inputStr, String likePatternStr) {
+  public static boolean likeVar(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLike(inputStr, regexPatternStr);
+    return regexpLikeVar(inputStr, regexPatternStr);
   }
 }

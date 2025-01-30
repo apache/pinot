@@ -20,7 +20,7 @@ package org.apache.pinot.common.function.scalar.regexp;
 
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.regexp.RegexpExtractVarFunctions.regexpExtract;
+import static org.apache.pinot.common.function.scalar.regexp.RegexpExtractVarFunctions.regexpExtractVar;
 import static org.testng.Assert.assertEquals;
 
 
@@ -28,14 +28,14 @@ public class RegexpExtractVarFunctionsTest {
 
   @Test
   public void test() {
-    assertEquals(regexpExtract("val abe eee", "(a[bcd]e)"), "abe");
-    assertEquals(regexpExtract("val ade eee", "(a[bcd]e)"), "ade");
-    assertEquals(regexpExtract("val age eee", "(a[bcd]e)"), "");
+    assertEquals(RegexpExtractVarFunctions.regexpExtractVar("val abe eee", "(a[bcd]e)"), "abe");
+    assertEquals(RegexpExtractVarFunctions.regexpExtractVar("val ade eee", "(a[bcd]e)"), "ade");
+    assertEquals(RegexpExtractVarFunctions.regexpExtractVar("val age eee", "(a[bcd]e)"), "");
 
-    assertEquals(regexpExtract("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "ace");
-    assertEquals(regexpExtract("abe ace ade", "(a[bcd]e) (a[bcd]e) (a[bcd]e)", 3), "ade");
+    assertEquals(RegexpExtractVarFunctions.regexpExtractVar("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "ace");
+    assertEquals(RegexpExtractVarFunctions.regexpExtractVar("abe ace ade", "(a[bcd]e) (a[bcd]e) (a[bcd]e)", 3), "ade");
 
-    assertEquals(regexpExtract("abe ace ade", "(a[bcd]e)", 5, "wrong"), "wrong");
-    assertEquals(regexpExtract("aa bb cc", "(a[bcd]e)", 1, "wrong"), "wrong");
+    assertEquals(regexpExtractVar("abe ace ade", "(a[bcd]e)", 5, "wrong"), "wrong");
+    assertEquals(regexpExtractVar("aa bb cc", "(a[bcd]e)", 1, "wrong"), "wrong");
   }
 }

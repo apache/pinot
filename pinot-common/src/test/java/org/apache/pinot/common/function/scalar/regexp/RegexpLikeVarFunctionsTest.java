@@ -20,8 +20,8 @@ package org.apache.pinot.common.function.scalar.regexp;
 
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.function.scalar.regexp.RegexpLikeVarFunctions.like;
-import static org.apache.pinot.common.function.scalar.regexp.RegexpLikeVarFunctions.regexpLike;
+import static org.apache.pinot.common.function.scalar.regexp.RegexpLikeVarFunctions.likeVar;
+import static org.apache.pinot.common.function.scalar.regexp.RegexpLikeVarFunctions.regexpLikeVar;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -30,30 +30,30 @@ public class RegexpLikeVarFunctionsTest {
 
   @Test
   public void testLike() {
-    assertTrue(like("ab", "%ab%"));
-    assertTrue(like("aaba", "%ab%"));
-    assertTrue(like("$ab$", "%ab%"));
+    assertTrue(likeVar("ab", "%ab%"));
+    assertTrue(likeVar("aaba", "%ab%"));
+    assertTrue(likeVar("$ab$", "%ab%"));
 
-    assertFalse(like("", "%ab%"));
-    assertFalse(like("_", "%ab%"));
-    assertFalse(like("a", "%ab%"));
-    assertFalse(like("b", "%ab%"));
+    assertFalse(likeVar("", "%ab%"));
+    assertFalse(likeVar("_", "%ab%"));
+    assertFalse(likeVar("a", "%ab%"));
+    assertFalse(likeVar("b", "%ab%"));
 
-    assertFalse(like("aab", "ab"));
+    assertFalse(likeVar("aab", "ab"));
   }
 
   @Test
   public void testRegexpLike() {
-    assertTrue(regexpLike("ab", ".*ab.*"));
-    assertTrue(regexpLike("aaba", ".*ab.*"));
-    assertTrue(regexpLike("$ab$", ".*ab.*"));
+    assertTrue(regexpLikeVar("ab", ".*ab.*"));
+    assertTrue(regexpLikeVar("aaba", ".*ab.*"));
+    assertTrue(regexpLikeVar("$ab$", ".*ab.*"));
 
-    assertFalse(regexpLike("", ".*ab.*"));
-    assertFalse(regexpLike("_", ".*ab.*"));
-    assertFalse(regexpLike("a", ".*ab.*"));
-    assertFalse(regexpLike("b", ".*ab.*"));
+    assertFalse(regexpLikeVar("", ".*ab.*"));
+    assertFalse(regexpLikeVar("_", ".*ab.*"));
+    assertFalse(regexpLikeVar("a", ".*ab.*"));
+    assertFalse(regexpLikeVar("b", ".*ab.*"));
 
     //returns true because function matches against first pattern
-    assertFalse(regexpLike("aab", "abb"));
+    assertFalse(regexpLikeVar("aab", "abb"));
   }
 }

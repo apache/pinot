@@ -29,20 +29,20 @@ public class RegexpExtractConstFunctionsTest {
   public void test() {
     RegexpExtractConstFunctions f = new RegexpExtractConstFunctions();
 
-    assertEquals(f.regexpExtractConst("val abe eee", "(a[bcd]e)"), "abe");
-    assertEquals(f.regexpExtractConst("val ade eee", "(a[bcd]e)"), "ade");
-    assertEquals(f.regexpExtractConst("val age eee", "(a[bcd]e)"), "");
+    assertEquals(f.regexpExtract("val abe eee", "(a[bcd]e)"), "abe");
+    assertEquals(f.regexpExtract("val ade eee", "(a[bcd]e)"), "ade");
+    assertEquals(f.regexpExtract("val age eee", "(a[bcd]e)"), "");
     // f caches first pattern and ignores second argument
-    assertEquals(f.regexpExtractConst("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "");
+    assertEquals(f.regexpExtract("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "");
 
     f = new RegexpExtractConstFunctions();
-    assertEquals(f.regexpExtractConst("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "ace");
+    assertEquals(f.regexpExtract("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "ace");
 
     f = new RegexpExtractConstFunctions();
-    assertEquals(f.regexpExtractConst("abe ace ade", "(a[bcd]e) (a[bcd]e) (a[bcd]e)", 3), "ade");
+    assertEquals(f.regexpExtract("abe ace ade", "(a[bcd]e) (a[bcd]e) (a[bcd]e)", 3), "ade");
 
     f = new RegexpExtractConstFunctions();
-    assertEquals(f.regexpExtractConst("abe ace ade", "(a[bcd]e)", 5, "wrong"), "wrong");
-    assertEquals(f.regexpExtractConst("aa bb cc", "(a[bcd]e)", 1, "wrong"), "wrong");
+    assertEquals(f.regexpExtract("abe ace ade", "(a[bcd]e)", 5, "wrong"), "wrong");
+    assertEquals(f.regexpExtract("aa bb cc", "(a[bcd]e)", 1, "wrong"), "wrong");
   }
 }

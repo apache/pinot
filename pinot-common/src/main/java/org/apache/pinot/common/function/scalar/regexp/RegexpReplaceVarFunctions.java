@@ -50,7 +50,7 @@ public class RegexpReplaceVarFunctions {
    * @return replaced input string
    */
   @ScalarFunction
-  public String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
+  public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence, String flag) {
     int patternFlag = "i".equals(flag) ? Pattern.CASE_INSENSITIVE : 0;
     Pattern p = Pattern.compile(matchStr, patternFlag);
@@ -87,8 +87,8 @@ public class RegexpReplaceVarFunctions {
    * @return replaced input string
    */
   @ScalarFunction
-  public String regexpReplace(String inputStr, String matchStr, String replaceStr) {
-    return regexpReplace(inputStr, matchStr, replaceStr, 0, -1, "");
+  public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr) {
+    return regexpReplaceVar(inputStr, matchStr, replaceStr, 0, -1, "");
   }
 
   /**
@@ -102,8 +102,8 @@ public class RegexpReplaceVarFunctions {
    * @return replaced input string
    */
   @ScalarFunction
-  public String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
-    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
+  public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
+    return regexpReplaceVar(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
   }
 
   /**
@@ -118,8 +118,8 @@ public class RegexpReplaceVarFunctions {
    * @return replaced input string
    */
   @ScalarFunction
-  public String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
+  public String regexpReplaceVar(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence) {
-    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
+    return regexpReplaceVar(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
   }
 }

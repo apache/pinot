@@ -31,26 +31,26 @@ public class RegexpExtractVarFunctions {
   }
 
   /**
-   * @see #RegexpExtractVarFunctions#regexpExtract(String, String, int, String)
+   * @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
    * @param value
    * @param regexp
    * @return the matched result.
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp) {
-    return regexpExtract(value, regexp, 0, "");
+  public static String regexpExtractVar(String value, String regexp) {
+    return regexpExtractVar(value, regexp, 0, "");
   }
 
   /**
-   * @see #RegexpExtractVarFunctions#regexpExtract(String, String, int, String)
+   * @see #RegexpExtractVarFunctions#regexpExtractVar(String, String, int, String)
    * @param value
    * @param regexp
    * @param group
    * @return the matched result.
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int group) {
-    return regexpExtract(value, regexp, group, "");
+  public static String regexpExtractVar(String value, String regexp, int group) {
+    return regexpExtractVar(value, regexp, group, "");
   }
 
   /**
@@ -62,7 +62,7 @@ public class RegexpExtractVarFunctions {
    * @return the matched result
    */
   @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
+  public static String regexpExtractVar(String value, String regexp, int group, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
     Matcher matcher = p.matcher(value);
     if (matcher.find() && matcher.groupCount() >= group) {

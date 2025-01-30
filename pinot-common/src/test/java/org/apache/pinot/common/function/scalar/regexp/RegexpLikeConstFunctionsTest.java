@@ -30,33 +30,33 @@ public class RegexpLikeConstFunctionsTest {
   public void testLike() {
     RegexpLikeConstFunctions f = new RegexpLikeConstFunctions();
 
-    assertTrue(f.likeConst("ab", "%ab%"));
-    assertTrue(f.likeConst("aaba", "%ab%"));
-    assertTrue(f.likeConst("$ab$", "%ab%"));
+    assertTrue(f.like("ab", "%ab%"));
+    assertTrue(f.like("aaba", "%ab%"));
+    assertTrue(f.like("$ab$", "%ab%"));
 
-    assertFalse(f.likeConst("", "%ab%"));
-    assertFalse(f.likeConst("_", "%ab%"));
-    assertFalse(f.likeConst("a", "%ab%"));
-    assertFalse(f.likeConst("b", "%ab%"));
+    assertFalse(f.like("", "%ab%"));
+    assertFalse(f.like("_", "%ab%"));
+    assertFalse(f.like("a", "%ab%"));
+    assertFalse(f.like("b", "%ab%"));
 
     //returns true because function matches against first pattern
-    assertTrue(f.likeConst("aab", "abb"));
+    assertTrue(f.like("aab", "abb"));
   }
 
   @Test
   public void testRegexpLike() {
     RegexpLikeConstFunctions f = new RegexpLikeConstFunctions();
 
-    assertTrue(f.regexpLikeConst("ab", ".*ab.*"));
-    assertTrue(f.regexpLikeConst("aaba", ".*ab.*"));
-    assertTrue(f.regexpLikeConst("$ab$", ".*ab.*"));
+    assertTrue(f.regexpLike("ab", ".*ab.*"));
+    assertTrue(f.regexpLike("aaba", ".*ab.*"));
+    assertTrue(f.regexpLike("$ab$", ".*ab.*"));
 
-    assertFalse(f.regexpLikeConst("", ".*ab.*"));
-    assertFalse(f.regexpLikeConst("_", ".*ab.*"));
-    assertFalse(f.regexpLikeConst("a", ".*ab.*"));
-    assertFalse(f.regexpLikeConst("b", ".*ab.*"));
+    assertFalse(f.regexpLike("", ".*ab.*"));
+    assertFalse(f.regexpLike("_", ".*ab.*"));
+    assertFalse(f.regexpLike("a", ".*ab.*"));
+    assertFalse(f.regexpLike("b", ".*ab.*"));
 
     //returns true because function matches against first pattern
-    assertTrue(f.regexpLikeConst("aab", "ab"));
+    assertTrue(f.regexpLike("aab", "ab"));
   }
 }

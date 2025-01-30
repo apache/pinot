@@ -32,7 +32,7 @@ public class RegexpLikeConstFunctions {
   private Matcher _matcher;
 
   @ScalarFunction
-  public boolean regexpLikeConst(String inputStr, String regexPatternStr) {
+  public boolean regexpLike(String inputStr, String regexPatternStr) {
     if (_matcher == null) {
       _matcher = PatternFactory.compile(regexPatternStr).matcher("");
     }
@@ -40,7 +40,7 @@ public class RegexpLikeConstFunctions {
     return _matcher.reset(inputStr).find();
   }
 
-  public boolean likeConst(String inputStr, String likePatternStr) {
+  public boolean like(String inputStr, String likePatternStr) {
     if (_matcher == null) {
       String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
       _matcher = PatternFactory.compile(regexPatternStr).matcher("");
