@@ -25,12 +25,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.trace.ServerStatsInfo;
 
 
 /**
@@ -143,6 +145,20 @@ public class AsyncQueryResponse implements QueryResponse {
       stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
     }
     return stringBuilder.toString();
+  }
+
+  @Override
+  public Map<String, ServerStatsInfo> getServerStatsMap() {
+    return _responseMap.entrySet().stream()
+        .collect(Collectors.toMap(
+            entry -> entry.getKey().getInstanceId(),
+            entry -> new ServerStatsInfo(
+                entry.getValue().getSubmitDelayMs(),
+                entry.getValue().getRequestSentDelayMs(),
+                entry.getValue().getResponseDelayMs(),
+                entry.getValue().getResponseSize(),
+                entry.getValue().getDeserializationTimeMs())
+        ));
   }
 
   @Override

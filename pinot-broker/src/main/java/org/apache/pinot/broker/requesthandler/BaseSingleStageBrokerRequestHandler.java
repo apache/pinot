@@ -103,6 +103,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.ServerStatsInfo;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -874,7 +875,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Log query and stats
       _queryLogger.log(
           new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, serverStats));
-
+      requestContext.setServerStatsMap(serverStats.getServerStatsMap());
       return brokerResponse;
     } finally {
       Tracing.ThreadAccountantOps.clear();
@@ -1897,13 +1898,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    */
   public static class ServerStats {
     private String _serverStats;
+    private Map<String, ServerStatsInfo> _serverStatsMap;
 
     public String getServerStats() {
       return _serverStats;
     }
 
+    public Map getServerStatsMap() {
+      return _serverStatsMap;
+    }
+
     public void setServerStats(String serverStats) {
       _serverStats = serverStats;
+    }
+
+    public void setServerStatsMap(Map<String, ServerStatsInfo> serverStatsMap) {
+      _serverStatsMap = serverStatsMap;
     }
   }
 
