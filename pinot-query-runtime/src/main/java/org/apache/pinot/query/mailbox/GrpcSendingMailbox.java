@@ -32,6 +32,7 @@ import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,8 +111,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-      _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-          new RuntimeException("Cancelled by sender with exception: " + msg, t))));
+      LOGGER.debug("Cancelling GRPC mailbox: {} with error message: {}", _id, msg, t);
+      // The user message should be simple to understand and ideally the same in all mailboxes
+      String userMessage = "Cancelled inter server connection";
+      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
+          QException.INTERNAL_ERROR_CODE, userMessage);
+      MailboxContent block = toMailboxContent(errorBlock);
+      _contentObserver.onNext(block);
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it

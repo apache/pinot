@@ -24,10 +24,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,11 +247,15 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
 
     private final MultiStageQueryStats _stats;
+    private final VirtualServerAddress _serverAddress;
+    private final int _senderStageId;
 
     public OfTransferableBlock(OpChainExecutionContext context,
-        List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
+        List<? extends AsyncStream<TransferableBlock>> asyncProducers, int senderStageId) {
       super(context.getId(), context.getDeadlineMs(), asyncProducers);
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
+      _serverAddress = context.getServer();
+      _senderStageId = senderStageId;
     }
 
     @Override
@@ -273,12 +279,28 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected TransferableBlock onTimeout() {
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      // TODO: Should we send the hostname to the users?
+      String errMsg = "Server " + _serverAddress.hostname() + " timed out on stage "
+          + _stats.getCurrentStageId() + " waiting for data sent by stage " + _senderStageId;
+      // We log this case as debug because:
+      // - The opchain will already log a stackless message once the opchain fail
+      // - The trace is not useful (the log message is good enough to find where we failed)
+      // - We may fail for timeout reasons often and in case there is an execution error this log will be noisy and
+      //   will make it more difficult to find the real error in the log.
+      LOGGER.debug(errMsg, _senderStageId);
+      return TransferableBlockUtils.getErrorTransferableBlock(QException.EXECUTION_TIMEOUT_ERROR_CODE,
+          errMsg);
     }
 
     @Override
     protected TransferableBlock onException(Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      // TODO: Should we send the hostname to the users?
+      String errMsg = "Server " + _serverAddress.hostname() + " found an error while reading on stage "
+          + _stats.getCurrentStageId() + " waiting for data sent by stage "  + _senderStageId;
+      // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
+      // with an exception and the stack trace may be useful to find the root cause.
+      LOGGER.warn(errMsg, e);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.INTERNAL_ERROR_CODE, errMsg);
     }
 
     @Override

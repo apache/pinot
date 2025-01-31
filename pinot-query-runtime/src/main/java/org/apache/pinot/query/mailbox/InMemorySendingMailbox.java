@@ -21,8 +21,8 @@ package org.apache.pinot.query.mailbox;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,12 +94,14 @@ public class InMemorySendingMailbox implements SendingMailbox {
     if (_isTerminated) {
       return;
     }
-    LOGGER.debug("Cancelling mailbox: {}", _id);
+    String msg = t != null ? t.getMessage() : "Unknown";
+    LOGGER.debug("Cancelling in-memory mailbox: {} with error message {}", _id, msg);
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
+    // The user message should be simple to understand and ideally the same in all mailboxes
+    String userMessage = "Cancelled inter server connection";
+    _receivingMailbox.setErrorBlock(QException.INTERNAL_ERROR_CODE, userMessage);
   }
 
   @Override

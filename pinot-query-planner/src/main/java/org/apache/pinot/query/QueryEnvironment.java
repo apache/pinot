@@ -76,6 +76,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -269,6 +270,12 @@ public class QueryEnvironment {
       RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
+    } catch (CalciteContextException e) {
+      int errorCode = QException.QUERY_VALIDATION_ERROR_CODE;
+      if (e.getMessage() != null && e.getMessage().contains("Column") && e.getMessage().contains("not found")) {
+        errorCode = QException.UNKNOWN_COLUMN_ERROR_CODE;
+      }
+      throw new QException(errorCode, "Error composing query plan: " + e.getMessage(), e);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }

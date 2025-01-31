@@ -40,6 +40,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.spi.exception.QException;
 
 
 public final class DataBlockUtils {
@@ -95,13 +96,33 @@ public final class DataBlockUtils {
 
   static final int VERSION_TYPE_SHIFT = 5;
 
+  /**
+   * Returns a data block that represents an error.
+   *
+   * {@link ProcessingException} and {@link QException} are handled differently and the error code is extracted from
+   * the exception. On other exceptions, we try to do our best to extract the error code and the error message.
+   */
   public static MetadataBlock getErrorDataBlock(Exception e) {
     if (e instanceof ProcessingException) {
+      // for historical reasons ProcessingExceptions include the stack trace in the message.
+      // Notice that in general that is a bad practice, given that:
+      //   - the error should be already logged by the caller
+      //   - the stack trace is not useful for the user
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
+    } else if (e instanceof QException) {
+      // notice that contrary to ProcessingExceptions, we don't extract the trace from QExceptions
+      return getErrorDataBlock(Collections.singletonMap(((QException) e).getErrorCode(), e.getMessage()));
     } else {
       // TODO: Pass in meaningful error code.
       return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
     }
+  }
+
+  /**
+   * Returns a data block that represents an error with a user message
+   */
+  public static MetadataBlock getErrorDataBlock(int errorCode, String errorMessage) {
+    return getErrorDataBlock(Collections.singletonMap(errorCode, errorMessage));
   }
 
   private static String extractErrorMsg(Throwable t) {

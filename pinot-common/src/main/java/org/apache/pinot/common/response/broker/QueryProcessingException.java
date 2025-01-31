@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * This class represents an exception using a message and an error code.
  */
+// TODO: Rename as QueryErrorMessage or something like that to avoid confusion with java.lang.Exception
 public class QueryProcessingException {
   private int _errorCode;
   private String _message;
@@ -54,5 +55,10 @@ public class QueryProcessingException {
   @JsonProperty("message")
   public void setMessage(String message) {
     _message = message;
+  }
+
+  @Override
+  public String toString() {
+    return "{" + _errorCode + "=" + _message + '}';
   }
 }

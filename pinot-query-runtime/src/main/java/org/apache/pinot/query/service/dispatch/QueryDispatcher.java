@@ -46,8 +46,6 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -78,6 +76,7 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -127,16 +126,20 @@ public class QueryDispatcher {
 
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
-      throws Exception {
+      throws TimeoutException, QException {
     long requestId = context.getRequestId();
     List<DispatchablePlanFragment> plans = dispatchableSubPlan.getQueryStageList();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
       return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
-    } catch (Throwable e) {
+    } catch (ExecutionException e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, plans);
-      throw e;
+      throw new QException(QException.INTERNAL_ERROR_CODE, e.getCause());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      cancel(requestId, plans);
+      throw new QException(QException.INTERNAL_ERROR_CODE, e);
     }
   }
 
@@ -180,7 +183,7 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
-      throws Exception {
+      throws ExecutionException, InterruptedException, TimeoutException {
     SendRequest<Worker.QueryResponse> requestSender = DispatchClient::submit;
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     List<DispatchablePlanFragment> plansWithoutRoot = stagePlans.subList(1, stagePlans.size());
@@ -462,20 +465,37 @@ public class QueryDispatcher {
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
-      String errorMessage = "Received error query execution result block: " + queryExceptions;
-      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
-        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
-        throw queryInfoException;
-      }
 
-      throw new RuntimeException(errorMessage);
+      if (queryExceptions.size() == 1) {
+        Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
+        throw new QException(error.getKey(), "Error on servers: " + error.getValue());
+      } else {
+        Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
+            .max(QueryDispatcher::compareErrors)
+            .orElseThrow();
+        throw new QException(highestPriorityError.getKey(),
+            "Received " + queryExceptions.size() + " errors from server. "
+                + "The one with highest priority is: " + highestPriorityError.getValue());
+      }
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
     assert queryStats != null;
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<Integer, String> entry1, Map.Entry<Integer, String> entry2) {
+    int errorCode1 = entry1.getKey();
+    int errorCode2 = entry2.getKey();
+    if (errorCode1 == QException.QUERY_VALIDATION_ERROR_CODE) {
+      return errorCode1;
+    }
+    if (errorCode2 == QException.QUERY_VALIDATION_ERROR_CODE) {
+      return errorCode2;
+    }
+    return Integer.compare(errorCode1, errorCode2);
   }
 
   public void shutdown() {

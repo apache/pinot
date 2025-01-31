@@ -141,16 +141,22 @@ public class PinotQueryResource {
     try {
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions);
     } catch (QException e) {
-      LOGGER.error("Caught query exception while processing post request", e);
+      String errMsg = "Controller caught an exception while processing query {}. Code: {}, Message: {}";
+      if (QueryException.isClientError(e.getErrorCode())) {
+        LOGGER.warn(errMsg, sqlQuery, e.getErrorCode(), e.getMessage()); // Do not log stack trace for client errors
+      } else {
+        LOGGER.warn(errMsg, sqlQuery, e.getErrorCode(), e.getMessage(), e);
+      }
       return constructQueryExceptionResponse(e);
     } catch (ProcessingException pe) {
-      LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
+      LOGGER.warn("Controller caught an exception while processing query {}. Code: {}, Message: {}",
+          sqlQuery, pe.getErrorCode(), pe.getErrorCode(), pe);
       return constructQueryExceptionResponse(pe);
     } catch (WebApplicationException wae) {
-      LOGGER.error("Caught exception while processing get request", wae);
+      LOGGER.warn("Controller caught an exception while processing query {}", sqlQuery, wae);
       throw wae;
     } catch (Exception e) {
-      LOGGER.error("Caught unknown exception while processing get request", e);
+      LOGGER.warn("Controller caught an unknown exception while processingquery {}", sqlQuery, e);
       return constructQueryExceptionResponse(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
   }
@@ -417,9 +423,7 @@ public class PinotQueryResource {
   public void sendPostRaw(String urlStr, String requestStr, Map<String, String> headers, OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
-      if (LOGGER.isInfoEnabled()) {
-        LOGGER.info("Sending a post request to the server - " + urlStr);
-      }
+      LOGGER.info("Sending a post request to the controller - {}");
 
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();

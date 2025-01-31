@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -41,6 +42,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -99,8 +101,14 @@ public abstract class MultiStageOperator
       Stopwatch executeStopwatch = Stopwatch.createStarted();
       try {
         nextBlock = getNextBlock();
+      } catch (TimeoutException e) {
+        String errMsg = "Operator " + getExplainName() + " on stage " + _context.getStageId() + " timed out";
+        logger().warn(errMsg, e);
+        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(QException.EXECUTION_TIMEOUT_ERROR_CODE, errMsg);
       } catch (Exception e) {
-        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+        String errMsg = "Operator " + getExplainName() + " on stage " + _context.getStageId() + " failed";
+        logger().warn(errMsg, e);
+        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(QException.INTERNAL_ERROR_CODE, errMsg);
       }
       registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
 

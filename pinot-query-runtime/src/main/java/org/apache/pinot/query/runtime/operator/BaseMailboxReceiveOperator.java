@@ -76,12 +76,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams, senderStageId);
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
       _receivingStats = List.of();
-      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, List.of());
+      _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, List.of(), senderStageId);
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
