@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -255,7 +256,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Override
   public Map<Long, String> getRunningQueries() {
     Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
-    return new HashMap<>(_queriesById);
+    return Collections.unmodifiableMap(_queriesById);
   }
 
   @Override
