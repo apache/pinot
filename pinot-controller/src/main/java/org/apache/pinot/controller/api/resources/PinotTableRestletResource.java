@@ -211,6 +211,7 @@ public class PinotTableRestletResource {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
+    Schema schema;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
@@ -224,7 +225,7 @@ public class PinotTableRestletResource {
       ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
           AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
@@ -239,7 +240,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -481,6 +482,7 @@ public class PinotTableRestletResource {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
+    Schema schema;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
@@ -497,7 +499,7 @@ public class PinotTableRestletResource {
             Response.Status.BAD_REQUEST);
       }
 
-      Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
@@ -514,7 +516,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -575,7 +577,7 @@ public class PinotTableRestletResource {
         throw new SchemaNotFoundException("Got empty schema");
       }
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
-      TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
+      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());

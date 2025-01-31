@@ -220,9 +220,9 @@ public class PinotQueryResource {
           new Exception("Unable to find table for this query", e)).toString();
     }
     List<String> instanceIds;
-    if (tableNames.size() != 0) {
-      List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
-      if (tableConfigList == null || tableConfigList.size() == 0) {
+    if (!tableNames.isEmpty()) {
+      List<TableConfig> tableConfigList = getListTableConfigs(tableNames, database);
+      if (tableConfigList == null || tableConfigList.isEmpty()) {
         return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR,
             new Exception("Unable to find table in cluster, table does not exist")).toString();
       }
@@ -300,17 +300,18 @@ public class PinotQueryResource {
   }
 
   // given a list of tables, returns the list of tableConfigs
-  private List<TableConfig> getListTableConfigs(List<String> tableNames) {
+  private List<TableConfig> getListTableConfigs(List<String> tableNames, String database) {
     List<TableConfig> allTableConfigList = new ArrayList<>();
     for (String tableName : tableNames) {
+      String actualTableName = _pinotHelixResourceManager.getActualTableName(tableName, database);
       List<TableConfig> tableConfigList = new ArrayList<>();
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName)));
+      if (_pinotHelixResourceManager.hasRealtimeTable(actualTableName)) {
+        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(actualTableName)));
       }
-      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(tableName)));
+      if (_pinotHelixResourceManager.hasOfflineTable(actualTableName)) {
+        tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getOfflineTableConfig(actualTableName)));
       }
-      if (tableConfigList.size() == 0) {
+      if (tableConfigList.isEmpty()) {
         return null;
       }
       allTableConfigList.addAll(tableConfigList);

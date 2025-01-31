@@ -34,7 +34,7 @@ import org.apache.calcite.rel.core.SortExchange;
 /**
  * Pinot's implementation of {@code SortExchange} which needs information about whether to sort on the sender
  * and/or receiver side of the exchange. Every {@code Exchange} is broken into a send and a receive node and the
- * decision on where to sort is made by the planner and this information has to b passed onto the send and receive
+ * decision on where to sort is made by the planner and this information has to be passed onto the send and receive
  * nodes for the correct execution.
  *
  * Note: This class does not extend {@code LogicalSortExchange} because its constructor which takes the list of

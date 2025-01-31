@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -55,7 +56,7 @@ import org.testng.annotations.Test;
 /**
  * Unit tests for On-Heap dictionary implementations.
  */
-public class OnHeapDictionariesTest {
+public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapDictionariesTest.class);
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "onHeapDict";
@@ -91,6 +92,8 @@ public class OnHeapDictionariesTest {
   @AfterClass
   public void tearDown()
       throws IOException {
+    _onHeapSegment.destroy();
+    _offHeapSegment.destroy();
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 

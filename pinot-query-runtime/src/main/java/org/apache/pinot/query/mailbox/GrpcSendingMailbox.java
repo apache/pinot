@@ -63,9 +63,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean isLocal() {
+    return false;
+  }
+
+  @Override
   public void send(TransferableBlock block)
       throws IOException {
     if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
+      LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
+          block, _id);
       return;
     }
     if (LOGGER.isDebugEnabled()) {
@@ -124,7 +131,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private StreamObserver<MailboxContent> getContentObserver() {
     return PinotMailboxGrpc.newStub(_channelManager.getChannel(_hostname, _port))
-        .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS).open(_statusObserver);
+        .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+        .open(_statusObserver);
   }
 
   private MailboxContent toMailboxContent(TransferableBlock block)
@@ -146,5 +154,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
+  }
+
+  @Override
+  public String toString() {
+    return "g" + _id;
   }
 }

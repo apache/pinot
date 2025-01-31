@@ -70,6 +70,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 /**
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
+ * Used for key-less aggregations, e.g. select max(id), sum(quantity) from orders .
  */
 @SuppressWarnings("rawtypes")
 public class GroupByDataTableReducer implements DataTableReducer {
@@ -239,7 +240,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Create an indexed table to perform the reduce.
     IndexedTable indexedTable =
         GroupByUtils.createIndexedTableForDataTableReducer(dataTables.get(0), _queryContext, reducerContext,
-            numReduceThreadsToUse);
+            numReduceThreadsToUse, reducerContext.getExecutorService());
 
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.

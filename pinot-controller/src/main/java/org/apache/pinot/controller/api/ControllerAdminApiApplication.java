@@ -49,6 +49,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
 
   private final String _controllerResourcePackages;
   private final boolean _useHttps;
+  private final boolean _enableSwagger;
   private HttpServer _httpServer;
 
   public ControllerAdminApiApplication(ControllerConf conf) {
@@ -60,6 +61,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // TODO See ControllerResponseFilter
     // register(new LoggingFeature());
     _useHttps = Boolean.parseBoolean(conf.getProperty(ControllerConf.CONSOLE_SWAGGER_USE_HTTPS));
+    _enableSwagger = conf.isEnableSwagger();
     if (conf.getProperty(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, false)) {
       register(ServiceAutoDiscoveryFeature.class);
     }
@@ -86,8 +88,10 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       throw new RuntimeException("Failed to start http server", e);
     }
     ClassLoader classLoader = ControllerAdminApiApplication.class.getClassLoader();
-    PinotReflectionUtils.runWithLock(() ->
-        SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
+    if (_enableSwagger) {
+      PinotReflectionUtils.runWithLock(() ->
+          SwaggerSetupUtils.setupSwagger("Controller", _controllerResourcePackages, _useHttps, "/", _httpServer));
+    }
 
     // This is ugly from typical patterns to setup static resources but all our APIs are
     // at path "/". So, configuring static handler for path "/" does not work well.

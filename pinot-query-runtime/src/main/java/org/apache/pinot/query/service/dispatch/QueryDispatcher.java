@@ -46,6 +46,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -390,43 +392,51 @@ public class QueryDispatcher {
     return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
   }
 
+  // There is no reduction happening here, results are simply concatenated.
   @VisibleForTesting
-  public static QueryResult runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<String, String> queryOptions, MailboxService mailboxService) {
+  public static QueryResult runReducer(long requestId,
+      DispatchableSubPlan subPlan,
+      long timeoutMs,
+      Map<String, String> queryOptions,
+      MailboxService mailboxService) {
+
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
-
     // NOTE: Reduce stage is always stage 0
-    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(0);
-    PlanFragment planFragment = dispatchableStagePlan.getPlanFragment();
+    DispatchablePlanFragment stagePlan = subPlan.getQueryStageList().get(0);
+    PlanFragment planFragment = stagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
+
     Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
         "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
-    List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
-    Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
-        workerMetadataList.size());
-    StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadataList.get(0), null, parentContext);
 
-    PairList<Integer, String> resultFields = dispatchableSubPlan.getQueryResultFields();
-    DataSchema sourceDataSchema = receiveNode.getDataSchema();
+    MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
+    List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
+
+    Preconditions.checkState(workerMetadata.size() == 1,
+        "Expecting single worker for reduce stage, got: %s", workerMetadata.size());
+
+    StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
+    OpChainExecutionContext executionContext =
+        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
+            workerMetadata.get(0), null, parentContext);
+
+    PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
+    DataSchema sourceSchema = receiveNode.getDataSchema();
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
       Map.Entry<Integer, String> field = resultFields.get(i);
       columnNames[i] = field.getValue();
-      columnTypes[i] = sourceDataSchema.getColumnDataType(field.getKey());
+      columnTypes[i] = sourceSchema.getColumnDataType(field.getKey());
     }
-    DataSchema resultDataSchema = new DataSchema(columnNames, columnTypes);
+    DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
     TransferableBlock block;
-    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(opChainExecutionContext, receiveNode)) {
+    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(executionContext, receiveNode)) {
       block = receiveOperator.nextBlock();
       while (!TransferableBlockUtils.isEndOfStream(block)) {
         DataBlock dataBlock = block.getDataBlock();
@@ -451,12 +461,20 @@ public class QueryDispatcher {
     }
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
-      throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
+      Map<Integer, String> queryExceptions = block.getExceptions();
+      String errorMessage = "Received error query execution result block: " + queryExceptions;
+      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
+        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
+        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
+        throw queryInfoException;
+      }
+
+      throw new RuntimeException(errorMessage);
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
     assert queryStats != null;
-    return new QueryResult(new ResultTable(resultDataSchema, resultRows), queryStats,
+    return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
   }
 

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
@@ -55,7 +56,7 @@ import static org.testng.Assert.assertNull;
 /**
  * Unit test for {@link JsonIndexCreator} and {@link JsonIndexReader}.
  */
-public class JsonIndexTest {
+public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIndexTest");
   private static final String ON_HEAP_COLUMN_NAME = "onHeap";
   private static final String OFF_HEAP_COLUMN_NAME = "offHeap";

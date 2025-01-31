@@ -44,7 +44,7 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     // Start an empty Pinot cluster
     startZk();
-    startController();
+    startControllerWithSwagger();
     startBroker();
     startServer();
     startMinion();

@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -179,10 +181,9 @@ public class ZkStarter {
       // Wait until the ZK server is started
       for (int retry = 0; retry < DEFAULT_ZK_CLIENT_RETRIES; retry++) {
         try {
-          Thread.sleep(1000L);
           ZkClient client = new ZkClient("localhost:" + port, 1000 * (DEFAULT_ZK_CLIENT_RETRIES - retry));
           client.waitUntilConnected(DEFAULT_ZK_CLIENT_RETRIES - retry, TimeUnit.SECONDS);
-          client.close();
+          closeAsync(client);
           break;
         } catch (Exception e) {
           if (retry < DEFAULT_ZK_CLIENT_RETRIES - 1) {
@@ -191,6 +192,7 @@ public class ZkStarter {
             LOGGER.warn("Failed to connect to zk server.", e);
             throw e;
           }
+          Thread.sleep(50L);
         }
       }
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath, port);
@@ -199,6 +201,17 @@ public class ZkStarter {
       throw new RuntimeException(e);
     }
   }
+
+  public static void closeAsync(ZkClient client) {
+    if (client != null) {
+      ZK_DISCONNECTOR.submit(() -> {
+        client.close();
+      });
+    }
+  }
+
+  private static final ExecutorService ZK_DISCONNECTOR =
+      Executors.newFixedThreadPool(1, new NamedThreadFactory("zk-disconnector"));
 
   /**
    * Stops a local Zk instance, deleting its data directory

@@ -324,7 +324,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
       if (e instanceof BadQueryRequestException) {
         LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
       } else if (e instanceof QueryCancelledException) {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);

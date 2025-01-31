@@ -72,6 +72,7 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -125,7 +126,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _peerDownloadScheme;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
+  protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
+  // TODO: Make this configurable via ZK cluster configs to avoid server restarts to update
   private Semaphore _segmentDownloadSemaphore;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
@@ -138,7 +141,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -166,6 +170,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           + "Please check for available space and write-permissions for this directory.", _resourceTmpDir);
     }
     _errorCache = errorCache;
+    _segmentPreprocessThrottler = segmentPreprocessThrottler;
     _recentlyDeletedSegments =
         CacheBuilder.newBuilder().maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
             .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES).build();
@@ -403,7 +408,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentPreprocessThrottler));
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -639,10 +644,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      // Download segment from deep store if CRC changes or forced to download;
-      // otherwise, copy backup directory back to the original index directory.
-      // And then continue to load the segment from the index directory.
-      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      /*
+      Determines if a segment should be downloaded from deep storage based on:
+      1. A forced download flag.
+      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+         between ZK metadata and local metadata CRC.
+         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+           and the segment is available in deep storage or with a peer before discarding
+           the local copy.
+
+      Otherwise:
+      - Copy the backup directory back to the original index directory.
+      - Continue loading the segment from the index directory.
+      */
+      boolean shouldDownload =
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(
+              zkMetadata, localMetadata));
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -683,7 +700,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema,
+          _segmentPreprocessThrottler);
       addSegment(segment);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -703,6 +721,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentLock.unlock();
     }
     _logger.info("Reloaded segment: {}", segmentName);
+  }
+
+  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+    return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
+        || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
   private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
@@ -777,7 +800,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
@@ -827,7 +850,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(_peerDownloadScheme != null, "Peer download is not enabled for table: %s",
@@ -987,9 +1010,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
-    // If the segment doesn't exist on server or its CRC has changed, then we
-    // need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null || !hasSameCRC(zkMetadata, segmentMetadata)) {
+    /*
+    If:
+    1. The segment doesn't exist on the server, or
+    2. The segment status is marked as "DONE" in ZK metadata but there's a CRC mismatch
+       between the ZK metadata and the local metadata CRC.
+       - The "DONE" status confirms the COMMIT_END_METADATA call succeeded,
+         and the segment is available either in deep storage or with a peer
+         before discarding the local copy.
+
+    Then:
+    We need to fall back to downloading the segment from deep storage to load it.
+    */
+    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
       if (segmentMetadata == null) {
         _logger.info("Segment: {} does not exist", segmentName);
       } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
@@ -1012,7 +1045,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory.copyTo(indexDir);
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema, _segmentPreprocessThrottler);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);

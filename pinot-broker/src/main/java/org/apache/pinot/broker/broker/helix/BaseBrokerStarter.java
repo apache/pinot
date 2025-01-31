@@ -406,7 +406,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
     _clusterConfigChangeHandlers.add(_queryQuotaManager);
-    _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
+    if (_multiStageQueryThrottler != null) {
+      _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -416,7 +418,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _externalViewChangeHandlers.add(_routingManager);
     _externalViewChangeHandlers.add(_queryQuotaManager);
-    _externalViewChangeHandlers.add(_multiStageQueryThrottler);
+    if (_multiStageQueryThrottler != null) {
+      _externalViewChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
@@ -508,22 +512,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean shouldUpdateBrokerResource = false;
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
-      // This is a new broker (first time joining the cluster)
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+      // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
+      // tenant isolation mode since it defaults to true and is relatively obscure.
+      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
+                  instanceTag);
+          instanceConfig.addTag(instanceTag);
+        }
+        shouldUpdateBrokerResource = true;
+      } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
       } else {
-        String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
-        if (StringUtils.isNotEmpty(instanceTagsConfig)) {
-          for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-            Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                instanceTag);
-            instanceConfig.addTag(instanceTag);
-          }
-          shouldUpdateBrokerResource = true;
-        } else {
-          instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
-        }
+        instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
       }
       instanceTags = instanceConfig.getTags();
       updated = true;

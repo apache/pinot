@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.forward.mutable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
@@ -35,7 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class CLPMutableForwardIndexTest {
+public class CLPMutableForwardIndexTest implements PinotBuffersAfterClassCheckRule {
   private final List<String> _logLines = new ArrayList<>() {{
     add("2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
         + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective:"
