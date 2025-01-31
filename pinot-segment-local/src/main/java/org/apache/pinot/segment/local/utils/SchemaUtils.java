@@ -172,13 +172,17 @@ public class SchemaUtils {
    */
   private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {
     try {
-      TableConfigUtils.validate(tableConfig, schema);
+        // Attempt to validate the schema with the table configuration
+        TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      throw new IllegalStateException(
-          "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "
-              + tableConfig.getTableType() + ", reason: " + e.getMessage(), e);
+        // Capture the exception message and improve the error reporting
+        String errorMessage = String.format("Schema validation failed for tableConfig with name: %s, type: %s. " +
+                "Reason: %s", tableConfig.getTableName(), tableConfig.getTableType(), e.getMessage());
+
+        // Throw a new IllegalStateException with the detailed message
+        throw new IllegalStateException(errorMessage, e);
     }
-  }
+}
 
   /**
    * Checks for valid incoming and outgoing granularity spec in the time field spec
