@@ -173,23 +173,6 @@ public class MergeTaskUtilsTest {
   }
 
   @Test
-  public void testGetAggregationFunctionParameters() {
-    Map<String, String> taskConfig = new HashMap<>();
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param1", "value1");
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param2", "value2");
-    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnB.param1", "value3");
-    taskConfig.put("otherPrefix.metricColumnC.param1", "value1");
-    taskConfig.put("aggregationFunction.metricColumnD.param2", "value2");
-    Map<String, Map<String, String>> result = MergeTaskUtils.getAggregationFunctionParameters(taskConfig);
-    assertEquals(result.size(), 2);
-    assertTrue(result.containsKey("metricColumnA"));
-    assertTrue(result.containsKey("metricColumnB"));
-    assertEquals(result.get("metricColumnA").get("param1"), "value1");
-    assertEquals(result.get("metricColumnA").get("param2"), "value2");
-    assertEquals(result.get("metricColumnB").get("param1"), "value3");
-  }
-
-  @Test
   public void testGetSegmentConfig() {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");

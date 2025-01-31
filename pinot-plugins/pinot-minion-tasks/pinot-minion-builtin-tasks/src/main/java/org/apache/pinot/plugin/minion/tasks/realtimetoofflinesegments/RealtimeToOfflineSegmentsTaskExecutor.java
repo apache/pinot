@@ -38,6 +38,7 @@ import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.plugin.minion.tasks.mergerollup.MergeRollupTaskUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -151,7 +152,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     // Aggregation function parameters
     segmentProcessorConfigBuilder.setAggregationFunctionParameters(
-        MergeTaskUtils.getAggregationFunctionParameters(configs));
+        MergeRollupTaskUtils.getAggregationFunctionParameters(configs));
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));

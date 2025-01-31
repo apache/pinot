@@ -93,7 +93,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
     // Aggregation function parameters
     segmentProcessorConfigBuilder.setAggregationFunctionParameters(
-        MergeTaskUtils.getAggregationFunctionParameters(configs));
+        MergeRollupTaskUtils.getAggregationFunctionParameters(configs));
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
