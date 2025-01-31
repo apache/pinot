@@ -216,4 +216,10 @@ public class FunctionUtils {
         return typeFactory.createSqlType(SqlTypeName.OTHER);
     }
   }
+
+  public static boolean isAssertEnabled() {
+    boolean assertEnabled = false;
+    assert assertEnabled = true;
+    return assertEnabled;
+  }
 }
