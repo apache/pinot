@@ -219,7 +219,9 @@ public class FunctionUtils {
 
   public static boolean isAssertEnabled() {
     boolean assertEnabled = false;
+    //CHECKSTYLE:OFF
     assert assertEnabled = true;
+    //CHECKSTYLE:ON
     return assertEnabled;
   }
 }
