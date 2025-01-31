@@ -1321,6 +1321,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
     }
 
+    segmentBatchList = realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, 200);
+
+    assert segmentBatchList.size() == 1;
+    segmentsAdded = new HashSet<>();
+
+    for (Set<String> segmentBatch : segmentBatchList) {
+      assert segmentBatch.size() <= 200;
+      for (String segmentName : segmentBatch) {
+        assert !segmentsAdded.contains(segmentName);
+        segmentsAdded.add(segmentName);
+      }
+    }
+
     Random random = new Random();
     int numOfServers = 1 + random.nextInt(20);
     int numOfSegments = Math.max(numOfServers, 1 + random.nextInt(500));
