@@ -299,14 +299,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
-  private void setupHelixClusterConstraints() {
+  protected void setupHelixClusterConstraints() {
     String maxStateTransitions =
         _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
             CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
-        Message.MessageType.STATE_TRANSITION.name());
+        Message.MessageType.STATE_TRANSITION.name());s
     ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxStateTransitions);
 
     _helixControllerManager.getClusterManagmentTool()
