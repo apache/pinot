@@ -141,6 +141,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
   protected final int _queryResponseLimit;
+  // maps broker-generated query id with the servers that are running the query
   protected final Map<Long, QueryServers> _serversById;
   // if >= 0, then overrides default limit of 10, otherwise setting is ignored
   protected final int _defaultQueryLimit;
