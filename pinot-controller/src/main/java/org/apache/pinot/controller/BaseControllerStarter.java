@@ -300,6 +300,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   private void setupHelixClusterConstraints() {
+    setupHelixMaxStateTransitions();
+  }
+
+  protected void setupHelixMaxStateTransitions() {
     String maxStateTransitions =
         _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
             CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
