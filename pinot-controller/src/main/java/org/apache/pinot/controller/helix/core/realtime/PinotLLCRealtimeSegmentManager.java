@@ -2060,6 +2060,22 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
     });
+    // For pauseless tables, a segment marked ONLINE in the ideal state may not have been committed yet.
+    // We rely on SegmentZkMetadata to determine whether a segment has been committed (status is DONE)
+    // instead of relying solely on the ideal state.
+    // A segment in COMMITTING state is treated as consuming for pauseStatus.
+    String tableNameWithType = idealState.getResourceName();
+    if (PauselessConsumptionUtils.isPauselessEnabled(getTableConfig(tableNameWithType))) {
+      Map<Integer, SegmentZKMetadata> metadataMap = getLatestSegmentZKMetadataMap(tableNameWithType);
+      if (metadataMap != null) {
+        metadataMap.values()
+            .stream()
+            .filter(segmentZKMetadata -> !consumingSegments.contains(segmentZKMetadata.getSegmentName()))
+            .filter(segmentZKMetadata -> segmentZKMetadata.getStatus() == Status.COMMITTING)
+            .map(SegmentZKMetadata::getSegmentName)
+            .forEach(consumingSegments::add);
+      }
+    }
     return consumingSegments;
   }
 
