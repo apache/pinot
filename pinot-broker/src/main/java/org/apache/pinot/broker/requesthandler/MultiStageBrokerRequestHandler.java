@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -118,7 +119,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
-    _queryCompileExecutor = Executors.newCachedThreadPool(new NamedThreadFactory("query-compile-executor"));
+    _queryCompileExecutor = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
+        new NamedThreadFactory("multi-stage-query-compile-executor"));
   }
 
   @Override
@@ -128,8 +130,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public void shutDown() {
-    _queryDispatcher.shutdown();
     _queryCompileExecutor.shutdown();
+    _queryDispatcher.shutdown();
   }
 
   @Override
@@ -171,7 +173,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
               ? fragment -> requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions)
               : null;
 
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
+          try {
+            queryPlanResult = planQueryWithTimeout(requestId, query,
+                () -> queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode),
+                queryTimer.getRemainingTime());
+          } catch (TimeoutException | InterruptedException e) {
+            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
+          }
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
@@ -186,27 +195,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          // Run the query planning in a separate thread so that we can enforce a timeout on it (in some rare cases,
-          // we can see query compilation taking a very long time).
-          Future<QueryEnvironment.QueryPlannerResult> queryPlanResultFuture = _queryCompileExecutor.submit(
-              () -> queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId));
-
           try {
-            queryPlanResult = queryPlanResultFuture.get(queryTimer.getRemainingTime(), TimeUnit.MILLISECONDS);
-          } catch (TimeoutException e) {
-            LOGGER.warn("Timed out while planning query {}: {}", requestId, query);
-            queryPlanResultFuture.cancel(true);
+            queryPlanResult = planQueryWithTimeout(requestId, query,
+                () -> queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId), queryTimer.getRemainingTime());
+          } catch (TimeoutException | InterruptedException e) {
             requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
             return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
-          } catch (InterruptedException e) {
-            LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
-            // re-set the thread's interrupt status
-            Thread.currentThread().interrupt();
-            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
-            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
-          } catch (ExecutionException e) {
-            // Handled in outer catch block
-            throw e.getCause();
           }
           break;
       }
@@ -221,7 +215,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      if (t.getMessage().matches(".* Column .* not found in any table'")) {
+      if (t.getMessage() != null && t.getMessage().matches(".* Column .* not found in any table'")) {
         requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
         return new BrokerResponseNative(
             QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, consolidatedMessage));
@@ -355,6 +349,29 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return brokerResponse;
     } finally {
       _queryThrottler.release(estimatedNumQueryThreads);
+    }
+  }
+
+  /**
+   * Runs the query planning in a separate thread so that we can enforce a timeout on it (in some rare cases,
+   * we can see query compilation taking a very long time).
+   */
+  private QueryEnvironment.QueryPlannerResult planQueryWithTimeout(long requestId, String query,
+      Callable<QueryEnvironment.QueryPlannerResult> queryPlannerResultCallable, long timeoutMs)
+      throws Throwable {
+    Future<QueryEnvironment.QueryPlannerResult> queryPlanResultFuture = _queryCompileExecutor.submit(
+        queryPlannerResultCallable);
+    try {
+      return queryPlanResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timed out while planning query {}: {}", requestId, query);
+      queryPlanResultFuture.cancel(true);
+      throw e;
+    } catch (InterruptedException e) {
+      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+      throw e;
+    } catch (ExecutionException e) {
+      throw e.getCause();
     }
   }
 
