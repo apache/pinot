@@ -266,7 +266,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       return handleCancel(queryId, timeoutMs, executor, connMgr, serverResponses);
     } finally {
-      maybeRemoveQuery(queryId);
+      onQueryFinish(queryId);
     }
   }
 
@@ -285,23 +285,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  protected String maybeSaveQuery(long requestId, SqlNodeAndOptions sqlNodeAndOptions, String query) {
-    if (isQueryCancellationEnabled()) {
-      String clientRequestId = sqlNodeAndOptions.getOptions() != null
-          ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
-      _queriesById.put(requestId, query);
-      if (StringUtils.isNotBlank(clientRequestId)) {
-        _clientQueryIds.put(requestId, clientRequestId);
-        LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
-      } else {
-        LOGGER.debug("Keep track of running query: {}", requestId);
-      }
-      return clientRequestId;
-    }
-    return null;
+  protected String extractClientRequestId(SqlNodeAndOptions sqlNodeAndOptions) {
+    return sqlNodeAndOptions.getOptions() != null
+        ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
   }
 
-  protected void maybeRemoveQuery(long requestId) {
+  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+    _queriesById.put(requestId, query);
+    if (isQueryCancellationEnabled() && StringUtils.isNotBlank(clientRequestId)) {
+      _clientQueryIds.put(requestId, clientRequestId);
+      LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
+    } else {
+      LOGGER.debug("Keep track of running query: {}", requestId);
+    }
+  }
+
+  protected void onQueryFinish(long requestId) {
     if (isQueryCancellationEnabled()) {
       _queriesById.remove(requestId);
       _clientQueryIds.remove(requestId);

@@ -227,8 +227,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   @Override
-  protected void maybeRemoveQuery(long requestId) {
-    super.maybeRemoveQuery(requestId);
+  protected void onQueryFinish(long requestId) {
+    super.onQueryFinish(requestId);
     if (isQueryCancellationEnabled()) {
       _serversById.remove(requestId);
     }
@@ -825,17 +825,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         //       can always list the running queries and cancel query again until it ends. Just that such race
         //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
         //       servers takes time, but will address later if needed.
-        String clientRequestId = maybeSaveQuery(requestId, sqlNodeAndOptions, query);
-        if (isQueryCancellationEnabled()) {
-          _serversById.put(requestId, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
-        }
+        String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
+        onQueryStart(
+            requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
         try {
           brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
               offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
               requestContext);
           brokerResponse.setClientRequestId(clientRequestId);
         } finally {
-          maybeRemoveQuery(requestId);
+          onQueryFinish(requestId);
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
@@ -917,6 +916,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return errorMessage + ", with routing policy: " + offlineRoutingPolicy + " [offline]";
     }
     return errorMessage;
+  }
+
+  @Override
+  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+    super.onQueryStart(requestId, clientRequestId, query, extras);
+    if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
+      _serversById.put(requestId, (QueryServers) extras[0]);
+    }
   }
 
   private static String getRoutingPolicy(TableConfig tableConfig) {
