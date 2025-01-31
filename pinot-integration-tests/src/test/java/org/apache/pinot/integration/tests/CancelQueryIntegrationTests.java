@@ -181,7 +181,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
     String clientRequestId = UUID.randomUUID().toString();
     // tricky query: use sleep with some column data to avoid Calcite from optimizing it on compile time
     String sqlQuery =
-        "SET " + CommonConstants.Broker.Request.QueryOptionKey.CLIENT_QUERY_ID + "='" + clientRequestId + "'; "
+        "SET clientQueryId='" + clientRequestId + "'; "
             + "SELECT sleep(ActualElapsedTime+60000) FROM mytable WHERE ActualElapsedTime > 0 limit 1";
 
     new Timer().schedule(new java.util.TimerTask() {
