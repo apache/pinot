@@ -1930,8 +1930,8 @@ public class PinotLLCRealtimeSegmentManager {
   List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
       int batchSize) {
     List<Set<String>> segmentBatchList = new ArrayList<>();
-    if (batchSize == Integer.MAX_VALUE) {
-      // Add as many segments to batch as possible
+    if (batchSize >= targetConsumingSegments.size()) {
+      // All segments can be added in a single batch.
       // No need to divide segments in batches.
       segmentBatchList.add(targetConsumingSegments);
       return segmentBatchList;
