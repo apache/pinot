@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
@@ -28,19 +29,19 @@ public class ForceCommitBatchConfigTest {
   @Test
   public void testForceCommitBatchConfig() {
     ForceCommitBatchConfig forceCommitBatchConfig = ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
-    assert Integer.MAX_VALUE == forceCommitBatchConfig.getBatchSize();
-    assert 5000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
-    assert 180000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+    assertEquals(forceCommitBatchConfig.getBatchSize(), Integer.MAX_VALUE);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 5000);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 180000);
 
     forceCommitBatchConfig = ForceCommitBatchConfig.of(1, 5, 180);
-    assert 1 == forceCommitBatchConfig.getBatchSize();
-    assert 5000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
-    assert 180000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+    assertEquals(forceCommitBatchConfig.getBatchSize(), 1);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 5000);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 180000);
 
     forceCommitBatchConfig = ForceCommitBatchConfig.of(1, 23, 37);
-    assert 1 == forceCommitBatchConfig.getBatchSize();
-    assert 23000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
-    assert 37000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+    assertEquals(forceCommitBatchConfig.getBatchSize(), 1);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckIntervalMs(), 23000);
+    assertEquals(forceCommitBatchConfig.getBatchStatusCheckTimeoutMs(), 37000);
 
     assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(0, 5, 180));
     assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(32, 0, 0));

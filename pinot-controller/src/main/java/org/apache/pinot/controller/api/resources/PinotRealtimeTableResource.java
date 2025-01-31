@@ -172,32 +172,24 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
       @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
-      @QueryParam("batchSize")
-      int batchSize,
+      @QueryParam("batchSize") @DefaultValue(Integer.MAX_VALUE + "") int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
           + " not (default = 5)")
-      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue("5")
-      int batchStatusCheckIntervalSec,
+      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue("5") int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
           + " of segments and throw an exception. (default = 180)")
-      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue("180")
-      int batchStatusCheckTimeoutSec,
+      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue("180") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
     }
-    ForceCommitBatchConfig forceCommitBatchConfig;
+    ForceCommitBatchConfig batchConfig;
     try {
-      if (batchSize == 0) {
-        batchSize = Integer.MAX_VALUE;
-      }
-      forceCommitBatchConfig =
-          ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
+      batchConfig = ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid batch config",
-          Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid batch config", Response.Status.BAD_REQUEST, e);
     }
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -206,7 +198,7 @@ public class PinotRealtimeTableResource {
     try {
       Set<String> consumingSegmentsForceCommitted =
           _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments,
-              forceCommitBatchConfig);
+              batchConfig);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();

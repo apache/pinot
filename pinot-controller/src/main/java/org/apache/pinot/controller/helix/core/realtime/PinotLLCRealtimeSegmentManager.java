@@ -122,8 +122,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
+import org.apache.pinot.spi.utils.retry.AttemptFailureException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
@@ -197,7 +196,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
-  private final ExecutorService _forceCommitExecutorService;
 
   private volatile boolean _isStopping = false;
 
@@ -222,7 +220,6 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
-    _forceCommitExecutorService = Executors.newCachedThreadPool();
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -319,8 +316,6 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
     }
-
-    _forceCommitExecutorService.shutdown();
   }
 
   /**
@@ -1860,18 +1855,21 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit, ForceCommitBatchConfig forceCommitBatchConfig) {
+      @Nullable String segmentsToCommit, ForceCommitBatchConfig batchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
-
-    List<Set<String>> segmentBatchList =
-        getSegmentBatchList(idealState, targetConsumingSegments, forceCommitBatchConfig.getBatchSize());
-
-    _forceCommitExecutorService.submit(
-        () -> processBatchesSequentially(segmentBatchList, tableNameWithType, forceCommitBatchConfig));
-
+    int batchSize = batchConfig.getBatchSize();
+    if (batchSize >= targetConsumingSegments.size()) {
+      // No need to divide segments in batches.
+      sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
+    } else {
+      List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      executor.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType, batchConfig));
+      executor.shutdown();
+    }
     return targetConsumingSegments;
   }
 
@@ -1900,26 +1898,18 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     int maxAttempts = (batchStatusCheckTimeoutMs + batchStatusCheckIntervalMs - 1) / batchStatusCheckIntervalMs;
-    RetryPolicy retryPolicy =
-        RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
-    final Set<String>[] segmentsYetToBeCommitted = new Set[1];
-
+    RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
+    Set<?>[] segmentsYetToBeCommitted = new Set[1];
     try {
       retryPolicy.attempt(() -> {
         segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
-    } catch (AttemptsExceededException | RetriableOperationException e) {
-      int attemptCount;
-      if (e instanceof AttemptsExceededException) {
-        attemptCount = ((AttemptsExceededException) e).getAttempts();
-      } else {
-        attemptCount = ((RetriableOperationException) e).getAttempts();
-      }
+    } catch (AttemptFailureException e) {
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
-              + "segmentsYetToBeCommitted: %s",
-          segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
+              + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
+      LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
 
@@ -1927,27 +1917,20 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
-      int batchSize) {
-    List<Set<String>> segmentBatchList = new ArrayList<>();
-    if (batchSize >= targetConsumingSegments.size()) {
-      // All segments can be added in a single batch.
-      // No need to divide segments in batches.
-      segmentBatchList.add(targetConsumingSegments);
-      return segmentBatchList;
-    }
+  List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments, int batchSize) {
+    int numSegments = targetConsumingSegments.size();
+    List<Set<String>> segmentBatchList = new ArrayList<>((numSegments + batchSize - 1) / batchSize);
 
     Map<String, Queue<String>> instanceToConsumingSegments =
         getInstanceToConsumingSegments(idealState, targetConsumingSegments);
 
-    Set<String> currentBatch = new HashSet<>();
-    Set<String> segmentsAdded = new HashSet<>();
+    Set<String> segmentsAdded = Sets.newHashSetWithExpectedSize(numSegments);
+    Set<String> currentBatch = Sets.newHashSetWithExpectedSize(batchSize);
     Collection<Queue<String>> instanceSegmentsCollection = instanceToConsumingSegments.values();
 
     while (!instanceSegmentsCollection.isEmpty()) {
       Iterator<Queue<String>> instanceCollectionIterator = instanceSegmentsCollection.iterator();
-      // pick segments in round-robin fashion to parallelize
-      // forceCommit across max servers
+      // Pick segments in round-robin fashion to parallelize forceCommit across max servers
       while (instanceCollectionIterator.hasNext()) {
         Queue<String> consumingSegments = instanceCollectionIterator.next();
         String segmentName = consumingSegments.poll();
@@ -1955,14 +1938,13 @@ public class PinotLLCRealtimeSegmentManager {
           instanceCollectionIterator.remove();
         }
         if (!segmentsAdded.add(segmentName)) {
-          // there might be a segment replica hosted on
-          // another instance added before
+          // There might be a segment replica hosted on another instance added before
           continue;
         }
         currentBatch.add(segmentName);
         if (currentBatch.size() == batchSize) {
           segmentBatchList.add(currentBatch);
-          currentBatch = new HashSet<>();
+          currentBatch = Sets.newHashSetWithExpectedSize(batchSize);
         }
       }
     }
