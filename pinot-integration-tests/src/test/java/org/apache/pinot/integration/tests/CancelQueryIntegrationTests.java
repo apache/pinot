@@ -193,7 +193,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
           fail("No exception should be thrown", e);
         }
       }
-    }, 1000);
+    }, 500);
 
     JsonNode result = postQuery(sqlQuery);
     // ugly: error message differs from SSQE to MSQE

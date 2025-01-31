@@ -380,77 +380,48 @@ public class PinotClientRequest {
   }
 
   @DELETE
-  @Path("query/{queryId}")
+  @Path("query/{id}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
-      + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "
+  @ApiOperation(value = "Cancel a query as identified by the id", notes = "No effect if no query exists for the "
+      + "given id on the requested broker. Query may continue to run for a short while after calling cancel as "
       + "it's done in a non-blocking manner. The cancel method can be called multiple times.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Query not found on the requested broker")
   })
   public String cancelQuery(
-      @ApiParam(value = "QueryId as assigned by the broker", required = true) @PathParam("queryId") long queryId,
+      @ApiParam(value = "Query id", required = true) @PathParam("id") String id,
+      @ApiParam(value = "Determines is query id is internal or provided by the client") @QueryParam("client")
+      @DefaultValue("false") boolean isClient,
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
     try {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
-      if (_requestHandler.cancelQuery(queryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        String resp = "Cancelled query: " + queryId;
+      if (isClient && _requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+        String resp = "Cancelled client query: " + id;
         if (verbose) {
           resp += " with responses from servers: " + serverResponses;
         }
         return resp;
+      } else if (_requestHandler.cancelQuery(Long.parseLong(id), timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+          String resp = "Cancelled query: " + id;
+          if (verbose) {
+            resp += " with responses from servers: " + serverResponses;
+          }
+          return resp;
       }
+    } catch (NumberFormatException e) {
+      Response.status(Response.Status.BAD_REQUEST).entity(String.format("Invalid internal query id: %s", id));
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", queryId, e.getMessage()))
+          .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", id, e.getMessage()))
           .build());
     }
     throw new WebApplicationException(
-        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", queryId))
-            .build());
-  }
-
-  @DELETE
-  @Path("clientQuery/{clientQueryId}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Cancel a query as identified by the clientQueryId", notes = "No effect if no query exists for"
-      + "the given clientQueryId on the requested broker. Query may continue to run for a short while after calling"
-      + "cancel as it's done in a non-blocking manner. The cancel method can be called multiple times.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
-      @ApiResponse(code = 404, message = "Query not found on the requested broker")
-  })
-  public String cancelClientQuery(
-      @ApiParam(value = "ClientQueryId given by the client", required = true)
-      @PathParam("clientQueryId") String clientQueryId,
-      @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
-      @DefaultValue("3000") int timeoutMs,
-      @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
-      boolean verbose) {
-    try {
-      Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
-      if (_requestHandler.cancelQueryByClientId(clientQueryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        String resp = "Cancelled client query: " + clientQueryId;
-        if (verbose) {
-          resp += " with responses from servers: " + serverResponses;
-        }
-        return resp;
-      }
-    } catch (Exception e) {
-      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(String.format(
-              "Failed to cancel client query: %s on the broker due to error: %s", clientQueryId, e.getMessage()))
-          .build());
-    }
-    throw new WebApplicationException(
-        Response.status(Response.Status.NOT_FOUND).entity(
-            String.format("Client query: %s not found on the broker", clientQueryId))
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", id))
             .build());
   }
 

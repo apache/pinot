@@ -258,7 +258,7 @@ public class PinotRunningQueryResource {
       for (InstanceInfo broker: getBrokers(httpHeaders.getHeaderString(DATABASE)).values()) {
         int port = portOverride > 0 ? portOverride : broker.getPort();
         HttpDelete delete = new HttpDelete(String.format(
-            "%s://%s:%d/clientQuery/%s?verbose=%b", protocol, broker.getHost(), port, clientQueryId, verbose));
+            "%s://%s:%d/query/%s?client=true&verbose=%b", protocol, broker.getHost(), port, clientQueryId, verbose));
         requestHeaders.forEach(delete::setHeader);
         brokerDeletes.add(delete);
       }
