@@ -791,10 +791,10 @@ public class DateTimeFunctionsTest {
   @Test
   public void testSleepFunction() {
     long startTime = System.currentTimeMillis();
-    testFunction("sleep(500)", Collections.emptyList(), new GenericRow(), result -> {
-      assertTrue((long) result >= 500);
+    testFunction("sleep(50)", Collections.emptyList(), new GenericRow(), result -> {
+      assertTrue((long) result >= 50);
     });
     long endTime = System.currentTimeMillis();
-    assertTrue(endTime - startTime >= 500);
+    assertTrue(endTime - startTime >= 50);
   }
 }
