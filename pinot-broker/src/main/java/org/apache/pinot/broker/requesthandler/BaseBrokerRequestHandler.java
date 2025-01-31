@@ -198,6 +198,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception;
 
+  /**
+   * Attemps to cancel an ongoing query identified by its broker-generated id.
+   * @return true if the query was successfully cancelled, false otherwise.
+   */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
 
