@@ -1907,8 +1907,6 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       retryPolicy.attempt(() -> {
         segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
-        // TODO: to be removed, added for CI failure debugging
-        LOGGER.info("segmentsYetToBeCommitted: {}", segmentsYetToBeCommitted[0]);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
     } catch (AttemptsExceededException | RetriableOperationException e) {
