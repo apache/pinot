@@ -27,12 +27,12 @@ public class ForceCommitBatchConfigTest {
 
   @Test
   public void testForceCommitBatchConfig() {
-    ForceCommitBatchConfig forceCommitBatchConfig = ForceCommitBatchConfig.of(null, null, null);
+    ForceCommitBatchConfig forceCommitBatchConfig = ForceCommitBatchConfig.of(Integer.MAX_VALUE, 5, 180);
     assert Integer.MAX_VALUE == forceCommitBatchConfig.getBatchSize();
     assert 5000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     assert 180000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
 
-    forceCommitBatchConfig = ForceCommitBatchConfig.of(1, null, null);
+    forceCommitBatchConfig = ForceCommitBatchConfig.of(1, 5, 180);
     assert 1 == forceCommitBatchConfig.getBatchSize();
     assert 5000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     assert 180000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
@@ -42,7 +42,7 @@ public class ForceCommitBatchConfigTest {
     assert 23000 == forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     assert 37000 == forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
 
-    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(0, null, null));
-    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(32, 0, null));
+    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(0, 5, 180));
+    assertThrows(IllegalArgumentException.class, () -> ForceCommitBatchConfig.of(32, 0, 0));
   }
 }

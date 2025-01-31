@@ -1922,15 +1922,24 @@ public class PinotLLCRealtimeSegmentManager {
           segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
       throw new RuntimeException(errorMsg, e);
     }
+
+    LOGGER.info("segmentBatch: {} successfully force committed", segmentBatchToCommit);
   }
 
   @VisibleForTesting
   List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
       int batchSize) {
+    List<Set<String>> segmentBatchList = new ArrayList<>();
+    if (batchSize == Integer.MAX_VALUE) {
+      // Add as many segments to batch as possible
+      // No need to divide segments in batches.
+      segmentBatchList.add(targetConsumingSegments);
+      return segmentBatchList;
+    }
+
     Map<String, Queue<String>> instanceToConsumingSegments =
         getInstanceToConsumingSegments(idealState, targetConsumingSegments);
 
-    List<Set<String>> segmentBatchList = new ArrayList<>();
     Set<String> currentBatch = new HashSet<>();
     Set<String> segmentsAdded = new HashSet<>();
     Collection<Queue<String>> instanceSegmentsCollection = instanceToConsumingSegments.values();

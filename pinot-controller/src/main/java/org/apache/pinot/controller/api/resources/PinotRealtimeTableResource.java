@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -172,15 +173,15 @@ public class PinotRealtimeTableResource {
       String consumingSegments,
       @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
       @QueryParam("batchSize")
-      Integer batchSize,
+      int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
           + " not (default = 5)")
-      @QueryParam("batchStatusCheckIntervalSec")
-      Integer batchStatusCheckIntervalSec,
+      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue("5")
+      int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
           + " of segments and throw an exception. (default = 180)")
-      @QueryParam("batchStatusCheckTimeoutSec")
-      Integer batchStatusCheckTimeoutSec,
+      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue("180")
+      int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
@@ -189,6 +190,9 @@ public class PinotRealtimeTableResource {
     }
     ForceCommitBatchConfig forceCommitBatchConfig;
     try {
+      if (batchSize == 0) {
+        batchSize = Integer.MAX_VALUE;
+      }
       forceCommitBatchConfig =
           ForceCommitBatchConfig.of(batchSize, batchStatusCheckIntervalSec, batchStatusCheckTimeoutSec);
     } catch (Exception e) {
