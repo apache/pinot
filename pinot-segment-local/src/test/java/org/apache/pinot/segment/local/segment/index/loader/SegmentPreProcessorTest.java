@@ -43,6 +43,8 @@ import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -142,8 +144,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   private static final String NEW_HLL_BYTE_METRIC_COLUMN_NAME = "newHLLByteMetric";
   private static final String NEW_TDIGEST_BYTE_METRIC_COLUMN_NAME = "newTDigestByteMetric";
 
-  private static final SegmentStarTreePreprocessThrottler SEGMENT_STAR_TREE_PREPROCESS_THROTTLER =
-      new SegmentStarTreePreprocessThrottler(1);
+  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER =
+      new SegmentPreprocessThrottler(new SegmentAllIndexPreprocessThrottler(2, 4, true),
+          new SegmentStarTreePreprocessThrottler(1));
 
   private final File _avroFile;
   private final Schema _schema;
@@ -311,7 +314,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, createIndexLoadingConfig(schema),
             schema)) {
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
   }
 
@@ -1496,7 +1499,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             createIndexLoadingConfig(_newColumnsSchemaWithH3Json), _newColumnsSchemaWithH3Json)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
     verifyProcessNotNeeded();
   }
@@ -1607,7 +1610,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
 
     // Update table config to convert noDict to dict for longCol
@@ -1616,7 +1619,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
 
     // Update table config to convert dict to noDict for longCol and add the Startree index config
@@ -1629,7 +1632,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
 
     // Remove Startree index but keep the no dictionary for longCol
@@ -1638,7 +1641,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
 
     // Update table config to convert noDict to dict for longCol and also add the Startree index
@@ -1648,7 +1651,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory,
             new IndexLoadingConfig(tableConfig, schema), schema)) {
       assertTrue(processor.needProcess());
-      processor.process(SEGMENT_STAR_TREE_PREPROCESS_THROTTLER);
+      processor.process(SEGMENT_PREPROCESS_THROTTLER);
     }
   }
 

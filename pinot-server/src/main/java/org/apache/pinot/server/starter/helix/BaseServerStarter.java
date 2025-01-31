@@ -80,6 +80,7 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -156,6 +157,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  protected SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
   protected SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
@@ -635,15 +637,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxPreprocessConcurrency,
+    _segmentAllIndexPreprocessThrottler = new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency,
         maxPreprocessConcurrencyBeforeServingQueries, false);
     int maxStarTreePreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
     _segmentStarTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency);
-    ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler,
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(_segmentAllIndexPreprocessThrottler,
         _segmentStarTreePreprocessThrottler);
+    ServerConf serverConf = new ServerConf(_serverConf);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory,
+        _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -671,7 +675,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentPreprocessThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentAllIndexPreprocessThrottler);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentStarTreePreprocessThrottler);
 
     // Start restlet server for admin API endpoint
@@ -775,7 +779,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
-    _segmentPreprocessThrottler.startServingQueries();
+    _segmentAllIndexPreprocessThrottler.startServingQueries();
   }
 
   @Override

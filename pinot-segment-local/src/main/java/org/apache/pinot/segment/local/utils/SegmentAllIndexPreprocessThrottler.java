@@ -1,0 +1,188 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.utils;
+
+import com.google.common.base.Preconditions;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/**
+ * Used to throttle the total concurrent index rebuilds (for all indexes) that can happen on a given Pinot server.
+ */
+public class SegmentAllIndexPreprocessThrottler extends BaseSegmentPreprocessThrottler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAllIndexPreprocessThrottler.class);
+
+  /**
+   * _maxPreprocessConcurrency and _maxConcurrentPreprocessesBeforeServingQueries must be > 0. To effectively disable
+   * throttling, this can be set to a very high value
+   */
+  private int _maxPreprocessConcurrency;
+  private int _maxPreprocessConcurrencyBeforeServingQueries;
+  private boolean _isServingQueries;
+
+  /**
+   * @param maxPreprocessConcurrency configured preprocessing concurrency
+   * @param maxPreprocessConcurrencyBeforeServingQueries configured preprocessing concurrency before serving queries
+   * @param isServingQueries whether the server is ready to serve queries or not
+   */
+  public SegmentAllIndexPreprocessThrottler(int maxPreprocessConcurrency,
+      int maxPreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
+    // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
+    // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
+    // server is starting up.
+    super(isServingQueries ? maxPreprocessConcurrency : maxPreprocessConcurrencyBeforeServingQueries, LOGGER);
+    LOGGER.info("Initializing SegmentAllIndexPreprocessThrottler, maxPreprocessConcurrency: {}, "
+            + "maxPreprocessConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
+        maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries);
+    // Still checking both values are > 0 since only one will be utilized to initialize the sempahore, still want to
+    // ensure the other config is valid
+    Preconditions.checkArgument(maxPreprocessConcurrency > 0,
+        "Max preprocess parallelism must be > 0, but found to be: " + maxPreprocessConcurrency);
+    Preconditions.checkArgument(maxPreprocessConcurrencyBeforeServingQueries > 0,
+        "Max preprocess parallelism before serving queries must be > 0, but found to be: "
+            + maxPreprocessConcurrencyBeforeServingQueries);
+
+    _maxPreprocessConcurrency = maxPreprocessConcurrency;
+    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
+    _isServingQueries = isServingQueries;
+
+    if (!isServingQueries) {
+      LOGGER.info("Serving queries is disabled, using preprocess concurrency as: {}",
+          _maxPreprocessConcurrencyBeforeServingQueries);
+    }
+  }
+
+  public synchronized void startServingQueries() {
+    LOGGER.info("Serving queries is to be enabled, reset throttling threshold for segment preprocess concurrency, "
+        + "total permits: {}, available permits: {}", totalPermits(), availablePermits());
+    _isServingQueries = true;
+    _semaphore.setPermits(_maxPreprocessConcurrency);
+    LOGGER.info("Reset throttling completed, new concurrency: {}, total permits: {}, available permits: {}",
+        _maxPreprocessConcurrency, totalPermits(), availablePermits());
+  }
+
+  @Override
+  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (CollectionUtils.isEmpty(changedConfigs)) {
+      LOGGER.info("Skip updating SegmentAllIndexPreprocessThrottler configs with unchanged clusterConfigs");
+      return;
+    }
+
+    LOGGER.info("Updating SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
+    handleMaxPreprocessConcurrencyChange(changedConfigs, clusterConfigs);
+    handleMaxPreprocessConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs);
+    LOGGER.info("Updated SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
+  }
+
+  private void handleMaxPreprocessConcurrencyChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM)) {
+      LOGGER.info("changedConfigs list indicates maxPreprocessConcurrency was not updated, skipping updates");
+      return;
+    }
+
+    String configName = CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM;
+    String defaultConfigValue = CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM;
+    String maxParallelSegmentPreprocessesStr =
+        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
+
+    int maxPreprocessConcurrency;
+    try {
+      maxPreprocessConcurrency = Integer.parseInt(maxParallelSegmentPreprocessesStr);
+    } catch (Exception e) {
+      LOGGER.warn("Invalid maxPreprocessConcurrency set: {}, not making change, fix config and try again",
+          maxParallelSegmentPreprocessesStr);
+      return;
+    }
+
+    if (maxPreprocessConcurrency <= 0) {
+      LOGGER.warn("maxPreprocessConcurrency: {} must be > 0, not making change, fix config and try again",
+          maxPreprocessConcurrency);
+      return;
+    }
+
+    if (maxPreprocessConcurrency == _maxPreprocessConcurrency) {
+      LOGGER.info("No ZK update for maxPreprocessConcurrency {}, total permits: {}", _maxPreprocessConcurrency,
+          totalPermits());
+      return;
+    }
+
+    LOGGER.info("Updated maxPreprocessConcurrency from: {} to: {}", _maxPreprocessConcurrency,
+        maxPreprocessConcurrency);
+    _maxPreprocessConcurrency = maxPreprocessConcurrency;
+
+    if (!_isServingQueries) {
+      LOGGER.info("Serving queries hasn't been enabled yet, not updating the permits with maxPreprocessConcurrency");
+      return;
+    }
+    _semaphore.setPermits(_maxPreprocessConcurrency);
+    LOGGER.info("Updated total permits: {}", totalPermits());
+  }
+
+  private void handleMaxPreprocessConcurrencyBeforeServingQueriesChange(Set<String> changedConfigs,
+      Map<String, String> clusterConfigs) {
+    if (!changedConfigs.contains(
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)) {
+      LOGGER.info("changedConfigs list indicates maxPreprocessConcurrencyBeforeServingQueries was not updated, "
+          + "skipping updates");
+      return;
+    }
+
+    String configName = CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
+    String defaultConfigValue = CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
+    String maxParallelSegmentPreprocessesBeforeServingQueriesStr =
+        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
+
+    int maxPreprocessConcurrencyBeforeServingQueries;
+    try {
+      maxPreprocessConcurrencyBeforeServingQueries =
+          Integer.parseInt(maxParallelSegmentPreprocessesBeforeServingQueriesStr);
+    } catch (Exception e) {
+      LOGGER.warn("Invalid maxPreprocessConcurrencyBeforeServingQueries set: {}, not making change, fix config and "
+          + "try again", maxParallelSegmentPreprocessesBeforeServingQueriesStr);
+      return;
+    }
+
+    if (maxPreprocessConcurrencyBeforeServingQueries <= 0) {
+      LOGGER.warn("maxPreprocessConcurrencyBeforeServingQueries: {} must be > 0, not making change, fix config "
+          + "and try again", maxPreprocessConcurrencyBeforeServingQueries);
+      return;
+    }
+
+    if (maxPreprocessConcurrencyBeforeServingQueries == _maxPreprocessConcurrencyBeforeServingQueries) {
+      LOGGER.info("No ZK update for maxPreprocessConcurrencyBeforeServingQueries {}, total permits: {}",
+          _maxPreprocessConcurrencyBeforeServingQueries, totalPermits());
+      return;
+    }
+
+    LOGGER.info("Updated maxPreprocessConcurrencyBeforeServingQueries from: {} to: {}",
+        _maxPreprocessConcurrencyBeforeServingQueries, maxPreprocessConcurrencyBeforeServingQueries);
+    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
+    if (!_isServingQueries) {
+      LOGGER.info("maxPreprocessConcurrencyBeforeServingQueries was updated before serving queries was enabled, "
+          + "updating the permits");
+      _semaphore.setPermits(_maxPreprocessConcurrencyBeforeServingQueries);
+      LOGGER.info("Updated total permits: {}", totalPermits());
+    }
+  }
+}

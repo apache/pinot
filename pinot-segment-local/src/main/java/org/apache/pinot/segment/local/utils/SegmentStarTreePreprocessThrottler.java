@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Used to throttle the total concurrent startree index rebuilds that can happen on a given Pinot server.
- * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
  */
 public class SegmentStarTreePreprocessThrottler extends BaseSegmentPreprocessThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStarTreePreprocessThrottler.class);

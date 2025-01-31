@@ -794,7 +794,7 @@ public class RealtimeSegmentDataManagerTest {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
-    tableDataManagerProvider.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), null, null);
+    tableDataManagerProvider.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), null);
     TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig);
     tableDataManager.start();
     tableDataManager.shutDown();

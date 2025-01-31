@@ -73,7 +73,6 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -128,7 +127,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
-  protected SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
   // TODO: Make this configurable via ZK cluster configs to avoid server restarts to update
   private Semaphore _segmentDownloadSemaphore;
@@ -144,8 +142,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
-      @Nullable SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler) {
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -174,7 +171,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _errorCache = errorCache;
     _segmentPreprocessThrottler = segmentPreprocessThrottler;
-    _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
     _recentlyDeletedSegments =
         CacheBuilder.newBuilder().maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
             .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES).build();
@@ -412,8 +408,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentPreprocessThrottler,
-        _segmentStarTreePreprocessThrottler));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentPreprocessThrottler));
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -706,7 +701,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
       ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema,
-          _segmentPreprocessThrottler, _segmentStarTreePreprocessThrottler);
+          _segmentPreprocessThrottler);
       addSegment(segment);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -1050,8 +1045,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory.copyTo(indexDir);
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema, _segmentPreprocessThrottler,
-            _segmentStarTreePreprocessThrottler);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema, _segmentPreprocessThrottler);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);

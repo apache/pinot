@@ -40,6 +40,7 @@ import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
@@ -98,10 +99,8 @@ public class BaseTableDataManagerTest {
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
-  static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(2, 4,
-      true);
-  static final SegmentStarTreePreprocessThrottler SEGMENT_STARTREE_PREPROCESS_THROTTLER =
-      new SegmentStarTreePreprocessThrottler(2);
+  static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(
+      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2));
 
   @BeforeClass
   public void setUp()
@@ -663,7 +662,7 @@ public class BaseTableDataManagerTest {
     SegmentLocks segmentLocks = new SegmentLocks();
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, helixManager, segmentLocks, DEFAULT_TABLE_CONFIG, null, null,
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     return tableDataManager;
   }
 

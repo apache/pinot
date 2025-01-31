@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -73,10 +74,9 @@ public class LoaderTest {
   private static final String VECTOR_INDEX_COL_NAME = "vector1";
   private static final int VECTOR_DIM_SIZE = 512;
 
-  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(1, 2,
-      true);
-  private static final SegmentStarTreePreprocessThrottler SEGMENT_STARTREE_PREPROCESS_THROTTLER =
-      new SegmentStarTreePreprocessThrottler(1);
+  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER =
+      new SegmentPreprocessThrottler(new SegmentAllIndexPreprocessThrottler(1, 2, true),
+          new SegmentStarTreePreprocessThrottler(1));
 
   private File _avroFile;
   private File _vectorAvroFile;
@@ -171,8 +171,7 @@ public class LoaderTest {
     }
 
     // The segment is in v3 format now, not leading to reprocess.
-    ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
 
     // Need to reset `segmentDirectory` to point to the correct index directory after the above load since the path
     // changes
@@ -190,15 +189,13 @@ public class LoaderTest {
     indexSegment.destroy();
 
     // Set segment version to v1, should not convert the segment
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
 
     // Set segment version to v3, should convert the segment to v3
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
@@ -210,12 +207,11 @@ public class LoaderTest {
     Schema schema = constructV1Segment();
 
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema,
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     testBuiltInVirtualColumns(indexSegment);
     indexSegment.destroy();
 
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
     testBuiltInVirtualColumns(indexSegment);
     indexSegment.destroy();
   }
@@ -239,13 +235,12 @@ public class LoaderTest {
     schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
 
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema,
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
 
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema, SEGMENT_PREPROCESS_THROTTLER);
     assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
@@ -261,7 +256,7 @@ public class LoaderTest {
     FieldSpec byteMetric = new MetricFieldSpec(newColumnName, FieldSpec.DataType.BYTES, defaultValue);
     schema.addField(byteMetric);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema,
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
         defaultValue);
     indexSegment.destroy();
@@ -308,7 +303,7 @@ public class LoaderTest {
     TableConfig tableConfig = createTableConfigWithFSTIndex(null);
     Schema schema = createSchema();
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -326,7 +321,7 @@ public class LoaderTest {
     // is same as the version of segment on disk (V3)
     tableConfig = createTableConfigWithFSTIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -364,7 +359,7 @@ public class LoaderTest {
     // be able to create fst index reader with on-disk version V1
     tableConfig = createTableConfigWithFSTIndex(null);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -382,7 +377,7 @@ public class LoaderTest {
     // is same as the version of segment on fisk
     tableConfig = createTableConfigWithFSTIndex(SegmentVersion.v1);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -400,7 +395,7 @@ public class LoaderTest {
     // is different than the version of segment on disk
     tableConfig = createTableConfigWithFSTIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // the index dir should exist in v3 format due to conversion
@@ -472,7 +467,7 @@ public class LoaderTest {
     TableConfig tableConfig = createTableConfigWithForwardIndexDisabled(null, false);
     Schema schema = createSchema();
     ImmutableSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
@@ -488,7 +483,7 @@ public class LoaderTest {
     // is same as the version of segment on disk (V3)
     tableConfig = createTableConfigWithForwardIndexDisabled(SegmentVersion.v3, false);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
@@ -518,7 +513,7 @@ public class LoaderTest {
     // be able to create all index readers with on-disk version V1
     tableConfig = createTableConfigWithForwardIndexDisabled(null, false);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
@@ -533,7 +528,7 @@ public class LoaderTest {
     // is same as the version of segment on fisk
     tableConfig = createTableConfigWithForwardIndexDisabled(SegmentVersion.v1, false);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
@@ -548,7 +543,7 @@ public class LoaderTest {
     // is different than the version of segment on disk
     tableConfig = createTableConfigWithForwardIndexDisabled(SegmentVersion.v3, false);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     assertNull(indexSegment.getForwardIndex(NO_FORWARD_INDEX_COL_NAME));
@@ -632,7 +627,7 @@ public class LoaderTest {
     TableConfig tableConfig = createTableConfigWithTextIndex(null);
     Schema schema = createSchema();
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
@@ -661,7 +656,7 @@ public class LoaderTest {
     // is same as the version of segment on disk (V3)
     tableConfig = createTableConfigWithTextIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
@@ -711,7 +706,7 @@ public class LoaderTest {
     // be able to create text index reader with on-disk version V1
     tableConfig = createTableConfigWithTextIndex(null);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -737,7 +732,7 @@ public class LoaderTest {
     // is same as the version of segment on fisk
     tableConfig = createTableConfigWithTextIndex(SegmentVersion.v1);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -763,7 +758,7 @@ public class LoaderTest {
     // is different than the version of segment on disk
     tableConfig = createTableConfigWithTextIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // the index dir should exist in v3 format due to conversion
@@ -848,7 +843,7 @@ public class LoaderTest {
     TableConfig tableConfig = createTableConfigWithVectorIndex(null);
     Schema schema = createVectorSchema();
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
@@ -869,7 +864,7 @@ public class LoaderTest {
     // is same as the version of segment on disk (V3)
     tableConfig = createTableConfigWithVectorIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // no change/conversion should have happened in indexDir
@@ -911,7 +906,7 @@ public class LoaderTest {
     // be able to create vector index reader with on-disk version V1
     tableConfig = createTableConfigWithVectorIndex(null);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -931,7 +926,7 @@ public class LoaderTest {
     // is same as the version of segment on fisk
     tableConfig = createTableConfigWithVectorIndex(SegmentVersion.v1);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v1
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1);
     // no change/conversion should have happened in indexDir
@@ -951,7 +946,7 @@ public class LoaderTest {
     // is different than the version of segment on disk
     tableConfig = createTableConfigWithVectorIndex(SegmentVersion.v3);
     indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(tableConfig, schema),
-        SEGMENT_PREPROCESS_THROTTLER, SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER);
     // check that loaded segment version is v3
     assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3);
     // the index dir should exist in v3 format due to conversion

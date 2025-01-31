@@ -18,172 +18,40 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.base.Preconditions;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Used to throttle the total concurrent index rebuilds that can happen on a given Pinot server.
+ * Contains all the segment preprocess throttlers used to control the total index rebuilds that can happen on a given
+ * Pinot server. For now this class supports index rebuild throttling at the following levels:
+ * - All index throttling
+ * - StarTree index throttling
  * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
  */
-public class SegmentPreprocessThrottler extends BaseSegmentPreprocessThrottler {
+public class SegmentPreprocessThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessThrottler.class);
 
-  /**
-   * _maxPreprocessConcurrency and _maxConcurrentPreprocessesBeforeServingQueries must be > 0. To effectively disable
-   * throttling, this can be set to a very high value
-   */
-  private int _maxPreprocessConcurrency;
-  private int _maxPreprocessConcurrencyBeforeServingQueries;
-  private boolean _isServingQueries;
+  SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
+  SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
 
   /**
-   * @param maxPreprocessConcurrency configured preprocessing concurrency
-   * @param maxPreprocessConcurrencyBeforeServingQueries configured preprocessing concurrency before serving queries
-   * @param isServingQueries whether the server is ready to serve queries or not
+   * Constructor for SegmentPreprocessThrottler
+   * @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
+   * @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
    */
-  public SegmentPreprocessThrottler(int maxPreprocessConcurrency, int maxPreprocessConcurrencyBeforeServingQueries,
-      boolean isServingQueries) {
-    // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
-    // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
-    // server is starting up.
-    super(isServingQueries ? maxPreprocessConcurrency : maxPreprocessConcurrencyBeforeServingQueries, LOGGER);
-    LOGGER.info("Initializing SegmentPreprocessThrottler, maxPreprocessConcurrency: {}, "
-            + "maxPreprocessConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
-        maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries);
-    // Still checking both values are > 0 since only one will be utilized to initialize the sempahore, still want to
-    // ensure the other config is valid
-    Preconditions.checkArgument(maxPreprocessConcurrency > 0,
-        "Max preprocess parallelism must be > 0, but found to be: " + maxPreprocessConcurrency);
-    Preconditions.checkArgument(maxPreprocessConcurrencyBeforeServingQueries > 0,
-        "Max preprocess parallelism before serving queries must be > 0, but found to be: "
-            + maxPreprocessConcurrencyBeforeServingQueries);
-
-    _maxPreprocessConcurrency = maxPreprocessConcurrency;
-    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
-    _isServingQueries = isServingQueries;
-
-    if (!isServingQueries) {
-      LOGGER.info("Serving queries is disabled, using preprocess concurrency as: {}",
-          _maxPreprocessConcurrencyBeforeServingQueries);
-    }
+  public SegmentPreprocessThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
+      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler) {
+    LOGGER.info("Initializing SegmentPreprocessThrottler");
+    _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
+    _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
   }
 
-  public synchronized void startServingQueries() {
-    LOGGER.info("Serving queries is to be enabled, reset throttling threshold for segment preprocess concurrency, "
-        + "total permits: {}, available permits: {}", totalPermits(), availablePermits());
-    _isServingQueries = true;
-    _semaphore.setPermits(_maxPreprocessConcurrency);
-    LOGGER.info("Reset throttling completed, new concurrency: {}, total permits: {}, available permits: {}",
-        _maxPreprocessConcurrency, totalPermits(), availablePermits());
+  public SegmentAllIndexPreprocessThrottler getSegmentAllIndexPreprocessThrottler() {
+    return _segmentAllIndexPreprocessThrottler;
   }
 
-  @Override
-  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (CollectionUtils.isEmpty(changedConfigs)) {
-      LOGGER.info("Skip updating SegmentPreprocessThrottler configs with unchanged clusterConfigs");
-      return;
-    }
-
-    LOGGER.info("Updating SegmentPreprocessThrottler configs with latest clusterConfigs");
-    handleMaxPreprocessConcurrencyChange(changedConfigs, clusterConfigs);
-    handleMaxPreprocessConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs);
-    LOGGER.info("Updated SegmentPreprocessThrottler configs with latest clusterConfigs");
-  }
-
-  private void handleMaxPreprocessConcurrencyChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM)) {
-      LOGGER.info("changedConfigs list indicates maxPreprocessConcurrency was not updated, skipping updates");
-      return;
-    }
-
-    String configName = CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM;
-    String defaultConfigValue = CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM;
-    String maxParallelSegmentPreprocessesStr =
-        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
-
-    int maxPreprocessConcurrency;
-    try {
-      maxPreprocessConcurrency = Integer.parseInt(maxParallelSegmentPreprocessesStr);
-    } catch (Exception e) {
-      LOGGER.warn("Invalid maxPreprocessConcurrency set: {}, not making change, fix config and try again",
-          maxParallelSegmentPreprocessesStr);
-      return;
-    }
-
-    if (maxPreprocessConcurrency <= 0) {
-      LOGGER.warn("maxPreprocessConcurrency: {} must be > 0, not making change, fix config and try again",
-          maxPreprocessConcurrency);
-      return;
-    }
-
-    if (maxPreprocessConcurrency == _maxPreprocessConcurrency) {
-      LOGGER.info("No ZK update for maxPreprocessConcurrency {}, total permits: {}", _maxPreprocessConcurrency,
-          totalPermits());
-      return;
-    }
-
-    LOGGER.info("Updated maxPreprocessConcurrency from: {} to: {}", _maxPreprocessConcurrency,
-        maxPreprocessConcurrency);
-    _maxPreprocessConcurrency = maxPreprocessConcurrency;
-
-    if (!_isServingQueries) {
-      LOGGER.info("Serving queries hasn't been enabled yet, not updating the permits with maxPreprocessConcurrency");
-      return;
-    }
-    _semaphore.setPermits(_maxPreprocessConcurrency);
-    LOGGER.info("Updated total permits: {}", totalPermits());
-  }
-
-  private void handleMaxPreprocessConcurrencyBeforeServingQueriesChange(Set<String> changedConfigs,
-      Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(
-        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)) {
-      LOGGER.info("changedConfigs list indicates maxPreprocessConcurrencyBeforeServingQueries was not updated, "
-          + "skipping updates");
-      return;
-    }
-
-    String configName = CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
-    String defaultConfigValue = CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES;
-    String maxParallelSegmentPreprocessesBeforeServingQueriesStr =
-        clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
-
-    int maxPreprocessConcurrencyBeforeServingQueries;
-    try {
-      maxPreprocessConcurrencyBeforeServingQueries =
-          Integer.parseInt(maxParallelSegmentPreprocessesBeforeServingQueriesStr);
-    } catch (Exception e) {
-      LOGGER.warn("Invalid maxPreprocessConcurrencyBeforeServingQueries set: {}, not making change, fix config and "
-              + "try again", maxParallelSegmentPreprocessesBeforeServingQueriesStr);
-      return;
-    }
-
-    if (maxPreprocessConcurrencyBeforeServingQueries <= 0) {
-      LOGGER.warn("maxPreprocessConcurrencyBeforeServingQueries: {} must be > 0, not making change, fix config "
-          + "and try again", maxPreprocessConcurrencyBeforeServingQueries);
-      return;
-    }
-
-    if (maxPreprocessConcurrencyBeforeServingQueries == _maxPreprocessConcurrencyBeforeServingQueries) {
-      LOGGER.info("No ZK update for maxPreprocessConcurrencyBeforeServingQueries {}, total permits: {}",
-          _maxPreprocessConcurrencyBeforeServingQueries, totalPermits());
-      return;
-    }
-
-    LOGGER.info("Updated maxPreprocessConcurrencyBeforeServingQueries from: {} to: {}",
-        _maxPreprocessConcurrencyBeforeServingQueries, maxPreprocessConcurrencyBeforeServingQueries);
-    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
-    if (!_isServingQueries) {
-      LOGGER.info("maxPreprocessConcurrencyBeforeServingQueries was updated before serving queries was enabled, "
-          + "updating the permits");
-      _semaphore.setPermits(_maxPreprocessConcurrencyBeforeServingQueries);
-      LOGGER.info("Updated total permits: {}", totalPermits());
-    }
+  public SegmentStarTreePreprocessThrottler getSegmentStarTreePreprocessThrottler() {
+    return _segmentStarTreePreprocessThrottler;
   }
 }

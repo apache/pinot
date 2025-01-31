@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -82,10 +83,8 @@ public class TableIndexingTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "TableIndexingTest");
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(2, 4,
-      true);
-  private static final SegmentStarTreePreprocessThrottler SEGMENT_STARTREE_PREPROCESS_THROTTLER =
-      new SegmentStarTreePreprocessThrottler(1);
+  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(
+      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(1));
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";
   public static final String COLUMN_MONTH_NAME = "$col$MONTH";
@@ -675,8 +674,7 @@ public class TableIndexingTest {
     File indexDir = createSegment(tableConfig, schema, segmentName, rows);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER,
-        SEGMENT_STARTREE_PREPROCESS_THROTTLER);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, SEGMENT_PREPROCESS_THROTTLER);
 
     Map<String, Map<String, Integer>> map = new HashMap<>();
     addColumnIndexStats(segment, COLUMN_NAME, map);
