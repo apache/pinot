@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
@@ -43,10 +44,13 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
  *   <li>
  *     For BIG_DECIMAL:
  *     <ul>
- *       <li>Remove trailing zeros</li>
+ *       <li>Strip trailing zeros</li>
  *     </ul>
  *   </li>
  * </ul>
+ * <p>This transformation is required to ensure that the value is equal to itself, and the ordering of the values is
+ * consistent with equals. This is required for certain data structures (e.g. sorted map) and algorithm (e.g. binary
+ * search) to work correctly. Read more about it in {@link Comparable}.
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that we already have the values complying
  * with the schema before handling special values and before {@link NullValueTransformer} so that it transforms
  * all the null values properly.
@@ -60,9 +64,9 @@ public class SpecialValueTransformer implements RecordTransformer {
   public SpecialValueTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
-        FieldSpec.DataType dataType = fieldSpec.getDataType();
-        if (dataType == FieldSpec.DataType.FLOAT || dataType == FieldSpec.DataType.DOUBLE
-            || dataType == FieldSpec.DataType.BIG_DECIMAL) {
+        DataType dataType = fieldSpec.getDataType();
+        if (dataType == DataType.FLOAT || dataType == DataType.DOUBLE
+            || (dataType == DataType.BIG_DECIMAL && !fieldSpec.isAllowTrailingZeros())) {
           _columnsToCheck.add(fieldSpec.getName());
         }
       }
