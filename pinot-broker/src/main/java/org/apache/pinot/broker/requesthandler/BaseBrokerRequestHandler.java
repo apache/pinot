@@ -291,12 +291,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
-    _queriesById.put(requestId, query);
-    if (isQueryCancellationEnabled() && StringUtils.isNotBlank(clientRequestId)) {
-      _clientQueryIds.put(requestId, clientRequestId);
-      LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
-    } else {
-      LOGGER.debug("Keep track of running query: {}", requestId);
+    if (isQueryCancellationEnabled()) {
+      _queriesById.put(requestId, query);
+      if (StringUtils.isNotBlank(clientRequestId)) {
+        _clientQueryIds.put(requestId, clientRequestId);
+        LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
+      } else {
+        LOGGER.debug("Keep track of running query: {}", requestId);
+      }
     }
   }
 
