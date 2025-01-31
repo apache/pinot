@@ -246,7 +246,7 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.28.0</jline.version>
+    <jline.version>3.29.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.0.1</nimbus-jose-jwt.version>
