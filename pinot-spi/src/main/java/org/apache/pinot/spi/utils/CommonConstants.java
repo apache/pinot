@@ -224,7 +224,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
     public static final String CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS =
         "pinot.helix.instance.state.maxStateTransitions";
-    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "1000";
+    public static final String DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS = "100000";
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
