@@ -100,7 +100,7 @@ public class BaseTableDataManagerTest {
       new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension(STRING_COLUMN, DataType.STRING)
           .addMetric(LONG_COLUMN, DataType.LONG).build();
   static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(
-      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2));
+      new SegmentAllIndexPreprocessThrottler(2, 4, true), new SegmentStarTreePreprocessThrottler(2, 4, true));
 
   @BeforeClass
   public void setUp()

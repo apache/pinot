@@ -642,7 +642,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int maxStarTreePreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
-    _segmentStarTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency);
+    int maxStarTreePreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    _segmentStarTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
+        maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(_segmentAllIndexPreprocessThrottler,
         _segmentStarTreePreprocessThrottler);
     ServerConf serverConf = new ServerConf(_serverConf);
@@ -779,7 +784,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
-    _segmentAllIndexPreprocessThrottler.startServingQueries();
+    _segmentPreprocessThrottler.startServingQueries();
   }
 
   @Override

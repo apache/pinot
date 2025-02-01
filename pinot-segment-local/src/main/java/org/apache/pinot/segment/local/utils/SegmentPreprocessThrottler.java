@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * Contains all the segment preprocess throttlers used to control the total index rebuilds that can happen on a given
@@ -28,12 +25,13 @@ import org.slf4j.LoggerFactory;
  * - All index throttling
  * - StarTree index throttling
  * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
+ * The throttlers passed in for now cannot be 'null', instead for code paths that do not need throttling, this object
+ * itself will be passed in as 'null'.
  */
 public class SegmentPreprocessThrottler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessThrottler.class);
 
-  SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
-  SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
+  private final SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
+  private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
 
   /**
    * Constructor for SegmentPreprocessThrottler
@@ -42,7 +40,6 @@ public class SegmentPreprocessThrottler {
    */
   public SegmentPreprocessThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
       SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler) {
-    LOGGER.info("Initializing SegmentPreprocessThrottler");
     _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
     _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
   }
@@ -53,5 +50,10 @@ public class SegmentPreprocessThrottler {
 
   public SegmentStarTreePreprocessThrottler getSegmentStarTreePreprocessThrottler() {
     return _segmentStarTreePreprocessThrottler;
+  }
+
+  public void startServingQueries() {
+    _segmentAllIndexPreprocessThrottler.startServingQueries();
+    _segmentStarTreePreprocessThrottler.startServingQueries();
   }
 }

@@ -146,7 +146,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
 
   private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER =
       new SegmentPreprocessThrottler(new SegmentAllIndexPreprocessThrottler(2, 4, true),
-          new SegmentStarTreePreprocessThrottler(1));
+          new SegmentStarTreePreprocessThrottler(1, 2, true));
 
   private final File _avroFile;
   private final Schema _schema;

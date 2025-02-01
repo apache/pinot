@@ -76,7 +76,7 @@ public class LoaderTest {
 
   private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER =
       new SegmentPreprocessThrottler(new SegmentAllIndexPreprocessThrottler(1, 2, true),
-          new SegmentStarTreePreprocessThrottler(1));
+          new SegmentStarTreePreprocessThrottler(1, 2, true));
 
   private File _avroFile;
   private File _vectorAvroFile;
