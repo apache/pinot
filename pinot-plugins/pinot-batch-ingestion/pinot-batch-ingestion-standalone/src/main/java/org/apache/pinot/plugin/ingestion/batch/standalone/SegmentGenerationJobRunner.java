@@ -223,6 +223,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
 
   private void submitSegmentGenTask(File localTempDir, URI inputFileURI, int seqId)
       throws Exception {
+        
 
     //create localTempDir for input and output
     File localInputTempDir = new File(localTempDir, "input");
@@ -265,6 +266,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentName = taskRunner.run();
         // Tar segment directory to compress file
         localSegmentDir = new File(localOutputTempDir, segmentName);
+        String segmentFileName = segmentName + ".tar.gz";
         String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
         localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
