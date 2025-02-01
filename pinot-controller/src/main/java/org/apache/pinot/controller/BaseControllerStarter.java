@@ -487,8 +487,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
-    _pinotLLCRealtimeSegmentManager =
-        new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
+    _pinotLLCRealtimeSegmentManager = createPinotLLCRealtimeSegmentManager();
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
@@ -621,6 +620,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+  }
+
+  protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
+    return new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
   }
 
   /**

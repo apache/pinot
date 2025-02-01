@@ -245,6 +245,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =
         "pinot.beta.multistage.engine.max.server.query.threads";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS = "-1";
+
+    // Preprocess throttle configs
+    public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
+        "pinot.server.max.segment.preprocess.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM = String.valueOf(100);
+    // Before serving queries is enabled, we should use a higher preprocess parallelism to process segments faster
+    public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.preprocess.parallelism.before.serving.queries";
+    // Use the below default before enabling queries on the server
+    public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES = String.valueOf(100);
   }
 
   public static class Broker {
@@ -264,7 +274,14 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES = "pinot.broker.query.rewriter.class.names";
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
+    public static final String CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT =
+        "pinot.broker.default.query.limit";
+
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+
+    // -1 means no limit; value of 10 aligns limit with PinotQuery's defaults.
+    public static final int DEFAULT_BROKER_QUERY_LIMIT = 10;
+
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =

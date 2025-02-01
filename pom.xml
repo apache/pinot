@@ -148,7 +148,7 @@
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
-    <swagger-ui.version>5.18.2</swagger-ui.version>
+    <swagger-ui.version>5.18.3</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
@@ -175,8 +175,8 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.5</aws.sdk.version>
-    <azure.sdk.version>1.2.30</azure.sdk.version>
+    <aws.sdk.version>2.30.10</aws.sdk.version>
+    <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
@@ -204,7 +204,7 @@
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-beanutils.version>1.10.0</commons-beanutils.version>
     <commons-io.version>2.18.0</commons-io.version>
-    <commons-codec.version>1.17.2</commons-codec.version>
+    <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
@@ -228,7 +228,7 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.3.2</httpcore5.version>
+    <httpcore5.version>5.3.3</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
@@ -246,11 +246,11 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.28.0</jline.version>
+    <jline.version>3.29.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>10.0.1</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.2</dnsjava.version>
+    <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
     <curator.version>5.7.1</curator.version>
@@ -276,7 +276,7 @@
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>
     <mockito-core.version>5.15.2</mockito-core.version>
-    <equalsverifier.version>3.18.1</equalsverifier.version>
+    <equalsverifier.version>3.18.2</equalsverifier.version>
     <testcontainers.version>1.20.4</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
@@ -1597,12 +1597,12 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.27ea0</version>
+        <version>2.27ea1</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.27ea1</version>
+        <version>2.27ea2</version>
       </dependency>
 
       <dependency>
@@ -2454,7 +2454,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.1</version>
+            <version>10.21.2</version>
           </dependency>
         </dependencies>
         <executions>

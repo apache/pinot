@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -123,6 +125,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     startZk();
     startController();
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    // Set max segment preprocess parallelism to 10
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(10));
     startBroker();
     startServers(2);
     startKafka();

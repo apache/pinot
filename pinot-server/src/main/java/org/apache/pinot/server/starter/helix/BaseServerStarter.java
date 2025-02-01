@@ -80,6 +80,7 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -153,6 +154,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
+  protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
   @Override
@@ -242,6 +245,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -621,8 +626,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    int maxPreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
+    int maxPreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxPreprocessConcurrency,
+        maxPreprocessConcurrencyBeforeServingQueries, false);
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -643,6 +657,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
+
+    LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
+    try {
+      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+    }
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentPreprocessThrottler);
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -745,6 +767,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
+    _segmentPreprocessThrottler.startServingQueries();
   }
 
   @Override
