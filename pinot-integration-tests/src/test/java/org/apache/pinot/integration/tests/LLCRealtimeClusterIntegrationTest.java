@@ -428,10 +428,22 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName());
+    testForceCommitInternal(jobId, consumingSegments, 60000L);
+  }
+
+  @Test
+  public void testForceCommitInBatches()
+      throws Exception {
+    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
+    String jobId = forceCommit(getTableName(), 1, 5, 210);
+    testForceCommitInternal(jobId, consumingSegments, 240000L);
+  }
+
+  private void testForceCommitInternal(String jobId, Set<String> consumingSegments, long timeoutMs) {
     Map<String, String> jobMetadata =
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
     assert jobMetadata != null;
-    assert jobMetadata.get("segmentsForceCommitted") != null;
+    assert jobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST) != null;
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -446,7 +458,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       } catch (Exception e) {
         return false;
       }
-    }, 60000L, "Error verifying force commit operation on table!");
+    }, timeoutMs, "Error verifying force commit operation on table!");
   }
 
   public Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
@@ -489,6 +501,15 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   private String forceCommit(String tableName)
       throws Exception {
     String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
+    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+  }
+
+  private String forceCommit(String tableName, int batchSize, int batchIntervalSec, int batchTimeoutSec)
+      throws Exception {
+    String response =
+        sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize
+                + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec,
+            null);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 

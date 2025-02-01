@@ -28,11 +28,15 @@ import java.net.URI;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -74,6 +78,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
+import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -115,7 +120,9 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptFailureException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1934,13 +1941,124 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit) {
+      @Nullable String segmentsToCommit, ForceCommitBatchConfig batchConfig) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
-    sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
+    int batchSize = batchConfig.getBatchSize();
+    if (batchSize >= targetConsumingSegments.size()) {
+      // No need to divide segments in batches.
+      sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
+    } else {
+      List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+      executor.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType, batchConfig));
+      executor.shutdown();
+    }
     return targetConsumingSegments;
+  }
+
+  private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
+      ForceCommitBatchConfig forceCommitBatchConfig) {
+    Set<String> prevBatch = null;
+    for (Set<String> segmentBatchToCommit : segmentBatchList) {
+      if (prevBatch != null) {
+        waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
+      }
+      sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
+      prevBatch = segmentBatchToCommit;
+    }
+  }
+
+  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+      ForceCommitBatchConfig forceCommitBatchConfig) {
+    int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
+    int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
+
+    try {
+      Thread.sleep(batchStatusCheckIntervalMs);
+    } catch (InterruptedException e) {
+      LOGGER.error("Exception occurred while waiting for the forceCommit of segments: {}", segmentBatchToCommit, e);
+      throw new RuntimeException(e);
+    }
+
+    int maxAttempts = (batchStatusCheckTimeoutMs + batchStatusCheckIntervalMs - 1) / batchStatusCheckIntervalMs;
+    RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
+    Set<?>[] segmentsYetToBeCommitted = new Set[1];
+    try {
+      retryPolicy.attempt(() -> {
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        return segmentsYetToBeCommitted[0].isEmpty();
+      });
+    } catch (AttemptFailureException e) {
+      String errorMsg = String.format(
+          "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
+              + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
+    }
+
+    LOGGER.info("segmentBatch: {} successfully force committed", segmentBatchToCommit);
+  }
+
+  @VisibleForTesting
+  List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments, int batchSize) {
+    int numSegments = targetConsumingSegments.size();
+    List<Set<String>> segmentBatchList = new ArrayList<>((numSegments + batchSize - 1) / batchSize);
+
+    Map<String, Queue<String>> instanceToConsumingSegments =
+        getInstanceToConsumingSegments(idealState, targetConsumingSegments);
+
+    Set<String> segmentsAdded = Sets.newHashSetWithExpectedSize(numSegments);
+    Set<String> currentBatch = Sets.newHashSetWithExpectedSize(batchSize);
+    Collection<Queue<String>> instanceSegmentsCollection = instanceToConsumingSegments.values();
+
+    while (!instanceSegmentsCollection.isEmpty()) {
+      Iterator<Queue<String>> instanceCollectionIterator = instanceSegmentsCollection.iterator();
+      // Pick segments in round-robin fashion to parallelize forceCommit across max servers
+      while (instanceCollectionIterator.hasNext()) {
+        Queue<String> consumingSegments = instanceCollectionIterator.next();
+        String segmentName = consumingSegments.poll();
+        if (consumingSegments.isEmpty()) {
+          instanceCollectionIterator.remove();
+        }
+        if (!segmentsAdded.add(segmentName)) {
+          // There might be a segment replica hosted on another instance added before
+          continue;
+        }
+        currentBatch.add(segmentName);
+        if (currentBatch.size() == batchSize) {
+          segmentBatchList.add(currentBatch);
+          currentBatch = Sets.newHashSetWithExpectedSize(batchSize);
+        }
+      }
+    }
+
+    if (!currentBatch.isEmpty()) {
+      segmentBatchList.add(currentBatch);
+    }
+    return segmentBatchList;
+  }
+
+  @VisibleForTesting
+  Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
+      Set<String> targetConsumingSegments) {
+    Map<String, Queue<String>> instanceToConsumingSegments = new HashMap<>();
+    Map<String, Map<String, String>> segmentNameToInstanceToStateMap = idealState.getRecord().getMapFields();
+
+    for (String segmentName: targetConsumingSegments) {
+      Map<String, String> instanceToStateMap = segmentNameToInstanceToStateMap.get(segmentName);
+
+      for (Map.Entry<String, String> instanceToState : instanceToStateMap.entrySet()) {
+        String instance = instanceToState.getKey();
+        String state = instanceToState.getValue();
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          instanceToConsumingSegments.computeIfAbsent(instance, k -> new LinkedList<>()).add(segmentName);
+        }
+      }
+    }
+    return instanceToConsumingSegments;
   }
 
   /**
