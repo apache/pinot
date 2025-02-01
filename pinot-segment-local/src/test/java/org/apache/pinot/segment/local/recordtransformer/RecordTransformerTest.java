@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,23 +49,35 @@ import static org.testng.Assert.*;
 public class RecordTransformerTest {
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       // For data type conversion
-      .addSingleValueDimension("svInt", DataType.INT).addSingleValueDimension("svLong", DataType.LONG)
-      .addSingleValueDimension("svFloat", DataType.FLOAT).addSingleValueDimension("svDouble", DataType.DOUBLE)
-      .addSingleValueDimension("svBoolean", DataType.BOOLEAN).addSingleValueDimension("svTimestamp", DataType.TIMESTAMP)
-      .addSingleValueDimension("svBytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT)
-      .addSingleValueDimension("svJson", DataType.JSON).addMultiValueDimension("mvLong", DataType.LONG)
-      .addMultiValueDimension("mvFloat", DataType.FLOAT).addMultiValueDimension("mvDouble", DataType.DOUBLE)
+      .addSingleValueDimension("svInt", DataType.INT)
+      .addSingleValueDimension("svLong", DataType.LONG)
+      .addSingleValueDimension("svFloat", DataType.FLOAT)
+      .addSingleValueDimension("svDouble", DataType.DOUBLE)
+      .addSingleValueDimension("svBoolean", DataType.BOOLEAN)
+      .addSingleValueDimension("svTimestamp", DataType.TIMESTAMP)
+      .addSingleValueDimension("svBytes", DataType.BYTES)
+      .addMultiValueDimension("mvInt", DataType.INT)
+      .addSingleValueDimension("svJson", DataType.JSON)
+      .addMultiValueDimension("mvLong", DataType.LONG)
+      .addMultiValueDimension("mvFloat", DataType.FLOAT)
+      .addMultiValueDimension("mvDouble", DataType.DOUBLE)
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
-      .addMultiValueDimension("mvString1", DataType.STRING).addMultiValueDimension("mvString2", DataType.STRING)
+      .addMultiValueDimension("mvString1", DataType.STRING)
+      .addMultiValueDimension("mvString2", DataType.STRING)
       // For negative zero and NaN conversions
       .addSingleValueDimension("svFloatNegativeZero", DataType.FLOAT)
       .addMultiValueDimension("mvFloatNegativeZero", DataType.FLOAT)
       .addSingleValueDimension("svDoubleNegativeZero", DataType.DOUBLE)
       .addMultiValueDimension("mvDoubleNegativeZero", DataType.DOUBLE)
-      .addSingleValueDimension("svFloatNaN", DataType.FLOAT).addMultiValueDimension("mvFloatNaN", DataType.FLOAT)
-      .addSingleValueDimension("svDoubleNaN", DataType.DOUBLE).addMultiValueDimension("mvDoubleNaN", DataType.DOUBLE)
+      .addSingleValueDimension("svFloatNaN", DataType.FLOAT)
+      .addMultiValueDimension("mvFloatNaN", DataType.FLOAT)
+      .addSingleValueDimension("svDoubleNaN", DataType.DOUBLE)
+      .addMultiValueDimension("mvDoubleNaN", DataType.DOUBLE)
+      .addMetric("bigDecimalZero", DataType.BIG_DECIMAL)
+      .addMetric("bigDecimalZeroWithPoint", DataType.BIG_DECIMAL)
+      .addMetric("bigDecimalZeroWithExponent", DataType.BIG_DECIMAL)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
@@ -105,6 +118,9 @@ public class RecordTransformerTest {
     record.putValue("svDoubleNaN", Double.NaN);
     record.putValue("mvFloatNaN", new Float[]{-0.0f, Float.NaN, 2.0f});
     record.putValue("mvDoubleNaN", new Double[]{-0.0d, Double.NaN, 2.0d});
+    record.putValue("bigDecimalZero", new BigDecimal("0"));
+    record.putValue("bigDecimalZeroWithPoint", new BigDecimal("0.0"));
+    record.putValue("bigDecimalZeroWithExponent", new BigDecimal("0E-18"));
     return record;
   }
 
@@ -187,7 +203,8 @@ public class RecordTransformerTest {
   @Test
   public void testDataTypeTransformerIncorrectDataTypes() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.BYTES)
-        .addSingleValueDimension("svLong", DataType.LONG).build();
+        .addSingleValueDimension("svLong", DataType.LONG)
+        .build();
 
     RecordTransformer transformer = new DataTypeTransformer(TABLE_CONFIG, schema);
     GenericRow record = getRecord();
@@ -365,8 +382,7 @@ public class RecordTransformerTest {
     // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
     schema = SCHEMA;
     schema.getFieldSpecFor("svJson").setMaxLength(10);
-    schema.getFieldSpecFor("svJson")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    schema.getFieldSpecFor("svJson").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -378,8 +394,7 @@ public class RecordTransformerTest {
     // scenario where json field exceeds max length and fieldSpec maxLengthExceedStrategy is to TRIM_LENGTH
     schema = SCHEMA;
     schema.getFieldSpecFor("svJson").setMaxLength(10);
-    schema.getFieldSpecFor("svJson")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+    schema.getFieldSpecFor("svJson").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -417,17 +432,16 @@ public class RecordTransformerTest {
         record = transformer.transform(record);
       } catch (Exception e) {
         assertTrue(e instanceof IllegalStateException);
-        assertEquals(e.getMessage(), "Throwing exception as value: "
-            + "{\"first\": \"daffy\", \"last\": \"duck\"} for column "
-            + "svJson exceeds configured max length 10.");
+        assertEquals(e.getMessage(),
+            "Throwing exception as value: {\"first\": \"daffy\", \"last\": \"duck\"} for column svJson exceeds "
+                + "configured max length 10.");
       }
     }
 
     // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to NO_ACTION
     schema = SCHEMA;
     schema.getFieldSpecFor("svBytes").setMaxLength(2);
-    schema.getFieldSpecFor("svBytes")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    schema.getFieldSpecFor("svBytes").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -439,8 +453,7 @@ public class RecordTransformerTest {
     // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to TRIM_LENGTH
     schema = SCHEMA;
     schema.getFieldSpecFor("svBytes").setMaxLength(2);
-    schema.getFieldSpecFor("svBytes")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+    schema.getFieldSpecFor("svBytes").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -468,8 +481,7 @@ public class RecordTransformerTest {
     // scenario where bytes field exceeds max length and fieldSpec maxLengthExceedStrategy is to ERROR
     schema = SCHEMA;
     schema.getFieldSpecFor("svBytes").setMaxLength(2);
-    schema.getFieldSpecFor("svBytes")
-        .setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+    schema.getFieldSpecFor("svBytes").setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
     transformer = new SanitizationTransformer(schema);
     record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
@@ -477,8 +489,8 @@ public class RecordTransformerTest {
         record = transformer.transform(record);
       } catch (Exception e) {
         assertTrue(e instanceof IllegalStateException);
-        assertEquals(e.getMessage(), "Throwing exception as value: 7b7b for column svBytes "
-            + "exceeds configured max length 2.");
+        assertEquals(e.getMessage(),
+            "Throwing exception as value: 7b7b for column svBytes exceeds configured max length 2.");
       }
     }
   }
@@ -500,8 +512,9 @@ public class RecordTransformerTest {
       assertNull(record.getValue("svDoubleNaN"));
       assertEquals(record.getValue("mvFloatNaN"), new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"), new Double[]{0.0d, 2.0d});
-      assertEquals(transformer.getNegativeZeroConversionCount(), 6);
-      assertEquals(transformer.getNanConversionCount(), 4);
+      assertEquals(record.getValue("bigDecimalZero"), BigDecimal.ZERO);
+      assertEquals(record.getValue("bigDecimalZeroWithPoint"), BigDecimal.ZERO);
+      assertEquals(record.getValue("bigDecimalZeroWithExponent"), BigDecimal.ZERO);
     }
   }
 
@@ -513,21 +526,24 @@ public class RecordTransformerTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
         .addSingleValueDimension("svDouble", DataType.DOUBLE)
         .addSingleValueDimension("expressionTestColumn", DataType.INT)
-        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN", DataType.FLOAT)
+        .addSingleValueDimension("svNaN", DataType.FLOAT)
+        .addMultiValueDimension("mvNaN", DataType.FLOAT)
         .addSingleValueDimension("emptyDimensionForNullValueTransformer", DataType.FLOAT)
         .addSingleValueDimension("svStringNull", DataType.STRING)
         .addSingleValueDimension("indexableExtras", DataType.JSON)
-        .addDateTime("timeCol", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS").build();
+        .addDateTime("timeCol", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
-            .setTimeColumnName("timeCol").build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setIngestionConfig(ingestionConfig)
+        .setTimeColumnName("timeCol")
+        .build();
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123 AND svDouble <= 200"));
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
     ingestionConfig.setSchemaConformingTransformerConfig(
-        new SchemaConformingTransformerConfig(null, "indexableExtras", false, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        new SchemaConformingTransformerConfig(null, "indexableExtras", false, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, null, null, null));
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setContinueOnError(false);
 
@@ -858,10 +874,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
       assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
       assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
-      assertEquals(record.getValue("mvFloatNaN"),
-          new Float[]{0.0f, 2.0f});
-      assertEquals(record.getValue("mvDoubleNaN"),
-          new Double[]{0.0d, 2.0d});
+      assertEquals(record.getValue("mvFloatNaN"), new Float[]{0.0f, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"), new Double[]{0.0d, 2.0d});
       assertEquals(new ArrayList<>(record.getNullValueFields()),
           new ArrayList<>(Arrays.asList("svFloatNaN", "svDoubleNaN")));
     }
