@@ -1686,17 +1686,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
       _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
           : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
-    } catch (Exception e) {
+    } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _partitionGroupConsumerSemaphore.release();
+      _acquiredConsumerSemaphore.set(false);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
-          "Failed to initialize segment data manager", e));
+          "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
            + " to initialization error: '{}'",
-          e.getMessage());
+          t.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
       // invoke controller API mark it OFFLINE in the idealstate.
@@ -1714,7 +1715,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
       }).start();
-      throw e;
+      throw t;
     }
   }
 
