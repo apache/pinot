@@ -300,7 +300,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.INTERNAL_ERROR_CODE, errMsg);
+      return TransferableBlockUtils.getErrorTransferableBlock(QException.INTERNAL_ERROR_CODE, errMsg);
     }
 
     @Override

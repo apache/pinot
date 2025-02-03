@@ -20,6 +20,7 @@ package org.apache.pinot.common.response.broker;
 
 import java.io.IOException;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.spi.exception.QException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -43,10 +44,7 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
-    Assert.assertEquals(actual.getExceptions().get(0).getErrorCode(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(actual.getExceptions().get(0).getMessage(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
+    Assert.assertEquals(actual.getExceptions().get(0).getErrorCode(), QException.BROKER_RESOURCE_MISSING_ERROR_CODE);
   }
 
   @Test
@@ -58,9 +56,7 @@ public class BrokerResponseNativeTest {
     String brokerString = expected.toJsonString();
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
+        QException.BROKER_RESOURCE_MISSING_ERROR_CODE);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
   }

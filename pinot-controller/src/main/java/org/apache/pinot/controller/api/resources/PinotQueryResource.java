@@ -109,11 +109,11 @@ public class PinotQueryResource {
     try {
       requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
     } catch (Exception e) {
-      return constructQueryExceptionResponse(QueryException.JSON_PARSING_ERROR_CODE, e.getMessage());
+      return constructQueryExceptionResponse(QException.JSON_PARSING_ERROR_CODE, e.getMessage());
     }
     if (!requestJson.has("sql")) {
-      return constructQueryExceptionResponse(QueryException.getException(QueryException.JSON_PARSING_ERROR,
-          "JSON Payload is missing the query string field 'sql'"));
+      return constructQueryExceptionResponse(QException.JSON_PARSING_ERROR_CODE,
+          "JSON Payload is missing the query string field 'sql'");
     }
     String sqlQuery = requestJson.get("sql").asText();
     String traceEnabled = "false";
@@ -236,7 +236,7 @@ public class PinotQueryResource {
     try {
       tableNames = queryEnvironment.getTableNamesForQuery(query);
     } catch (QException e) {
-      if (e.getErrorCode() != QueryException.UNKNOWN_ERROR_CODE) {
+      if (e.getErrorCode() != QException.UNKNOWN_ERROR_CODE) {
         throw e;
       } else {
         throw new QException(QException.SQL_PARSING_ERROR_CODE, e);
@@ -423,8 +423,6 @@ public class PinotQueryResource {
   public void sendPostRaw(String urlStr, String requestStr, Map<String, String> headers, OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
-      LOGGER.info("Sending a post request to the controller - {}");
-
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
       conn.setDoOutput(true);

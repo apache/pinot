@@ -39,6 +39,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -110,7 +111,7 @@ public class MailboxReceiveOperatorTest {
         System.currentTimeMillis() + 100L)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+      assertTrue(block.getExceptions().containsKey(QException.EXECUTION_TIMEOUT_ERROR_CODE));
     }
   }
 
@@ -146,7 +147,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
   }
 
@@ -201,7 +202,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
   }
 

@@ -185,9 +185,9 @@ public class QueryEnvironment {
       DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
       return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
-      throw new RuntimeException("Error composing query plan for '" + sqlQuery + "': " + e.getMessage() + "'", e);
+      throw calciteContextToQException(e);
     } catch (Throwable t) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+      throw new QException("Error composing query plan for: " + sqlQuery, t);
     }
   }
 
@@ -271,11 +271,7 @@ public class QueryEnvironment {
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (CalciteContextException e) {
-      int errorCode = QException.QUERY_VALIDATION_ERROR_CODE;
-      if (e.getMessage() != null && e.getMessage().contains("Column") && e.getMessage().contains("not found")) {
-        errorCode = QException.UNKNOWN_COLUMN_ERROR_CODE;
-      }
-      throw new QException(errorCode, "Error composing query plan: " + e.getMessage(), e);
+      throw calciteContextToQException(e);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
@@ -467,6 +463,14 @@ public class QueryEnvironment {
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
     return hepProgramBuilder.build();
+  }
+
+  private QException calciteContextToQException(CalciteContextException e) {
+    int errorCode = QException.QUERY_PLANNING_ERROR_CODE;
+    if (e.getMessage() != null && e.getMessage().contains("Column") && e.getMessage().contains("not found")) {
+      errorCode = QException.UNKNOWN_COLUMN_ERROR_CODE;
+    }
+    return new QException(errorCode, "Error composing query plan: " + e.getMessage(), e);
   }
 
   public static ImmutableQueryEnvironment.Config.Builder configBuilder() {

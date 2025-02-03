@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -76,7 +77,7 @@ public class CombineErrorOperatorsTest {
     assertNotNull(processingExceptions);
     assertEquals(processingExceptions.size(), 1);
     ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
+    assertEquals(processingException.getErrorCode(), QException.QUERY_EXECUTION_ERROR_CODE);
     assertTrue(processingException.getMessage().contains("java.lang.RuntimeException: Exception"));
   }
 
@@ -95,7 +96,7 @@ public class CombineErrorOperatorsTest {
     assertNotNull(processingExceptions);
     assertEquals(processingExceptions.size(), 1);
     ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
+    assertEquals(processingException.getErrorCode(), QException.QUERY_EXECUTION_ERROR_CODE);
     assertTrue(processingException.getMessage().contains("java.lang.Error: Error"));
   }
 
@@ -115,7 +116,7 @@ public class CombineErrorOperatorsTest {
     assertNotNull(processingExceptions);
     assertEquals(processingExceptions.size(), 1);
     ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
+    assertEquals(processingException.getErrorCode(), QException.QUERY_EXECUTION_ERROR_CODE);
     String message = processingException.getMessage();
     assertTrue(message.contains("java.lang.RuntimeException: Exception") || message.contains("java.lang.Error: Error"));
   }

@@ -37,6 +37,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.mockito.Mock;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -470,7 +471,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected ERROR block from window overflow");
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("reach number of rows limit"));
   }
 

@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -339,9 +340,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode pinotResponse = postQuery(query);
     int expectedStatusCode;
     if (useMultiStageQueryEngine) {
-      expectedStatusCode = QueryException.UNKNOWN_COLUMN_ERROR_CODE;
+      expectedStatusCode = QException.UNKNOWN_COLUMN_ERROR_CODE;
     } else {
-      expectedStatusCode = QueryException.SQL_PARSING_ERROR_CODE;
+      expectedStatusCode = QException.SQL_PARSING_ERROR_CODE;
     }
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);

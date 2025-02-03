@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -183,9 +183,9 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       // - Connection refused
       // - Connection reset
       // - Channel is inactive
-      assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
+      assertEquals(firstException.get("errorCode").intValue(), QException.BROKER_REQUEST_SEND_ERROR_CODE);
       JsonNode secondException = exceptions.get(1);
-      assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
+      assertEquals(secondException.get("errorCode").intValue(), QException.SERVER_NOT_RESPONDING_ERROR_CODE);
     } else {
       assertEquals(queryResult.get("resultTable").get("rows").get(0).get(0).longValue(), getCountStarResult());
       assertTrue(queryResult.get("exceptions").isEmpty());

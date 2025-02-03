@@ -114,7 +114,7 @@ public final class DataBlockUtils {
       return getErrorDataBlock(Collections.singletonMap(((QException) e).getErrorCode(), e.getMessage()));
     } else {
       // TODO: Pass in meaningful error code.
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
+      return getErrorDataBlock(Collections.singletonMap(QException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
     }
   }
 

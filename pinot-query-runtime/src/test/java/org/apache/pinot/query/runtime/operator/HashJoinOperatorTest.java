@@ -34,6 +34,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
@@ -440,7 +441,7 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
+    assertTrue(block.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -464,7 +465,7 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
+    assertTrue(block.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
   }
 
   @Test
@@ -492,9 +493,9 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("Cannot build in memory hash table"));
   }
 
@@ -556,9 +557,9 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("Cannot process join"));
   }
 

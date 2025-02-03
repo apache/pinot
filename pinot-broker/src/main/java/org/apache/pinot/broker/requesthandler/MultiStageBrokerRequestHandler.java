@@ -145,8 +145,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       LOGGER.info("Request {} failed as HTTP request", requestId, e);
       throw e;
     } catch (QException e) {
-      // a _yellow_ error (see handleRequestFailing javadoc)
-      LOGGER.info("Request {} failed as Pinot exception", requestId, e);
+      if (isYellowError(e)) {
+        // a _yellow_ error (see handleRequestFailing javadoc)
+        LOGGER.warn("Request {} failed with exception", requestId, e);
+      } else {
+        // a _green_ error (see handleRequestFailing javadoc)
+        LOGGER.info("Request {} failed with exception message {}", e.getMessage(), requestId);
+      }
       BrokerResponseNative brokerResponseNative = new BrokerResponseNative(e.getErrorCode(), e.getMessage());
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
@@ -166,10 +171,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     for (QueryProcessingException ex : exs) {
       switch (ex.getErrorCode()) {
-        case QueryException.QUERY_VALIDATION_ERROR_CODE:
+        case QException.QUERY_VALIDATION_ERROR_CODE:
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
           break;
-        case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
+        case QException.UNKNOWN_COLUMN_ERROR_CODE:
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
           break;
       }
@@ -182,10 +187,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    * The query may be a select or an explain and it can fail finish in the following ways:
    * <ul>
    *   <li>Successfully, the BrokerResponse will contain no errors</li>
-   *   <li>With green error, the BrokerResponse will contain error messages.
+   *   <li>With green error, the BrokerResponse will contain error messages or the method throws a QException that
+   *   is not considered a {@link #isYellowError(QException) yellow error}.
    *   In that case, it is understood that the request failed in a controlled way. The error message will be sent
    *   to the user and these error messages will be logged without stack trace.</li>
-   *   <li>With yellow error, the method fails throwing either a QException or a WebApplicationException.
+   *   <li>With yellow error, the method fails throwing either a WebApplicationException or a QException that
+   *   is considered a {@link #isYellowError(QException) yellow error}.
    *   In that case, it is understood that the request failed in a controlled but infrequent way.
    *   The exception message will be sent to the user and these exception will be logged with stack trace.</li>
    *   <li>With red error, the method fails throwing any other RuntimeException.
@@ -242,7 +249,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw e;
     } catch (RuntimeException e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      throw new QException(QueryException.QUERY_PLANNING_ERROR_CODE, e);
+      throw new QException(QException.QUERY_PLANNING_ERROR_CODE, e);
     }
   }
 
@@ -357,7 +364,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     // Validate QPS quota
     if (hasExceededQPSQuota(queryEnvConf.getDatabase(), tableNames, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
-      throw new QException(QueryException.TOO_MANY_REQUESTS_ERROR_CODE, errorMessage);
+      throw new QException(QException.TOO_MANY_REQUESTS_ERROR_CODE, errorMessage);
     }
 
     long queryTimeoutMs = getTimeout(queryOptions);
@@ -387,7 +394,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       } catch (QException e) {
         // this is a case we may want to log as a warning, because it is unexpected
         if (e.getErrorCode() == QException.INTERNAL_ERROR_CODE || e.getErrorCode() == QException.UNKNOWN_ERROR_CODE) {
-          LOGGER.warn("Request {} failed in the query dispatcher on an unexpected way", requestId, e);
+          LOGGER.warn("Request {} failed in the query dispatcher on an unexpected way", requestId);
         }
         // In other cases (ie something that fail in a server), we don't need the stack trace in the broker log
         // given that the server log will have it.
@@ -511,7 +518,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (!tableAuthorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      requestContext.setErrorCode(QException.ACCESS_DENIED_ERROR_CODE);
     }
 
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
@@ -526,13 +533,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       RequestContext requestContext) {
     if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
       LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
-      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+      requestContext.setErrorCode(QException.TOO_MANY_REQUESTS_ERROR_CODE);
       return true;
     }
     for (String tableName : tableNames) {
       if (!_queryQuotaManager.acquire(tableName)) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
-        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+        requestContext.setErrorCode(QException.TOO_MANY_REQUESTS_ERROR_CODE);
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return true;
@@ -580,5 +587,22 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
     return setOfStrings.stream().limit(limit)
         .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
+  }
+
+  public static boolean isYellowError(QException e) {
+    switch (e.getErrorCode()) {
+      case QException.QUERY_EXECUTION_ERROR_CODE:
+      case QException.QUERY_SCHEDULING_TIMEOUT_ERROR_CODE:
+      case QException.EXECUTION_TIMEOUT_ERROR_CODE:
+      case QException.INTERNAL_ERROR_CODE:
+      case QException.UNKNOWN_ERROR_CODE:
+      case QException.MERGE_RESPONSE_ERROR_CODE:
+      case QException.BROKER_TIMEOUT_ERROR_CODE:
+      case QException.BROKER_REQUEST_SEND_ERROR_CODE:
+      case QException.SERVER_NOT_RESPONDING_ERROR_CODE:
+        return true;
+      default:
+        return false;
+    }
   }
 }

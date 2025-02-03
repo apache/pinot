@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -506,24 +507,24 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueryExceptions()
       throws Exception {
-    testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
+    testQueryException("POTATO", QException.SQL_PARSING_ERROR_CODE);
 
     // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
     testQueryException("SELECT COUNT(*) FROM potato",
         useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+            ? QException.QUERY_PLANNING_ERROR_CODE : QException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
 
     testQueryException("SELECT POTATO(ArrTime) FROM mytable",
         useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_VALIDATION_ERROR_CODE);
+            ? QException.QUERY_PLANNING_ERROR_CODE : QException.QUERY_VALIDATION_ERROR_CODE);
 
     // ArrTime expects a numeric type
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
+        QException.QUERY_VALIDATION_ERROR_CODE);
 
     // Cannot use numeric aggregate function for string column
     testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
+        QException.QUERY_VALIDATION_ERROR_CODE);
   }
 
   private void testQueryException(String query, int errorCode)

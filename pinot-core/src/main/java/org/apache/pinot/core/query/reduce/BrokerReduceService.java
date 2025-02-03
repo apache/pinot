@@ -40,6 +40,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -126,7 +127,7 @@ public class BrokerReduceService extends BaseReduceService {
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
       brokerResponseNative.addException(
-          new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+          new QueryProcessingException(QException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
     }
 
     // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the
@@ -161,7 +162,7 @@ public class BrokerReduceService extends BaseReduceService {
               groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
-          new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
+          new QueryProcessingException(QException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));
     }
     QueryContext queryContext;
     if (brokerRequest == serverBrokerRequest) {

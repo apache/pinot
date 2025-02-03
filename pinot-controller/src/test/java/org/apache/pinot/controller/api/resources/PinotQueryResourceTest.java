@@ -26,6 +26,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QException;
 import org.mockito.AdditionalAnswers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -66,7 +67,7 @@ public class PinotQueryResourceTest {
     String response = streamingOutputToString(
         _pinotQueryResource.handleGetSql("WITH tmp AS (SELECT * FROM a) SELECT * FROM tmp", null, null, null)
     );
-    Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
+    Assert.assertTrue(response.contains(String.valueOf(QException.SQL_PARSING_ERROR_CODE)));
     Assert.assertTrue(response.contains("retry the query using the multi-stage query engine"));
   }
 
@@ -75,7 +76,7 @@ public class PinotQueryResourceTest {
     String response = streamingOutputToString(
         _pinotQueryResource.handleGetSql("INVALID QUERY", null, null, null)
     );
-    Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
+    Assert.assertTrue(response.contains(String.valueOf(QException.SQL_PARSING_ERROR_CODE)));
     Assert.assertFalse(response.contains("retry the query using the multi-stage query engine"));
   }
 

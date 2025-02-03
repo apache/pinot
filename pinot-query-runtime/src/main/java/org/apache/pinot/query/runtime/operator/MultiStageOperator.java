@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
@@ -105,6 +106,10 @@ public abstract class MultiStageOperator
         String errMsg = "Operator " + getExplainName() + " on stage " + _context.getStageId() + " timed out";
         logger().warn(errMsg, e);
         nextBlock = TransferableBlockUtils.getErrorTransferableBlock(QException.EXECUTION_TIMEOUT_ERROR_CODE, errMsg);
+      } catch (QException e) {
+        nextBlock = onPinotError(e.getErrorCode(), e);
+      } catch (ProcessingException e) {
+        nextBlock = onPinotError(e.getErrorCode(), e);
       } catch (Exception e) {
         String errMsg = "Operator " + getExplainName() + " on stage " + _context.getStageId() + " failed";
         logger().warn(errMsg, e);
@@ -116,6 +121,37 @@ public abstract class MultiStageOperator
         logger().debug("Operator {}. Block of type {} ready to send", _operatorId, nextBlock.getType());
       }
       return nextBlock;
+    }
+  }
+
+  private TransferableBlock onPinotError(int errorCode, Exception e) {
+    String errMsg = "Operator " + getExplainName() + " on stage " + _context.getStageId() + " failed: "
+        + e.getMessage();
+    if (logWithStackTrace(errorCode)) {
+      logger().warn(errMsg, e);
+    } else {
+      logger().warn(errMsg);
+    }
+    return TransferableBlockUtils.getErrorTransferableBlock(errorCode, errMsg);
+  }
+
+  private static boolean logWithStackTrace(int errorCode) {
+    switch (errorCode) {
+      case QException.EXECUTION_TIMEOUT_ERROR_CODE:
+      case QException.BROKER_TIMEOUT_ERROR_CODE:
+      case QException.BROKER_RESOURCE_MISSING_ERROR_CODE:
+      case QException.BROKER_INSTANCE_MISSING_ERROR_CODE:
+      case QException.BROKER_REQUEST_SEND_ERROR_CODE:
+      case QException.SERVER_NOT_RESPONDING_ERROR_CODE:
+      case QException.TOO_MANY_REQUESTS_ERROR_CODE:
+      case QException.INTERNAL_ERROR_CODE:
+      case QException.MERGE_RESPONSE_ERROR_CODE:
+      case QException.QUERY_VALIDATION_ERROR_CODE:
+      case QException.QUERY_PLANNING_ERROR_CODE:
+      case QException.UNKNOWN_ERROR_CODE:
+        return true;
+      default:
+        return false;
     }
   }
 

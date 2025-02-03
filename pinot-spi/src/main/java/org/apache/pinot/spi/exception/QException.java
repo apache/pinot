@@ -98,7 +98,7 @@ public class QException extends PinotRuntimeException {
   }
 
   public QException(int errorCode, Throwable cause) {
-    super(cause);
+    super(cause.getMessage(), cause);
     _errorCode = errorCode;
   }
 
