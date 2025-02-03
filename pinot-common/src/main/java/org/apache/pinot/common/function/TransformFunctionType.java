@@ -94,6 +94,7 @@ public enum TransformFunctionType {
 
   // CASE WHEN function parsed as 'CASE_WHEN'
   CASE("case"),
+  TEXT_MATCH("textMatch", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
 
   // date type conversion functions
   CAST("cast"),

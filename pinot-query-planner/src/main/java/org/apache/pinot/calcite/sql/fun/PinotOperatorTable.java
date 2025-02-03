@@ -273,7 +273,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
    */
   private static final List<SqlOperator> PINOT_OPERATORS = List.of(
       // Placeholder for special predicates
-      new PinotSqlFunction("TEXT_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("TEXT_CONTAINS", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("JSON_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("VECTOR_SIMILARITY", ReturnTypes.BOOLEAN,
