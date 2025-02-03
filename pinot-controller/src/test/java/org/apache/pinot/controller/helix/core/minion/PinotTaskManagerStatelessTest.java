@@ -193,7 +193,9 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       throws Exception {
     testValidateTaskGeneration(taskManager -> {
       String taskName = "SegmentGenerationAndPushTask";
-      TaskSchedulingContext context = new TaskSchedulingContext("myTable", taskName);
+      TaskSchedulingContext context = new TaskSchedulingContext()
+          .setTablesToSchedule(Collections.singleton("myTable"))
+          .setTasksToSchedule(Collections.singleton(taskName));
       // Validate schedule tasks for table when task queue is in stopped state
       TaskSchedulingInfo info = taskManager.scheduleTasks(context).get(taskName);
       assertNotNull(info);

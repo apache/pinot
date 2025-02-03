@@ -109,13 +109,16 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
   public void testFirstSegmentRefresh() {
     // This will create the inverted index as we disable inverted index creation during segment push.
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(offlineTableName)))
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
@@ -129,8 +132,10 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     }
 
     // This should be no-op as nothing changes.
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Get the value in segment metadata
       Map<String, String> customMap = metadata.getCustomMap();
@@ -154,13 +159,16 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     schema.getFieldSpecFor("DestAirportID").setDataType(FieldSpec.DataType.STRING);
     addSchema(schema);
 
-    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(offlineTableName)))
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     waitForServerSegmentDownload(aVoid -> {
@@ -233,13 +241,16 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     updateTableConfig(tableConfig);
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(offlineTableName)))
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     waitForServerSegmentDownload(aVoid -> {
@@ -324,13 +335,16 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
-    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(offlineTableName)))
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains processed times.
@@ -402,13 +416,16 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
 
     updateTableConfig(tableConfig);
 
-    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(offlineTableName)))
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName)))
         .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
     assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
     // Will not schedule task if there's incomplete task
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
@@ -424,8 +441,10 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     }
 
     // This should be no-op as nothing changes.
-    MinionTaskTestUtils.assertNoTaskSchedule(
-        new TaskSchedulingContext(offlineTableName, MinionConstants.RefreshSegmentTask.TASK_TYPE), _taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(offlineTableName))
+            .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+        _taskManager);
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Get the value in segment metadata
       Map<String, String> customMap = metadata.getCustomMap();

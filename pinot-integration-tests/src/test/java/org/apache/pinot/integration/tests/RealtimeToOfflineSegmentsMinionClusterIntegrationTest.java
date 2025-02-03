@@ -232,13 +232,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(_realtimeTableName)))
+      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName)))
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext(_realtimeTableName,
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE), _taskManager);
+      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName))
+              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+          _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark, _realtimeTableName);
@@ -284,13 +287,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext(List.of(_realtimeTableName)))
+      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName)))
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext(_realtimeTableName,
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE), _taskManager);
+      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName))
+              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+          _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark, _realtimeMetadataTableName);
