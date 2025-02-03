@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.tsdb.spi.plan;
 
+import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -33,6 +35,8 @@ public class LeafTimeSeriesPlanNodeTest {
   private static final String TABLE = "myTable";
   private static final String TIME_COLUMN = "orderTime";
   private static final TimeUnit TIME_UNIT = TimeUnit.SECONDS;
+  private static final int SERIES_LIMIT = 10;
+  private static final Map<String, String> QUERY_OPTIONS = ImmutableMap.of("numGroupsLimit", "100000");
 
   @Test
   public void testGetEffectiveFilter() {
@@ -44,7 +48,7 @@ public class LeafTimeSeriesPlanNodeTest {
     {
       LeafTimeSeriesPlanNode planNode =
           new LeafTimeSeriesPlanNode(ID, Collections.emptyList(), TABLE, TIME_COLUMN, TIME_UNIT, 0L, "", "value_col",
-              new AggInfo("SUM", false, null), Collections.singletonList("cityName"));
+              new AggInfo("SUM", false, null), Collections.singletonList("cityName"), SERIES_LIMIT, QUERY_OPTIONS);
       assertEquals(planNode.getEffectiveFilter(timeBuckets),
           "orderTime > " + expectedStartTimeInFilter + " AND orderTime <= " + expectedEndTimeInFilter);
     }
@@ -52,7 +56,7 @@ public class LeafTimeSeriesPlanNodeTest {
     {
       LeafTimeSeriesPlanNode planNode =
           new LeafTimeSeriesPlanNode(ID, Collections.emptyList(), TABLE, TIME_COLUMN, TIME_UNIT, 123L, "", "value_col",
-              new AggInfo("SUM", false, null), Collections.singletonList("cityName"));
+              new AggInfo("SUM", false, null), Collections.singletonList("cityName"), SERIES_LIMIT, QUERY_OPTIONS);
       assertEquals(planNode.getEffectiveFilter(timeBuckets),
           "orderTime > " + (expectedStartTimeInFilter - 123) + " AND orderTime <= " + (expectedEndTimeInFilter - 123));
     }
@@ -60,7 +64,8 @@ public class LeafTimeSeriesPlanNodeTest {
     {
       LeafTimeSeriesPlanNode planNode =
           new LeafTimeSeriesPlanNode(ID, Collections.emptyList(), TABLE, TIME_COLUMN, TIME_UNIT, 123L, nonEmptyFilter,
-              "value_col", new AggInfo("SUM", false, Collections.emptyMap()), Collections.singletonList("cityName"));
+              "value_col", new AggInfo("SUM", false, Collections.emptyMap()), Collections.singletonList("cityName"),
+              SERIES_LIMIT, QUERY_OPTIONS);
       assertEquals(planNode.getEffectiveFilter(timeBuckets),
           String.format("(%s) AND (orderTime > %s AND orderTime <= %s)", nonEmptyFilter,
               (expectedStartTimeInFilter - 123), (expectedEndTimeInFilter - 123)));
@@ -70,7 +75,7 @@ public class LeafTimeSeriesPlanNodeTest {
       LeafTimeSeriesPlanNode planNode =
           new LeafTimeSeriesPlanNode(ID, Collections.emptyList(), TABLE, TIME_COLUMN, TimeUnit.MILLISECONDS, 123L,
               nonEmptyFilter, "value_col", new AggInfo("SUM", false, Collections.emptyMap()),
-              Collections.singletonList("cityName"));
+              Collections.singletonList("cityName"), SERIES_LIMIT, QUERY_OPTIONS);
       assertEquals(planNode.getEffectiveFilter(timeBuckets),
           String.format("(%s) AND (orderTime > %s AND orderTime <= %s)", nonEmptyFilter,
               (expectedStartTimeInFilter * 1000 - 123 * 1000), (expectedEndTimeInFilter * 1000 - 123 * 1000)));
