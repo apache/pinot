@@ -45,6 +45,7 @@ import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -120,6 +121,8 @@ public class S3PinotFS extends BasePinotFS {
         AwsBasicCredentials awsBasicCredentials =
             AwsBasicCredentials.create(s3Config.getAccessKey(), s3Config.getSecretKey());
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
+      } else if (s3Config.isAnonymousCredentialsProvider()) {
+        awsCredentialsProvider = AnonymousCredentialsProvider.create();
       } else {
         awsCredentialsProvider = DefaultCredentialsProvider.builder().build();
       }

@@ -72,7 +72,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws IOException {
 
     // create avro schema
@@ -124,7 +124,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         fileWriter.append(record);
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 
   @Override

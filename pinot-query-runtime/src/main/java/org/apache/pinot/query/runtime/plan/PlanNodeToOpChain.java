@@ -49,6 +49,7 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MinusAllOperator;
 import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
@@ -180,7 +181,12 @@ public class PlanNodeToOpChain {
       MultiStageOperator rightOperator = visit(right, context);
       JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
       if (joinStrategy == JoinNode.JoinStrategy.HASH) {
-        return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+        if (node.getLeftKeys().isEmpty()) {
+          // TODO: Consider adding non-equi as a separate join strategy.
+          return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+        } else {
+          return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+        }
       } else {
         assert joinStrategy == JoinNode.JoinStrategy.LOOKUP;
         return new LookupJoinOperator(context, leftOperator, rightOperator, node);

@@ -126,6 +126,22 @@
         "sql": "SET stageParallelism=2; SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
       },
       {
+        "description": "Broadcast JOIN",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with partition hint",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with parallelism",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Broadcast JOIN with partition hint and parallelism",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+      },
+      {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.num, {tbl1}.name FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ WHERE {tbl2}.val IN ('xxx', 'yyy'))"
       },
@@ -567,5 +583,80 @@
         "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
       }
     ]
-  }
+  },
+  "hint_option_replicated_table": {
+  "tables": {
+    "tbl1" : {
+      "schema": [
+        {"name": "num", "type": "INT"},
+        {"name": "name", "type": "STRING"}
+      ],
+      "inputs": [
+        [1, "a"],
+        [2, "b"],
+        [3, "c"],
+        [3, "yyy"],
+        [4, "e"],
+        [4, "e"],
+        [6, "e"],
+        [7, "d"],
+        [7, "f"],
+        [8, "z"]
+      ],
+      "partitionColumns": [
+        "num"
+      ]
+    },
+    "tbl2" : {
+      "schema": [
+        {"name": "num", "type": "INT"},
+        {"name": "val", "type": "STRING"}
+      ],
+      "inputs": [
+        [1, "xxx"],
+        [1, "xxx"],
+        [3, "yyy"],
+        [3, "zzz"],
+        [5, "zzz"],
+        [6, "e"],
+        [7, "d"],
+        [8, "z"]
+      ],
+      "replicated": true
+    }
+  },
+  "queries": [
+    {
+      "description": "Broadcast JOIN",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with partition hint",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Broadcast JOIN with partition hint and parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with partition hint",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Local replicated JOIN with partition hint and parallelism",
+      "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    }
+  ]}
 }

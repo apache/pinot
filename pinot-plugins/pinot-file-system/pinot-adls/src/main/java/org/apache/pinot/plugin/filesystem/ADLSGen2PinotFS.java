@@ -480,6 +480,10 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws Exception {
     LOGGER.debug("copyToLocalFile is called with srcUri='{}', dstFile='{}'", srcUri, dstFile);
+
+    // Create parent directories if they don't exist.
+    FileUtils.forceMkdir(dstFile.getParentFile());
+
     if (dstFile.exists()) {
       if (dstFile.isDirectory()) {
         FileUtils.deleteDirectory(dstFile);

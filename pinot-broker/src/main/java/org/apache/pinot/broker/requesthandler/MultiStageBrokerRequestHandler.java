@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,9 +45,11 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -64,6 +67,7 @@ import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -214,8 +218,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
-    Set<String> tableNames = queryPlanResult.getTableNames();
 
+    Set<QueryServerInstance> servers = new HashSet<>();
+    for (DispatchablePlanFragment planFragment: dispatchableSubPlan.getQueryStageList()) {
+      servers.addAll(planFragment.getServerInstances());
+    }
+
+    Set<String> tableNames = queryPlanResult.getTableNames();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_GLOBAL, 1);
     for (String tableName : tableNames) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.MULTI_STAGE_QUERIES, 1);
@@ -242,10 +251,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     Timer queryTimer = new Timer(queryTimeoutMs);
+    int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
-      if (!_queryThrottler.tryAcquire(queryTimeoutMs, TimeUnit.MILLISECONDS)) {
+      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimeoutMs, TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
@@ -273,11 +283,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       } catch (Throwable t) {
+        ProcessingException queryException = QueryException.QUERY_EXECUTION_ERROR;
+        if (t instanceof QueryInfoException
+            && ((QueryInfoException) t).getProcessingException().equals(QueryException.QUERY_VALIDATION_ERROR)) {
+          // provide more specific error code if available
+          queryException = QueryException.QUERY_VALIDATION_ERROR;
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+        }
+
         String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
         LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
-        requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
+        requestContext.setErrorCode(queryException.getErrorCode());
         return new BrokerResponseNative(
-            QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
+            QueryException.getException(queryException, consolidatedMessage));
       } finally {
         Tracing.getThreadAccountant().clear();
       }
@@ -288,8 +306,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setTablesQueried(tableNames);
-      // TODO: Add servers queried/responded stats
       brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
+      // MSE cannot finish if a single queried server did not respond, so we can use the same count for
+      // both the queried and responded stats. Minus one prevents the broker to be included in the count
+      // (it will always be included because of the root of the query plan)
+      brokerResponse.setNumServersQueried(servers.size() - 1);
+      brokerResponse.setNumServersResponded(servers.size() - 1);
 
       // Attach unavailable segments
       int numUnavailableSegments = 0;
@@ -322,7 +344,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       return brokerResponse;
     } finally {
-      _queryThrottler.release();
+      _queryThrottler.release(estimatedNumQueryThreads);
     }
   }
 

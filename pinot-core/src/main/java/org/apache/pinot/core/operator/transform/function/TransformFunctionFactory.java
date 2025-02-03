@@ -251,6 +251,9 @@ public class TransformFunctionFactory {
     // Item functions
     typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
 
+    // Time Series functions
+    typeToImplementation.put(TransformFunctionType.TIME_SERIES_BUCKET, TimeSeriesBucketTransformFunction.class);
+
     Map<String, Class<? extends TransformFunction>> registry =
         new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {

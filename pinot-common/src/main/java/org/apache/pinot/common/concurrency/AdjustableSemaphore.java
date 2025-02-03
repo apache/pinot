@@ -27,7 +27,7 @@ import java.util.concurrent.Semaphore;
  */
 public class AdjustableSemaphore extends Semaphore {
 
-  private int _totalPermits;
+  private volatile int _totalPermits;
 
   public AdjustableSemaphore(int permits) {
     super(permits);
@@ -39,7 +39,11 @@ public class AdjustableSemaphore extends Semaphore {
     _totalPermits = permits;
   }
 
-  public void setPermits(int permits) {
+  /**
+   * Sets the total number of permits to the given value without blocking.
+   * Synchronized to allow multiple threads to update permits concurrently
+   */
+  public synchronized void setPermits(int permits) {
     Preconditions.checkArgument(permits > 0, "Permits must be a positive integer");
     if (permits < _totalPermits) {
       reducePermits(_totalPermits - permits);
@@ -47,5 +51,13 @@ public class AdjustableSemaphore extends Semaphore {
       release(permits - _totalPermits);
     }
     _totalPermits = permits;
+  }
+
+  /**
+   * Returns the total number of permits (as opposed to just the number of available permits returned by
+   * {@link #availablePermits()}).
+   */
+  public int getTotalPermits() {
+    return _totalPermits;
   }
 }

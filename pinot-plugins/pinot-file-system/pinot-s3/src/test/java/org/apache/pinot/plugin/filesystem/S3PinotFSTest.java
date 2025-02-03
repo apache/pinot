@@ -41,6 +41,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -527,6 +529,9 @@ public class S3PinotFSTest {
     return S3Client.builder().region(Region.of("us-east-1"))
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("foo", "bar")))
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .endpointOverride(URI.create(endpoint)).build();
+        .endpointOverride(URI.create(endpoint))
+        .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+        .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+        .build();
   }
 }

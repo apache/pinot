@@ -133,7 +133,7 @@ public class MergeRollupTaskExecutorTest {
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
     configs.put(MinionConstants.MergeTask.MERGE_TYPE_KEY, "rollup");
-    configs.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, D1);
+    configs.put("daily." + MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, D1);
 
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, configs);
     List<SegmentConversionResult> conversionResults =
