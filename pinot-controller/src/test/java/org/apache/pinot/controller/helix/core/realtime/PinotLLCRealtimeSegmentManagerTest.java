@@ -29,11 +29,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1377,6 +1380,76 @@ public class PinotLLCRealtimeSegmentManagerTest {
         .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList);
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
+  }
+
+  @Test
+  public void testGetInstanceToConsumingSegments() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    IdealState idealState = mock(IdealState.class);
+    Map<String, Map<String, String>> map = Map.of(
+        "seg0", Map.of("i1", "CONSUMING", "i4", "ONLINE"),
+        "seg1", Map.of("i2", "CONSUMING"),
+        "seg2", Map.of("i3", "CONSUMING", "i2", "OFFLINE"),
+        "seg3", Map.of("i4", "CONSUMING", "i2", "CONSUMING", "i3", "CONSUMING"),
+        "seg4", Map.of("i5", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING")
+    );
+
+    ZNRecord znRecord = mock(ZNRecord.class);
+    when(znRecord.getMapFields()).thenReturn(map);
+    when(idealState.getRecord()).thenReturn(znRecord);
+    // Use TreeSet to ensure ordering
+    Set<String> targetConsumingSegment = new TreeSet<>(map.keySet());
+
+    Map<String, Queue<String>> instanceToConsumingSegments =
+        realtimeSegmentManager.getInstanceToConsumingSegments(idealState, targetConsumingSegment);
+    assertEquals(instanceToConsumingSegments, Map.of(
+        "i1", new LinkedList<>(List.of("seg0", "seg4")),
+        "i2", new LinkedList<>(List.of("seg1", "seg3")),
+        "i3", new LinkedList<>(List.of("seg2", "seg3", "seg4")),
+        "i4", new LinkedList<>(List.of("seg3")),
+        "i5", new LinkedList<>(List.of("seg4"))
+    ));
+  }
+
+  @Test
+  public void getSegmentBatchList() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    IdealState idealState = mock(IdealState.class);
+
+    Map<String, Map<String, String>> map = Map.of(
+        "seg0", Map.of("i1", "CONSUMING", "i4", "ONLINE"),
+        "seg1", Map.of("i2", "CONSUMING"),
+        "seg2", Map.of("i3", "CONSUMING", "i2", "OFFLINE"),
+        "seg3", Map.of("i4", "CONSUMING", "i2", "CONSUMING", "i3", "CONSUMING"),
+        "seg4", Map.of("i5", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING"),
+        "seg5", Map.of("i6", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING"),
+        "seg6", Map.of("i7", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING")
+    );
+
+    ZNRecord znRecord = mock(ZNRecord.class);
+    when(znRecord.getMapFields()).thenReturn(map);
+    when(idealState.getRecord()).thenReturn(znRecord);
+    // Use TreeSet to ensure ordering
+    Set<String> targetConsumingSegment = new TreeSet<>(map.keySet());
+
+    List<Set<String>> segmentBatchList =
+        realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, 2);
+    assertEquals(segmentBatchList, List.of(
+        Set.of("seg0", "seg1"),
+        Set.of("seg2", "seg3"),
+        Set.of("seg4", "seg5"),
+        Set.of("seg6")
+    ));
+
+    segmentBatchList = realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, 4);
+    assertEquals(segmentBatchList, List.of(
+        Set.of("seg0", "seg1", "seg2", "seg3"),
+        Set.of("seg4", "seg5", "seg6")
+    ));
   }
 
   @Test
