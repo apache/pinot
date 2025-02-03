@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api.resources;
 
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -42,7 +43,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -117,6 +120,7 @@ public class ReIngestionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReIngestionResource.class);
 
   //TODO: Make this configurable
+  private static final int MIN_REINGESTION_THREADS = 4;
   private static final int MAX_PARALLEL_REINGESTIONS = 8;
 
   // Tracks if a particular segment is currently being re-ingested
@@ -125,7 +129,9 @@ public class ReIngestionResource {
 
   // Executor for asynchronous re-ingestion
   private static final ExecutorService REINGESTION_EXECUTOR =
-      Executors.newFixedThreadPool(MAX_PARALLEL_REINGESTIONS);
+      new ThreadPoolExecutor(MIN_REINGESTION_THREADS, MAX_PARALLEL_REINGESTIONS, 0L, TimeUnit.MILLISECONDS,
+          new LinkedBlockingQueue<>(), // unbounded queue for the reingestion tasks
+          new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").build());
 
   // Keep track of jobs by jobId => job info
   private static final ConcurrentHashMap<String, ReIngestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
@@ -196,11 +202,6 @@ public class ReIngestionResource {
     String tableNameWithType = request.getTableNameWithType();
     String segmentName = request.getSegmentName();
 
-    if (RUNNING_JOBS.size() >= MAX_PARALLEL_REINGESTIONS) {
-      return Response.status(Response.Status.TOO_MANY_REQUESTS)
-          .entity("Reingestion jobs parallel limit " + MAX_PARALLEL_REINGESTIONS + " reached.").build();
-    }
-
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
@@ -231,6 +232,13 @@ public class ReIngestionResource {
     if (segmentZKMetadata == null) {
       throw new WebApplicationException("Segment metadata not found for segment: " + segmentName,
           Response.Status.NOT_FOUND);
+    }
+
+    // Check if download url is present
+    if (segmentZKMetadata.getDownloadUrl() != null) {
+      throw new WebApplicationException(
+          "Download URL is already present for segment: " + segmentName + ". No need to re-ingest.",
+          Response.Status.BAD_REQUEST);
     }
 
     // Grab start/end offsets
