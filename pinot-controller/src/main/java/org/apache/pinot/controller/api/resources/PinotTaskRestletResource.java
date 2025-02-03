@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +89,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -649,43 +651,25 @@ public class PinotTaskRestletResource {
     List<String> generationErrors = new ArrayList<>();
     List<String> schedulingErrors = new ArrayList<>();
     TaskSchedulingContext context = new TaskSchedulingContext()
-        .setTriggeredBy(PinotTaskManager.Triggers.MANUAL_TRIGGER.name())
+        .setTriggeredBy(CommonConstants.TaskTriggers.MANUAL_TRIGGER.name())
         .setMinionInstanceTag(minionInstanceTag)
         .setLeader(false);
     if (taskType != null) {
-      Map<String, Set<String>> tableToTaskNamesMap = new HashMap<>();
-      Set<String> taskTypes = new HashSet<>(1);
-      taskTypes.add(taskType);
-      // Schedule task for the given task type
-      if (tableName != null) {
-        tableToTaskNamesMap.put(DatabaseUtils.translateTableName(tableName, headers), taskTypes);
-      } else {
-        _pinotHelixResourceManager.getAllTables(database).forEach(table -> tableToTaskNamesMap.put(table, taskTypes));
-      }
-      context.setTableToTaskNamesMap(tableToTaskNamesMap);
-      TaskSchedulingInfo taskInfos = _pinotTaskManager.scheduleTasks(context).get(taskType);
-      response.put(taskType, StringUtils.join(taskInfos.getScheduledTaskNames(), ','));
-      generationErrors.addAll(taskInfos.getGenerationErrors());
-      schedulingErrors.addAll(taskInfos.getSchedulingErrors());
-    } else {
-      Map<String, Set<String>> tableToTaskNamesMap = new HashMap<>();
-      // Schedule tasks for all task types
-      if (tableName != null) {
-        tableToTaskNamesMap.put(DatabaseUtils.translateTableName(tableName, headers), null);
-      } else {
-        _pinotHelixResourceManager.getAllTables(database)
-            .forEach(table -> tableToTaskNamesMap.put(table, null));
-      }
-      context.setTableToTaskNamesMap(tableToTaskNamesMap);
-      Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
-      allTaskInfos.forEach((key, value) -> {
-        if (value.getScheduledTaskNames() != null) {
-          response.put(key, String.join(",", value.getScheduledTaskNames()));
-        }
-        generationErrors.addAll(value.getGenerationErrors());
-        schedulingErrors.addAll(value.getSchedulingErrors());
-      });
+      context.setTasksToSchedule(Collections.singleton(taskType));
     }
+    if (tableName != null) {
+      context.setTablesToSchedule(Collections.singleton(DatabaseUtils.translateTableName(tableName, headers)));
+    } else {
+      context.setDatabasesToSchedule(Collections.singleton(database));
+    }
+    Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
+    allTaskInfos.forEach((key, value) -> {
+      if (value.getScheduledTaskNames() != null) {
+        response.put(key, String.join(",", value.getScheduledTaskNames()));
+      }
+      generationErrors.addAll(value.getGenerationErrors());
+      schedulingErrors.addAll(value.getSchedulingErrors());
+    });
     response.put(GENERATION_ERRORS_KEY, String.join(",", generationErrors));
     response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
     return response;

@@ -409,7 +409,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     long expectedWatermark = 16000 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(offlineTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -526,7 +527,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     long expectedWatermark = 16000 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(offlineTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -636,7 +638,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     long expectedWatermark = 16050 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(offlineTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -789,7 +792,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(MULTI_LEVEL_CONCAT_TEST_TABLE);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(offlineTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(offlineTableName));
     List<String> taskList;
     for (String tasks = _taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -923,7 +927,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     long expectedWatermark = 16000 * 86_400_000L;
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(realtimeTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0);
@@ -1030,7 +1035,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     long[] expectedNumBucketsToProcess200Days = {0, 0, 1, 1, 0, 0, 1, 1};
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
-    TaskSchedulingContext context = new TaskSchedulingContext(List.of(realtimeTableName));
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(realtimeTableName));
     List<String> taskList;
     for (String tasks = taskManager.scheduleTasks(context)
         .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0); tasks != null;
