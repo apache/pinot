@@ -121,6 +121,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     } else {
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
+
+    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessConsumptionEnabled) {
+      _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
+    }
   }
 
   /**
@@ -176,12 +181,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
-
-    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-
-    if (isPauselessConsumptionEnabled) {
-      _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
-    }
 
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {

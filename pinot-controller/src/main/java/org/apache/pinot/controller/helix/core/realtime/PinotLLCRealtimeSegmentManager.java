@@ -2167,13 +2167,12 @@ public class PinotLLCRealtimeSegmentManager {
     for (String segmentName : segmentsInErrorState) {
       // Skip non-LLC segments or segments missing from the ideal state altogether
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      if (llcSegmentName == null || !segmentToInstanceCurrentStateMap.containsKey(segmentName)) {
+      if (llcSegmentName == null) {
         continue;
       }
 
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName);
-      // We only consider segments that are in COMMITTING which is indicated by having an endOffset
-      // but have a missing or placeholder download URL
+      // We only consider segments that are in COMMITTING state
       if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
         Map<String, String> instanceStateMap = segmentToInstanceIdealStateMap.get(segmentName);
 
@@ -2195,11 +2194,6 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
         }
-      } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
-        LOGGER.info(
-            "Segment {} in table {} is in ERROR state with download URL present. Resetting segment to ONLINE state.",
-            segmentName, tableNameWithType);
-        _helixResourceManager.resetSegment(tableNameWithType, segmentName, null);
       }
     }
   }
@@ -2225,7 +2219,7 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       for (String server : candidateServers) {
-        if (liveInstances.contains(server)) {
+        if (liveInstances.contains(server) && instanceToEndpointMap.containsKey(server)) {
           return instanceToEndpointMap.get(server);
         }
       }

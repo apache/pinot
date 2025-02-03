@@ -1305,15 +1305,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
     requestJson.put("segmentName", segmentName);
 
     String jsonPayload = JsonUtils.objectToString(requestJson);
-    SimpleHttpResponse response =
-        HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, jsonPayload));
-
-    // Check that we got a 2xx response
-    int statusCode = response.getStatusCode();
-    if (statusCode / 100 != 2) {
-      throw new IOException(String.format("Failed POST to %s, HTTP %d: %s",
-          reIngestUri, statusCode, response.getResponse()));
-    }
+    HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, jsonPayload));
   }
 
   /**
