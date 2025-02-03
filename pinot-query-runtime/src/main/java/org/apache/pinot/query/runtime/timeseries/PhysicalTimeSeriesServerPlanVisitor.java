@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -111,14 +110,16 @@ public class PhysicalTimeSeriesServerPlanVisitor {
         leafNode.getTimeUnit(), timeBuckets, leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds());
     ExpressionContext aggregation = TimeSeriesAggregationFunction.create(context.getLanguage(),
         leafNode.getValueExpression(), timeTransform, timeBuckets, leafNode.getAggInfo());
+    Map<String, String> queryOptions = new HashMap<>(leafNode.getQueryOptions());
+    queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(Math.max(0L, context.getRemainingTimeMs())));
     return new QueryContext.Builder()
         .setTableName(leafNode.getTableName())
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(List.of(aggregation))
-        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getRemainingTimeMs())))
+        .setQueryOptions(queryOptions)
         .setAliasList(Collections.emptyList())
-        .setLimit(Integer.MAX_VALUE)
+        .setLimit(leafNode.getLimit())
         .build();
   }
 
