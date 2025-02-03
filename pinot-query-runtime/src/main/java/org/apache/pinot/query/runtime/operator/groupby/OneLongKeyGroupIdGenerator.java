@@ -31,8 +31,8 @@ public class OneLongKeyGroupIdGenerator implements GroupIdGenerator {
   private int _numGroups = 0;
   private int _nullGroupId = INVALID_ID;
 
-  public OneLongKeyGroupIdGenerator(int numGroupsLimit) {
-    _groupIdMap = new Long2IntOpenHashMap();
+  public OneLongKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Long2IntOpenHashMap(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
   }

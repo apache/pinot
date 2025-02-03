@@ -87,7 +87,13 @@ public class MultistageGroupByExecutor {
     _aggType = aggType;
     _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
+
     int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    Integer mseCapacity = getMSEMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    if (mseCapacity != null) {
+      maxInitialResultHolderCapacity = mseCapacity;
+    }
+
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
@@ -109,7 +115,7 @@ public class MultistageGroupByExecutor {
 
     _groupIdGenerator =
         GroupIdGeneratorFactory.getGroupIdGenerator(_resultSchema.getStoredColumnDataTypes(), groupKeyIds.length,
-            _numGroupsLimit);
+            _numGroupsLimit, maxInitialResultHolderCapacity);
   }
 
   private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
@@ -141,6 +147,22 @@ public class MultistageGroupByExecutor {
     Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
     return maxInitialResultHolderCapacity != null ? maxInitialResultHolderCapacity
         : InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  }
+
+  private Integer getMSEMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (aggregateOptions != null) {
+        String maxInitialMSEResultHolderCapacityStr =
+            aggregateOptions.get(PinotHintOptions.AggregateOptions.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+        if (maxInitialMSEResultHolderCapacityStr != null) {
+          return Integer.parseInt(maxInitialMSEResultHolderCapacityStr);
+        }
+      }
+    }
+    // Don't return default value since null value means we need to fallback to MaxInitialResultHolderCapacity
+    return QueryOptionsUtils.getMSEMaxInitialResultHolderCapacity(opChainMetadata);
   }
 
   public int getNumGroupsLimit() {

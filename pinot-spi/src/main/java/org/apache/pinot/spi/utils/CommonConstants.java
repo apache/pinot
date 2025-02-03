@@ -501,6 +501,7 @@ public class CommonConstants {
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
+        public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
@@ -756,6 +757,8 @@ public class CommonConstants {
         "pinot.server.query.executor.group.trim.size";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+        "pinot.server.query.executor.mse.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
         "pinot.server.query.executor.min.init.indexed.table.capacity";
 

@@ -30,8 +30,8 @@ public class OneFloatKeyGroupIdGenerator implements GroupIdGenerator {
   private int _numGroups = 0;
   private int _nullGroupId = INVALID_ID;
 
-  public OneFloatKeyGroupIdGenerator(int numGroupsLimit) {
-    _groupIdMap = new Float2IntOpenHashMap();
+  public OneFloatKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Float2IntOpenHashMap(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
   }

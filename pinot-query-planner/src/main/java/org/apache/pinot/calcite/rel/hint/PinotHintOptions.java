@@ -62,6 +62,7 @@ public class PinotHintOptions {
     public static final String GROUP_TRIM_SIZE = "group_trim_size";
 
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max_initial_result_holder_capacity";
+    public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mse_max_initial_result_holder_capacity";
   }
 
   public static class WindowHintOptions {
