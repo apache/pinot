@@ -66,6 +66,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
@@ -193,7 +194,8 @@ public class ReIngestionResource {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableNameWithType);
+    RealtimeTableDataManager tableDataManager =
+        (RealtimeTableDataManager) instanceDataManager.getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
       throw new WebApplicationException("Table data manager not found for table: " + tableNameWithType,
           Response.Status.NOT_FOUND);
@@ -255,9 +257,10 @@ public class ReIngestionResource {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
         StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
-        StatelessRealtimeSegmentWriter manager = new StatelessRealtimeSegmentWriter(
-            segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata, tableConfig, schema,
-            indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, null);
+        StatelessRealtimeSegmentWriter manager =
+            new StatelessRealtimeSegmentWriter(segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata,
+                tableConfig, schema, indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr,
+                tableDataManager.getSegmentBuildSemaphore(), null);
 
         RUNNING_JOBS.put(jobId, job);
         doReIngestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);

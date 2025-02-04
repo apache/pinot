@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests.realtime;
+package org.apache.pinot.integration.tests.realtime.utils;
 
 import com.google.common.cache.Cache;
 import java.util.Map;

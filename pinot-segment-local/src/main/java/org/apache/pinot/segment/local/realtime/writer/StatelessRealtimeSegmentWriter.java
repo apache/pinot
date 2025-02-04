@@ -22,11 +22,15 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -81,6 +85,7 @@ public class StatelessRealtimeSegmentWriter {
   private static final int DEFAULT_CAPACITY = 100_000;
   private static final int DEFAULT_FETCH_TIMEOUT_MS = 5000;
 
+  private final Semaphore _segBuildSemaphore;
   private final String _segmentName;
   private final String _tableNameWithType;
   private final int _partitionGroupId;
@@ -113,9 +118,9 @@ public class StatelessRealtimeSegmentWriter {
   public StatelessRealtimeSegmentWriter(String segmentName, String tableNameWithType, int partitionGroupId,
       SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Schema schema,
       IndexLoadingConfig indexLoadingConfig, StreamConfig streamConfig, String startOffsetStr, String endOffsetStr,
-      ServerMetrics serverMetrics)
+      Semaphore segBuildSemaphore, ServerMetrics serverMetrics)
       throws Exception {
-
+    _segBuildSemaphore = segBuildSemaphore;
     _segmentName = segmentName;
     _tableNameWithType = tableNameWithType;
     _partitionGroupId = partitionGroupId;
@@ -335,7 +340,27 @@ public class StatelessRealtimeSegmentWriter {
   @VisibleForTesting
   public SegmentBuildDescriptor buildSegmentInternal() throws Exception {
     _logger.info("Building segment from {} to {}", _startOffset, _currentOffset);
+    final long startTimeMillis = now();
+    try {
+      if (_segBuildSemaphore != null) {
+        _logger.info("Trying to acquire semaphore for building segment");
+        Instant acquireStart = Instant.now();
+        int timeoutSeconds = 5;
+        while (!_segBuildSemaphore.tryAcquire(timeoutSeconds, TimeUnit.SECONDS)) {
+          _logger.warn("Could not acquire semaphore for building segment in {}",
+              Duration.between(acquireStart, Instant.now()));
+          timeoutSeconds = Math.min(timeoutSeconds * 2, 300);
+        }
+        _logger.info("Acquired semaphore for building segment");
+      }
+    } catch (InterruptedException e) {
+      String errorMessage = "Interrupted while waiting for semaphore";
+      _logger.error(errorMessage, e);
+      return null;
+    }
+
     final long lockAcquireTimeMillis = now();
+    final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
     // Build a segment from in-memory rows.
     // Use a temporary directory
     Path tempSegmentFolder = null;
@@ -364,6 +389,8 @@ public class StatelessRealtimeSegmentWriter {
       return null;
     }
     final long buildTimeMillis = now() - lockAcquireTimeMillis;
+    _logger.info("Successfully built segment (Column Mode: {}) in {} ms, after lockWaitTime {} ms",
+        converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
 
     File dataDir = _resourceDataDir;
     File indexDir = new File(dataDir, _segmentNameStr);
