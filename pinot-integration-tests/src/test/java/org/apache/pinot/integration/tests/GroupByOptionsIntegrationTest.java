@@ -74,7 +74,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
-    List<File> avroFiles = createAvroFile();
+    List<File> avroFiles = createAvroFile(_tempDir);
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
 
@@ -99,7 +99,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         .build();
   }
 
-  private List<File> createAvroFile()
+  static List<File> createAvroFile(File tempDir)
       throws IOException {
 
     // create avro schema
@@ -112,7 +112,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
 
     List<File> files = new ArrayList<>();
     for (int file = 0; file < FILES_NO; file++) {
-      File avroFile = new File(_tempDir, "data_" + file + ".avro");
+      File avroFile = new File(tempDir, "data_" + file + ".avro");
       try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
         fileWriter.create(avroSchema, avroFile);
 
@@ -126,6 +126,47 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     return files;
+  }
+
+  @Test
+  public void testOrderByKeysIsNotPushedToFinalAggregationWhenGroupTrimHintIsDisabled()
+      throws Exception {
+    String trimDisabledPlan = "Execution Plan\n"
+        + "LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[1])\n"
+        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0, 1 DESC]], isSortOnSender=[false], "
+        + "isSortOnReceiver=[true])\n"
+        + "    LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], fetch=[1])\n"
+        + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
+        + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
+        + "          LeafStageCombineOperator(table=[mytable])\n"
+        + "            StreamingInstanceResponse\n"
+        + "              CombineGroupBy\n"
+        + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
+        + "                  Project(columns=[[i, j]])\n"
+        + "                    DocIdSet(maxDocs=[40000])\n"
+        + "                      FilterMatchEntireSegment(numDocs=[80])\n";
+
+    assertResultAndPlan(
+        "",
+        " select /*+  aggOptions(is_enable_group_trim='false') */ i, j, count(*) as cnt "
+            + " from " + getTableName()
+            + " group by i, j "
+            + " order by i, j desc "
+            + " limit 1",
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"cnt\"[\"LONG\"]\n"
+            + "0,\t9,\t2",
+        trimDisabledPlan);
+
+    assertResultAndPlan(
+        "",
+        " select i, j, count(*) as cnt "
+            + " from " + getTableName()
+            + " group by i, j "
+            + " order by i, j desc "
+            + " limit 1",
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"cnt\"[\"LONG\"]\n"
+            + "0,\t9,\t2",
+        trimDisabledPlan);
   }
 
   @Test
@@ -511,7 +552,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         getExtraQueryProperties());
   }
 
-  private static @NotNull String toResultStr(JsonNode mainNode) {
+  static @NotNull String toResultStr(JsonNode mainNode) {
     if (mainNode == null) {
       return "null";
     }
@@ -522,7 +563,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  private static @NotNull String toExplainStr(JsonNode mainNode) {
+  static @NotNull String toExplainStr(JsonNode mainNode) {
     if (mainNode == null) {
       return "null";
     }
