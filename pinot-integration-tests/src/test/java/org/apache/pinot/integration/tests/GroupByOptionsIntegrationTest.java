@@ -99,7 +99,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         .build();
   }
 
-  static List<File> createAvroFile(File tempDir)
+  public static List<File> createAvroFile(File tempDir)
       throws IOException {
 
     // create avro schema
