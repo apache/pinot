@@ -337,6 +337,10 @@ public class IndexLoadingConfig {
     _errorOnColumnBuildFailure = errorOnColumnBuildFailure;
   }
 
+  public boolean isSkipSegmentPreprocess() {
+    return _tableConfig != null && _tableConfig.getIndexingConfig().isSkipSegmentPreprocess();
+  }
+
   @Nullable
   public FieldIndexConfigs getFieldIndexConfig(String columnName) {
     if (_indexConfigsByColName == null || _dirty) {

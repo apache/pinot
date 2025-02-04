@@ -282,6 +282,9 @@ public class ImmutableSegmentLoader {
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
+    if (indexLoadingConfig.isSkipSegmentPreprocess()) {
+      return false;
+    }
     if (needConvertSegmentFormat(indexLoadingConfig, segmentDirectory.getSegmentMetadata())) {
       return true;
     }
