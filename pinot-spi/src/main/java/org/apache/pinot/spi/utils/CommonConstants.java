@@ -758,7 +758,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
-        "pinot.server.query.executor.mse.max.init.group.holder.capacity";
+        "pinot.server.mse.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
         "pinot.server.query.executor.min.init.indexed.table.capacity";
 

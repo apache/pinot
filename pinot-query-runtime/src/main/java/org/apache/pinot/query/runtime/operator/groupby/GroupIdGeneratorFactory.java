@@ -27,8 +27,7 @@ public class GroupIdGeneratorFactory {
 
   public static GroupIdGenerator getGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns,
       int numGroupsLimit, int maxInitialResultHolderCapacity) {
-    // Initial capacity is one more than expected to avoid rehashing if container is full.
-    int initialCapacity = 1 + Math.min(maxInitialResultHolderCapacity, numGroupsLimit);
+    int initialCapacity = Math.min(maxInitialResultHolderCapacity, numGroupsLimit);
     if (numKeyColumns == 1) {
       switch (keyTypes[0]) {
         case INT:
