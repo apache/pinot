@@ -97,6 +97,7 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
 
     List<String> statePriorityList = new ArrayList<String>();
     statePriorityList.add(ONLINE_STATE);
+    statePriorityList.add(CONSUMING_STATE);
     statePriorityList.add(OFFLINE_STATE);
     statePriorityList.add(DROPPED_STATE);
     record.setListField(StateModelDefinitionProperty.STATE_PRIORITY_LIST.toString(), statePriorityList);
@@ -154,6 +155,8 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
 
     stateTransitionPriorityList.add("ONLINE-OFFLINE");
     stateTransitionPriorityList.add("ONLINE-DROPPED");
+    stateTransitionPriorityList.add("CONSUMING-ONLINE");
+    stateTransitionPriorityList.add("CONSUMING-OFFLINE");
     stateTransitionPriorityList.add("OFFLINE-ONLINE");
     stateTransitionPriorityList.add("OFFLINE-DROPPED");
 
