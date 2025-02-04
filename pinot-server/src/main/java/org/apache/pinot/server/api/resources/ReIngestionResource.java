@@ -34,10 +34,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,45 +52,29 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.core5.http.Header;
-import org.apache.hc.core5.http.NameValuePair;
-import org.apache.hc.core5.http.message.BasicHeader;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.server.api.resources.reingestion.ReIngestionRequest;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionResponse;
 import org.apache.pinot.server.api.resources.reingestion.utils.StatelessRealtimeSegmentDataManager;
-import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.filesystem.PinotFS;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -102,7 +84,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -189,7 +170,7 @@ public class ReIngestionResource {
   }
 
   @POST
-  @Path("/reingestSegment")
+  @Path("/reingestSegment/{segmentName}")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Re-ingest segment asynchronously", notes = "Returns a jobId immediately; ingestion runs in "
@@ -198,9 +179,14 @@ public class ReIngestionResource {
       @ApiResponse(code = 200, message = "Success", response = ReIngestionResponse.class),
       @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
   })
-  public Response reIngestSegment(ReIngestionRequest request) {
-    String tableNameWithType = request.getTableNameWithType();
-    String segmentName = request.getSegmentName();
+  public Response reIngestSegment(@PathParam("segmentName") String segmentName) {
+    // if segment is not in LLC format, return error
+    if (!LLCSegmentName.isLLCSegment(segmentName)) {
+      throw new WebApplicationException("Segment name is not in LLC format: " + segmentName,
+          Response.Status.BAD_REQUEST);
+    }
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     if (instanceDataManager == null) {
@@ -264,7 +250,6 @@ public class ReIngestionResource {
     // Kick off the actual work asynchronously
     REINGESTION_EXECUTOR.submit(() -> {
       try {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         int partitionGroupId = llcSegmentName.getPartitionGroupId();
 
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
@@ -275,7 +260,7 @@ public class ReIngestionResource {
             indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, _serverInstance.getServerMetrics());
 
         RUNNING_JOBS.put(jobId, job);
-        doReIngestSegment(manager, segmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
+        doReIngestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
       } finally {
@@ -293,13 +278,14 @@ public class ReIngestionResource {
    * The actual re-ingestion logic, moved into a separate method for clarity.
    * This is essentially the old synchronous logic you had in reIngestSegment.
    */
-  private void doReIngestSegment(StatelessRealtimeSegmentDataManager manager, String segmentName,
+  private void doReIngestSegment(StatelessRealtimeSegmentDataManager manager, LLCSegmentName llcSegmentName,
       String tableNameWithType, IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
       throws Exception {
     try {
+      String segmentName = llcSegmentName.getSegmentName();
+
       manager.startConsumption();
-      waitForCondition((Void) -> manager.isDoneConsuming(), CHECK_INTERVAL_MS,
-          CONSUMPTION_END_TIMEOUT_MS, 0);
+      waitForCondition((Void) -> manager.isDoneConsuming(), CHECK_INTERVAL_MS, CONSUMPTION_END_TIMEOUT_MS, 0);
       manager.stopConsumption();
 
       if (!manager.isSuccess()) {
@@ -318,26 +304,7 @@ public class ReIngestionResource {
       ServerSegmentCompletionProtocolHandler protocolHandler =
           new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), tableNameWithType);
 
-      AuthProvider authProvider = protocolHandler.getAuthProvider();
-      List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
-
-      String controllerUrl = getControllerUrl(tableNameWithType, protocolHandler);
-
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      String segmentStoreUri = indexLoadingConfig.getSegmentStoreURI();
-      String destUriStr = StringUtil.join(File.separator, segmentStoreUri, rawTableName,
-          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
-
-      try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
-        URI destUri = new URI(destUriStr);
-        if (pinotFS.exists(destUri)) {
-          pinotFS.delete(destUri, true);
-        }
-        pinotFS.copyFromLocalFile(segmentTarFile, destUri);
-      }
-
-      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
-      pushSegmentMetadata(tableNameWithType, controllerUrl, segmentTarFile, headers, segmentName, protocolHandler);
+      protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
 
       // Wait for segment to be uploaded
       waitForCondition((Void) -> {
@@ -351,9 +318,10 @@ public class ReIngestionResource {
 
       // Trigger segment reset
       HttpClient httpClient = HttpClient.getInstance();
-      Map<String, String> headersMap = headers.stream()
-          .collect(Collectors.toMap(Header::getName, Header::getValue));
-      resetSegment(httpClient, controllerUrl, tableNameWithType, segmentName, null, headersMap);
+      List<Header> headers = AuthProviderUtils.toRequestHeaders(protocolHandler.getAuthProvider());
+      Map<String, String> headersMap = headers.stream().collect(Collectors.toMap(Header::getName, Header::getValue));
+      String controllerVipUrl = protocolHandler.getControllerUrl(llcSegmentName.getTableName());
+      resetSegment(httpClient, controllerVipUrl, tableNameWithType, segmentName, null, headersMap);
 
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     } finally {
@@ -411,123 +379,5 @@ public class ReIngestionResource {
 
   private String encode(String s) {
     return URLEncoder.encode(s, StandardCharsets.UTF_8);
-  }
-
-  /**
-   * Push segment metadata to the Pinot Controller in METADATA mode.
-   *
-   * @param tableNameWithType The table name with type (e.g., "myTable_OFFLINE")
-   * @param controllerUrl The base URL of the Pinot Controller (e.g., "http://controller-host:9000")
-   * @param segmentFile   The local segment tar.gz file
-   * @param authHeaders   A map of authentication or additional headers for the request
-   */
-  public void pushSegmentMetadata(String tableNameWithType, String controllerUrl, File segmentFile,
-      List<Header> authHeaders, String segmentName, ServerSegmentCompletionProtocolHandler protocolHandler)
-      throws Exception {
-    LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentFile.getName(),
-        tableNameWithType, controllerUrl);
-    String tableName = tableNameWithType;
-    File segmentMetadataFile = generateSegmentMetadataTar(segmentFile);
-
-    LOGGER.info("Generated segment metadata tar file: {}", segmentMetadataFile.getAbsolutePath());
-    try {
-      // Prepare headers
-      List<Header> headers = authHeaders;
-
-      // The upload type must be METADATA
-      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-          FileUploadDownloadClient.FileUploadType.METADATA.toString()));
-
-      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE, "true"));
-
-      // Set table name parameter
-      List<NameValuePair> parameters = getSegmentPushCommonParams(tableNameWithType);
-
-      // Construct the endpoint URI
-      URI uploadEndpoint = FileUploadDownloadClient.getUploadSegmentURI(new URI(controllerUrl));
-
-      LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
-
-      // Perform the metadata upload
-      SimpleHttpResponse response = protocolHandler.getFileUploadDownloadClient()
-          .uploadSegmentMetadata(uploadEndpoint, segmentName, segmentMetadataFile, headers, parameters,
-              HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
-
-      LOGGER.info("Response for pushing metadata of segment {} of table {} to {} - {}: {}", segmentName, tableName,
-          controllerUrl, response.getStatusCode(), response.getResponse());
-    } finally {
-      FileUtils.deleteQuietly(segmentMetadataFile);
-    }
-  }
-
-  private List<NameValuePair> getSegmentPushCommonParams(String tableNameWithType) {
-    List<NameValuePair> params = new ArrayList<>();
-    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
-        "true"));
-    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
-        TableNameBuilder.extractRawTableName(tableNameWithType)));
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType != null) {
-      params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.toString()));
-    } else {
-      throw new RuntimeException(String.format("Failed to determine the tableType from name: %s", tableNameWithType));
-    }
-    return params;
-  }
-
-  /**
-   * Generate a tar.gz file containing only the metadata files (metadata.properties, creation.meta)
-   * from a given Pinot segment tar.gz file.
-   */
-  private File generateSegmentMetadataTar(File segmentTarFile)
-      throws Exception {
-
-    if (!segmentTarFile.exists()) {
-      throw new IllegalArgumentException("Segment tar file does not exist: " + segmentTarFile.getAbsolutePath());
-    }
-
-    LOGGER.info("Generating segment metadata tar file from segment tar: {}", segmentTarFile.getAbsolutePath());
-    File tempDir = Files.createTempDirectory("pinot-segment-temp").toFile();
-    String uuid = UUID.randomUUID().toString();
-    try {
-      File metadataDir = new File(tempDir, "segmentMetadataDir-" + uuid);
-      if (!metadataDir.mkdirs()) {
-        throw new RuntimeException("Failed to create metadata directory: " + metadataDir.getAbsolutePath());
-      }
-
-      LOGGER.info("Trying to untar Metadata file from: [{}] to [{}]", segmentTarFile, metadataDir);
-      TarCompressionUtils.untarOneFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
-          new File(metadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-
-      // Extract creation.meta
-      LOGGER.info("Trying to untar CreationMeta file from: [{}] to [{}]", segmentTarFile, metadataDir);
-      TarCompressionUtils.untarOneFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META,
-          new File(metadataDir, V1Constants.SEGMENT_CREATION_META));
-
-      File segmentMetadataFile =
-          new File(FileUtils.getTempDirectory(), "segmentMetadata-" + UUID.randomUUID() + ".tar.gz");
-      TarCompressionUtils.createCompressedTarFile(metadataDir, segmentMetadataFile);
-      return segmentMetadataFile;
-    } finally {
-      FileUtils.deleteQuietly(tempDir);
-    }
-  }
-
-  private String getControllerUrl(String rawTableName, ServerSegmentCompletionProtocolHandler protocolHandler) {
-    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader(rawTableName);
-    if (leaderHostPort == null) {
-      LOGGER.warn("No leader found for table: {}", rawTableName);
-      return null;
-    }
-    Integer port = leaderHostPort.getRight();
-    String protocol = protocolHandler.getProtocol();
-    Integer controllerHttpsPort = protocolHandler.getControllerHttpsPort();
-    if (controllerHttpsPort != null) {
-      port = controllerHttpsPort;
-      protocol = HTTPS_PROTOCOL;
-    }
-
-    return URIUtils.buildURI(protocol, leaderHostPort.getLeft() + ":" + port, "", Collections.emptyMap()).toString();
   }
 }

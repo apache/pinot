@@ -1243,7 +1243,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  protected void closeStreamConsumers() {
+  private void closeStreamConsumers() {
     closePartitionGroupConsumer();
     closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {

@@ -1279,13 +1279,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Invokes the server's reIngestSegment API via a POST request with JSON payload,
    * using Simple HTTP APIs.
    *
-   * POST http://[serverURL]/reIngestSegment
-   * {
-   *   "tableNameWithType": [tableName],
-   *   "segmentName": [segmentName]
-   * }
+   * POST http://[serverURL]/reIngestSegment/[segmentName]
    */
-  public void triggerReIngestion(String serverHostPort, String tableNameWithType, String segmentName)
+  public void triggerReIngestion(String serverHostPort, String segmentName)
       throws IOException, URISyntaxException, HttpErrorStatusException {
     String scheme = HTTP;
     if (serverHostPort.contains(HTTPS)) {
@@ -1298,14 +1294,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
     String serverHost = serverHostPort.split(":")[0];
     String serverPort = serverHostPort.split(":")[1];
 
-    URI reIngestUri = getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
-
-    Map<String, Object> requestJson = new HashMap<>();
-    requestJson.put("tableNameWithType", tableNameWithType);
-    requestJson.put("segmentName", segmentName);
-
-    String jsonPayload = JsonUtils.objectToString(requestJson);
-    HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, jsonPayload));
+    URI reIngestUri =
+        getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH + "/" + segmentName);
+    HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, ""));
   }
 
   /**

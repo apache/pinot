@@ -637,6 +637,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }).orElse(DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS);
   }
 
+  @VisibleForTesting
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
       Semaphore semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,

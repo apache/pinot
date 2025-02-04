@@ -21,24 +21,46 @@ package org.apache.pinot.server.realtime;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.data.manager.realtime.Server2ControllerSegmentUploader;
 import org.apache.pinot.core.util.SegmentCompletionProtocolUtils;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
@@ -257,5 +279,141 @@ public class ServerSegmentCompletionProtocolHandler {
     }
     SegmentCompletionProtocolUtils.raiseSegmentCompletionProtocolResponseMetric(_serverMetrics, response);
     return response;
+  }
+
+  public void uploadReingestedSegment(String segmentName, String segmentStoreUri, File segmentTarFile)
+      throws Exception {
+    List<Header> headers = AuthProviderUtils.toRequestHeaders(_authProvider);
+
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    String rawTableName = llcSegmentName.getTableName();
+    String destUriStr = StringUtil.join(File.separator, segmentStoreUri, rawTableName,
+        SegmentCompletionUtils.generateTmpSegmentFileName(segmentName));
+
+    try (PinotFS pinotFS = PinotFSFactory.create(new URI(segmentStoreUri).getScheme())) {
+      URI destUri = new URI(destUriStr);
+      if (pinotFS.exists(destUri)) {
+        pinotFS.delete(destUri, true);
+      }
+      pinotFS.copyFromLocalFile(segmentTarFile, destUri);
+    }
+
+    headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
+    String controllerUrl = getControllerUrl(rawTableName);
+    pushSegmentMetadata(llcSegmentName, controllerUrl, segmentTarFile, headers);
+  }
+
+  /**
+   * Push segment metadata to the Pinot Controller in METADATA mode.
+   *
+   * @param llcSegmentName The LLC segment name
+   * @param controllerUrl The base URL of the Pinot Controller (e.g., "http://controller-host:9000")
+   * @param segmentFile   The local segment tar.gz file
+   * @param authHeaders   A map of authentication or additional headers for the request
+   */
+  public void pushSegmentMetadata(LLCSegmentName llcSegmentName, String controllerUrl, File segmentFile,
+      List<Header> authHeaders)
+      throws Exception {
+    String segmentName = llcSegmentName.getSegmentName();
+    String rawTableName = llcSegmentName.getTableName();
+
+    LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentFile.getName(),
+        rawTableName, controllerUrl);
+    File segmentMetadataFile = generateSegmentMetadataTar(segmentFile);
+
+    LOGGER.info("Generated segment metadata tar file: {}", segmentMetadataFile.getAbsolutePath());
+    try {
+      // Prepare headers
+      List<Header> headers = authHeaders;
+
+      // The upload type must be METADATA
+      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+          FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+
+      headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE, "true"));
+
+      // Set table name parameter
+      List<NameValuePair> parameters = getSegmentPushCommonParams(rawTableName);
+
+      // Construct the endpoint URI
+      URI uploadEndpoint = FileUploadDownloadClient.getUploadSegmentURI(new URI(controllerUrl));
+
+      LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
+
+      // Perform the metadata upload
+      SimpleHttpResponse response = _fileUploadDownloadClient
+          .uploadSegmentMetadata(uploadEndpoint, segmentName, segmentMetadataFile, headers, parameters,
+              HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+
+      LOGGER.info("Response for pushing metadata of segment {} of table {} to {} - {}: {}", segmentName, rawTableName,
+          controllerUrl, response.getStatusCode(), response.getResponse());
+    } finally {
+      FileUtils.deleteQuietly(segmentMetadataFile);
+    }
+  }
+
+  private List<NameValuePair> getSegmentPushCommonParams(String rawTableName) {
+    List<NameValuePair> params = new ArrayList<>();
+    params.add(
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
+    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, rawTableName));
+    params.add(
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, TableType.REALTIME.toString()));
+    return params;
+  }
+
+  /**
+   * Generate a tar.gz file containing only the metadata files (metadata.properties, creation.meta)
+   * from a given Pinot segment tar.gz file.
+   */
+  private File generateSegmentMetadataTar(File segmentTarFile)
+      throws Exception {
+
+    if (!segmentTarFile.exists()) {
+      throw new IllegalArgumentException("Segment tar file does not exist: " + segmentTarFile.getAbsolutePath());
+    }
+
+    LOGGER.info("Generating segment metadata tar file from segment tar: {}", segmentTarFile.getAbsolutePath());
+    File tempDir = Files.createTempDirectory("pinot-segment-temp").toFile();
+    String uuid = UUID.randomUUID().toString();
+    try {
+      File metadataDir = new File(tempDir, "segmentMetadataDir-" + uuid);
+      if (!metadataDir.mkdirs()) {
+        throw new RuntimeException("Failed to create metadata directory: " + metadataDir.getAbsolutePath());
+      }
+
+      LOGGER.info("Trying to untar Metadata file from: [{}] to [{}]", segmentTarFile, metadataDir);
+      TarCompressionUtils.untarOneFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+          new File(metadataDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+
+      // Extract creation.meta
+      LOGGER.info("Trying to untar CreationMeta file from: [{}] to [{}]", segmentTarFile, metadataDir);
+      TarCompressionUtils.untarOneFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META,
+          new File(metadataDir, V1Constants.SEGMENT_CREATION_META));
+
+      File segmentMetadataFile =
+          new File(FileUtils.getTempDirectory(), "segmentMetadata-" + UUID.randomUUID() + ".tar.gz");
+      TarCompressionUtils.createCompressedTarFile(metadataDir, segmentMetadataFile);
+      return segmentMetadataFile;
+    } finally {
+      FileUtils.deleteQuietly(tempDir);
+    }
+  }
+
+  public String getControllerUrl(String rawTableName) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader(rawTableName);
+    if (leaderHostPort == null) {
+      LOGGER.warn("No leader found for table: {}", rawTableName);
+      return null;
+    }
+    Integer port = leaderHostPort.getRight();
+    String protocol = _protocol;
+    if (_controllerHttpsPort != null) {
+      port = _controllerHttpsPort;
+      protocol = HTTPS_PROTOCOL;
+    }
+
+    return URIUtils.buildURI(protocol, leaderHostPort.getLeft() + ":" + port, "", Collections.emptyMap()).toString();
   }
 }
