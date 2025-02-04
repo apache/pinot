@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.function;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
@@ -38,6 +39,13 @@ public class ArithmeticFunctionsTest {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
     Assert.assertEquals(evaluator.getArguments(), expectedArguments);
     Assert.assertEquals(evaluator.evaluate(row), expectedResult);
+  }
+
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Consumer<Object> assertResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    Assert.assertEquals(evaluator.getArguments(), expectedArguments);
+    assertResult.accept(evaluator.evaluate(row));
   }
 
   @Test(dataProvider = "arithmeticFunctionsDataProvider")

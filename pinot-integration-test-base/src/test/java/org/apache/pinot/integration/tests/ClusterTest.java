@@ -565,6 +565,13 @@ public abstract class ClusterTest extends ControllerTest {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
   }
 
+  public JsonNode cancelQuery(String clientQueryId)
+    throws Exception {
+    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
+    Object o = _httpClient.sendDeleteRequest(cancelURI);
+    return null; // TODO
+  }
+
   private Map<String, String> getExtraQueryPropertiesForController() {
     if (!useMultiStageQueryEngine()) {
       return Map.of();

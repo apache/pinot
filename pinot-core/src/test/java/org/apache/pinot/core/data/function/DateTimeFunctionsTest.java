@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,6 +37,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.AssertJUnit.assertTrue;
 
 
 /**
@@ -52,6 +54,13 @@ public class DateTimeFunctionsTest {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
     assertEquals(evaluator.getArguments(), expectedArguments);
     assertEquals(evaluator.evaluate(row), expectedResult);
+  }
+
+  private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
+      Consumer<Object> assertResult) {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+    assertEquals(evaluator.getArguments(), expectedArguments);
+    assertResult.accept(evaluator.evaluate(row));
   }
 
   private void testDateFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
@@ -777,5 +786,15 @@ public class DateTimeFunctionsTest {
     }
     testMultipleInvocations(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
         outputGranularityStr), rows, expectedResults);
+  }
+
+  @Test
+  public void testSleepFunction() {
+    long startTime = System.currentTimeMillis();
+    testFunction("sleep(50)", Collections.emptyList(), new GenericRow(), result -> {
+      assertTrue((long) result >= 50);
+    });
+    long endTime = System.currentTimeMillis();
+    assertTrue(endTime - startTime >= 50);
   }
 }

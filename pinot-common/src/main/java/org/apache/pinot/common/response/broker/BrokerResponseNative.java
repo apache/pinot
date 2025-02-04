@@ -45,12 +45,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
-    "requestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
-    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
-    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
-    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
+    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
+    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
+    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
+    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
@@ -72,6 +72,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
+  private String _clientRequestId;
   private String _brokerId;
   private long _numDocsScanned = 0L;
   private long _totalDocs = 0L;
@@ -225,6 +226,16 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setRequestId(String requestId) {
     _requestId = requestId;
+  }
+
+  @Override
+  public String getClientRequestId() {
+    return _clientRequestId;
+  }
+
+  @Override
+  public void setClientRequestId(String clientRequestId) {
+    _clientRequestId = clientRequestId;
   }
 
   @Override
