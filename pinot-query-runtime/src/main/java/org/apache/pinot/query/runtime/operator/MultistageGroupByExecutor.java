@@ -88,11 +88,7 @@ public class MultistageGroupByExecutor {
     _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
 
-    int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
-    Integer mseCapacity = getMSEMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
-    if (mseCapacity != null) {
-      maxInitialResultHolderCapacity = mseCapacity;
-    }
+    int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
 
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
 
@@ -130,6 +126,13 @@ public class MultistageGroupByExecutor {
     }
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     return numGroupsLimit != null ? numGroupsLimit : InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
+  }
+
+  private int getResolvedMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
+    Integer mseMaxInitialResultHolderCapacity = getMSEMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    return (mseMaxInitialResultHolderCapacity != null) ? mseMaxInitialResultHolderCapacity
+        : getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
   }
 
   private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,

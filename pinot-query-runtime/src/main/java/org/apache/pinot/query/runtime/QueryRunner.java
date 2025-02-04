@@ -162,7 +162,7 @@ public class QueryRunner {
 
 
     String mseMaxInitialGroupHolderCapacity =
-        config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+        config.getProperty(CommonConstants.Server.CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _mseMaxInitialResultHolderCapacity =
         mseMaxInitialGroupHolderCapacity != null ? Integer.parseInt(mseMaxInitialGroupHolderCapacity) : null;
 
