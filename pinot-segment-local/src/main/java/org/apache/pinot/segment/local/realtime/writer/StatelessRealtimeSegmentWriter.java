@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.api.resources.reingestion.utils;
+package org.apache.pinot.segment.local.realtime.writer;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -33,9 +33,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
@@ -44,7 +42,6 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
@@ -79,11 +76,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Simplified Segment Data Manager for ingesting data from a start offset to an end offset.
  */
-public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
+public class StatelessRealtimeSegmentWriter {
 
   private static final int DEFAULT_CAPACITY = 100_000;
   private static final int DEFAULT_FETCH_TIMEOUT_MS = 5000;
-  public static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
 
   private final String _segmentName;
   private final String _tableNameWithType;
@@ -108,15 +104,13 @@ public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamPartitionMsgOffset _endOffset;
   private volatile StreamPartitionMsgOffset _currentOffset;
-  private volatile int _numRowsIndexed = 0;
-  private final String _segmentStoreUriStr;
   private final int _fetchTimeoutMs;
   private final TransformPipeline _transformPipeline;
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
   private final ServerMetrics _serverMetrics;
 
-  public StatelessRealtimeSegmentDataManager(String segmentName, String tableNameWithType, int partitionGroupId,
+  public StatelessRealtimeSegmentWriter(String segmentName, String tableNameWithType, int partitionGroupId,
       SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Schema schema,
       IndexLoadingConfig indexLoadingConfig, StreamConfig streamConfig, String startOffsetStr, String endOffsetStr,
       ServerMetrics serverMetrics)
@@ -128,12 +122,11 @@ public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = tableConfig;
     _schema = schema;
-    _segmentStoreUriStr = indexLoadingConfig.getSegmentStoreURI();
     _streamConfig = streamConfig;
     _resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
     _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());;
     _serverMetrics = serverMetrics;
-    _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentDataManager.class.getName() + "_" + _segmentName);
+    _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
     _offsetFactory = StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
     _startOffset = _offsetFactory.create(startOffsetStr);
@@ -248,6 +241,7 @@ public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
     public void run() {
       try {
         _consumer.start(_startOffset);
+        _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
         TransformPipeline.Result reusedResult = new TransformPipeline.Result();
         while (!_shouldStop.get() && _currentOffset.compareTo(_endOffset) < 0) {
@@ -278,10 +272,8 @@ public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
 
               List<GenericRow> transformedRows = reusedResult.getTransformedRows();
 
-              // TODO: Do enrichment and transforms before indexing
               for (GenericRow transformedRow : transformedRows) {
                 _realtimeSegment.index(transformedRow, streamMessage.getMetadata());
-                _numRowsIndexed++;
               }
             } else {
               _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());
@@ -318,25 +310,13 @@ public class StatelessRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  @Override
-  public MutableSegment getSegment() {
-    return _realtimeSegment;
-  }
-
-  @Override
-  public String getSegmentName() {
-    return _segmentName;
-  }
-
-  @Override
-  protected void doDestroy() {
+  public void destroy() {
     _realtimeSegment.destroy();
     FileUtils.deleteQuietly(_resourceTmpDir);
     FileUtils.deleteQuietly(_resourceDataDir);
   }
 
-  @Override
-  public void doOffload() {
+  public void offload() {
     stopConsumption();
   }
 

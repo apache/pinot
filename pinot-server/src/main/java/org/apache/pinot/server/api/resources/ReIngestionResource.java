@@ -68,9 +68,9 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionResponse;
-import org.apache.pinot.server.api.resources.reingestion.utils.StatelessRealtimeSegmentDataManager;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -255,9 +255,9 @@ public class ReIngestionResource {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
         StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
-        StatelessRealtimeSegmentDataManager manager = new StatelessRealtimeSegmentDataManager(
+        StatelessRealtimeSegmentWriter manager = new StatelessRealtimeSegmentWriter(
             segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata, tableConfig, schema,
-            indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, _serverInstance.getServerMetrics());
+            indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr, null);
 
         RUNNING_JOBS.put(jobId, job);
         doReIngestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
@@ -278,7 +278,7 @@ public class ReIngestionResource {
    * The actual re-ingestion logic, moved into a separate method for clarity.
    * This is essentially the old synchronous logic you had in reIngestSegment.
    */
-  private void doReIngestSegment(StatelessRealtimeSegmentDataManager manager, LLCSegmentName llcSegmentName,
+  private void doReIngestSegment(StatelessRealtimeSegmentWriter manager, LLCSegmentName llcSegmentName,
       String tableNameWithType, IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
       throws Exception {
     try {
@@ -293,7 +293,7 @@ public class ReIngestionResource {
       }
 
       LOGGER.info("Starting build for segment {}", segmentName);
-      StatelessRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
+      StatelessRealtimeSegmentWriter.SegmentBuildDescriptor segmentBuildDescriptor =
           manager.buildSegmentInternal();
 
       File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
