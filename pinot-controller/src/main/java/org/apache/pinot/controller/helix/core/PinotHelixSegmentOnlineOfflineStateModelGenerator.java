@@ -18,21 +18,15 @@
  */
 package org.apache.pinot.controller.helix.core;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.helix.model.StateModelDefinition;
-import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 /**
  * Segment state model generator describes the transitions for segment states.
  *
  * Online to Offline, Online to Dropped
- * Offline to Online, Offline to Dropped
- *
+ * Consuming to Online, Consuming to Offline
+ * Offline to Online, Offline to Consuming, Offline to Dropped
  *
  */
 public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
@@ -46,6 +40,17 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
   public static final String DROPPED_STATE = "DROPPED";
   public static final String CONSUMING_STATE = "CONSUMING";
 
+  // In the state model, the priority of the transition is important.
+  // The transition with higher priority will be executed first.
+  // The priority is an integer, LOWER value means HIGHER priority.
+  // Making transitioning to OFFLINE and DROP higher priority.
+  // This can prevent server from running into resource/storage problems
+  public static final int DEFAULT_TO_DROP_TRANSITION_PRIORITY = 800;
+  public static final int DEFAULT_TO_OFFLINE_TRANSITION_PRIORITY = 900;
+  public static final int DEFAULT_TO_ONLINE_TRANSITION_PRIORITY = 1000;
+  // Given a lower priority to let the consuming segment start last during server startup.
+  public static final int OFFLINE_TO_CONSUMING_TRANSITION_PRIORITY = 1100;
+
   public static StateModelDefinition generatePinotStateModelDefinition() {
     StateModelDefinition.Builder builder = new StateModelDefinition.Builder(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
     builder.initialState(OFFLINE_STATE);
@@ -57,12 +62,13 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
     // Set the initial state when the node starts
 
     // Add transitions between the states.
-    builder.addTransition(CONSUMING_STATE, ONLINE_STATE);
-    builder.addTransition(OFFLINE_STATE, CONSUMING_STATE);
-    builder.addTransition(OFFLINE_STATE, ONLINE_STATE);
-    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE);
-    builder.addTransition(ONLINE_STATE, OFFLINE_STATE);
-    builder.addTransition(OFFLINE_STATE, DROPPED_STATE);
+    // Ordering the transitions by priority, high -> low.
+    builder.addTransition(OFFLINE_STATE, DROPPED_STATE, DEFAULT_TO_DROP_TRANSITION_PRIORITY);
+    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE, DEFAULT_TO_OFFLINE_TRANSITION_PRIORITY);
+    builder.addTransition(ONLINE_STATE, OFFLINE_STATE, DEFAULT_TO_OFFLINE_TRANSITION_PRIORITY);
+    builder.addTransition(CONSUMING_STATE, ONLINE_STATE, DEFAULT_TO_ONLINE_TRANSITION_PRIORITY);
+    builder.addTransition(OFFLINE_STATE, ONLINE_STATE, DEFAULT_TO_ONLINE_TRANSITION_PRIORITY);
+    builder.addTransition(OFFLINE_STATE, CONSUMING_STATE, OFFLINE_TO_CONSUMING_TRANSITION_PRIORITY);
 
     // set constraints on states.
     // static constraint
@@ -71,99 +77,6 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
     // factor.
     builder.dynamicUpperBound(CONSUMING_STATE, "R");
 
-    StateModelDefinition statemodelDefinition = builder.build();
-    return statemodelDefinition;
-  }
-
-  /**
-   * This method is not used, Code is to be removed when we have the new state model running in production
-   * @return
-   */
-  public static StateModelDefinition generatePinotStateModelDefinitionOld() {
-
-    ZNRecord record = new ZNRecord(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
-
-    /*
-     * initial state in always offline for an instance.
-     *
-     */
-    record.setSimpleField(StateModelDefinitionProperty.INITIAL_STATE.toString(), OFFLINE_STATE);
-
-    /*
-     * this is a ondered list of states in which we want the instances to be in. the first entry is
-     * given the top most priority.
-     *
-     */
-
-    List<String> statePriorityList = new ArrayList<String>();
-    statePriorityList.add(ONLINE_STATE);
-    statePriorityList.add(CONSUMING_STATE);
-    statePriorityList.add(OFFLINE_STATE);
-    statePriorityList.add(DROPPED_STATE);
-    record.setListField(StateModelDefinitionProperty.STATE_PRIORITY_LIST.toString(), statePriorityList);
-
-    /**
-     *
-     * If you are wondering what R and -1 signify, here is an explanation -1 means that don't even
-     * try to keep any instances in this state. R says that all instances in the preference list
-     * should be in this state.
-     *
-     */
-    for (String state : statePriorityList) {
-      String key = state + ".meta";
-      Map<String, String> metadata = new HashMap<String, String>();
-      if (state.equals(ONLINE_STATE)) {
-        metadata.put("count", "R");
-        record.setMapField(key, metadata);
-      }
-      if (state.equals(OFFLINE_STATE)) {
-        metadata.put("count", "-1");
-        record.setMapField(key, metadata);
-      }
-      if (state.equals(DROPPED_STATE)) {
-        metadata.put("count", "-1");
-        record.setMapField(key, metadata);
-      }
-    }
-
-    /*
-     * construction a state transition table, this tells the controller the next state given initial
-     * and final states.
-     *
-     */
-    for (String state : statePriorityList) {
-      String key = state + ".next";
-      if (state.equals(ONLINE_STATE)) {
-        Map<String, String> metadata = new HashMap<String, String>();
-        metadata.put(OFFLINE_STATE, OFFLINE_STATE);
-        metadata.put(DROPPED_STATE, DROPPED_STATE);
-        record.setMapField(key, metadata);
-      }
-      if (state.equals("OFFLINE")) {
-        Map<String, String> metadata = new HashMap<String, String>();
-        metadata.put(ONLINE_STATE, ONLINE_STATE);
-        metadata.put(DROPPED_STATE, DROPPED_STATE);
-        record.setMapField(key, metadata);
-      }
-    }
-
-    /*
-     * This is the transition priority list, again the first inserted gets the top most priority.
-     *
-     */
-    List<String> stateTransitionPriorityList = new ArrayList<String>();
-
-    stateTransitionPriorityList.add("ONLINE-OFFLINE");
-    stateTransitionPriorityList.add("ONLINE-DROPPED");
-    stateTransitionPriorityList.add("CONSUMING-ONLINE");
-    stateTransitionPriorityList.add("CONSUMING-OFFLINE");
-    stateTransitionPriorityList.add("OFFLINE-ONLINE");
-    stateTransitionPriorityList.add("OFFLINE-DROPPED");
-
-    record.setListField(StateModelDefinitionProperty.STATE_TRANSITION_PRIORITYLIST.toString(),
-        stateTransitionPriorityList);
-
-    throw new RuntimeException("This state model should not be used");
-//    return new StateModelDefinition(record);
+    return builder.build();
   }
 }
