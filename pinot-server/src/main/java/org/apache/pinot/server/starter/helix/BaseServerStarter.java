@@ -157,8 +157,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
-  protected SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
-  protected SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -630,6 +628,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+
     int maxPreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
@@ -637,8 +636,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    _segmentAllIndexPreprocessThrottler = new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency,
-        maxPreprocessConcurrencyBeforeServingQueries, false);
+    SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler =
+        new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries,
+            false);
     int maxStarTreePreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
@@ -646,13 +646,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    _segmentStarTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
-        maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(_segmentAllIndexPreprocessThrottler,
-        _segmentStarTreePreprocessThrottler);
+    SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler =
+        new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
+            maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
+    _segmentPreprocessThrottler =
+        new SegmentPreprocessThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler);
+
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory,
-        _segmentPreprocessThrottler);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
