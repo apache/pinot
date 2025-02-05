@@ -138,7 +138,7 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     HepProgram traitProgram = getTraitProgram(workerManager);
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
-        sqlNodeAndOptions.getOptions());
+        sqlNodeAndOptions.getOptions(), _envConfig);
   }
 
   @Nullable
@@ -503,6 +503,11 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseSpools() {
       return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    }
+
+    @Value.Default
+    default boolean defaultEnableGroupTrim() {
+      return CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM;
     }
 
     /**

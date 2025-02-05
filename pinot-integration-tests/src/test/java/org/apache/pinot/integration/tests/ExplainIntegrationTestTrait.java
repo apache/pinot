@@ -102,6 +102,19 @@ public interface ExplainIntegrationTestTrait {
     }
   }
 
+  default void explainAskingServers(@Language("sql") String query, String expected) {
+    try {
+      JsonNode jsonNode = postQuery("set explainAskingServers=true; explain plan for " + query);
+      JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+      Assert.assertEquals(plan.asText(), expected);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   default void explainVerbose(@Language("sql") String query, String expected) {
     try {
       JsonNode jsonNode = postQuery("set explainPlanVerbose=true; explain plan for " + query);
