@@ -138,28 +138,6 @@ public class MergeTaskUtils {
   }
 
   /**
-   * Returns a map from column name to the aggregation function parameters associated with it based on the task config.
-   */
-  public static Map<String, Map<String, String>> getAggregationFunctionParameters(Map<String, String> taskConfig) {
-    Map<String, Map<String, String>> aggregationFunctionParameters = new HashMap<>();
-    String prefix = MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
-
-    for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-      if (key.startsWith(prefix)) {
-        String[] parts = key.substring(prefix.length()).split("\\.", 2);
-        if (parts.length == 2) {
-          String metricColumn = parts[0];
-          String paramName = parts[1];
-          aggregationFunctionParameters.computeIfAbsent(metricColumn, k -> new HashMap<>()).put(paramName, value);
-        }
-      }
-    }
-    return aggregationFunctionParameters;
-  }
-
-  /**
    * Returns the segment config based on the task config.
    */
   public static SegmentConfig getSegmentConfig(Map<String, String> taskConfig) {

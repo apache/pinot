@@ -22,8 +22,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
@@ -44,6 +46,8 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
   private final String _valueExpression;
   private final AggInfo _aggInfo;
   private final List<String> _groupByExpressions;
+  private final Map<String, String> _queryOptions;
+  private final int _limit;
 
   @JsonCreator
   public LeafTimeSeriesPlanNode(
@@ -52,7 +56,8 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
       @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offsetSeconds") Long offsetSeconds,
       @JsonProperty("filterExpression") String filterExpression,
       @JsonProperty("valueExpression") String valueExpression, @JsonProperty("aggInfo") AggInfo aggInfo,
-      @JsonProperty("groupByExpressions") List<String> groupByExpressions) {
+      @JsonProperty("groupByExpressions") List<String> groupByExpressions,
+      @JsonProperty("limit") int limit, @JsonProperty("queryOptions") Map<String, String> queryOptions) {
     super(id, inputs);
     _tableName = tableName;
     _timeColumn = timeColumn;
@@ -62,17 +67,19 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
     _valueExpression = valueExpression;
     _aggInfo = aggInfo;
     _groupByExpressions = groupByExpressions;
+    _limit = limit <= 0 ? RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT : limit;
+    _queryOptions = queryOptions;
   }
 
   public LeafTimeSeriesPlanNode withAggInfo(AggInfo newAggInfo) {
     return new LeafTimeSeriesPlanNode(_id, _inputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
-        _filterExpression, _valueExpression, newAggInfo, _groupByExpressions);
+        _filterExpression, _valueExpression, newAggInfo, _groupByExpressions, _limit, _queryOptions);
   }
 
   @Override
   public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
     return new LeafTimeSeriesPlanNode(_id, newInputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
-        _filterExpression, _valueExpression, _aggInfo, _groupByExpressions);
+        _filterExpression, _valueExpression, _aggInfo, _groupByExpressions, _limit, _queryOptions);
   }
 
   @Override
@@ -83,8 +90,8 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
   @Override
   public String getExplainName() {
     return String.format("LEAF_TIME_SERIES_PLAN_NODE(%s, table=%s, timeExpr=%s, valueExpr=%s, aggInfo=%s, "
-        + "groupBy=%s, filter=%s, offsetSeconds=%s)", _id, _tableName, _timeColumn, _valueExpression,
-        _aggInfo.getAggFunction(), _groupByExpressions, _filterExpression, _offsetSeconds);
+        + "groupBy=%s, filter=%s, offsetSeconds=%s, limit=%s)", _id, _tableName, _timeColumn, _valueExpression,
+        _aggInfo.getAggFunction(), _groupByExpressions, _filterExpression, _offsetSeconds, _limit);
   }
 
   @Override
@@ -122,6 +129,14 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
 
   public List<String> getGroupByExpressions() {
     return _groupByExpressions;
+  }
+
+  public int getLimit() {
+    return _limit;
+  }
+
+  public Map<String, String> getQueryOptions() {
+    return _queryOptions;
   }
 
   public String getEffectiveFilter(TimeBuckets timeBuckets) {

@@ -343,7 +343,9 @@ public class OffHeapSingleTreeBuilder extends BaseSingleTreeBuilder {
   public void close()
       throws IOException {
     super.close();
-    _starTreeRecordBuffer.close();
+    if (_starTreeRecordBuffer != null) {
+      _starTreeRecordBuffer.close();
+    }
     _starTreeRecordOutputStream.close();
     FileUtils.forceDelete(_starTreeRecordFile);
   }

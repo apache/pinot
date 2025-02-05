@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -79,15 +80,58 @@ public class MergeRollupTaskUtils {
   }
 
   /**
+   * Returns a lookup key composed of the current merge level / key combination
+   * @param key the key of the value within the task configuration.
+   * @param taskConfig the current merge rollup task configuration used for sourcing the merge level.
+   * @return composite lookup key if the merge level is configured.  Otherwise, return original key.
+   */
+  public static String buildMergeLevelKeyPrefix(String key, Map<String, String> taskConfig) {
+    String mergeLevel = taskConfig.get(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY);
+    if (mergeLevel == null) {
+      return key;
+    } else {
+      return mergeLevel + "." + key;
+    }
+  }
+
+  /**
    * Extracts an array of dimensions to reduce/erase from the task config.
    * <p>The config for the dimensions to erase should be a comma-separated string value.
    */
   public static Set<String> getDimensionsToErase(Map<String, String> taskConfig) {
-    if (taskConfig == null || taskConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY) == null) {
+    if (taskConfig == null) {
       return new HashSet<>();
     }
-    return Arrays.stream(taskConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY).split(","))
+    String key = buildMergeLevelKeyPrefix(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, taskConfig);
+    String dimensionsToErase = taskConfig.get(key);
+
+    if (dimensionsToErase == null) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(dimensionsToErase.split(","))
         .map(String::trim)
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Returns a map from column name to the aggregation function parameters associated with it based on the task config.
+   */
+  public static Map<String, Map<String, String>> getAggregationFunctionParameters(Map<String, String> taskConfig) {
+    Map<String, Map<String, String>> aggregationFunctionParameters = new HashMap<>();
+    String prefix = buildMergeLevelKeyPrefix(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX, taskConfig);
+
+    for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key.startsWith(prefix)) {
+        String[] parts = key.substring(prefix.length()).split("\\.", 2);
+        if (parts.length == 2) {
+          String metricColumn = parts[0];
+          String paramName = parts[1];
+          aggregationFunctionParameters.computeIfAbsent(metricColumn, k -> new HashMap<>()).put(paramName, value);
+        }
+      }
+    }
+    return aggregationFunctionParameters;
   }
 }

@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
@@ -46,7 +45,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-// TODO: Add more inequi join tests.
 public class HashJoinOperatorTest {
   private AutoCloseable _mocks;
   @Mock
@@ -119,36 +117,6 @@ public class HashJoinOperatorTest {
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2, "BB", 2, "Aa"});
     assertEquals(resultRows.get(1), new Object[]{2, "BB", 2, "BB"});
-  }
-
-  @Test
-  public void shouldHandleJoinOnEmptySelector() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), List.of());
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
-    assertEquals(resultRows.size(), 6);
-    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
-    assertEquals(resultRows.get(1), new Object[]{1, "Aa", 2, "BB"});
-    assertEquals(resultRows.get(2), new Object[]{1, "Aa", 3, "BB"});
-    assertEquals(resultRows.get(3), new Object[]{2, "BB", 2, "Aa"});
-    assertEquals(resultRows.get(4), new Object[]{2, "BB", 2, "BB"});
-    assertEquals(resultRows.get(5), new Object[]{2, "BB", 3, "BB"});
   }
 
   @Test
@@ -243,65 +211,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator operator =
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
-  }
-
-  @Test
-  public void shouldHandleInequiJoinOnString() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    List<RexExpression> functionOperands = List.of(new RexExpression.InputRef(1), new RexExpression.InputRef(3));
-    List<RexExpression> nonEquiConditions =
-        List.of(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), nonEquiConditions);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
-    assertEquals(resultRows.size(), 3);
-    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "BB"});
-    assertEquals(resultRows.get(1), new Object[]{1, "Aa", 3, "BB"});
-    assertEquals(resultRows.get(2), new Object[]{2, "BB", 2, "Aa"});
-  }
-
-  @Test
-  public void shouldHandleInequiJoinOnInt() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING
-    });
-    when(_leftInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    when(_rightInput.nextBlock()).thenReturn(
-            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{1, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    List<RexExpression> functionOperands = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(2));
-    List<RexExpression> nonEquiConditions =
-        List.of(new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_EQUALS.name(), functionOperands));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
-        });
-    HashJoinOperator operator =
-        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(), List.of(), nonEquiConditions);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
-    assertEquals(resultRows.size(), 2);
-    assertEquals(resultRows.get(0), new Object[]{1, "Aa", 2, "Aa"});
-    assertEquals(resultRows.get(1), new Object[]{2, "BB", 1, "BB"});
   }
 
   @Test

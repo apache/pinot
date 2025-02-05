@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -50,11 +52,13 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.mergerollup.segmentgroupmananger.MergeRollupTaskSegmentGroupManagerProvider;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -484,6 +488,58 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     cleanUpDelayMetrics(tableConfigs);
 
     return pinotTaskConfigs;
+  }
+
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
+    Set<String> columnNames = schema.getColumnNames();
+    // check no mis-configured columns when erasing dimensions
+    Set<String> dimensionsToErase = MergeRollupTaskUtils.getDimensionsToErase(taskConfigs);
+    for (String dimension : dimensionsToErase) {
+      Preconditions.checkState(columnNames.contains(dimension),
+          String.format("Column dimension to erase \"%s\" not found in schema!", dimension));
+    }
+    // check no mis-configured aggregation function parameters
+    Set<String> allowedFunctionParameterNames = ImmutableSet.of(Constants.CPCSKETCH_LGK_KEY.toLowerCase(),
+        Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY.toLowerCase(),
+        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase());
+    Map<String, Map<String, String>> aggregationFunctionParameters =
+        MergeRollupTaskUtils.getAggregationFunctionParameters(taskConfigs);
+    for (String fieldName : aggregationFunctionParameters.keySet()) {
+      // check that function parameter field name exists
+      Preconditions.checkState(columnNames.contains(fieldName),
+          String.format("Metric column \"%s\" for aggregation function parameter not found in schema!", fieldName));
+      Map<String, String> functionParameters = aggregationFunctionParameters.get(fieldName);
+      for (String functionParameterName : functionParameters.keySet()) {
+        // check that function parameter name is valid
+        Preconditions.checkState(allowedFunctionParameterNames.contains(functionParameterName.toLowerCase()),
+            "Aggregation function parameter name must be one of [lgK, samplingProbability, nominalEntries]!");
+        // check that function parameter value is valid for nominal entries
+        if (functionParameterName.equalsIgnoreCase(Constants.CPCSKETCH_LGK_KEY)
+            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          String value = functionParameters.get(functionParameterName);
+          String err = String.format("Aggregation function parameter \"%s\" on column \"%s\" has invalid value: %s",
+              functionParameterName, fieldName, value);
+          try {
+            Preconditions.checkState(Integer.parseInt(value) > 0, err);
+          } catch (NumberFormatException e) {
+            throw new IllegalStateException(err);
+          }
+        }
+        // check that function parameter value is valid for sampling probability
+        if (functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY)) {
+          String value = functionParameters.get(functionParameterName);
+          String err = String.format("Aggregation function parameter \"%s\" on column \"%s\" has invalid value: %s",
+              functionParameterName, fieldName, value);
+          try {
+            float p = Float.parseFloat(value);
+            Preconditions.checkState(p >= 0.0f && p <= 1.0f, err);
+          } catch (NumberFormatException e) {
+            throw new IllegalStateException(err);
+          }
+        }
+      }
+    }
   }
 
   @VisibleForTesting
