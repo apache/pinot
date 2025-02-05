@@ -159,7 +159,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // a _red_ error (see handleRequestFailing javadoc)
       LOGGER.warn("Request {} failed in an uncontrolled manner", requestId, e);
       String subStackTrace = ExceptionUtils.consolidateExceptionMessages(e);
-      BrokerResponseNative brokerResponseNative = new BrokerResponseNative(QException.UNKNOWN_ERROR_CODE, subStackTrace);
+      BrokerResponseNative brokerResponseNative =
+          new BrokerResponseNative(QException.UNKNOWN_ERROR_CODE, subStackTrace);
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
     }
@@ -177,13 +178,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         case QException.UNKNOWN_COLUMN_ERROR_CODE:
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
           break;
+        default:
+          break;
       }
     }
   }
 
   /**
-   * Handles the request that is expected to fail in a controlled way. 
-   * 
+   * Handles the request that is expected to fail in a controlled way.
+   *
    * The query may be a select or an explain and it can fail finish in the following ways:
    * <ul>
    *   <li>Successfully, the BrokerResponse will contain no errors</li>

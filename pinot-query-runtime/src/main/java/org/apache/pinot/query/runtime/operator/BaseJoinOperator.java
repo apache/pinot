@@ -27,7 +27,6 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -40,6 +39,7 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -307,7 +307,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected static void throwProcessingExceptionForJoinRowLimitExceeded(String reason)
       throws ProcessingException {
     ProcessingException resourceLimitExceededException =
-        new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+        new ProcessingException(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
     resourceLimitExceededException.setMessage(reason
         + ". Consider increasing the limit for the maximum number of rows in a join either via the query option '"
         + QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"

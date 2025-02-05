@@ -63,6 +63,7 @@ public class MailboxStatusLogger implements StreamObserver<Mailbox.MailboxStatus
           default:
             LOGGER.warn("Mailbox from {} to {} failed with unknown GRPC error on server side",
                 _context.getStageId(), _receiverStage, t);
+            break;
         }
       } else {
         LOGGER.warn("Mailbox from {} to {} failed with unknown error on server side",

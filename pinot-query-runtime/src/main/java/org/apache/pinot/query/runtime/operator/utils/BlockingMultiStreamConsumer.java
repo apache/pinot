@@ -295,7 +295,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     protected TransferableBlock onException(Exception e) {
       // TODO: Should we send the hostname to the users?
       String errMsg = "Server " + _serverAddress.hostname() + " found an error while reading on stage "
-          + _stats.getCurrentStageId() + " waiting for data sent by stage "  + _senderStageId;
+          + _stats.getCurrentStageId() + " waiting for data sent by stage " + _senderStageId;
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
