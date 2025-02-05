@@ -680,8 +680,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentAllIndexPreprocessThrottler);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentStarTreePreprocessThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentPreprocessThrottler);
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

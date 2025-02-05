@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+
 
 /**
  * Contains all the segment preprocess throttlers used to control the total index rebuilds that can happen on a given
@@ -28,7 +32,7 @@ package org.apache.pinot.segment.local.utils;
  * The throttlers passed in for now cannot be 'null', instead for code paths that do not need throttling, this object
  * itself will be passed in as 'null'.
  */
-public class SegmentPreprocessThrottler {
+public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListener {
 
   private final SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
   private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
@@ -55,5 +59,11 @@ public class SegmentPreprocessThrottler {
   public void startServingQueries() {
     _segmentAllIndexPreprocessThrottler.startServingQueries();
     _segmentStarTreePreprocessThrottler.startServingQueries();
+  }
+
+  @Override
+  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    _segmentAllIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
+    _segmentStarTreePreprocessThrottler.onChange(changedConfigs, clusterConfigs);
   }
 }

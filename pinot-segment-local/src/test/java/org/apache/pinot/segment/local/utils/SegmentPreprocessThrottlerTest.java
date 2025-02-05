@@ -579,4 +579,67 @@ public class SegmentPreprocessThrottlerTest {
       Assert.assertEquals(preprocessThrottler.totalPermits(), initialPermits * 4);
     }
   }
+
+  @Test
+  public void testChangeConfigsOnSegmentPreprocessThrottler() {
+    int initialPermits = 4;
+    SegmentAllIndexPreprocessThrottler allIndexPreprocessThrottler = new SegmentAllIndexPreprocessThrottler(
+        initialPermits, initialPermits * 2, true);
+    SegmentStarTreePreprocessThrottler starTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(
+        initialPermits, initialPermits * 2, true);
+    SegmentPreprocessThrottler segmentPreprocessThrottler = new SegmentPreprocessThrottler(allIndexPreprocessThrottler,
+        starTreePreprocessThrottler);
+
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
+        initialPermits);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
+        initialPermits);
+
+    // Add random and relevant configs and call 'onChange'
+    Map<String, String> updatedClusterConfigs = new HashMap<>();
+    updatedClusterConfigs.put("random.config.key", "random.config.value");
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
+    segmentPreprocessThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
+        initialPermits * 2);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
+        initialPermits * 2);
+  }
+
+  @Test
+  public void testChangeConfigsOnSegmentPreprocessThrottlerQueriesDisabled() {
+    int initialPermits = 4;
+    SegmentAllIndexPreprocessThrottler allIndexPreprocessThrottler = new SegmentAllIndexPreprocessThrottler(
+        initialPermits, initialPermits * 2, false);
+    SegmentStarTreePreprocessThrottler starTreePreprocessThrottler = new SegmentStarTreePreprocessThrottler(
+        initialPermits, initialPermits * 2, false);
+    SegmentPreprocessThrottler segmentPreprocessThrottler = new SegmentPreprocessThrottler(allIndexPreprocessThrottler,
+        starTreePreprocessThrottler);
+
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
+        initialPermits * 2);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
+        initialPermits * 2);
+
+    // Add random and relevant configs and call 'onChange'
+    Map<String, String> updatedClusterConfigs = new HashMap<>();
+    updatedClusterConfigs.put("random.config.key", "random.config.value");
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        String.valueOf(initialPermits * 2));
+    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        String.valueOf(initialPermits * 4));
+    updatedClusterConfigs.put(
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+        String.valueOf(initialPermits * 4));
+    segmentPreprocessThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().totalPermits(),
+        initialPermits * 4);
+    Assert.assertEquals(segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
+        initialPermits * 4);
+  }
 }
