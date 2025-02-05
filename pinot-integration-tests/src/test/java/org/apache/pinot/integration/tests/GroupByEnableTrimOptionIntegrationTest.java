@@ -42,7 +42,7 @@ import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.get
 
 
 // similar to GroupByOptionsIntegrationTest but this test verifies that default enable group trim option works even
-// if hint is not set
+// if hint is not set in the query
 public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrationTestSet {
 
   static final int FILES_NO = 4;
