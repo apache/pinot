@@ -28,6 +28,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -614,28 +615,49 @@ public enum PinotDataType {
     @Override
     public float toFloat(Object value) {
       // NOTE: No need to trim here because Float.valueOf() will trim the string
-      return Float.parseFloat(value.toString());
+      try {
+        return Float.parseFloat(value.toString());
+      } catch (NumberFormatException e) {
+        throw new QException(QException.SQL_RUNTIME_ERROR_CODE, "Failed to convert value string value to float", e);
+      }
     }
 
     @Override
     public double toDouble(Object value) {
       // NOTE: No need to trim here because Double.valueOf() will trim the string
-      return Double.parseDouble(value.toString());
+      try {
+        return Double.parseDouble(value.toString());
+      } catch (NumberFormatException e) {
+        throw new QException(QException.SQL_RUNTIME_ERROR_CODE, "Failed to convert value string value to double", e);
+      }
     }
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return new BigDecimal(value.toString().trim());
+      try {
+        return new BigDecimal(value.toString().trim());
+      } catch (NumberFormatException e) {
+        throw new QException(QException.SQL_RUNTIME_ERROR_CODE, "Failed to convert value string value to big decimal",
+            e);
+      }
     }
 
     @Override
     public boolean toBoolean(Object value) {
-      return BooleanUtils.toBoolean(value.toString().trim());
+      try {
+        return BooleanUtils.toBoolean(value.toString().trim());
+      } catch (IllegalArgumentException e) {
+        throw new QException(QException.SQL_RUNTIME_ERROR_CODE, "Failed to convert value string value to boolean", e);
+      }
     }
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      return TimestampUtils.toTimestamp(value.toString().trim());
+      try {
+        return TimestampUtils.toTimestamp(value.toString().trim());
+      } catch (IllegalArgumentException e) {
+        throw new QException(QException.SQL_RUNTIME_ERROR_CODE, "Failed to convert value string value to timestamp", e);
+      }
     }
 
     @Override

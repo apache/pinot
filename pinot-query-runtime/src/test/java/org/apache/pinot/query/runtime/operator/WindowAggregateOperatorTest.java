@@ -43,6 +43,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.testng.collections.Sets;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.RANGE;
@@ -444,8 +445,10 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    assertTrue(block.getExceptions().get(1000).contains("String cannot be cast to class"),
-        "expected it to fail with class cast exception");
+    assertEquals(block.getExceptions().keySet(), Sets.newHashSet(QException.SQL_RUNTIME_ERROR_CODE),
+        "Expected only SQL runtime error but got: " + block.getExceptions());
+    assertEquals(block.getExceptions().get(QException.SQL_RUNTIME_ERROR_CODE),
+        "Operator WINDOW on stage 0 failed: Failed to cast value as expected in SUM");
   }
 
   @Test

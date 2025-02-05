@@ -32,6 +32,7 @@ import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+import org.testng.collections.Sets;
 
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
@@ -126,7 +127,10 @@ public class TransformOperatorTest {
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
+    assertEquals(block.getExceptions().keySet(), Sets.newHashSet(QException.SQL_RUNTIME_ERROR_CODE),
+        "Expected only SQL runtime error but got: " + block.getExceptions());
+    assertEquals(block.getExceptions().get(QException.SQL_RUNTIME_ERROR_CODE),
+        "Operator TRANSFORM on stage 0 failed: Failed to convert value string value to double");
   }
 
   @Test

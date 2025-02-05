@@ -34,12 +34,14 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+import org.testng.collections.Sets;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
@@ -236,8 +238,10 @@ public class AggregateOperatorTest {
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    assertTrue(block.getExceptions().get(1000).contains("cannot be cast to class"),
-        "expected it to fail with class cast exception");
+    assertEquals(block.getExceptions().keySet(), Sets.newHashSet(QException.INTERNAL_ERROR_CODE),
+        "expected it to fail with internal error");
+    assertEquals(block.getExceptions().get(QException.INTERNAL_ERROR_CODE),
+        "Operator AGGREGATE_OPERATOR on stage 0 failed", "expected it to fail in AGGREGATE_OPERATOR");
   }
 
   @Test
