@@ -1,0 +1,48 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.common.function.scalar.regexp;
+
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+
+
+public class RegexpExtractConstFunctionsTest {
+
+  @Test
+  public void test() {
+    RegexpExtractConstFunctions f = new RegexpExtractConstFunctions();
+
+    assertEquals(f.regexpExtract("val abe eee", "(a[bcd]e)"), "abe");
+    assertEquals(f.regexpExtract("val ade eee", "(a[bcd]e)"), "ade");
+    assertEquals(f.regexpExtract("val age eee", "(a[bcd]e)"), "");
+    // f caches first pattern and ignores second argument
+    assertEquals(f.regexpExtract("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "");
+
+    f = new RegexpExtractConstFunctions();
+    assertEquals(f.regexpExtract("val abe ace", "(a[bcd]e) (a[bcd]e)", 2), "ace");
+
+    f = new RegexpExtractConstFunctions();
+    assertEquals(f.regexpExtract("abe ace ade", "(a[bcd]e) (a[bcd]e) (a[bcd]e)", 3), "ade");
+
+    f = new RegexpExtractConstFunctions();
+    assertEquals(f.regexpExtract("abe ace ade", "(a[bcd]e)", 5, "wrong"), "wrong");
+    assertEquals(f.regexpExtract("aa bb cc", "(a[bcd]e)", 1, "wrong"), "wrong");
+  }
+}
