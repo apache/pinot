@@ -55,6 +55,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
+  private final ResourceUtilizationManager _resourceUtilizationManager;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -64,7 +65,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
+      ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
@@ -72,6 +74,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
     _storageQuotaChecker = quotaChecker;
+    _resourceUtilizationManager = resourceUtilizationManager;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
@@ -134,6 +137,17 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // if table is paused by admin then don't compute
     if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
       return false;
+    }
+    try {
+      boolean isResourceUtilizationWithinLimits =
+          _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType);
+      if (!isResourceUtilizationWithinLimits) {
+        _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
+        return false;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while checking resource utilization for table: {}", tableNameWithType, e);
     }
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
