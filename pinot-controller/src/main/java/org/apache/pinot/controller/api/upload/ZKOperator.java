@@ -72,6 +72,17 @@ public class ZKOperator {
       @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr, @Nullable String crypterName,
       long segmentSizeInBytes, boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers)
       throws Exception {
+    completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI, segmentFile,
+        sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes, enableParallelPushProtection,
+        allowRefresh, false, headers);
+  }
+
+  public void completeSegmentOperations(String tableNameWithType, SegmentMetadata segmentMetadata,
+      FileUploadType uploadType, @Nullable URI finalSegmentLocationURI, File segmentFile,
+      @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr, @Nullable String crypterName,
+      long segmentSizeInBytes, boolean enableParallelPushProtection, boolean allowRefresh, boolean allowReset,
+      HttpHeaders headers)
+      throws Exception {
     String segmentName = segmentMetadata.getName();
     boolean refreshOnly =
         Boolean.parseBoolean(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.REFRESH_ONLY));
@@ -100,18 +111,27 @@ public class ZKOperator {
           headers);
     } else {
       // Refresh an existing segment
-      if (!allowRefresh) {
+
+      if (!(allowRefresh || allowReset)) {
         // We cannot perform this check up-front in UploadSegment API call. If a segment doesn't exist during the check
         // done up-front but ends up getting created before the check here, we could incorrectly refresh an existing
         // segment.
         throw new ControllerApplicationException(LOGGER,
-            String.format("Segment: %s already exists in table: %s. Refresh not permitted.", segmentName,
-                tableNameWithType), Response.Status.CONFLICT);
+            String.format("Segment: %s already exists in table: %s. Neither refresh nor reset not permitted.",
+                segmentName, tableNameWithType), Response.Status.CONFLICT);
       }
-      LOGGER.info("Segment: {} already exists in table: {}, refreshing it", segmentName, tableNameWithType);
-      processExistingSegment(tableNameWithType, segmentMetadata, uploadType, existingSegmentMetadataZNRecord,
-          finalSegmentLocationURI, segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName,
-          segmentSizeInBytes, enableParallelPushProtection, headers);
+
+      if (allowRefresh) {
+        LOGGER.info("Segment: {} already exists in table: {}, refreshing it", segmentName, tableNameWithType);
+        processExistingSegmentWithRefresh(tableNameWithType, segmentMetadata, uploadType,
+            existingSegmentMetadataZNRecord, finalSegmentLocationURI, segmentFile, sourceDownloadURIStr,
+            segmentDownloadURIStr, crypterName, segmentSizeInBytes, enableParallelPushProtection, headers);
+      } else if (allowReset) {
+        LOGGER.info("Segment: {} already exists in table: {}, resetting it", segmentName, tableNameWithType);
+        processExistingSegmentWithReset(tableNameWithType, segmentMetadata, existingSegmentMetadataZNRecord,
+            finalSegmentLocationURI, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
+            enableParallelPushProtection, headers);
+      }
     }
   }
 
@@ -185,7 +205,7 @@ public class ZKOperator {
     }
 
       // Refresh an existing segment
-    processReIngestedSegment(tableNameWithType, segmentMetadata, existingSegmentMetadataZNRecord,
+    processExistingSegmentWithReset(tableNameWithType, segmentMetadata, existingSegmentMetadataZNRecord,
           finalSegmentLocationURI, sourceDownloadURIStr, segmentDownloadURIStr, crypterName,
           segmentSizeInBytes, enableParallelPushProtection, headers);
   }
@@ -228,7 +248,7 @@ public class ZKOperator {
     }
   }
 
-  private void processExistingSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
+  private void processExistingSegmentWithRefresh(String tableNameWithType, SegmentMetadata segmentMetadata,
       FileUploadType uploadType, ZNRecord existingSegmentMetadataZNRecord, @Nullable URI finalSegmentLocationURI,
       File segmentFile, @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr,
       @Nullable String crypterName, long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)
@@ -494,7 +514,7 @@ public class ZKOperator {
     }
   }
 
-  private void processReIngestedSegment(String tableNameWithType, SegmentMetadata segmentMetadata,
+  private void processExistingSegmentWithReset(String tableNameWithType, SegmentMetadata segmentMetadata,
       ZNRecord existingSegmentMetadataZNRecord, @Nullable URI finalSegmentLocationURI,
       @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr, @Nullable String crypterName,
       long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)

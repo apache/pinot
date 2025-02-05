@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,6 +58,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -73,6 +75,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
@@ -170,6 +173,8 @@ public class PinotLLCRealtimeSegmentManager {
    * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
    */
   private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
+  private static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
+
   // 1 hour
   private static final Random RANDOM = new Random();
 
@@ -2181,13 +2186,37 @@ public class PinotLLCRealtimeSegmentManager {
         }
 
         try {
-          _fileUploadDownloadClient.triggerReIngestion(aliveServer, segmentName);
+          triggerReIngestion(aliveServer, segmentName);
           LOGGER.info("Successfully triggered reIngestion for segment {} on server {}", segmentName, aliveServer);
         } catch (Exception e) {
           LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
         }
       }
     }
+  }
+
+  /**
+   * Invokes the server's reIngestSegment API via a POST request with JSON payload,
+   * using Simple HTTP APIs.
+   *
+   * POST http://[serverURL]/reIngestSegment/[segmentName]
+   */
+  private void triggerReIngestion(String serverHostPort, String segmentName)
+      throws IOException, URISyntaxException, HttpErrorStatusException {
+    String scheme = CommonConstants.HTTP_PROTOCOL;
+    if (serverHostPort.contains(CommonConstants.HTTPS_PROTOCOL)) {
+      scheme = CommonConstants.HTTPS_PROTOCOL;
+      serverHostPort = serverHostPort.replace(CommonConstants.HTTPS_PROTOCOL + "://", "");
+    } else if (serverHostPort.contains(CommonConstants.HTTP_PROTOCOL)) {
+      serverHostPort = serverHostPort.replace(CommonConstants.HTTP_PROTOCOL + "://", "");
+    }
+
+    String serverHost = serverHostPort.split(":")[0];
+    String serverPort = serverHostPort.split(":")[1];
+
+    URI reIngestUri = FileUploadDownloadClient.getURI(scheme, serverHost, Integer.parseInt(serverPort),
+        REINGEST_SEGMENT_PATH + "/" + segmentName);
+    HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendJsonPostRequest(reIngestUri, ""));
   }
 
   /**

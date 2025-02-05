@@ -60,7 +60,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 import static org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
 
 
@@ -300,18 +299,18 @@ public class ServerSegmentCompletionProtocolHandler {
 
     headers.add(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, destUriStr));
     String controllerUrl = getControllerUrl(rawTableName);
-    pushSegmentMetadata(llcSegmentName, controllerUrl, segmentTarFile, headers);
+    triggerSegmentReingestCompletion(llcSegmentName, controllerUrl, segmentTarFile, headers);
   }
 
   /**
-   * Push segment metadata to the Pinot Controller in METADATA mode.
+   * Trigger the segment reingest completion protocol to the controller.
    *
    * @param llcSegmentName The LLC segment name
    * @param controllerUrl The base URL of the Pinot Controller (e.g., "http://controller-host:9000")
    * @param segmentFile   The local segment tar.gz file
    * @param authHeaders   A map of authentication or additional headers for the request
    */
-  public void pushSegmentMetadata(LLCSegmentName llcSegmentName, String controllerUrl, File segmentFile,
+  public void triggerSegmentReingestCompletion(LLCSegmentName llcSegmentName, String controllerUrl, File segmentFile,
       List<Header> authHeaders)
       throws Exception {
     String segmentName = llcSegmentName.getSegmentName();
@@ -335,8 +334,8 @@ public class ServerSegmentCompletionProtocolHandler {
       // Set table name parameter
       List<NameValuePair> parameters = getSegmentPushCommonParams(rawTableName);
 
-      // Construct the endpoint URI
-      URI uploadEndpoint = FileUploadDownloadClient.getReingestSegmentURI(new URI(controllerUrl));
+      //
+      URI uploadEndpoint = FileUploadDownloadClient.getSegmentReingestCompletionURI(new URI(controllerUrl));
 
       LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
 

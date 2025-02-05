@@ -127,7 +127,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
-  public static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
+  public static final String SEGMENT_REINGEST_COMPLETION_PATH = "/segment/completeReingestion";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
@@ -370,9 +370,10 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
   }
 
-  public static URI getReingestSegmentURI(URI controllerURI)
+  public static URI getSegmentReingestCompletionURI(URI controllerURI)
       throws URISyntaxException {
-    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), "/segments/reingest");
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        SEGMENT_REINGEST_COMPLETION_PATH);
   }
 
   public static URI getBatchSegmentUploadURI(URI controllerURI)
@@ -1278,30 +1279,6 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
-  }
-
-  /**
-   * Invokes the server's reIngestSegment API via a POST request with JSON payload,
-   * using Simple HTTP APIs.
-   *
-   * POST http://[serverURL]/reIngestSegment/[segmentName]
-   */
-  public void triggerReIngestion(String serverHostPort, String segmentName)
-      throws IOException, URISyntaxException, HttpErrorStatusException {
-    String scheme = HTTP;
-    if (serverHostPort.contains(HTTPS)) {
-      scheme = HTTPS;
-      serverHostPort = serverHostPort.replace(HTTPS + "://", "");
-    } else if (serverHostPort.contains(HTTP)) {
-      serverHostPort = serverHostPort.replace(HTTP + "://", "");
-    }
-
-    String serverHost = serverHostPort.split(":")[0];
-    String serverPort = serverHostPort.split(":")[1];
-
-    URI reIngestUri =
-        getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH + "/" + segmentName);
-    HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, ""));
   }
 
   /**
