@@ -370,6 +370,11 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
   }
 
+  public static URI getReingestSegmentURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), "/segments/reingest");
+  }
+
   public static URI getBatchSegmentUploadURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),

@@ -45,7 +45,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -58,16 +57,12 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.hc.core5.http.Header;
-import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -77,7 +72,6 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -306,26 +300,7 @@ public class ReIngestionResource {
 
       ServerSegmentCompletionProtocolHandler protocolHandler =
           new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), tableNameWithType);
-
       protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
-
-      // Wait for segment to be uploaded
-      waitForCondition((Void) -> {
-        SegmentZKMetadata zkMetadata = tableDataManager.fetchZKMetadata(segmentName);
-        if (zkMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.UPLOADED) {
-          return false;
-        }
-        SegmentDataManager segDataManager = tableDataManager.acquireSegment(segmentName);
-        return segDataManager instanceof ImmutableSegmentDataManager;
-      }, CHECK_INTERVAL_MS, UPLOAD_END_TIMEOUT_MS, 0);
-
-      // Trigger segment reset
-      HttpClient httpClient = HttpClient.getInstance();
-      List<Header> headers = AuthProviderUtils.toRequestHeaders(protocolHandler.getAuthProvider());
-      Map<String, String> headersMap = headers.stream().collect(Collectors.toMap(Header::getName, Header::getValue));
-      String controllerVipUrl = protocolHandler.getControllerUrl(llcSegmentName.getTableName());
-      resetSegment(httpClient, controllerVipUrl, tableNameWithType, segmentName, null, headersMap);
-
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     } finally {
       manager.offload();

@@ -336,7 +336,7 @@ public class ServerSegmentCompletionProtocolHandler {
       List<NameValuePair> parameters = getSegmentPushCommonParams(rawTableName);
 
       // Construct the endpoint URI
-      URI uploadEndpoint = FileUploadDownloadClient.getUploadSegmentURI(new URI(controllerUrl));
+      URI uploadEndpoint = FileUploadDownloadClient.getReingestSegmentURI(new URI(controllerUrl));
 
       LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
 

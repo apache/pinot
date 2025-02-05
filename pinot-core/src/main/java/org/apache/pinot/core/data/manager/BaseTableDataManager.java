@@ -56,7 +56,6 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
-import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -394,17 +393,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
     // For pauseless tables, we should replace the segment if download url is missing even if crc is same
     // Without this the reingestion of ERROR segments in pauseless tables fails
     // as the segment data manager is still an instance of RealtimeSegmentDataManager
-    if (!PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
-      Preconditions.checkState(segmentDataManager instanceof ImmutableSegmentDataManager,
-          "Cannot replace CONSUMING segment: %s in table: %s", segmentName, _tableNameWithType);
-      SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-      if (hasSameCRC(zkMetadata, localMetadata)) {
-        _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
-        return;
-      }
-      _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
-          localMetadata.getCrc(), zkMetadata.getCrc());
+    Preconditions.checkState(segmentDataManager instanceof ImmutableSegmentDataManager,
+        "Cannot replace CONSUMING segment: %s in table: %s", segmentName, _tableNameWithType);
+    SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+    if (hasSameCRC(zkMetadata, localMetadata)) {
+      _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
+      return;
     }
+    _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
+        localMetadata.getCrc(), zkMetadata.getCrc());
     downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
     _logger.info("Replaced segment: {} with new CRC: {}", segmentName, zkMetadata.getCrc());
   }
