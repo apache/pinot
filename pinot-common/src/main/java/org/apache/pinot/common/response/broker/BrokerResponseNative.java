@@ -110,6 +110,10 @@ public class BrokerResponseNative implements BrokerResponse {
     _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
   }
 
+  public BrokerResponseNative(int errorCode, String errorMessage) {
+    _exceptions.add(new QueryProcessingException(errorCode, errorMessage));
+  }
+
   public BrokerResponseNative(List<ProcessingException> exceptions) {
     for (ProcessingException exception : exceptions) {
       _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
