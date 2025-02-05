@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,11 +67,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS = 4;
 
   // Key of how many parallel segment downloads can be made per table.
-  // A value of <= 0 indicates unlimited.
+  // Must have a value > 0. To effectively disable this, set to a very large value
   // Unlimited parallel downloads can make Pinot controllers receive high burst of download requests,
   // causing controllers unavailable for that period of time.
-  private static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
-  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = -1;
+  public static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = CommonConstants.Server.MAX_PARALLEL_SEGMENT_DOWNLOADS;
+  private static final int DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS =
+      Integer.parseInt(CommonConstants.Server.DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
 
   // Key of server segment download rate limit
   // limit the rate to write download-untar stream to disk, in bytes

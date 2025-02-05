@@ -653,7 +653,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new SegmentPreprocessThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler);
 
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler,
+        _clusterConfigChangeHandler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();

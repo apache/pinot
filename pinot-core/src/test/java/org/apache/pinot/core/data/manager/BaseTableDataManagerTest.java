@@ -662,7 +662,7 @@ public class BaseTableDataManagerTest {
     SegmentLocks segmentLocks = new SegmentLocks();
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, helixManager, segmentLocks, DEFAULT_TABLE_CONFIG, null, null,
-        SEGMENT_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER, null);
     return tableDataManager;
   }
 

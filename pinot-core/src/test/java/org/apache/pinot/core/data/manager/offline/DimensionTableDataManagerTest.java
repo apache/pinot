@@ -152,7 +152,7 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, null, null,
-        SEGMENT_PREPROCESS_THROTTLER);
+        SEGMENT_PREPROCESS_THROTTLER, null);
     tableDataManager.start();
     return tableDataManager;
   }

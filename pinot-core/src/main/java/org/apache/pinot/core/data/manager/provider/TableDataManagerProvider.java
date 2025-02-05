@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
@@ -40,7 +41,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public interface TableDataManagerProvider {
 
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
+      @Nullable PinotClusterConfigProvider clusterConfigProvider);
 
   default TableDataManager getTableDataManager(TableConfig tableConfig) {
     return getTableDataManager(tableConfig, null, null, () -> true);
