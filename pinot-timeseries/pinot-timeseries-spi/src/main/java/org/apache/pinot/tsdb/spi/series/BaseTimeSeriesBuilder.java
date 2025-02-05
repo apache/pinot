@@ -57,7 +57,16 @@ public abstract class BaseTimeSeriesBuilder {
 
   public abstract void addValueAtIndex(int timeBucketIndex, Double value);
 
+  /**
+   * This is the method used by Pinot's leaf stage.
+   */
+  public abstract void addValueAtIndex(int timeBucketIndex, Double value, long rawTimeValue);
+
   public void addValueAtIndex(int timeBucketIndex, String value) {
+    throw new UnsupportedOperationException("This aggregation function does not support string input");
+  }
+
+  public void addValueAtIndex(int timeBucketIndex, String value, long rawTimeValue) {
     throw new UnsupportedOperationException("This aggregation function does not support string input");
   }
 
