@@ -92,7 +92,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     serverConf.setProperty("pinot.server.instance." + HelixInstanceDataManagerConfig.UPLOAD_SEGMENT_TO_DEEP_STORE,
         "true");
     serverConf.setProperty("pinot.server.instance." + CommonConstants.Server.TABLE_DATA_MANAGER_PROVIDER_CLASS,
-        "org.apache.pinot.integration.tests.realtime.FailureInjectingTableDataManagerProvider");
+        "org.apache.pinot.integration.tests.realtime.utils.FailureInjectingTableDataManagerProvider");
   }
 
   @Override
