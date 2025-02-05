@@ -46,8 +46,33 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 
 
 /**
- * Aggregation function used by the Time Series Engine. This can't be used with SQL because the Object Serde is not
- * implemented. Though we don't plan on exposing this anytime soon.
+ * Aggregation function used by the Time Series Engine. This can't be used with SQL because the Object Serde is not yet
+ * implemented. Though we don't plan on exposing this function anytime soon.
+ * <h2>Converting Time Values to Bucket Indexes</h2>
+ * <p>
+ *   This aggregation function will map each scanned data point to a time bucket index. This is done using the
+ *   formula: {@code ((timeValue + timeOffset) - timeReferencePoint - 1) / bucketSize}. The entire calculation is done
+ *   in the Time Unit (seconds, ms, etc.) of the timeValue returned by the time expression chosen by the user.
+ *   The method used to add values to the series builders is:
+ *   {@link BaseTimeSeriesBuilder#addValueAtIndex(int, Double, long)}.
+ * </p>
+ * <p>
+ *   The formula originates from the fact that we use half-open time intervals, which are open on the left.
+ *   The timeReferencePoint is usually the start of the time-range being scanned. Assuming everything is in seconds,
+ *   the time buckets can generally thought to look something like the following:
+ *   <pre>
+ *     (timeReferencePoint, timeReferencePoint + bucketSize]
+ *     (timeReferencePoint + bucketSize, timeReferencePoint + 2 * bucketSize]
+ *     ...
+ *     (timeReferencePoint + (numBuckets - 1) * bucketSize, timeReferencePoint + numBuckets * bucketSize]
+ *   </pre>
+ * </p>
+ * <p>
+ *   Also, note that the timeReferencePoint is simply calculated as follows:
+ *   <pre>
+ *     timeReferencePointInSeconds = firstBucketValue - bucketSizeInSeconds
+ *   </pre>
+ * </p>
  */
 public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTimeSeriesBuilder, DoubleArrayList> {
   private final TimeSeriesBuilderFactory _factory;

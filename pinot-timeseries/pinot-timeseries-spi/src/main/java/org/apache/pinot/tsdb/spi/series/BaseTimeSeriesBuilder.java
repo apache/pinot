@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 /**
@@ -58,7 +59,12 @@ public abstract class BaseTimeSeriesBuilder {
   public abstract void addValueAtIndex(int timeBucketIndex, Double value);
 
   /**
-   * This is the method used by Pinot's leaf stage.
+   * This is the method called by Pinot's leaf stage to accumulate data in the series builders. Pinot's leaf stage
+   * passes the raw time value to allow languages to build complex series builders. For instance, PromQL relies on
+   * the first and last time value in each time bucket for certain functions.
+   * <p>
+   *   The rawTimeValue is in the same Time Unit as that passed to the {@link LeafTimeSeriesPlanNode}.
+   * </p>
    */
   public abstract void addValueAtIndex(int timeBucketIndex, Double value, long rawTimeValue);
 
