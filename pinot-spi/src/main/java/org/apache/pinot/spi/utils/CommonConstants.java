@@ -255,6 +255,14 @@ public class CommonConstants {
         "pinot.server.max.segment.preprocess.parallelism.before.serving.queries";
     // Use the below default before enabling queries on the server
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES = String.valueOf(100);
+    // Preprocess throttle config specifically for StarTree index rebuild
+    public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
+        "pinot.server.max.segment.startree.preprocess.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM = String.valueOf(100);
+    public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.startree.preprocess.parallelism.before.serving.queries";
+    public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        String.valueOf(100);
   }
 
   public static class Broker {
