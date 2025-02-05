@@ -140,6 +140,9 @@ public class QueryDispatcher {
       Thread.currentThread().interrupt();
       cancel(requestId, plans);
       throw new QException(QException.INTERNAL_ERROR_CODE, e);
+    } catch (Exception e) {
+      cancel(requestId, plans);
+      throw new QException(QException.INTERNAL_ERROR_CODE, e);
     }
   }
 

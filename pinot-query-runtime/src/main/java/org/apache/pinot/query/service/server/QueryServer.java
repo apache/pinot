@@ -233,6 +233,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       LOGGER.error("Caught exception while cancelling opChain for request: {}", request.getRequestId(), t);
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
+    // TODO: This produces fails inside GRPC when the other end did already closed the connection.
+    //  GRPC logs these errors using JUL, which pollutes the logs. Find a way to either suppress these logs or
+    //  handle the cancellation in a way that does not produce these errors.
     responseObserver.onCompleted();
   }
 
