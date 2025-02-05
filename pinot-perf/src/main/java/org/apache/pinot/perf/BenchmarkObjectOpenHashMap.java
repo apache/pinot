@@ -51,7 +51,7 @@ public class BenchmarkObjectOpenHashMap {
       "500000",
       "1000000",
       "5000000",
-      "20000000",
+      "20000000"
   })
   public int _cardinality;
 
@@ -65,8 +65,7 @@ public class BenchmarkObjectOpenHashMap {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
-  public int object2IntReservedOpenHashMap()
-  {
+  public int object2IntReservedOpenHashMap() {
     Object2IntOpenHashMap<Object> map = new Object2IntOpenHashMap<>(_cardinality + 1);
     map.defaultReturnValue(INVALID_ID);
     for (int j = 0; j < _cardinality; j++) {
@@ -77,8 +76,7 @@ public class BenchmarkObjectOpenHashMap {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
-  public int object2IntOpenHashMap()
-  {
+  public int object2IntOpenHashMap() {
     Object2IntOpenHashMap<Object> map = new Object2IntOpenHashMap<>();
     map.defaultReturnValue(INVALID_ID);
     for (int j = 0; j < _cardinality; j++) {
@@ -89,8 +87,7 @@ public class BenchmarkObjectOpenHashMap {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
-  public int vanillaReservedHashMap()
-  {
+  public int vanillaReservedHashMap() {
     HashMap<Object, Integer> map = new HashMap<>(_cardinality + 1);
     for (int j = 0; j < _cardinality; j++) {
       getGroupId(map, _values[j]);
@@ -100,8 +97,7 @@ public class BenchmarkObjectOpenHashMap {
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
-  public int vanillaHashMap()
-  {
+  public int vanillaHashMap() {
     HashMap<Object, Integer> map = new HashMap<>();
     for (int j = 0; j < _cardinality; j++) {
       getGroupId(map, _values[j]);
