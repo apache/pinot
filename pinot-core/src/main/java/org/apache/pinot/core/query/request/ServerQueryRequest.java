@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -171,5 +172,15 @@ public class ServerQueryRequest {
 
   public TimerContext getTimerContext() {
     return _timerContext;
+  }
+
+  public void registerOnMdc() {
+    LoggerConstants.QUERY_ID_KEY.registerOnMdc(String.valueOf(_requestId));
+    LoggerConstants.COMPONENT_TYPE_KEY.registerOnMdc("controller");
+  }
+
+  public void unregisterFromMdc() {
+    LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
+    LoggerConstants.COMPONENT_TYPE_KEY.unregisterFromMdc();
   }
 }

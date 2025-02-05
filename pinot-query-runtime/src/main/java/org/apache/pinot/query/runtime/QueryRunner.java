@@ -47,6 +47,8 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.mailbox.channel.MailboxStatusLogger;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -228,26 +230,31 @@ public class QueryRunner {
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
           stageId, errorBlock.getExceptions());
       MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
-      List<RoutingInfo> routingInfos = new ArrayList<>();
       for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
         List<MailboxInfo> receiverMailboxInfos =
             workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
         List<RoutingInfo> stageRoutingInfos =
             MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
                 receiverMailboxInfos);
-        routingInfos.addAll(stageRoutingInfos);
-      }
-      for (RoutingInfo routingInfo : routingInfos) {
-        try {
-          StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-          _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-              routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
-        } catch (TimeoutException e) {
-          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-              routingInfo.getMailboxId(), requestId, stageId, e);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-              routingInfo.getMailboxId(), requestId, stageId, e);
+
+        OpChainExecutionContext pipelineExecutionContext =
+            new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+                workerMetadata, pipelineBreakerResult, parentContext);
+
+        MailboxStatusLogger mailboxStatusLogger = new MailboxStatusLogger(pipelineExecutionContext, receiverStageId);
+        for (RoutingInfo routingInfo : stageRoutingInfos) {
+          try {
+            StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+            SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
+                routingInfo.getPort(), routingInfo.getMailboxId(), deadlineMs, statMap, mailboxStatusLogger);
+            sendingMailbox.send(errorBlock);
+          } catch (TimeoutException e) {
+            LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
+                routingInfo.getMailboxId(), requestId, stageId, e);
+          } catch (Exception e) {
+            LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+                routingInfo.getMailboxId(), requestId, stageId, e);
+          }
         }
       }
       return;

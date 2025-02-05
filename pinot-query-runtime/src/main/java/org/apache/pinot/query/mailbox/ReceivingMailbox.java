@@ -35,6 +35,7 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,7 @@ public class ReceivingMailbox {
   @Nullable
   private volatile Reader _reader;
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
+  private volatile OpChainExecutionContext _context;
 
   public ReceivingMailbox(String id) {
     _id = id;
@@ -237,6 +239,15 @@ public class ReceivingMailbox {
 
   public StatMap<StatKey> getStatMap() {
     return _stats;
+  }
+
+  public void setOpChainContext(OpChainExecutionContext context) {
+    _context = context;
+  }
+
+  @Nullable
+  public OpChainExecutionContext getContext() {
+    return _context;
   }
 
   public interface Reader {

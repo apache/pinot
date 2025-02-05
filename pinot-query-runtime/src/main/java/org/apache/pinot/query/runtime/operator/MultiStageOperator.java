@@ -204,7 +204,7 @@ public abstract class MultiStageOperator
       try {
         op.cancel(e);
       } catch (Exception e2) {
-        logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
+        logger().warn("Failed to cancel operator {} with error:{} with exception:", op, e.getMessage(), e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }

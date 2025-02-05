@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import java.io.ByteArrayOutputStream;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;

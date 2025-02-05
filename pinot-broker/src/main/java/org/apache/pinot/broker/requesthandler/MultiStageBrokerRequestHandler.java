@@ -136,7 +136,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext, httpHeaders);
       if (!brokerResponse.getExceptions().isEmpty()) {
         // a _green_ error (see handleRequestFailing javadoc)
-        LOGGER.info("Request failed in a controlled manner {}: {}", requestId, brokerResponse.getExceptions());
+        LOGGER.info("Request {} failed in a controlled manner: {}", requestId, brokerResponse.getExceptions());
         onFailedRequest(brokerResponse.getExceptions());
       }
       return brokerResponse;
@@ -150,14 +150,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         LOGGER.warn("Request {} failed with exception", requestId, e);
       } else {
         // a _green_ error (see handleRequestFailing javadoc)
-        LOGGER.info("Request {} failed with exception message {}", e.getMessage(), requestId);
+        LOGGER.info("Request {} failed with message {}", e.getMessage(), requestId);
       }
       BrokerResponseNative brokerResponseNative = new BrokerResponseNative(e.getErrorCode(), e.getMessage());
       onFailedRequest(brokerResponseNative.getExceptions());
       return brokerResponseNative;
     } catch (RuntimeException e) {
       // a _red_ error (see handleRequestFailing javadoc)
-      LOGGER.warn("Request {} failed in an uncontrolled way", requestId, e);
+      LOGGER.warn("Request {} failed in an uncontrolled manner", requestId, e);
       String subStackTrace = ExceptionUtils.consolidateExceptionMessages(e);
       BrokerResponseNative brokerResponseNative = new BrokerResponseNative(QException.UNKNOWN_ERROR_CODE, subStackTrace);
       onFailedRequest(brokerResponseNative.getExceptions());

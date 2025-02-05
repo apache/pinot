@@ -178,57 +178,63 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       return;
     }
 
-    // Table level access control
-    GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
-    if (!_accessControl.hasDataAccess(requestIdentity, queryRequest.getTableNameWithType())) {
-      Exception unsupportedOperationException = new UnsupportedOperationException(
-          String.format("No access to table %s while processing request %d: %s from broker: %s",
-              queryRequest.getTableNameWithType(), queryRequest.getRequestId(), queryRequest.getQueryContext(),
-              queryRequest.getBrokerId()));
-      final String exceptionMsg = String.format("Table not found: %s", queryRequest.getTableNameWithType());
-      LOGGER.error(exceptionMsg, unsupportedOperationException);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
-      responseObserver.onError(
-          Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
-      return;
-    }
-
-    // Process the query
-    InstanceResponseBlock instanceResponse;
     try {
-      LOGGER.info("Executing gRPC query request {}: {} received from broker: {}", queryRequest.getRequestId(),
-          queryRequest.getQueryContext(), queryRequest.getBrokerId());
-      instanceResponse = _queryExecutor.execute(queryRequest, _executorService,
-          new GrpcResultsBlockStreamer(responseObserver, _serverMetrics));
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing request {}: {} from broker: {}", queryRequest.getRequestId(),
-          queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      responseObserver.onError(Status.INTERNAL.withCause(e).asException());
-      return;
-    }
+      queryRequest.registerOnMdc();
 
-    ServerResponse serverResponse;
-    try {
-      DataTable dataTable = instanceResponse.toDataTable();
-      serverResponse = queryRequest.isEnableStreaming() ? StreamingResponseUtils.getMetadataResponse(dataTable)
-          : StreamingResponseUtils.getNonStreamingResponse(dataTable);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while serializing response for request {}: {} from broker: {}",
-          queryRequest.getRequestId(), queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
-      responseObserver.onError(Status.INTERNAL.withCause(e).asException());
-      return;
-    }
-    responseObserver.onNext(serverResponse);
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
-    responseObserver.onCompleted();
-    _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.GRPC_QUERY_EXECUTION_MS,
-        System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+      // Table level access control
+      GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
+      if (!_accessControl.hasDataAccess(requestIdentity, queryRequest.getTableNameWithType())) {
+        Exception unsupportedOperationException = new UnsupportedOperationException(
+            String.format("No access to table %s while processing request %d: %s from broker: %s",
+                queryRequest.getTableNameWithType(), queryRequest.getRequestId(), queryRequest.getQueryContext(),
+                queryRequest.getBrokerId()));
+        final String exceptionMsg = String.format("Table not found: %s", queryRequest.getTableNameWithType());
+        LOGGER.error(exceptionMsg, unsupportedOperationException);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.NO_TABLE_ACCESS, 1);
+        responseObserver.onError(
+            Status.NOT_FOUND.withDescription(exceptionMsg).withCause(unsupportedOperationException).asException());
+        return;
+      }
 
-    // Log the query
-    if (_queryLogger != null) {
-      _queryLogger.logQuery(queryRequest, instanceResponse, "GrpcQueryServer");
+      // Process the query
+      InstanceResponseBlock instanceResponse;
+      try {
+        LOGGER.info("Executing gRPC query request {}: {} received from broker: {}", queryRequest.getRequestId(),
+            queryRequest.getQueryContext(), queryRequest.getBrokerId());
+        instanceResponse = _queryExecutor.execute(queryRequest, _executorService,
+            new GrpcResultsBlockStreamer(responseObserver, _serverMetrics));
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while processing request {}: {} from broker: {}", queryRequest.getRequestId(),
+            queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+        responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+        return;
+      }
+
+      ServerResponse serverResponse;
+      try {
+        DataTable dataTable = instanceResponse.toDataTable();
+        serverResponse = queryRequest.isEnableStreaming() ? StreamingResponseUtils.getMetadataResponse(dataTable)
+            : StreamingResponseUtils.getNonStreamingResponse(dataTable);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while serializing response for request {}: {} from broker: {}",
+            queryRequest.getRequestId(), queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
+        responseObserver.onError(Status.INTERNAL.withCause(e).asException());
+        return;
+      }
+      responseObserver.onNext(serverResponse);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
+      responseObserver.onCompleted();
+      _serverMetrics.addTimedTableValue(queryRequest.getTableNameWithType(), ServerTimer.GRPC_QUERY_EXECUTION_MS,
+          System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+
+      // Log the query
+      if (_queryLogger != null) {
+        _queryLogger.logQuery(queryRequest, instanceResponse, "GrpcQueryServer");
+      }
+    } finally {
+      queryRequest.unregisterFromMdc();
     }
   }
 }

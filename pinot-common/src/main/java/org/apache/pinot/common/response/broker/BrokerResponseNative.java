@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;

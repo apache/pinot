@@ -33,9 +33,14 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxStatusObserver.class);
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
 
+  private final StreamObserver<MailboxStatus> _callbackListener;
   private final AtomicInteger _bufferSize = new AtomicInteger(DEFAULT_MAILBOX_QUEUE_CAPACITY);
   private final AtomicBoolean _finished = new AtomicBoolean();
   private volatile boolean _isEarlyTerminated;
+
+  public MailboxStatusObserver(StreamObserver<MailboxStatus> callbackListener) {
+    _callbackListener = callbackListener;
+  }
 
   @Override
   public void onNext(MailboxStatus mailboxStatus) {
@@ -67,13 +72,14 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on sender side", t);
     _finished.set(true);
+    _callbackListener.onError(t);
   }
 
   @Override
   public void onCompleted() {
     _finished.set(true);
+    _callbackListener.onCompleted();
   }
 
   public boolean isFinished() {

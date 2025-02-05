@@ -125,12 +125,12 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
     String tableNameWithType = null;
 
+    ServerQueryRequest queryRequest = null;
     try {
       // Put all code inside try block to catch all exceptions.
       int requestSize = msg.readableBytes();
 
       instanceRequest = new InstanceRequest();
-      ServerQueryRequest queryRequest;
       requestBytes = new byte[requestSize];
 
       queryArrivalTimeMs = System.currentTimeMillis();
@@ -141,6 +141,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       msg.readBytes(requestBytes);
       _deserializer.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+      queryRequest.registerOnMdc();
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
       tableNameWithType = queryRequest.getTableNameWithType();
@@ -157,6 +158,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       LOGGER.error("Exception while processing instance request: {}", hexString, e);
       sendErrorResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs,
           DataTableBuilderFactory.getEmptyDataTable(), e);
+    } finally {
+      if (queryRequest != null) {
+        queryRequest.unregisterFromMdc();
+      }
     }
   }
 

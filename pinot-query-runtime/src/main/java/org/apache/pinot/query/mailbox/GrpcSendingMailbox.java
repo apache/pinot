@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
@@ -49,12 +50,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final int _port;
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
-  private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
+  private final MailboxStatusObserver _statusObserver;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap) {
+      StatMap<MailboxSendOperator.StatKey> statMap, StreamObserver<Mailbox.MailboxStatus> callbackListener) {
+    _statusObserver = new MailboxStatusObserver(callbackListener);
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;

@@ -26,6 +26,7 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,12 +110,26 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on receiver side", t);
-    ReceivingMailbox mailbox = _mailbox; // copied in a variable to avoid unsafe publication
-    if (mailbox != null) {
-      mailbox.setErrorBlock(QException.INTERNAL_ERROR_CODE, "Error on inter-server channel");
-    } else {
-      LOGGER.error("Got error before mailbox is set up", t);
+    OpChainExecutionContext context = _mailbox.getContext();
+    if (context != null) {
+      context.registerOnMDC();
+    }
+    try {
+      if (LOGGER.isDebugEnabled()) { // Log the stack trace if debug is enabled
+        LOGGER.warn("Error on receiver side", t);
+      } else {
+        LOGGER.warn("Error on receiver side: {}", t.getMessage());
+      }
+      ReceivingMailbox mailbox = _mailbox; // copied in a variable to avoid unsafe publication
+      if (mailbox != null) {
+        mailbox.setErrorBlock(QException.INTERNAL_ERROR_CODE, "Error on inter-server channel");
+      } else {
+        LOGGER.error("Got error before mailbox is set up", t);
+      }
+    } finally {
+      if (context != null) {
+        context.unregisterFromMDC();
+      }
     }
   }
 

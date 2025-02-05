@@ -21,11 +21,13 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -111,11 +113,11 @@ public class MailboxService {
    * data is sent for the first time.
    */
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap) {
+      StatMap<MailboxSendOperator.StatKey> statMap, StreamObserver<Mailbox.MailboxStatus> callbackListener) {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap, callbackListener);
     }
   }
 

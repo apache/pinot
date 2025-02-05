@@ -19,7 +19,6 @@
 package org.apache.pinot.common.response.broker;
 
 import java.io.IOException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.exception.QException;
 import org.testng.Assert;
 import org.testng.annotations.Test;

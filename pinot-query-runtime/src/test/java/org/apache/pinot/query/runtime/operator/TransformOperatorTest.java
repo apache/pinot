@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;

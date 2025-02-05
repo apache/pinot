@@ -33,6 +33,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.mailbox.channel.MailboxStatusLogger;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -136,8 +137,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<RoutingInfo> routingInfos =
           MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
               mailboxInfos);
+    MailboxStatusLogger mailboxStatusLogger = new MailboxStatusLogger(context, receiverStageId);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap,
+            mailboxStatusLogger))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, splitter);
