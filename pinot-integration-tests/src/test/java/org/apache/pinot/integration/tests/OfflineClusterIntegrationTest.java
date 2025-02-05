@@ -196,6 +196,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Set max segment preprocess parallelism to 8 to test that all segments can be processed
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment startree preprocess parallelism to 6 to test that all segments can be processed
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
     startBrokers();
     startServers();
 
