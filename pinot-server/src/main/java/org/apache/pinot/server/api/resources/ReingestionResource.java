@@ -41,9 +41,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -96,18 +94,17 @@ public class ReingestionResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReingestionResource.class);
 
   //TODO: Make this configurable
-  private static final int MIN_REINGESTION_THREADS = 4;
-  private static final int MAX_PARALLEL_REINGESTIONS = 8;
+  private static final int MIN_REINGESTION_THREADS = 2;
+  private static final int MAX_PARALLEL_REINGESTIONS =
+      Math.max(Runtime.getRuntime().availableProcessors() / 2, MIN_REINGESTION_THREADS);
 
   // Tracks if a particular segment is currently being re-ingested
   private static final ConcurrentHashMap<String, AtomicBoolean>
       SEGMENT_INGESTION_MAP = new ConcurrentHashMap<>();
 
   // Executor for asynchronous re-ingestion
-  private static final ExecutorService REINGESTION_EXECUTOR =
-      new ThreadPoolExecutor(MIN_REINGESTION_THREADS, MAX_PARALLEL_REINGESTIONS, 0L, TimeUnit.MILLISECONDS,
-          new LinkedBlockingQueue<>(), // unbounded queue for the reingestion tasks
-          new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").build());
+  private static final ExecutorService REINGESTION_EXECUTOR = Executors.newFixedThreadPool(MAX_PARALLEL_REINGESTIONS,
+      new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").build());
 
   // Keep track of jobs by jobId => job info
   private static final ConcurrentHashMap<String, ReingestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
@@ -262,6 +259,7 @@ public class ReingestionResource {
       } finally {
         isIngesting.set(false);
         RUNNING_JOBS.remove(jobId);
+        SEGMENT_INGESTION_MAP.remove(segmentName);
       }
     });
 
