@@ -326,11 +326,10 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
-    _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
-
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
         streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
     ).collect(Collectors.toList());
+    streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
         getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList());
