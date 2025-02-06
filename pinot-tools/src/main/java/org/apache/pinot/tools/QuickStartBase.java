@@ -291,6 +291,10 @@ public abstract class QuickStartBase {
     }
   }
 
+  protected Map<String, String> getClusterConfigOverrides() {
+    return Map.of();
+  }
+
   protected String[] getDefaultBatchTableDirectories() {
     return DEFAULT_OFFLINE_TABLE_DIRECTORIES;
   }

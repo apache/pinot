@@ -67,7 +67,7 @@ public class Quickstart extends QuickStartBase {
 
     QuickstartRunner runner =
         new QuickstartRunner(quickstartTableRequests, 1, 1, getNumQuickstartRunnerServers(), 1, quickstartRunnerDir,
-            true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, true);
+            true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, true, getClusterConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
     runner.startAll();
