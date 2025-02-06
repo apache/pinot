@@ -388,6 +388,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     LOGGER.info("Including server: {} to routing", instanceId);
     if (!_excludedServers.remove(instanceId)) {
       LOGGER.info("Server: {} is not previously excluded, skipping updating the routing", instanceId);
+      return;
     }
     if (!_enabledServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +48,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.exception.QueryInfoException;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -99,7 +100,6 @@ import org.slf4j.LoggerFactory;
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
@@ -111,16 +111,21 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
+  @Nullable
+  private final FailureDetector _failureDetector;
 
   public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null, false);
+    this(mailboxService, null, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig, boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig,
+      @Nullable FailureDetector failureDetector, boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    _failureDetector = failureDetector;
+
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
     } else {
@@ -212,6 +217,17 @@ public class QueryDispatcher {
     }
   }
 
+  public boolean checkConnectivityToInstance(String instanceId) {
+    DispatchClient client = _dispatchClientMap.get(instanceId);
+
+    if (client == null) {
+      LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
+      return false;
+    }
+
+    return client.getChannel().getState(true) == ConnectivityState.READY;
+  }
+
   private boolean isQueryCancellationEnabled() {
     return _serversByQuery != null;
   }
@@ -252,6 +268,9 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
+        if (_failureDetector != null) {
+          _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
+        }
       }
     }
 
@@ -408,10 +427,8 @@ public class QueryDispatcher {
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
-    String hostname = queryServerInstance.getHostname();
-    int port = queryServerInstance.getQueryServicePort();
-    String key = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(hostname, port, _tlsConfig));
+    return _dispatchClientMap.computeIfAbsent(queryServerInstance.getInstanceId(), k -> new DispatchClient(
+        queryServerInstance.getHostname(), queryServerInstance.getQueryServicePort(), _tlsConfig));
   }
 
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
