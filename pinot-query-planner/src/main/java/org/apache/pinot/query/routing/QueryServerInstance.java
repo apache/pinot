@@ -30,18 +30,24 @@ import org.apache.pinot.core.transport.ServerInstance;
  * <p>Note that {@code QueryServerInstance} should only be used during dispatch.</p>
  */
 public class QueryServerInstance {
+  private final String _instanceId;
   private final String _hostname;
   private final int _queryServicePort;
   private final int _queryMailboxPort;
 
   public QueryServerInstance(ServerInstance server) {
-    this(server.getHostname(), server.getQueryServicePort(), server.getQueryMailboxPort());
+    this(server.getInstanceId(), server.getHostname(), server.getQueryServicePort(), server.getQueryMailboxPort());
   }
 
-  public QueryServerInstance(String hostName, int servicePort, int mailboxPort) {
+  public QueryServerInstance(String instanceId, String hostName, int servicePort, int mailboxPort) {
+    _instanceId = instanceId;
     _hostname = hostName;
     _queryServicePort = servicePort;
     _queryMailboxPort = mailboxPort;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   public String getHostname() {

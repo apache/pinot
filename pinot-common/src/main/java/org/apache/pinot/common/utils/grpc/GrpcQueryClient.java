@@ -112,6 +112,10 @@ public class GrpcQueryClient implements Closeable {
     return _blockingStub.submit(request);
   }
 
+  public ManagedChannel getChannel() {
+    return _managedChannel;
+  }
+
   @Override
   public void close() {
     if (!_managedChannel.isShutdown()) {
