@@ -825,8 +825,15 @@ public class PinotSegmentRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Reset/cleanup segments in a pauseless enabled table", notes =
-      "For each partition, finds the oldest error segment and deletes all segments with sequence number >= "
-          + "oldest error segment's sequence. Segments with sequence numbers < oldest error are preserved.")
+      "Resets segment state for pauseless-enabled tables in one of two modes: "
+          + "1. If error segments are explicitly provided: Deletes only the specified error segments"
+          + "2. If no error segments are provided: For each partition:"
+          + "   - Automatically detects error segments from ExternalView"
+          + "   - Identifies the oldest error segment (lowest sequence number) in that partition"
+          + "   - Deletes all segments in that partition with sequence numbers >= the oldest error segment"
+          + "The retention period controls how long deleted segments are retained before permanent removal. "
+          + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
+          + "Use 0d or -1d for immediate deletion without retention.")
   public SuccessResponse resetPauselessTable(
       @ApiParam(value = "Name of the table to reset", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Type of the table: OFFLINE or REALTIME", required = true) @QueryParam("type")
@@ -850,11 +857,25 @@ public class PinotSegmentRestletResource {
         PauselessConsumptionUtils.isPauselessEnabled(_pinotHelixResourceManager.getTableConfig(tableNameWithType)),
         "Pauseless is not enabled for the table " + tableNameWithType);
 
-    if (errorSegments == null || errorSegments.isEmpty()) {
-      ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-      Preconditions.checkState(externalView != null, "External view does not exist for table " + tableNameWithType);
-      errorSegments = getErrorSegments(externalView);
+    // Delete the error segments if the input is non-empty
+    if (errorSegments != null && !errorSegments.isEmpty()) {
+      int numSegments = errorSegments.size();
+      deleteSegmentsInternal(tableNameWithType, errorSegments,
+          retentionPeriod);
+      if (numSegments <= 5) {
+        return new SuccessResponse(
+            "Pauseless table has been reset successfully. Deleted segments: " + errorSegments + " from table: "
+                + tableNameWithType);
+      } else {
+        return new SuccessResponse(
+            "Pauseless table has been reset successfully. Deleted " + numSegments + " segments from table: "
+                + tableNameWithType);
+      }
     }
+
+    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "External view does not exist for table " + tableNameWithType);
+    errorSegments = getErrorSegments(externalView);
 
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
