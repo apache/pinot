@@ -66,14 +66,16 @@ public abstract class BaseTimeSeriesBuilder {
    *   The rawTimeValue is in the same Time Unit as that passed to the {@link LeafTimeSeriesPlanNode}.
    * </p>
    */
-  public abstract void addValueAtIndex(int timeBucketIndex, Double value, long rawTimeValue);
+  public void addValueAtIndex(int timeBucketIndex, Double value, long rawTimeValue) {
+    addValueAtIndex(timeBucketIndex, value);
+  }
 
   public void addValueAtIndex(int timeBucketIndex, String value) {
     throw new UnsupportedOperationException("This aggregation function does not support string input");
   }
 
   public void addValueAtIndex(int timeBucketIndex, String value, long rawTimeValue) {
-    throw new UnsupportedOperationException("This aggregation function does not support string input");
+    addValueAtIndex(timeBucketIndex, value);
   }
 
   public abstract void addValue(long timeValue, Double value);

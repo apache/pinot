@@ -45,11 +45,6 @@ public class MinTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   }
 
   @Override
-  public void addValueAtIndex(int timeBucketIndex, Double value, long rawTimeValue) {
-    addValueAtIndex(timeBucketIndex, value);
-  }
-
-  @Override
   public void addValue(long timeValue, Double value) {
     int timeBucketIndex = _timeBuckets.resolveIndex(timeValue);
     addValueAtIndex(timeBucketIndex, value);
