@@ -239,7 +239,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
-      boolean allowRefresh, boolean allowReset, HttpHeaders headers, Request request) {
+      boolean allowRefresh, boolean isReingested, HttpHeaders headers, Request request) {
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -416,9 +416,16 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentDownloadURIStr, segmentFile, tableNameWithType, copySegmentToFinalLocation);
 
       ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
-          segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
-          enableParallelPushProtection, allowRefresh, allowReset, headers);
+
+      if (!isReingested) {
+        zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
+            segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
+            enableParallelPushProtection, allowRefresh, headers);
+      } else {
+        zkOperator.completeReingestedSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI,
+            sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes, enableParallelPushProtection,
+            headers);
+      }
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
