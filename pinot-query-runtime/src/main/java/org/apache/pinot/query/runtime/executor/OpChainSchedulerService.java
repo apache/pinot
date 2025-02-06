@@ -53,6 +53,8 @@ public class OpChainSchedulerService {
         TransferableBlock returnedErrorBlock = null;
         Throwable thrown = null;
         try {
+          operatorChain.getContext().registerOnMDC();
+
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
@@ -65,8 +67,7 @@ public class OpChainSchedulerService {
           isFinished = true;
           if (result.isErrorBlock()) {
             returnedErrorBlock = result;
-            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, result.getQueryStats(),
-                result.getExceptions());
+            LOGGER.error("({}): Completed erroneously {}", operatorChain, result.getExceptions());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, result.getQueryStats());
           }
@@ -74,6 +75,8 @@ public class OpChainSchedulerService {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
+          operatorChain.getContext().unregisterFromMDC();
+
           _submittedOpChainMap.remove(operatorChain.getId());
           if (returnedErrorBlock != null || thrown != null) {
             if (thrown == null) {

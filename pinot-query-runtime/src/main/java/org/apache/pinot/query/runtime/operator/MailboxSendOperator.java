@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
+import org.apache.pinot.query.mailbox.channel.MailboxStatusLogger;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
@@ -42,6 +44,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,20 +66,22 @@ public class MailboxSendOperator extends MultiStageOperator {
   private final MultiStageOperator _input;
   private final BlockExchange _exchange;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private final Iterable<Integer> _receiverStages;
 
   // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
-    this(context, input, statMap -> getBlockExchange(context, node, statMap));
+    this(context, input, statMap -> getBlockExchange(context, node, statMap), node.getReceiverStageIds());
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
 
   @VisibleForTesting
   MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input,
-      Function<StatMap<StatKey>, BlockExchange> exchangeFactory) {
+      Function<StatMap<StatKey>, BlockExchange> exchangeFactory, Iterable<Integer> receiverStages) {
     super(context);
     _input = input;
     _exchange = exchangeFactory.apply(_statMap);
+    _receiverStages = receiverStages;
   }
 
   /**
@@ -132,8 +137,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     List<RoutingInfo> routingInfos =
           MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
               mailboxInfos);
+    MailboxStatusLogger mailboxStatusLogger = new MailboxStatusLogger(context, receiverStageId);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap,
+            mailboxStatusLogger))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, splitter);
@@ -189,12 +196,17 @@ public class MailboxSendOperator extends MultiStageOperator {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
       return createLeafBlock();
     } catch (TimeoutException e) {
-      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      String errMsg = "Server " + _context.getServer().hostname() + " timed out while sending data from stage "
+          + _context.getStageId() + " to stages " + Iterables.toString(_receiverStages);
+      LOGGER.warn(errMsg, e);
+      return TransferableBlockUtils.getErrorTransferableBlock(QException.EXECUTION_TIMEOUT_ERROR_CODE, errMsg);
     } catch (Exception e) {
-      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+      String errMsg = "Server " + _context.getServer().hostname() + " failed while sending data from stage "
+          + _context.getStageId() + " to stages " + Iterables.toString(_receiverStages);
+      TransferableBlock errorBlock =
+          TransferableBlockUtils.getErrorTransferableBlock(QException.INTERNAL_ERROR_CODE, errMsg);
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
+        LOGGER.error(errMsg, e);
         sendTransferableBlock(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);

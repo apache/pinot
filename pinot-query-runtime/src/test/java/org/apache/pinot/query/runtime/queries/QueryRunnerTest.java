@@ -203,10 +203,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
       //   In some cases there is no prefix.
       String exceptionMessage = e.getMessage();
-      Assert.assertTrue(
-          exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
-              "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
-          "Exception message didn't start with proper heading: " + exceptionMessage);
+      boolean matches = exceptionMessage.startsWith("Received error query execution result block: ")
+          || exceptionMessage.startsWith("Error occurred during stage submission")
+          || exceptionMessage.equals(expectedError)
+          || exceptionMessage.contains(expectedError);
+      if (!matches) {
+        Assert.fail("Exception message didn't match. Expected: " + expectedError + ". Actual: " + exceptionMessage);
+      }
       Assert.assertTrue(exceptionMessage.contains(expectedError),
           "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
     }
@@ -313,7 +316,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     });
 
     // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-    testCases.add(new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"});
+    testCases.add(new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
+        "Operator TRANSFORM on stage 1 failed: Failed to convert value string value to double"});
 
     // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
     //   - predicate only functions:

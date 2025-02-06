@@ -54,12 +54,12 @@
       {
         "description": "Wrong partition key",
         "sql": "SELECT {tbl1}.num, COUNT(*), COUNT(DISTINCT {tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='name', partition_size='4') */ GROUP BY {tbl1}.num",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": "Error composing query plan.*"
       },
       {
         "description": "Wrong partition size",
         "sql": "SELECT {tbl1}.num, COUNT(*), COUNT(DISTINCT {tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='2') */ GROUP BY {tbl1}.num",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": "Error composing query plan.*"
       },
       {
         "description": "Group by partition column",

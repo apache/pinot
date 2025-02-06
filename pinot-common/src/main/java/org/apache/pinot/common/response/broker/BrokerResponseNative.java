@@ -32,10 +32,10 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -59,11 +59,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
-      new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
+      new BrokerResponseNative(QException.BROKER_RESOURCE_MISSING_ERROR_CODE, "BrokerResourceMissingError");
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
-      new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+      new BrokerResponseNative(QException.TABLE_DOES_NOT_EXIST_ERROR_CODE, "TableDoesNotExistError");
   public static final BrokerResponseNative TABLE_IS_DISABLED =
-      new BrokerResponseNative(QueryException.TABLE_IS_DISABLED_ERROR);
+      new BrokerResponseNative(QException.TABLE_IS_DISABLED_ERROR_CODE, "TableIsDisabledError");
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
@@ -108,6 +108,10 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public BrokerResponseNative(ProcessingException exception) {
     _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  }
+
+  public BrokerResponseNative(int errorCode, String errorMessage) {
+    _exceptions.add(new QueryProcessingException(errorCode, errorMessage));
   }
 
   public BrokerResponseNative(List<ProcessingException> exceptions) {

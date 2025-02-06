@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -198,7 +199,7 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
             null, null);
-    return new MailboxSendOperator(context, _input, statMap -> _exchange);
+    return new MailboxSendOperator(context, _input, statMap -> _exchange, Collections.emptyList());
   }
 
   private static TransferableBlock getDummyDataBlock() {

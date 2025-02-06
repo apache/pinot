@@ -26,7 +26,8 @@ import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +69,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
         case CANCELLED:
-          LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
+          LOGGER.debug("Mailbox: {} already cancelled from upstream", mailboxId);
           cancelStream();
           break;
         case FIRST_ERROR:
@@ -78,7 +79,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           cancelStream();
           break;
         case TIMEOUT:
-          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
+          LOGGER.debug("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
           cancelStream();
           break;
         case EARLY_TERMINATED:
@@ -92,7 +93,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     } catch (Exception e) {
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
-      _mailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage, e)));
+      _mailbox.setErrorBlock(QException.INTERNAL_ERROR_CODE, errorMessage);
       cancelStream();
     }
   }
@@ -109,12 +110,26 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   @Override
   public void onError(Throwable t) {
-    LOGGER.warn("Error on receiver side", t);
-    if (_mailbox != null) {
-      _mailbox.setErrorBlock(
-          TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by sender", t)));
-    } else {
-      LOGGER.error("Got error before mailbox is set up", t);
+    OpChainExecutionContext context = _mailbox.getContext();
+    if (context != null) {
+      context.registerOnMDC();
+    }
+    try {
+      if (LOGGER.isDebugEnabled()) { // Log the stack trace if debug is enabled
+        LOGGER.warn("Error on receiver side", t);
+      } else {
+        LOGGER.warn("Error on receiver side: {}", t.getMessage());
+      }
+      ReceivingMailbox mailbox = _mailbox; // copied in a variable to avoid unsafe publication
+      if (mailbox != null) {
+        mailbox.setErrorBlock(QException.INTERNAL_ERROR_CODE, "Error on inter-server channel");
+      } else {
+        LOGGER.error("Got error before mailbox is set up", t);
+      }
+    } finally {
+      if (context != null) {
+        context.unregisterFromMDC();
+      }
     }
   }
 

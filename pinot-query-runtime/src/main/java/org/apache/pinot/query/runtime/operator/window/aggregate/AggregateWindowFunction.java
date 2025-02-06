@@ -30,6 +30,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
+import org.apache.pinot.spi.exception.QException;
 
 
 public class AggregateWindowFunction extends WindowFunction {
@@ -59,8 +60,13 @@ public class AggregateWindowFunction extends WindowFunction {
    */
   private List<Object> processUnboundedPrecedingAndFollowingWindow(List<Object[]> rows) {
     // Process all rows at once
-    for (Object[] row : rows) {
-      _windowValueAggregator.addValue(extractValueFromRow(row));
+    try {
+      for (Object[] row : rows) {
+        _windowValueAggregator.addValue(extractValueFromRow(row));
+      }
+    } catch (ClassCastException e) {
+      throw new QException(QException.SQL_RUNTIME_ERROR_CODE,
+          "Failed to cast value as expected in " + _functionName, e);
     }
     return Collections.nCopies(rows.size(), _windowValueAggregator.getCurrentAggregatedValue());
   }

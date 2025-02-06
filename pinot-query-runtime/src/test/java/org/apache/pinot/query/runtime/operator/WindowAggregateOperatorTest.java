@@ -26,7 +26,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
@@ -37,12 +36,14 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.mockito.Mock;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.testng.collections.Sets;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.RANGE;
@@ -444,8 +445,10 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    assertTrue(block.getExceptions().get(1000).contains("String cannot be cast to class"),
-        "expected it to fail with class cast exception");
+    assertEquals(block.getExceptions().keySet(), Sets.newHashSet(QException.SQL_RUNTIME_ERROR_CODE),
+        "Expected only SQL runtime error but got: " + block.getExceptions());
+    assertEquals(block.getExceptions().get(QException.SQL_RUNTIME_ERROR_CODE),
+        "Operator WINDOW on stage 0 failed: Failed to cast value as expected in SUM");
   }
 
   @Test
@@ -470,7 +473,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     assertTrue(block.isErrorBlock(), "expected ERROR block from window overflow");
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
         .contains("reach number of rows limit"));
   }
 

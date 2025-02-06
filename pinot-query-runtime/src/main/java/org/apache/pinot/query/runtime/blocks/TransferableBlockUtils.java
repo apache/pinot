@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
@@ -51,7 +52,18 @@ public final class TransferableBlockUtils {
     return new TransferableBlock(dataBlock);
   }
 
+  public static TransferableBlock getErrorTransferableBlock(int errorCode, String errorMessage) {
+    return new TransferableBlock(DataBlockUtils.getErrorDataBlock(errorCode, errorMessage));
+  }
+
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
+    if (e instanceof ProcessingException) {
+      // In SSE TransferableBlockUtils.getErrorTransferableBlock includes the stack trace as part
+      // of the block payload. We don't want that in MSE, so here we short-circuit the processing to
+      // include only the exception message
+      ProcessingException procEx = (ProcessingException) e;
+      return TransferableBlockUtils.getErrorTransferableBlock(procEx.getErrorCode(), procEx.getMessage());
+    }
     return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
   }
 

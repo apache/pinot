@@ -20,6 +20,6 @@ package org.apache.pinot.spi.exception;
 
 public class DatabaseConflictException extends BadQueryRequestException {
   public DatabaseConflictException(String message) {
-    super(message);
+    super(QUERY_VALIDATION_ERROR_CODE, message);
   }
 }
