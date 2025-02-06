@@ -66,7 +66,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.server.api.resources.reingestion.ReIngestionResponse;
+import org.apache.pinot.server.api.resources.reingestion.ReingestionResponse;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,7 +82,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = "ReIngestion", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+@Api(tags = "Reingestion", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
@@ -92,8 +92,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
 @Path("/")
-public class ReIngestionResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ReIngestionResource.class);
+public class ReingestionResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ReingestionResource.class);
 
   //TODO: Make this configurable
   private static final int MIN_REINGESTION_THREADS = 4;
@@ -110,9 +110,8 @@ public class ReIngestionResource {
           new ThreadFactoryBuilder().setNameFormat("reingestion-worker-%d").build());
 
   // Keep track of jobs by jobId => job info
-  private static final ConcurrentHashMap<String, ReIngestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, ReingestionJob> RUNNING_JOBS = new ConcurrentHashMap<>();
   public static final long CONSUMPTION_END_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
-  public static final long UPLOAD_END_TIMEOUT_MS = Duration.ofMinutes(5).toMillis();
   public static final long CHECK_INTERVAL_MS = Duration.ofSeconds(5).toMillis();
 
   @Inject
@@ -121,13 +120,13 @@ public class ReIngestionResource {
   /**
    * Simple data class to hold job details.
    */
-  private static class ReIngestionJob {
+  private static class ReingestionJob {
     private final String _jobId;
     private final String _tableNameWithType;
     private final String _segmentName;
     private final long _startTimeMs;
 
-    ReIngestionJob(String jobId, String tableNameWithType, String segmentName) {
+    ReingestionJob(String jobId, String tableNameWithType, String segmentName) {
       _jobId = jobId;
       _tableNameWithType = tableNameWithType;
       _segmentName = segmentName;
@@ -160,7 +159,7 @@ public class ReIngestionResource {
   @ApiOperation("Get all running re-ingestion jobs along with job IDs")
   public Response getAllRunningReingestionJobs() {
     // Filter only the jobs still marked as running
-    List<ReIngestionJob> runningJobs = new ArrayList<>(RUNNING_JOBS.values());
+    List<ReingestionJob> runningJobs = new ArrayList<>(RUNNING_JOBS.values());
     return Response.ok(runningJobs).build();
   }
 
@@ -171,10 +170,10 @@ public class ReIngestionResource {
   @ApiOperation(value = "Re-ingest segment asynchronously", notes = "Returns a jobId immediately; ingestion runs in "
       + "background.")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = ReIngestionResponse.class),
+      @ApiResponse(code = 200, message = "Success", response = ReingestionResponse.class),
       @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class)
   })
-  public Response reIngestSegment(@PathParam("segmentName") String segmentName) {
+  public Response reingestSegment(@PathParam("segmentName") String segmentName) {
     // if segment is not in LLC format, return error
     if (!LLCSegmentName.isLLCSegment(segmentName)) {
       throw new WebApplicationException("Segment name is not in LLC format: " + segmentName,
@@ -241,7 +240,7 @@ public class ReIngestionResource {
 
     // Generate a jobId for tracking
     String jobId = UUID.randomUUID().toString();
-    ReIngestionJob job = new ReIngestionJob(jobId, tableNameWithType, segmentName);
+    ReingestionJob job = new ReingestionJob(jobId, tableNameWithType, segmentName);
 
     // Kick off the actual work asynchronously
     REINGESTION_EXECUTOR.submit(() -> {
@@ -257,7 +256,7 @@ public class ReIngestionResource {
                 tableDataManager.getSegmentBuildSemaphore(), null);
 
         RUNNING_JOBS.put(jobId, job);
-        doReIngestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
+        doReingestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
       } finally {
@@ -266,16 +265,16 @@ public class ReIngestionResource {
       }
     });
 
-    ReIngestionResponse immediateResponse = new ReIngestionResponse(
+    ReingestionResponse immediateResponse = new ReingestionResponse(
         "Re-ingestion job submitted successfully with jobId: " + jobId);
     return Response.ok(immediateResponse).build();
   }
 
   /**
    * The actual re-ingestion logic, moved into a separate method for clarity.
-   * This is essentially the old synchronous logic you had in reIngestSegment.
+   * This is essentially the old synchronous logic you had in reingestSegment.
    */
-  private void doReIngestSegment(StatelessRealtimeSegmentWriter manager, LLCSegmentName llcSegmentName,
+  private void doReingestSegment(StatelessRealtimeSegmentWriter manager, LLCSegmentName llcSegmentName,
       String tableNameWithType, IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
       throws Exception {
     try {

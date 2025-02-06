@@ -334,14 +334,13 @@ public class ServerSegmentCompletionProtocolHandler {
       // Set table name parameter
       List<NameValuePair> parameters = getSegmentPushCommonParams(rawTableName);
 
-      //
-      URI uploadEndpoint = FileUploadDownloadClient.getSegmentReingestCompletionURI(new URI(controllerUrl));
+      URI reingestCompletionURI = FileUploadDownloadClient.getSegmentReingestCompletionURI(new URI(controllerUrl));
 
-      LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
+      LOGGER.info("Uploading segment metadata to: {} with headers: {}", reingestCompletionURI, headers);
 
       // Perform the metadata upload
       SimpleHttpResponse response = _fileUploadDownloadClient
-          .uploadSegmentMetadata(uploadEndpoint, segmentName, segmentMetadataFile, headers, parameters,
+          .uploadSegmentMetadata(reingestCompletionURI, segmentName, segmentMetadataFile, headers, parameters,
               HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
 
       LOGGER.info("Response for pushing metadata of segment {} of table {} to {} - {}: {}", segmentName, rawTableName,

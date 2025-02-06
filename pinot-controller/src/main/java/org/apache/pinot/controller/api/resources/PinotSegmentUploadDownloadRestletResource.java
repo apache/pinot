@@ -976,7 +976,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @Path("segment/completeReingestion")
+  @Path("segment/reingested")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPLOAD_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Reingest a realtime segment", notes = "Reingest a segment as multipart file")

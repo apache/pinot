@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.server.api.resources.reingestion;
 
-public class ReIngestionRequest {
+public class ReingestionRequest {
   private String _tableNameWithType;
   private String _segmentName;
 

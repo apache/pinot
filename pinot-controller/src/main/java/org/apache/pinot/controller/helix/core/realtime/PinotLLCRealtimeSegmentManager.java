@@ -2105,16 +2105,16 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
-   * will call the server reIngestSegment API
+   * will call the server reingestSegment API
    * on one of the alive servers that are supposed to host that segment according to IdealState.
    *
    * API signature:
-   *   POST http://[serverURL]/reIngestSegment/[segmentName]
+   *   POST http://[serverURL]/reingestSegment/[segmentName]
    *   Request body (JSON):
    *
    * @param realtimeTableName The table name with type, e.g. "myTable_REALTIME"
    */
-  public void reIngestSegmentsWithErrorState(String realtimeTableName) {
+  public void reingestSegmentsWithErrorState(String realtimeTableName) {
     // Step 1: Fetch the ExternalView and all segments
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
     if (externalView == null) {
@@ -2179,29 +2179,29 @@ public class PinotLLCRealtimeSegmentManager {
             segmentName, realtimeTableName);
 
         // Find at least one server that should host this segment and is alive
-        String aliveServer = pickServerToReIngest(instanceStateMap.keySet());
+        String aliveServer = pickServerToReingest(instanceStateMap.keySet());
         if (aliveServer == null) {
           LOGGER.warn("No alive server found to re-ingest segment {} in table {}", segmentName, realtimeTableName);
           continue;
         }
 
         try {
-          triggerReIngestion(aliveServer, segmentName);
-          LOGGER.info("Successfully triggered reIngestion for segment {} on server {}", segmentName, aliveServer);
+          triggerReingestion(aliveServer, segmentName);
+          LOGGER.info("Successfully triggered reingestion for segment {} on server {}", segmentName, aliveServer);
         } catch (Exception e) {
-          LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
+          LOGGER.error("Failed to call reingestSegment for segment {} on server {}", segmentName, aliveServer, e);
         }
       }
     }
   }
 
   /**
-   * Invokes the server's reIngestSegment API via a POST request with JSON payload,
+   * Invokes the server's reingestSegment API via a POST request with JSON payload,
    * using Simple HTTP APIs.
    *
-   * POST http://[serverURL]/reIngestSegment/[segmentName]
+   * POST http://[serverURL]/reingestSegment/[segmentName]
    */
-  private void triggerReIngestion(String serverHostPort, String segmentName)
+  private void triggerReingestion(String serverHostPort, String segmentName)
       throws IOException, URISyntaxException, HttpErrorStatusException {
     String scheme = CommonConstants.HTTP_PROTOCOL;
     if (serverHostPort.contains(CommonConstants.HTTPS_PROTOCOL)) {
@@ -2214,15 +2214,15 @@ public class PinotLLCRealtimeSegmentManager {
     String serverHost = serverHostPort.split(":")[0];
     String serverPort = serverHostPort.split(":")[1];
 
-    URI reIngestUri = FileUploadDownloadClient.getURI(scheme, serverHost, Integer.parseInt(serverPort),
+    URI reingestUri = FileUploadDownloadClient.getURI(scheme, serverHost, Integer.parseInt(serverPort),
         REINGEST_SEGMENT_PATH + "/" + segmentName);
-    HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendJsonPostRequest(reIngestUri, ""));
+    HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendJsonPostRequest(reingestUri, ""));
   }
 
   /**
    * Picks one server among a set of servers that are supposed to host the segment,
    */
-  private String pickServerToReIngest(Set<String> candidateServers) {
+  private String pickServerToReingest(Set<String> candidateServers) {
     try {
       List<String> serverList = new ArrayList<>(candidateServers);
       String server = serverList.get(RANDOM.nextInt(serverList.size()));

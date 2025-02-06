@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.server.api.resources.reingestion;
 
-public class ReIngestionResponse {
+public class ReingestionResponse {
   private String _message;
 
-  public ReIngestionResponse(String message) {
+  public ReingestionResponse(String message) {
     _message = message;
   }
 

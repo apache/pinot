@@ -124,7 +124,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     if (isPauselessConsumptionEnabled) {
-      _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
+      _llcRealtimeSegmentManager.reingestSegmentsWithErrorState(tableConfig.getTableName());
     }
   }
 

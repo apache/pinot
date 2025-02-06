@@ -190,26 +190,6 @@ public class ZKOperator {
     processExistingSegments(tableNameWithType, uploadType, enableParallelPushProtection, headers, existingSegmentsList);
   }
 
-  public void updateReingestedSegmentZKMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
-      @Nullable URI finalSegmentLocationURI, @Nullable String sourceDownloadURIStr, String segmentDownloadURIStr,
-      @Nullable String crypterName, long segmentSizeInBytes, boolean enableParallelPushProtection, HttpHeaders headers)
-      throws Exception {
-    String segmentName = segmentMetadata.getName();
-    ZNRecord existingSegmentMetadataZNRecord =
-        _pinotHelixResourceManager.getSegmentMetadataZnRecord(tableNameWithType, segmentName);
-
-    if (existingSegmentMetadataZNRecord == null) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Segment: %s does not exist in table: %s", segmentName, tableNameWithType),
-          Response.Status.NOT_FOUND);
-    }
-
-      // Refresh an existing segment
-    processExistingSegmentWithReset(tableNameWithType, segmentMetadata, existingSegmentMetadataZNRecord,
-          finalSegmentLocationURI, sourceDownloadURIStr, segmentDownloadURIStr, crypterName,
-          segmentSizeInBytes, enableParallelPushProtection, headers);
-  }
-
   /**
    * Returns {@code true} when the segment should be processed as new segment.
    * <p>When segment ZK metadata exists, check if segment exists in the ideal state. If the previous upload failed after
