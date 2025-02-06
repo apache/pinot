@@ -21,6 +21,7 @@ package org.apache.pinot.calcite.rel.rules;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -78,19 +79,21 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       newRight = right;
     } else {
       // Hash join
+      // Force pre-partitioned exchange when colocated join hint is provided
+      Boolean prePartitioned = PinotHintOptions.JoinHintOptions.isColocatedByJoinKeys(join);
       // TODO: Validate if the configured distribution types are valid
       if (leftDistributionType == null) {
         // By default, hash distribute the left side if there are join keys, otherwise randomly distribute
         leftDistributionType = !joinInfo.leftKeys.isEmpty() ? PinotHintOptions.DistributionType.HASH
             : PinotHintOptions.DistributionType.RANDOM;
       }
-      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left);
+      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, prePartitioned);
       if (rightDistributionType == null) {
         // By default, hash distribute the right side if there are join keys, otherwise broadcast
         rightDistributionType = !joinInfo.rightKeys.isEmpty() ? PinotHintOptions.DistributionType.HASH
             : PinotHintOptions.DistributionType.BROADCAST;
       }
-      newRight = createExchangeForHashJoin(rightDistributionType, joinInfo.rightKeys, right);
+      newRight = createExchangeForHashJoin(rightDistributionType, joinInfo.rightKeys, right, prePartitioned);
     }
 
     // TODO: Consider creating different JOIN Rel for each join strategy
@@ -102,7 +105,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       List<Integer> keys, RelNode child) {
     switch (distributionType) {
       case LOCAL:
-        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON);
+        // NOTE: We use SINGLETON to represent local distribution. Add keys to the exchange because we might want to
+        //       switch it to HASH distribution to increase parallelism. See MailboxAssignmentVisitor for details.
+        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON, keys, null);
       case HASH:
         Preconditions.checkArgument(!keys.isEmpty(), "Hash distribution requires join keys");
         return PinotLogicalExchange.create(child, RelDistributions.hash(keys));
@@ -114,17 +119,19 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   }
 
   private static PinotLogicalExchange createExchangeForHashJoin(PinotHintOptions.DistributionType distributionType,
-      List<Integer> keys, RelNode child) {
+      List<Integer> keys, RelNode child, @Nullable Boolean prePartitioned) {
     switch (distributionType) {
       case LOCAL:
-        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON);
+        // NOTE: We use SINGLETON to represent local distribution. Add keys to the exchange because we might want to
+        //       switch it to HASH distribution to increase parallelism. See MailboxAssignmentVisitor for details.
+        return PinotLogicalExchange.create(child, RelDistributions.SINGLETON, keys, prePartitioned);
       case HASH:
         Preconditions.checkArgument(!keys.isEmpty(), "Hash distribution requires join keys");
-        return PinotLogicalExchange.create(child, RelDistributions.hash(keys));
+        return PinotLogicalExchange.create(child, RelDistributions.hash(keys), prePartitioned);
       case BROADCAST:
-        return PinotLogicalExchange.create(child, RelDistributions.BROADCAST_DISTRIBUTED);
+        return PinotLogicalExchange.create(child, RelDistributions.BROADCAST_DISTRIBUTED, prePartitioned);
       case RANDOM:
-        return PinotLogicalExchange.create(child, RelDistributions.RANDOM_DISTRIBUTED);
+        return PinotLogicalExchange.create(child, RelDistributions.RANDOM_DISTRIBUTED, prePartitioned);
       default:
         throw new IllegalArgumentException("Unsupported distribution type: " + distributionType + " for hash join");
     }

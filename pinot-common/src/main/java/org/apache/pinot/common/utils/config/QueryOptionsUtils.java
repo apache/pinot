@@ -309,6 +309,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMSEMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
+    String maxInitialCapacity = queryOptions.get(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    return checkedParseIntPositive(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitialCapacity);
+  }
+
+  @Nullable
   public static Integer getMinInitialIndexedTableCapacity(Map<String, String> queryOptions) {
     String minInitialIndexedTableCapacity = queryOptions.get(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY);
     return checkedParseIntPositive(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY, minInitialIndexedTableCapacity);

@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorCustomConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -126,7 +127,8 @@ public class SegmentPurgerTest {
     };
 
     SegmentPurger segmentPurger =
-        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, recordModifier);
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, recordModifier,
+            null);
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger
@@ -171,6 +173,27 @@ public class SegmentPurgerTest {
       assertTrue(reader.hasIndexFor(D1, StandardIndexes.inverted()));
       assertFalse(reader.hasIndexFor(D2, StandardIndexes.inverted()));
     }
+  }
+
+  @Test
+  public void testSegmentPurgerWithCustomSegmentGeneratorConfig() {
+    SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
+
+    SegmentPurger segmentPurger =
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null, null);
+    segmentPurger.initSegmentGeneratorConfig("currentSegmentName");
+    assertEquals(segmentPurger.getSegmentGeneratorConfig().getSegmentName(), "currentSegmentName");
+
+    String newSegmentName = "myTable_segment_001";
+    SegmentGeneratorCustomConfigs segmentGeneratorCustomConfigs = new SegmentGeneratorCustomConfigs();
+    segmentGeneratorCustomConfigs.setSegmentName(newSegmentName);
+
+    // test with custom segment generator configs
+    SegmentPurger segmentPurger2 =
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, null,
+            segmentGeneratorCustomConfigs);
+    segmentPurger2.initSegmentGeneratorConfig("currentSegmentName");
+    assertEquals(segmentPurger2.getSegmentGeneratorConfig().getSegmentName(), newSegmentName);
   }
 
   @AfterClass

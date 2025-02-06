@@ -257,7 +257,12 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT ts_timestamp - CAST(123456789 AS TIMESTAMP) FROM a"},
         new Object[]{"SELECT SUB(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"},
         new Object[]{"SELECT ts_timestamp + CAST(123456789 AS TIMESTAMP) FROM a"},
-        new Object[]{"SELECT ADD(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"}
+        new Object[]{"SELECT ADD(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"},
+        new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1, 512) FROM a"},
+        new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1) FROM a"},
+        new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3, 1024) FROM a"},
+        new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3) FROM a"},
+        new Object[]{"SELECT DAY_OF_WEEK(ts_timestamp, 'UTC') FROM a"}
     };
   }
 

@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 public class MinAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
@@ -143,7 +144,7 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
         break;
       }
       default:
-        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
+        throw new BadQueryRequestException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
   }
 
