@@ -35,7 +35,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 
 
 /**
- * The {@code StarTreeIndexContainer} class contains the indexes for multiple star-trees.
+ * The {@code MapColumnIndexContainer} class contains the indexes for child columns for MAP column.
  */
 public class MapColumnIndexContainer implements ColumnIndexContainer {
   private static final String MAP_INDEX_READER_CLASS_NAME = "mapIndexReaderClassName";
