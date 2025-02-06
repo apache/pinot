@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.util.Map;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
 
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -29,25 +31,18 @@ public class MinionTaskTestUtils {
   private MinionTaskTestUtils() {
   }
 
-  public static void assertNoTaskSchedule(String tableNameWithType, String taskType, PinotTaskManager taskManager) {
-    PinotTaskManager.TaskSchedulingInfo info =
-        taskManager.scheduleAllTasksForTable(tableNameWithType, null).get(taskType);
-    assertNoTaskSchedule(info);
-  }
-
-  public static void assertNoTaskSchedule(String taskType, PinotTaskManager taskManager) {
-    PinotTaskManager.TaskSchedulingInfo info = taskManager.scheduleTaskForAllTables(taskType, null);
-    assertNoTaskSchedule(info);
-  }
-
-  public static void assertNoTaskSchedule(PinotTaskManager taskManager) {
-    Map<String, PinotTaskManager.TaskSchedulingInfo> infoMap = taskManager.scheduleAllTasksForAllTables(null);
+  public static void assertNoTaskSchedule(TaskSchedulingContext context, PinotTaskManager taskManager) {
+    Map<String, TaskSchedulingInfo> infoMap = taskManager.scheduleTasks(context);
     infoMap.forEach((key, value) -> assertNoTaskSchedule(value));
   }
 
-  public static void assertNoTaskSchedule(PinotTaskManager.TaskSchedulingInfo info) {
+  public static void assertNoTaskSchedule(TaskSchedulingInfo info) {
     assertNotNull(info.getScheduledTaskNames());
     assertTrue(info.getScheduledTaskNames().isEmpty());
+    assertNoTaskErrors(info);
+  }
+
+  public static void assertNoTaskErrors(TaskSchedulingInfo info) {
     assertNotNull(info.getGenerationErrors());
     assertTrue(info.getGenerationErrors().isEmpty());
     assertNotNull(info.getSchedulingErrors());

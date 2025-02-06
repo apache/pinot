@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -64,8 +66,12 @@ public class CronJobScheduleJob implements Job {
             ControllerMeter.CRON_SCHEDULER_JOB_SKIPPED, 1L);
         return;
       }
+      TaskSchedulingContext context = new TaskSchedulingContext()
+          .setTablesToSchedule(Collections.singleton(table))
+          .setTasksToSchedule(Collections.singleton(taskType))
+          .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name());
       long jobStartTime = System.currentTimeMillis();
-      pinotTaskManager.scheduleTaskForTable(taskType, table, null);
+      pinotTaskManager.scheduleTasks(context);
       LOGGER.info("Finished CronJob: table - {}, task - {}, next runtime is {}", table, taskType,
           jobExecutionContext.getNextFireTime());
       pinotTaskManager.getControllerMetrics().addTimedTableValue(PinotTaskManager.getCronJobName(table, taskType),
