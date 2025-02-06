@@ -31,8 +31,8 @@ public class OneDoubleKeyGroupIdGenerator implements GroupIdGenerator {
   private int _numGroups = 0;
   private int _nullGroupId = INVALID_ID;
 
-  public OneDoubleKeyGroupIdGenerator(int numGroupsLimit) {
-    _groupIdMap = new Double2IntOpenHashMap();
+  public OneDoubleKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Double2IntOpenHashMap(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
   }
