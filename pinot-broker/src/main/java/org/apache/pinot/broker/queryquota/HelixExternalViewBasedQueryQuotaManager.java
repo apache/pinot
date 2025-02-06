@@ -74,6 +74,13 @@ import org.slf4j.LoggerFactory;
  * - broker added or removed from cluster
  */
 public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
+
+  // Maximum 'disabled' value for app quota. If actual value is equal or less than this, it is considered as
+  // disabled, otherwise it's enabled. This is a side effect of rate limiter accepting only positive values.
+  private static final double MAX_DISABLED_APP_QUOTA = 0.0d;
+  // standard value meaning - no app quota limit set
+  private static final double DISABLED_APP_QUOTA = -1;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
   private static final int ONE_SECOND_TIME_RANGE_IN_SECOND = 1;
   private static final int ONE_MINUTE_TIME_RANGE_IN_SECOND = 60;
@@ -130,9 +137,9 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
       String appName = entry.getKey();
       double appQpsQuota =
-          entry.getValue() != null && entry.getValue() != -1.0d ? entry.getValue() : _defaultQpsQuotaForApplication;
+          entry.getValue() != null ? entry.getValue() : _defaultQpsQuotaForApplication;
 
-      if (appQpsQuota < 0) {
+      if (isDisabled(appQpsQuota)) {
         buildEmptyOrResetApplicationRateLimiter(appName);
         continue;
       }
@@ -144,8 +151,14 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
               new MaxHitRateTracker(ONE_MINUTE_TIME_RANGE_IN_SECOND), numOnlineBrokers, appQpsQuota, -1);
       _applicationRateLimiterMap.put(appName, queryQuotaEntity);
     }
+  }
 
-    return;
+  private static boolean isEnabled(double appQpsQuota) {
+    return appQpsQuota > MAX_DISABLED_APP_QUOTA;
+  }
+
+  private static boolean isDisabled(double appQpsQuota) {
+    return appQpsQuota <= MAX_DISABLED_APP_QUOTA;
   }
 
   @Override
@@ -348,19 +361,45 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   public synchronized void createOrUpdateApplicationRateLimiter(String applicationName) {
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName));
+    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), DISABLED_APP_QUOTA);
   }
 
-  // Caller method need not worry about getting lock on _applicationRateLimiterMap
-  // as this method will do idempotent updates to the application rate limiters
+  public synchronized void createOrUpdateApplicationRateLimiter(String applicationName, double newQps) {
+    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName), newQps);
+  }
+
   private synchronized void createOrUpdateApplicationRateLimiter(List<String> applicationNames) {
+    createOrUpdateApplicationRateLimiter(applicationNames, DISABLED_APP_QUOTA);
+  }
+
+  /**
+   * Caller method need not worry about getting lock on _applicationRateLimiterMap
+   *  as this method will do idempotent updates to the application rate limiters
+   * @param applicationNames application names for which to update the rate limiter
+   * @param newQps - if > 0, fixed value to use for rate limiter(s), otherwise value is fetched from ZK.
+   */
+  private synchronized void createOrUpdateApplicationRateLimiter(List<String> applicationNames, double newQps) {
     ExternalView brokerResource = getBrokerResource();
+    Map<String, Double> quotas = null;
+    if (applicationNames.size() > 0 && !isEnabled(newQps)) {
+      quotas = ZKMetadataProvider.getApplicationQpsQuotas(_helixManager.getHelixPropertyStore());
+    }
+
     for (String appName : applicationNames) {
-      double qpsQuota = getEffectiveQueryQuotaOnApplication(appName);
-      if (qpsQuota < 0) {
+      double qpsQuota;
+      if (isEnabled(newQps)) {
+        qpsQuota = newQps;
+      } else if (quotas != null && quotas.get(appName) != null) {
+        qpsQuota = quotas.get(appName);
+      } else {
+        qpsQuota = _defaultQpsQuotaForApplication;
+      }
+
+      if (isDisabled(qpsQuota)) {
         buildEmptyOrResetApplicationRateLimiter(appName);
         continue;
       }
+
       int numOnlineBrokers = getNumOnlineBrokers(brokerResource);
       double perBrokerQpsQuota = qpsQuota / numOnlineBrokers;
       QueryQuotaEntity oldEntity = _applicationRateLimiterMap.get(appName);
@@ -437,22 +476,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   /**
-   * Utility to get the effective query quota being imposed on an application. It is computed based on the default quota
-   * set at cluster config.
-   *
-   * @param applicationName application name to get the query quota on.
-   * @return effective query quota limit being applied
-   */
-  private double getEffectiveQueryQuotaOnApplication(String applicationName) {
-    Map<String, Double> quotas =
-        ZKMetadataProvider.getApplicationQpsQuotas(_helixManager.getHelixPropertyStore());
-    if (quotas != null && quotas.get(applicationName) != null && quotas.get(applicationName) != -1.0d) {
-      return quotas.get(applicationName);
-    }
-    return _defaultQpsQuotaForApplication;
-  }
-
-  /**
    * Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
    * @param databaseName database name for which rate limiter needs to be created
    */
@@ -472,7 +495,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     if (_applicationRateLimiterMap.containsKey(applicationName)) {
       return;
     }
-    createOrUpdateApplicationRateLimiter(Collections.singletonList(applicationName));
+    createOrUpdateApplicationRateLimiter(applicationName);
   }
 
   /**
@@ -579,10 +602,12 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
     QueryQuotaEntity queryQuota = _applicationRateLimiterMap.get(applicationName);
     if (queryQuota == null) {
-      if (getDefaultQueryQuotaForApplication() < 0) {
+      // do not create a new rate limiter because that could lead to OOM if client floods us with many unique app names
+      if (isDisabled(_defaultQpsQuotaForApplication)) {
         return true;
       } else {
-        createOrUpdateApplicationRateLimiter(applicationName);
+        // create limiter without querying ZK
+        createOrUpdateApplicationRateLimiter(applicationName, _defaultQpsQuotaForApplication);
         queryQuota = _applicationRateLimiterMap.get(applicationName);
       }
     }
@@ -809,9 +834,12 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       if (quota.getNumOnlineBrokers() != onlineBrokerCount) {
         quota.setNumOnlineBrokers(onlineBrokerCount);
       }
-      if (quota.getOverallRate() > 0) {
+      if (isEnabled(quota.getOverallRate())) {
         double qpsQuota = quota.getOverallRate() / onlineBrokerCount;
-        quota.setRateLimiter(RateLimiter.create(qpsQuota));
+        // dividing small qps value by broker's count can result in 0 and blow up in rate limiter
+        if (isEnabled(qpsQuota)) {
+          quota.setRateLimiter(RateLimiter.create(qpsQuota));
+        }
       }
     }
 
@@ -820,9 +848,8 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
     }
     _lastKnownBrokerResourceVersion.set(currentVersionNumber);
     long endTime = System.currentTimeMillis();
-    LOGGER
-        .info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.", (endTime - startTime),
-            numRebuilt, _rateLimiterMap.size());
+    LOGGER.info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.",
+        (endTime - startTime), numRebuilt, _rateLimiterMap.size());
   }
 
   /**
@@ -857,11 +884,16 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   private double getDefaultQueryQuotaForApplication() {
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
-    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
-        _helixManager.getClusterName()).build();
-    return Double.parseDouble(helixAdmin.getConfig(configScope,
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_helixManager.getClusterName()).build();
+    String value = helixAdmin.getConfig(configScope,
             Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
-        .getOrDefault(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, "-1"));
+        .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
+    if (value != null) {
+      return Double.parseDouble(value);
+    } else {
+      return DISABLED_APP_QUOTA;
+    }
   }
 
   /**
