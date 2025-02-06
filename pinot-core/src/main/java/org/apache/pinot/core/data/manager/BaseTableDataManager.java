@@ -36,7 +36,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -71,6 +70,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -91,6 +91,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -127,9 +128,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  protected PinotClusterConfigProvider _clusterConfigProvider;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
-  // TODO: Make this configurable via ZK cluster configs to avoid server restarts to update
-  private Semaphore _segmentDownloadSemaphore;
+  private SegmentDownloadThrottler _segmentDownloadSemaphore;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
   protected Cache<Pair<String, String>, SegmentErrorInfo> _errorCache;
@@ -142,7 +143,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
+      @Nullable PinotClusterConfigProvider clusterConfigProvider) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -171,6 +173,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _errorCache = errorCache;
     _segmentPreprocessThrottler = segmentPreprocessThrottler;
+    _clusterConfigProvider = clusterConfigProvider;
     _recentlyDeletedSegments =
         CacheBuilder.newBuilder().maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
             .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES).build();
@@ -196,14 +199,23 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
-    if (maxParallelSegmentDownloads > 0) {
-      LOGGER.info(
-          "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
-          _tableNameWithType, maxParallelSegmentDownloads);
-      _segmentDownloadSemaphore = new Semaphore(maxParallelSegmentDownloads, true);
-    } else {
-      _segmentDownloadSemaphore = null;
+    // For backward compatibility, check if the value is negative and set it to the default in that case
+    // Earlier this config could be negative, in which case download throttling was completely disabled
+    if (maxParallelSegmentDownloads <= 0) {
+      LOGGER.warn("Segment download config: {} found to be <= 0: value {}, resetting it to default of: {}",
+          CommonConstants.Server.CONFIG_OF_MAX_PARALLEL_SEGMENT_DOWNLOADS, maxParallelSegmentDownloads,
+          CommonConstants.Server.DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
+      maxParallelSegmentDownloads = Integer.parseInt(CommonConstants.Server.DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
     }
+    LOGGER.info(
+        "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
+        _tableNameWithType, maxParallelSegmentDownloads);
+    _segmentDownloadSemaphore = new SegmentDownloadThrottler(maxParallelSegmentDownloads, _tableNameWithType);
+    // If the cluster config provider exists, register the download semaphore to get dynamic config updates
+    if (_clusterConfigProvider != null) {
+      _clusterConfigProvider.registerClusterConfigChangeListener(_segmentDownloadSemaphore);
+    }
+
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
     doInit();
@@ -806,14 +818,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String downloadUrl = zkMetadata.getDownloadUrl();
     _logger.info("Downloading segment: {} from: {}", segmentName, downloadUrl);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    if (_segmentDownloadSemaphore != null) {
-      long startTime = System.currentTimeMillis();
-      _logger.info("Acquiring segment download semaphore for segment: {}, queue-length: {} ", segmentName,
-          _segmentDownloadSemaphore.getQueueLength());
-      _segmentDownloadSemaphore.acquire();
-      _logger.info("Acquired segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
-          segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
-    }
+    long startTime = System.currentTimeMillis();
+    _logger.info("Acquiring segment download semaphore for segment: {}, queue-length: {} ", segmentName,
+        _segmentDownloadSemaphore.getQueueLength());
+    _segmentDownloadSemaphore.acquire();
+    _logger.info("Acquired segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
+        segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     try {
       File untarredSegmentDir;
       if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
@@ -843,9 +853,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
       throw e;
     } finally {
-      if (_segmentDownloadSemaphore != null) {
-        _segmentDownloadSemaphore.release();
-      }
+      _segmentDownloadSemaphore.release();
       FileUtils.deleteQuietly(tempRootDir);
     }
   }

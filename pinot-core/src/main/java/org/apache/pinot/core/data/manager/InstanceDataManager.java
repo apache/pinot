@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -51,7 +52,8 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
+      @Nullable PinotClusterConfigProvider clusterConfigProvider)
       throws Exception;
 
   /**

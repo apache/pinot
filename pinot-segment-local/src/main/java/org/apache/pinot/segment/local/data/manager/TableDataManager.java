@@ -39,6 +39,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -55,7 +56,8 @@ public interface TableDataManager {
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler,
+      @Nullable PinotClusterConfigProvider clusterConfigProvider);
 
   /**
    * Returns the instance id of the server.

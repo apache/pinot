@@ -742,6 +742,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_RELOAD_CONSUMING_SEGMENT =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + RELOAD_CONSUMING_SEGMENT;
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
+    public static final String MAX_PARALLEL_SEGMENT_DOWNLOADS = "table.level.max.parallel.segment.downloads";
+    public static final String CONFIG_OF_MAX_PARALLEL_SEGMENT_DOWNLOADS =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + MAX_PARALLEL_SEGMENT_DOWNLOADS;
+    public static final String DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS = "1000";
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
