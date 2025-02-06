@@ -59,9 +59,15 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
             newSegmentZKMetadata.getSegmentName());
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
 
-    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName, ControllerGauge.NUM_ROWS_THRESHOLD,
-        threshold);
-    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName, ControllerGauge.COMMITTING_SEGMENT_SIZE,
+    // metrics tagged with table only
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.NUM_ROWS_THRESHOLD, threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.COMMITTING_SEGMENT_SIZE,
         committingSegmentDescriptor.getSegmentSizeBytes());
+
+    // metrics tagged with topic and table
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC, threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.COMMITTING_SEGMENT_SIZE_WITH_TOPIC, committingSegmentDescriptor.getSegmentSizeBytes());
   }
 }
