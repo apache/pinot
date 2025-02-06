@@ -30,7 +30,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.core.operator.transform.function.TimeSeriesBucketTransformFunction;
 import org.apache.pinot.core.query.aggregation.function.TimeSeriesAggregationFunction;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -106,10 +105,10 @@ public class PhysicalTimeSeriesServerPlanVisitor {
     List<ExpressionContext> groupByExpressions = leafNode.getGroupByExpressions().stream()
         .map(RequestContextUtils::getExpression).collect(Collectors.toList());
     TimeBuckets timeBuckets = context.getInitialTimeBuckets();
-    ExpressionContext timeTransform = TimeSeriesBucketTransformFunction.create(leafNode.getTimeColumn(),
-        leafNode.getTimeUnit(), timeBuckets, leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds());
+    ExpressionContext rawTimeValuesInLong = RequestContextUtils.getExpression(leafNode.getTimeColumn());
     ExpressionContext aggregation = TimeSeriesAggregationFunction.create(context.getLanguage(),
-        leafNode.getValueExpression(), timeTransform, timeBuckets, leafNode.getAggInfo());
+        leafNode.getValueExpression(), rawTimeValuesInLong, leafNode.getTimeUnit(),
+        leafNode.getOffsetSeconds() == null ? 0 : leafNode.getOffsetSeconds(), timeBuckets, leafNode.getAggInfo());
     Map<String, String> queryOptions = new HashMap<>(leafNode.getQueryOptions());
     queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(Math.max(0L, context.getRemainingTimeMs())));
     return new QueryContext.Builder()
