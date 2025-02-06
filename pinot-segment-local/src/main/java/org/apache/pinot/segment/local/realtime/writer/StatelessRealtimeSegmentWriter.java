@@ -88,12 +88,14 @@ public class StatelessRealtimeSegmentWriter {
 
   private static final int DEFAULT_CAPACITY = 100_000;
   private static final int DEFAULT_FETCH_TIMEOUT_MS = 5000;
+  public static final String SEGMENT_STATS_FILE_NAME = "segment-stats.ser";
+  public static final String RESOURCE_TMP_DIR_PREFIX = "resourceTmpDir_";
+  public static final String RESOURCE_DATA_DIR_PREFIX = "resourceDataDir_";
 
   private final Semaphore _segBuildSemaphore;
   private final String _segmentName;
   private final String _tableNameWithType;
   private final int _partitionGroupId;
-  private final String _segmentNameStr;
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final Schema _schema;
@@ -108,7 +110,6 @@ public class StatelessRealtimeSegmentWriter {
   private final File _resourceDataDir;
   private final Logger _logger;
   private Thread _consumerThread;
-  private final AtomicBoolean _shouldStop = new AtomicBoolean(false);
   private final AtomicBoolean _isDoneConsuming = new AtomicBoolean(false);
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamPartitionMsgOffset _endOffset;
@@ -132,9 +133,14 @@ public class StatelessRealtimeSegmentWriter {
     _segmentZKMetadata = segmentZKMetadata;
     _tableConfig = indexLoadingConfig.getTableConfig();
     _schema = indexLoadingConfig.getSchema();
-    _resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
-    _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());
-    ;
+    String tableDataDir = indexLoadingConfig.getTableDataDir() == null ? FileUtils.getTempDirectory().getAbsolutePath()
+        : indexLoadingConfig.getTableDataDir();
+    File reingestionDir = new File(tableDataDir, "reingestion");
+    _resourceTmpDir =
+        new File(reingestionDir, RESOURCE_TMP_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
+    _resourceDataDir =
+        new File(reingestionDir, RESOURCE_DATA_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
+
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
     Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0);
@@ -152,7 +158,6 @@ public class StatelessRealtimeSegmentWriter {
 
     _consumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(clientId, _partitionGroupId);
-    _segmentNameStr = _segmentZKMetadata.getSegmentName();
 
     // Create a simple PartitionGroupConsumptionStatus
     PartitionGroupConsumptionStatus partitionGroupConsumptionStatus =
@@ -175,10 +180,7 @@ public class StatelessRealtimeSegmentWriter {
 
     // Load stats history, here we are using the same stats while as the RealtimeSegmentDataManager so that we are
     // much more efficient in allocating buffers. It also works with empty file
-    String tableDataDir = indexLoadingConfig.getInstanceDataManagerConfig() != null
-        ? indexLoadingConfig.getInstanceDataManagerConfig().getInstanceDataDir() + File.separator + _tableNameWithType
-        : _resourceTmpDir.getAbsolutePath();
-    File statsHistoryFile = new File(tableDataDir, "segment-stats.ser");
+    File statsHistoryFile = new File(tableDataDir, SEGMENT_STATS_FILE_NAME);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsHistoryFile);
 
     // Initialize mutable segment with configurations
@@ -190,7 +192,7 @@ public class StatelessRealtimeSegmentWriter {
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
             .setFieldConfigList(_tableConfig.getFieldConfigList()).setConsumerDir(_resourceDataDir.getAbsolutePath())
             .setMemoryManager(
-                new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentNameStr, null));
+                new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null));
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
@@ -256,20 +258,16 @@ public class StatelessRealtimeSegmentWriter {
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
         TransformPipeline.Result reusedResult = new TransformPipeline.Result();
-        while (!_shouldStop.get() && _currentOffset.compareTo(_endOffset) < 0) {
+        while (_currentOffset.compareTo(_endOffset) < 0) {
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
 
           int messageCount = messageBatch.getMessageCount();
 
           for (int i = 0; i < messageCount; i++) {
-            if (_shouldStop.get()) {
-              break;
-            }
             StreamMessage streamMessage = messageBatch.getStreamMessage(i);
             if (streamMessage.getMetadata() != null && streamMessage.getMetadata().getOffset() != null
                 && streamMessage.getMetadata().getOffset().compareTo(_endOffset) >= 0) {
-              _shouldStop.set(true);
               _logger.info("Reached end offset: {} for partition group: {}", _endOffset, _partitionGroupId);
               break;
             }
@@ -311,7 +309,6 @@ public class StatelessRealtimeSegmentWriter {
   }
 
   public void stopConsumption() {
-    _shouldStop.set(true);
     if (_consumerThread.isAlive()) {
       _consumerThread.interrupt();
       try {
@@ -322,14 +319,11 @@ public class StatelessRealtimeSegmentWriter {
     }
   }
 
-  public void destroy() {
+  public void close() {
+    stopConsumption();
     _realtimeSegment.destroy();
     FileUtils.deleteQuietly(_resourceTmpDir);
     FileUtils.deleteQuietly(_resourceDataDir);
-  }
-
-  public void offload() {
-    stopConsumption();
   }
 
   public boolean isDoneConsuming() {
@@ -345,7 +339,7 @@ public class StatelessRealtimeSegmentWriter {
   }
 
   @VisibleForTesting
-  public SegmentBuildDescriptor buildSegmentInternal()
+  public File buildSegmentInternal()
       throws Exception {
     _logger.info("Building segment from {} to {}", _startOffset, _currentOffset);
     final long startTimeMillis = now();
@@ -359,7 +353,6 @@ public class StatelessRealtimeSegmentWriter {
               Duration.between(acquireStart, Instant.now()));
           timeoutSeconds = Math.min(timeoutSeconds * 2, 300);
         }
-        _logger.info("Acquired semaphore for building segment");
       }
     } catch (InterruptedException e) {
       String errorMessage = "Interrupted while waiting for semaphore";
@@ -369,12 +362,13 @@ public class StatelessRealtimeSegmentWriter {
 
     final long lockAcquireTimeMillis = now();
     final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
+    _logger.info("Acquired lock for building segment in {} ms", waitTimeMillis);
     // Build a segment from in-memory rows.
     // Use a temporary directory
     Path tempSegmentFolder = null;
     try {
       tempSegmentFolder =
-          java.nio.file.Files.createTempDirectory(_resourceTmpDir.toPath(), "tmp-" + _segmentNameStr + "-");
+          java.nio.file.Files.createTempDirectory(_resourceTmpDir.toPath(), "tmp-" + _segmentName + "-");
     } catch (IOException e) {
       _logger.error("Failed to create temporary directory for segment build", e);
       return null;
@@ -401,10 +395,10 @@ public class StatelessRealtimeSegmentWriter {
         converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
 
     File dataDir = _resourceDataDir;
-    File indexDir = new File(dataDir, _segmentNameStr);
+    File indexDir = new File(dataDir, _segmentName);
     FileUtils.deleteQuietly(indexDir);
 
-    File tempIndexDir = new File(tempSegmentFolder.toFile(), _segmentNameStr);
+    File tempIndexDir = new File(tempSegmentFolder.toFile(), _segmentName);
     if (!tempIndexDir.exists()) {
       _logger.error("Temp index directory {} does not exist", tempIndexDir);
       FileUtils.deleteQuietly(tempSegmentFolder.toFile());
@@ -422,7 +416,7 @@ public class StatelessRealtimeSegmentWriter {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
 
     long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
-    File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(dataDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
       TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
     } catch (IOException e) {
@@ -443,18 +437,11 @@ public class StatelessRealtimeSegmentWriter {
     Map<String, File> metadataFiles = new HashMap<>();
     metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
     metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
-    return new SegmentBuildDescriptor(segmentTarFile, metadataFiles, _currentOffset, buildTimeMillis, buildTimeMillis,
-        segmentSizeBytes, segmentMetadata);
+    return segmentTarFile;
   }
 
   protected long now() {
     return System.currentTimeMillis();
-  }
-
-  public void removeSegmentFile(SegmentBuildDescriptor segmentBuildDescriptor) {
-    if (segmentBuildDescriptor != null) {
-      segmentBuildDescriptor.deleteSegmentFile();
-    }
   }
 
   /*
@@ -527,64 +514,6 @@ public class StatelessRealtimeSegmentWriter {
       } catch (Exception e) {
         _logger.warn("Could not close stream metadata provider", e);
       }
-    }
-  }
-
-  public class SegmentBuildDescriptor {
-    final File _segmentTarFile;
-    final Map<String, File> _metadataFileMap;
-    final StreamPartitionMsgOffset _offset;
-    final long _waitTimeMillis;
-    final long _buildTimeMillis;
-    final long _segmentSizeBytes;
-    final SegmentMetadataImpl _segmentMetadata;
-
-    public SegmentBuildDescriptor(@Nullable File segmentTarFile, @Nullable Map<String, File> metadataFileMap,
-        StreamPartitionMsgOffset offset, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes,
-        SegmentMetadataImpl segmentMetadata) {
-      _segmentTarFile = segmentTarFile;
-      _metadataFileMap = metadataFileMap;
-      _offset = _offsetFactory.create(offset);
-      _buildTimeMillis = buildTimeMillis;
-      _waitTimeMillis = waitTimeMillis;
-      _segmentSizeBytes = segmentSizeBytes;
-      _segmentMetadata = segmentMetadata;
-    }
-
-    public StreamPartitionMsgOffset getOffset() {
-      return _offset;
-    }
-
-    public long getBuildTimeMillis() {
-      return _buildTimeMillis;
-    }
-
-    public long getWaitTimeMillis() {
-      return _waitTimeMillis;
-    }
-
-    @Nullable
-    public File getSegmentTarFile() {
-      return _segmentTarFile;
-    }
-
-    @Nullable
-    public Map<String, File> getMetadataFiles() {
-      return _metadataFileMap;
-    }
-
-    public long getSegmentSizeBytes() {
-      return _segmentSizeBytes;
-    }
-
-    public void deleteSegmentFile() {
-      if (_segmentTarFile != null) {
-        FileUtils.deleteQuietly(_segmentTarFile);
-      }
-    }
-
-    public SegmentMetadataImpl getSegmentMetadata() {
-      return _segmentMetadata;
     }
   }
 }

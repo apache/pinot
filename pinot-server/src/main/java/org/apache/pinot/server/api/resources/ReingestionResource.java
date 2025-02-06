@@ -29,21 +29,14 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -55,13 +48,10 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.api.resources.reingestion.ReingestionResponse;
@@ -69,7 +59,6 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -245,7 +234,7 @@ public class ReingestionResource {
                 tableDataManager.getSegmentBuildSemaphore());
 
         RUNNING_JOBS.put(jobId, job);
-        doReingestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
+        doReingestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig);
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
       } finally {
@@ -265,7 +254,7 @@ public class ReingestionResource {
    * This is essentially the old synchronous logic you had in reingestSegment.
    */
   private void doReingestSegment(StatelessRealtimeSegmentWriter manager, LLCSegmentName llcSegmentName,
-      String tableNameWithType, IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager)
+      String tableNameWithType, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     try {
       String segmentName = llcSegmentName.getSegmentName();
@@ -279,10 +268,7 @@ public class ReingestionResource {
       }
 
       LOGGER.info("Starting build for segment {}", segmentName);
-      StatelessRealtimeSegmentWriter.SegmentBuildDescriptor segmentBuildDescriptor =
-          manager.buildSegmentInternal();
-
-      File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
+      File segmentTarFile = manager.buildSegmentInternal();
       if (segmentTarFile == null) {
         throw new Exception("Failed to build segment: " + segmentName);
       }
@@ -292,8 +278,7 @@ public class ReingestionResource {
       protocolHandler.uploadReingestedSegment(segmentName, indexLoadingConfig.getSegmentStoreURI(), segmentTarFile);
       LOGGER.info("Re-ingested segment {} uploaded successfully", segmentName);
     } finally {
-      manager.offload();
-      manager.destroy();
+      manager.close();
     }
   }
 
@@ -324,27 +309,5 @@ public class ReingestionResource {
     }
 
     throw new RuntimeException("Timeout waiting for condition: " + condition);
-  }
-
-  public void resetSegment(HttpClient httpClient, String controllerVipUrl, String tableNameWithType, String segmentName,
-      String targetInstance, Map<String, String> headers)
-      throws IOException {
-    try {
-      HttpClient.wrapAndThrowHttpException(httpClient.sendJsonPostRequest(
-          new URI(getURLForSegmentReset(controllerVipUrl, tableNameWithType, segmentName, targetInstance)), null,
-          headers));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
-      throw new IOException(e);
-    }
-  }
-
-  private String getURLForSegmentReset(String controllerVipUrl, String tableNameWithType, String segmentName,
-      @Nullable String targetInstance) {
-    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
-    return StringUtil.join("/", controllerVipUrl, "segments", tableNameWithType, encode(segmentName), query);
-  }
-
-  private String encode(String s) {
-    return URLEncoder.encode(s, StandardCharsets.UTF_8);
   }
 }
