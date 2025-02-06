@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,8 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -75,6 +78,7 @@ import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckRespon
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -815,6 +819,100 @@ public class PinotSegmentRestletResource {
     }
   }
 
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/resetPauselessTable/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Reset/cleanup segments in a pauseless enabled table", notes =
+      "For each partition, finds the oldest error segment and deletes all segments with sequence number >= "
+          + "oldest error segment's sequence. Segments with sequence numbers < oldest error are preserved.")
+  public SuccessResponse resetPauselessTable(
+      @ApiParam(value = "Name of the table to reset", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Type of the table: OFFLINE or REALTIME", required = true) @QueryParam("type")
+      String tableTypeStr,
+      @ApiParam(value =
+          "Retention period for segments (e.g. 12h, 3d). Defaults to: table config → cluster setting → 7d. "
+              + "Use 0d or -1d for immediate deletion without retention")
+      @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = "List of error segment names. If not provided, error segments are automatically detected from"
+          + " ExternalView", allowMultiple = true) @QueryParam("segments") List<String> errorSegments,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == null) {
+      throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+
+    Preconditions.checkState(
+        PauselessConsumptionUtils.isPauselessEnabled(_pinotHelixResourceManager.getTableConfig(tableNameWithType)),
+        "Pauseless is not enabled for the table " + tableNameWithType);
+
+    if (errorSegments == null || errorSegments.isEmpty()) {
+      ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+      Preconditions.checkState(externalView != null, "External view does not exist for table " + tableNameWithType);
+      errorSegments = getErrorSegments(externalView);
+    }
+
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
+
+    // Get LLCSegmentName objects for oldest segments in one pass
+    Map<Integer, LLCSegmentName> partitionToOldestSegment = getPartitionIDToOldestSegmentInfo(errorSegments);
+    Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
+        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealState);
+    for (Integer partitionID : partitionToOldestSegment.keySet()) {
+      LOGGER.info("Deleting segments for partition: {}, with the oldest error segment: {}", partitionID,
+          partitionToOldestSegment.get(partitionID));
+      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(partitionIdToSegmentsToDeleteMap.get(partitionID)),
+          retentionPeriod);
+    }
+    return new SuccessResponse("Pauseless table: " + tableNameWithType + " has been reset successfully");
+  }
+
+  @VisibleForTesting
+  Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
+      Map<Integer, LLCSegmentName> partitionToOldestSegment,
+      IdealState idealState) {
+
+    // Find segments to delete (those with higher sequence numbers)
+    Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
+    Map<String, Map<String, String>> segmentsToInstanceState = idealState.getRecord().getMapFields();
+
+    for (String segmentName : segmentsToInstanceState.keySet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
+      if (oldestSegment != null && oldestSegment.getSequenceNumber() <= llcSegmentName.getSequenceNumber()) {
+        partitionToSegmentsToDelete
+            .computeIfAbsent(partitionId, k -> new HashSet<>())
+            .add(segmentName);
+      }
+    }
+
+    return partitionToSegmentsToDelete;
+  }
+
+  @VisibleForTesting
+  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegmentInfo(List<String> errorSegments) {
+    Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
+
+    for (String segment : errorSegments) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);
+      if (currentOldest == null || llcSegmentName.getSequenceNumber() < currentOldest.getSequenceNumber()) {
+        partitionToOldestSegment.put(partitionId, llcSegmentName);
+      }
+    }
+
+    return partitionToOldestSegment;
+  }
+
   @Deprecated
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
@@ -1244,5 +1342,35 @@ public class PinotSegmentRestletResource {
       resultList.add(Pair.of(tableType, segments));
     }
     return resultList;
+  }
+
+  /**
+   * Gets the set of segments that are in ERROR state across all servers for the given table.
+   *
+   * A segment is considered an error segment only if it is in ERROR state on all servers
+   * that host it. This definition aligns with the error segment criteria used by the
+   * reingestion process.
+   *
+   * @param externalView ExternalView of the table
+   * @return List of segment names that are in ERROR state across all servers
+   * @throws IllegalStateException if the external view does not exist for the table
+   */
+
+  private List<String> getErrorSegments(ExternalView externalView) {
+    List<String> errorSegments = new ArrayList<>();
+    for (String segmentName : externalView.getPartitionSet()) {
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      boolean isErrorSegment = true;
+      for (String segmentStatus : externalViewStateMap.values()) {
+        if (!CommonConstants.Helix.StateModel.SegmentStateModel.ERROR.equals(segmentStatus)) {
+          isErrorSegment = false;
+          break;
+        }
+      }
+      if (isErrorSegment) {
+        errorSegments.add(segmentName);
+      }
+    }
+    return errorSegments;
   }
 }
