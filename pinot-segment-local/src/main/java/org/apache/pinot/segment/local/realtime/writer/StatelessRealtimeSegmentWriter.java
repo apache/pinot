@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.writer;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -36,7 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
@@ -54,6 +55,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -71,6 +73,8 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -113,29 +117,32 @@ public class StatelessRealtimeSegmentWriter {
   private final TransformPipeline _transformPipeline;
   private volatile boolean _isSuccess = false;
   private volatile Throwable _consumptionException;
-  private final ServerMetrics _serverMetrics;
 
-  public StatelessRealtimeSegmentWriter(String segmentName, String tableNameWithType, int partitionGroupId,
-      SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Schema schema,
-      IndexLoadingConfig indexLoadingConfig, StreamConfig streamConfig, String startOffsetStr, String endOffsetStr,
-      Semaphore segBuildSemaphore, ServerMetrics serverMetrics)
+  public StatelessRealtimeSegmentWriter(SegmentZKMetadata segmentZKMetadata, IndexLoadingConfig indexLoadingConfig,
+      @Nullable Semaphore segBuildSemaphore)
       throws Exception {
+    Preconditions.checkNotNull(indexLoadingConfig.getTableConfig(), "Table config must be set in index loading config");
+    Preconditions.checkNotNull(indexLoadingConfig.getSchema(), "Schema must be set in index loading config");
+    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
+
+    _segmentName = segmentZKMetadata.getSegmentName();
+    _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _segBuildSemaphore = segBuildSemaphore;
-    _segmentName = segmentName;
-    _tableNameWithType = tableNameWithType;
-    _partitionGroupId = partitionGroupId;
+    _tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
     _segmentZKMetadata = segmentZKMetadata;
-    _tableConfig = tableConfig;
-    _schema = schema;
-    _streamConfig = streamConfig;
+    _tableConfig = indexLoadingConfig.getTableConfig();
+    _schema = indexLoadingConfig.getSchema();
     _resourceTmpDir = new File(FileUtils.getTempDirectory(), "resourceTmpDir_" + System.currentTimeMillis());
-    _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());;
-    _serverMetrics = serverMetrics;
+    _resourceDataDir = new File(FileUtils.getTempDirectory(), "resourceDataDir_" + System.currentTimeMillis());
+    ;
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0);
+    _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMap);
+
     _offsetFactory = StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
-    _startOffset = _offsetFactory.create(startOffsetStr);
-    _endOffset = _offsetFactory.create(endOffsetStr);
+    _startOffset = _offsetFactory.create(segmentZKMetadata.getStartOffset());
+    _endOffset = _offsetFactory.create(segmentZKMetadata.getEndOffset());
 
     String clientId = getClientId();
 
@@ -158,7 +165,7 @@ public class StatelessRealtimeSegmentWriter {
     _decoder = createDecoder(fieldsToRead);
 
     // Fetch capacity from indexLoadingConfig or use default
-    int capacity = streamConfig.getFlushThresholdRows();
+    int capacity = _streamConfig.getFlushThresholdRows();
     if (capacity <= 0) {
       capacity = DEFAULT_CAPACITY;
     }
@@ -181,15 +188,15 @@ public class StatelessRealtimeSegmentWriter {
             .setSegmentZKMetadata(_segmentZKMetadata).setStatsHistory(statsHistory).setSchema(_schema)
             .setCapacity(capacity).setAvgNumMultiValues(avgNumMultiValues)
             .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
-            .setFieldConfigList(tableConfig.getFieldConfigList()).setConsumerDir(_resourceDataDir.getAbsolutePath())
+            .setFieldConfigList(_tableConfig.getFieldConfigList()).setConsumerDir(_resourceDataDir.getAbsolutePath())
             .setMemoryManager(
-                new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentNameStr, _serverMetrics));
+                new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentNameStr, null));
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
-    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), _serverMetrics);
+    _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
-    _transformPipeline = new TransformPipeline(tableConfig, schema);
+    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
 
     // Initialize fetch timeout
     _fetchTimeoutMs =
@@ -338,7 +345,8 @@ public class StatelessRealtimeSegmentWriter {
   }
 
   @VisibleForTesting
-  public SegmentBuildDescriptor buildSegmentInternal() throws Exception {
+  public SegmentBuildDescriptor buildSegmentInternal()
+      throws Exception {
     _logger.info("Building segment from {} to {}", _startOffset, _currentOffset);
     final long startTimeMillis = now();
     try {
@@ -378,11 +386,11 @@ public class StatelessRealtimeSegmentWriter {
 
     // Build the segment
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.toString(),
-            _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
+        new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.toString(), _schema,
+            _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
             _tableConfig.getIndexingConfig().isNullHandlingEnabled());
     try {
-      converter.build(null, _serverMetrics);
+      converter.build(null, null);
     } catch (Exception e) {
       _logger.error("Failed to build segment", e);
       FileUtils.deleteQuietly(tempSegmentFolder.toFile());

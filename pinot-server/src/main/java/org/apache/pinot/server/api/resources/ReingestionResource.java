@@ -69,8 +69,6 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -242,15 +240,9 @@ public class ReingestionResource {
     // Kick off the actual work asynchronously
     REINGESTION_EXECUTOR.submit(() -> {
       try {
-        int partitionGroupId = llcSegmentName.getPartitionGroupId();
-
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
-        StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-
         StatelessRealtimeSegmentWriter manager =
-            new StatelessRealtimeSegmentWriter(segmentName, tableNameWithType, partitionGroupId, segmentZKMetadata,
-                tableConfig, schema, indexLoadingConfig, streamConfig, startOffsetStr, endOffsetStr,
-                tableDataManager.getSegmentBuildSemaphore(), null);
+            new StatelessRealtimeSegmentWriter(segmentZKMetadata, indexLoadingConfig,
+                tableDataManager.getSegmentBuildSemaphore());
 
         RUNNING_JOBS.put(jobId, job);
         doReingestSegment(manager, llcSegmentName, tableNameWithType, indexLoadingConfig, tableDataManager);
