@@ -127,6 +127,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
+  public static final String SEGMENT_REINGEST_COMPLETION_PATH = "/segments/reingested";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
@@ -367,6 +368,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
+  }
+
+  public static URI getSegmentReingestCompletionURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        SEGMENT_REINGEST_COMPLETION_PATH);
   }
 
   public static URI getBatchSegmentUploadURI(URI controllerURI)

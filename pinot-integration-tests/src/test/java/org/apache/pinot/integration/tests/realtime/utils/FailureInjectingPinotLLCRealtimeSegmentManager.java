@@ -26,16 +26,39 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
+import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class FailureInjectingPinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   private final Map<String, String> _failureConfig;
+  private long _maxSegmentCompletionTimeoutMs = 300000L;
+  private static final Logger LOGGER = LoggerFactory.getLogger(FailureInjectingPinotLLCRealtimeSegmentManager.class);
 
   public FailureInjectingPinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(helixResourceManager, controllerConf, controllerMetrics);
     _failureConfig = new HashMap<>();
+  }
+
+  @Override
+  protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
+      long currentTimeMs) {
+    Stat stat = new Stat();
+    getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    if (currentTimeMs > stat.getMtime() + _maxSegmentCompletionTimeoutMs) {
+      LOGGER.info("Segment: {} exceeds the max completion time: {}ms, metadata update time: {}, current time: {}",
+          segmentName, _maxSegmentCompletionTimeoutMs, stat.getMtime(), currentTimeMs);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  public void setMaxSegmentCompletionTimeoutMs(long maxSegmentCompletionTimeoutMs) {
+    _maxSegmentCompletionTimeoutMs = maxSegmentCompletionTimeoutMs;
   }
 
   @VisibleForTesting

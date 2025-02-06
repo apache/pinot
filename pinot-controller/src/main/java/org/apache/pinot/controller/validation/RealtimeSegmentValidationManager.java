@@ -28,6 +28,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
@@ -120,6 +121,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     } else {
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
+
+    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessConsumptionEnabled) {
+      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig.getTableName());
+    } else if (_segmentAutoResetOnErrorAtValidation) {
+      // reset for pauseless tables is already handled in repairSegmentsInErrorState method
+      // with additional checks for pauseless consumption
+      _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
+    }
   }
 
   /**
@@ -179,10 +189,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
-    }
-
-    if (_segmentAutoResetOnErrorAtValidation) {
-      _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
     }
   }
 

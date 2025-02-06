@@ -233,6 +233,13 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
+    return uploadSegment(tableName, tableType, multiPart, copySegmentToFinalLocation, enableParallelPushProtection,
+        allowRefresh, false, headers, request);
+  }
+
+  private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
+      @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
+      boolean allowRefresh, boolean isReingested, HttpHeaders headers, Request request) {
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -409,9 +416,16 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentDownloadURIStr, segmentFile, tableNameWithType, copySegmentToFinalLocation);
 
       ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
-          segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
-          enableParallelPushProtection, allowRefresh, headers);
+
+      if (!isReingested) {
+        zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
+            segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
+            enableParallelPushProtection, allowRefresh, headers);
+      } else {
+        zkOperator.completeReingestedSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI,
+            sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes, enableParallelPushProtection,
+            headers);
+      }
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -962,6 +976,41 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Path("segments/reingested")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.CREATE)
+  @ApiOperation(value = "Reingest a realtime segment", notes = "Reingest a segment as multipart file")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully reingested segment"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 403, message = "Segment validation fails"),
+      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
+      @ApiResponse(code = 412, message = "CRC check fails"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS)
+  public void completeSegmentReingestion(FormDataMultiPart multiPart,
+      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
+      String tableName,
+      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
+      @DefaultValue("REALTIME") String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
+      boolean enableParallelPushProtection,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart,
+          true, enableParallelPushProtection, false, true, headers, request));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
     }
   }
 

@@ -180,7 +180,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // segment when the partition is first detected).
   COMMITTING_SEGMENT_SIZE("committingSegmentSize", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+
+  // Number of reingested segments getting uploaded
+  SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS("segmentReingestionUploadInProgress", true);
 
   private final String _gaugeName;
   private final String _unit;
