@@ -78,6 +78,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
@@ -687,6 +688,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(
+        _serverConf.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+    GroovyFunctionEvaluator.setMetrics(serverMetrics, ServerMeter.GROOVY_SECURITY_VIOLATIONS);
 
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
