@@ -104,6 +104,7 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -218,7 +219,8 @@ public class QueryDispatcher {
   }
 
   public boolean checkConnectivityToInstance(String instanceId) {
-    DispatchClient client = _dispatchClientMap.get(instanceId);
+    String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
 
     if (client == null) {
       LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
@@ -260,10 +262,11 @@ public class QueryDispatcher {
               serverInstance);
         }
       };
+      Worker.QueryRequest requestBuilder =
+          createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
+      DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
+
       try {
-        Worker.QueryRequest requestBuilder =
-            createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
-        DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
         sendRequest.send(dispatchClient, requestBuilder, serverInstance, deadline, callbackConsumer);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
@@ -427,8 +430,11 @@ public class QueryDispatcher {
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
-    return _dispatchClientMap.computeIfAbsent(queryServerInstance.getInstanceId(), k -> new DispatchClient(
-        queryServerInstance.getHostname(), queryServerInstance.getQueryServicePort(), _tlsConfig));
+    String hostname = queryServerInstance.getHostname();
+    int port = queryServerInstance.getQueryServicePort();
+    String hostnamePort = String.format("%s_%d", hostname, port);
+    _instanceIdToHostnamePortMap.put(queryServerInstance.getInstanceId(), hostnamePort);
+    return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
@@ -530,6 +536,7 @@ public class QueryDispatcher {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
+    _instanceIdToHostnamePortMap.clear();
     _mailboxService.shutdown();
     _executorService.shutdown();
   }

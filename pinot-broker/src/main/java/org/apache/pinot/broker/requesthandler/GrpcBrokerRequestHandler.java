@@ -137,6 +137,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   public static class PinotStreamingQueryClient {
     private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
+    private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
     private final GrpcConfig _config;
 
     public PinotStreamingQueryClient(GrpcConfig config) {
@@ -149,7 +150,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     }
 
     private GrpcQueryClient getOrCreateGrpcQueryClient(ServerInstance serverInstance) {
-      return _grpcQueryClientMap.computeIfAbsent(serverInstance.getInstanceId(),
+      String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());
+      _instanceIdToHostnamePortMap.put(serverInstance.getInstanceId(), hostnamePort);
+      return _grpcQueryClientMap.computeIfAbsent(hostnamePort,
           k -> new GrpcQueryClient(serverInstance.getHostname(), serverInstance.getGrpcPort(), _config));
     }
 
@@ -171,7 +174,8 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       return false;
     }
 
-    GrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(instanceId);
+    String hostnamePort = _streamingQueryClient._instanceIdToHostnamePortMap.get(instanceId);
+    GrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
 
     if (client == null) {
       LOGGER.warn("No GrpcQueryClient found for server with instanceId: {}", instanceId);
