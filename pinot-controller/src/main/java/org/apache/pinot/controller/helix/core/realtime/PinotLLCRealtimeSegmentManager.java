@@ -2112,9 +2112,10 @@ public class PinotLLCRealtimeSegmentManager {
    *   POST http://[serverURL]/reingestSegment/[segmentName]
    *   Request body (JSON):
    *
+   * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
    * @param realtimeTableName The table name with type, e.g. "myTable_REALTIME"
    */
-  public void reingestSegmentsWithErrorState(String realtimeTableName) {
+  public void repairSegmentsInErrorState(String realtimeTableName) {
     // Step 1: Fetch the ExternalView and all segments
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
     if (externalView == null) {
@@ -2126,7 +2127,8 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, Map<String, String>> segmentToInstanceIdealStateMap = idealState.getRecord().getMapFields();
 
     // find segments in ERROR state in externalView
-    List<String> segmentsInErrorState = new ArrayList<>();
+    List<String> segmentsInErrorStateInAllReplicas = new ArrayList<>();
+    List<String> segmentsInErrorStateInAtleastOneReplica = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : segmentToInstanceCurrentStateMap.entrySet()) {
       String segmentName = entry.getKey();
 
@@ -2137,25 +2139,29 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       Map<String, String> instanceStateMap = entry.getValue();
-      boolean allReplicasInError = true;
+      int numReplicasInError = 0;
       for (String state : instanceStateMap.values()) {
-        if (!SegmentStateModel.ERROR.equals(state)) {
-          allReplicasInError = false;
-          break;
+        if (SegmentStateModel.ERROR.equals(state)) {
+          numReplicasInError++;
         }
       }
-      if (allReplicasInError) {
-        segmentsInErrorState.add(segmentName);
+
+      if (numReplicasInError > 0) {
+        segmentsInErrorStateInAtleastOneReplica.add(segmentName);
+      }
+
+      if (numReplicasInError == instanceStateMap.size()) {
+        segmentsInErrorStateInAllReplicas.add(segmentName);
       }
     }
 
-    if (segmentsInErrorState.isEmpty()) {
+    if (segmentsInErrorStateInAtleastOneReplica.isEmpty()) {
       LOGGER.info("No segments found in ERROR state for table {}", realtimeTableName);
       return;
     }
 
     // filter out segments that are not ONLINE in IdealState
-    for (String segmentName : segmentsInErrorState) {
+    for (String segmentName : segmentsInErrorStateInAtleastOneReplica) {
       Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
       boolean isOnline = true;
       for (String state : instanceIdealStateMap.values()) {
@@ -2169,8 +2175,9 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);
-      // We only consider segments that are in COMMITTING state
-      if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
+      // We only consider segments that are in COMMITTING state for reingestion
+      if (segmentsInErrorStateInAllReplicas.contains(segmentName)
+          && segmentZKMetadata.getStatus() == Status.COMMITTING) {
         Map<String, String> instanceStateMap = segmentToInstanceIdealStateMap.get(segmentName);
 
         // Step 3: “No peer has that segment.” => Re-ingest from one server that is supposed to host it and is alive
@@ -2191,6 +2198,9 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.error("Failed to call reingestSegment for segment {} on server {}", segmentName, aliveServer, e);
         }
+      } else if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+        // trigger segment reset for this since it is not in IN_PROGRESS state so download URL must be present
+        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
   }
