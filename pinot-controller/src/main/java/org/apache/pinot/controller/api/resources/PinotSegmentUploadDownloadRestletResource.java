@@ -996,7 +996,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_REINGESTION_IN_PROGRESS)
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS)
   public void completeSegmentReingestion(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
       String tableName,
