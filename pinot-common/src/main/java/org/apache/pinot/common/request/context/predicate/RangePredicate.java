@@ -140,20 +140,4 @@ public class RangePredicate extends BasePredicate {
     return "(" + _lhs + (_lowerInclusive ? " >= '" : " > '") + _lowerBound + "' AND " + _lhs + (_upperInclusive
         ? " <= '" : " < '") + _upperBound + "')";
   }
-
-  public static String getGreatRange(String value) {
-    return LOWER_EXCLUSIVE + value + DELIMITER + UNBOUNDED + UPPER_EXCLUSIVE;
-  }
-
-  public static String getLessRange(String value) {
-    return LOWER_EXCLUSIVE + UNBOUNDED + DELIMITER + value + UPPER_EXCLUSIVE;
-  }
-
-  public static String getGreatEqualRange(String value) {
-    return LOWER_INCLUSIVE + value + DELIMITER + UNBOUNDED + UPPER_EXCLUSIVE;
-  }
-
-  public static String getLessEqualRange(String value) {
-    return LOWER_EXCLUSIVE + UNBOUNDED + DELIMITER + value + UPPER_INCLUSIVE;
-  }
 }
