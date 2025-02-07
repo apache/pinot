@@ -105,12 +105,13 @@ public class QueryEnvironment {
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
   private final Config _envConfig;
+  private final PinotCatalog _catalog;
 
   public QueryEnvironment(Config config) {
     _envConfig = config;
     String database = config.getDatabase();
-    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
+    _catalog = new PinotCatalog(config.getTableCache(), database);
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     Properties connectionConfigProperties = new Properties();
     connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
         config.getTableCache() == null
@@ -139,6 +140,10 @@ public class QueryEnvironment {
     HepProgram traitProgram = getTraitProgram(workerManager);
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
         sqlNodeAndOptions.getOptions());
+  }
+
+  public Set<String> getResolvedTables() {
+    return _catalog.getResolvedTables();
   }
 
   @Nullable

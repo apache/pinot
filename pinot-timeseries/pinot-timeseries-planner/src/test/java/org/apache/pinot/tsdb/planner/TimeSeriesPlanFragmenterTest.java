@@ -21,6 +21,7 @@ package org.apache.pinot.tsdb.planner;
 import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -31,6 +32,9 @@ import static org.testng.Assert.*;
 
 
 public class TimeSeriesPlanFragmenterTest {
+  private static final int SERIES_LIMIT = 1000;
+  private static final Map<String, String> QUERY_OPTIONS = Collections.emptyMap();
+
   @Test
   public void testGetFragmentsWithMultipleLeafNodes() {
     /*
@@ -136,7 +140,8 @@ public class TimeSeriesPlanFragmenterTest {
 
   private LeafTimeSeriesPlanNode createMockLeafNode(String id) {
     return new LeafTimeSeriesPlanNode(id, Collections.emptyList(), "someTableName", "someTimeColumn",
-        TimeUnit.SECONDS, 0L, "", "", null, Collections.emptyList());
+        TimeUnit.SECONDS, 0L, "", "", null, Collections.emptyList(),
+        SERIES_LIMIT, QUERY_OPTIONS);
   }
 
   static class MockTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {

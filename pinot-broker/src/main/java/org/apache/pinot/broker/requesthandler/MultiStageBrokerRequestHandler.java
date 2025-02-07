@@ -139,6 +139,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
+    QueryEnvironment queryEnvironment = null;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
     String database;
     try {
@@ -149,13 +150,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
           CommonConstants.Broker.DEFAULT_OF_SPOOLS);
-      QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
+
+      queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
           .tableCache(_tableCache)
           .workerManager(_workerManager)
           .defaultInferPartitionHint(inferPartitionHint)
           .defaultUseSpools(defaultUseSpool)
           .build());
+
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
@@ -191,6 +194,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     } catch (WebApplicationException e) {
       throw e;
     } catch (RuntimeException e) {
+      if (queryEnvironment != null) {
+        Set<String> resolvedTables = queryEnvironment.getResolvedTables();
+        if (resolvedTables != null && resolvedTables.size() > 0) {
+          // validate table access to prevent schema leak via error messages
+          TableAuthorizationResult tableAuthorizationResult =
+              hasTableAccess(requesterIdentity, resolvedTables, requestContext, httpHeaders);
+          if (!tableAuthorizationResult.hasAccess()) {
+            throwTableAccessError(tableAuthorizationResult);
+          }
+        }
+      }
+
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
       LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -228,11 +243,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     TableAuthorizationResult tableAuthorizationResult =
         hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
     if (!tableAuthorizationResult.hasAccess()) {
-      String failureMessage = tableAuthorizationResult.getFailureMessage();
-      if (StringUtils.isNotBlank(failureMessage)) {
-        failureMessage = "Reason: " + failureMessage;
-      }
-      throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+      throwTableAccessError(tableAuthorizationResult);
     }
 
     // Validate QPS quota
@@ -335,13 +346,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // Log query and stats
       _queryLogger.log(
-          new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity,
-              null));
+          new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null));
 
       return brokerResponse;
     } finally {
       _queryThrottler.release(estimatedNumQueryThreads);
     }
+  }
+
+  private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {
+    String failureMessage = tableAuthorizationResult.getFailureMessage();
+    if (StringUtils.isNotBlank(failureMessage)) {
+      failureMessage = "Reason: " + failureMessage;
+    }
+    throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
   }
 
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,

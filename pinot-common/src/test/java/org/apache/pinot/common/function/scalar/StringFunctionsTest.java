@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import org.apache.pinot.common.function.scalar.string.NgramFunctions;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -135,8 +136,8 @@ public class StringFunctionsTest {
 
   @Test(dataProvider = "ngramTestCases")
   public void testNGram(String input, int minGram, int maxGram, String[] expectedExactNGram, String[] expectedNGram) {
-    assertEquals(StringFunctions.uniqueNgrams(input, maxGram), expectedExactNGram);
-    assertEquals(StringFunctions.uniqueNgrams(input, minGram, maxGram), expectedNGram);
+    assertEquals(new NgramFunctions().uniqueNgrams(input, maxGram), expectedExactNGram);
+    assertEquals(new NgramFunctions().uniqueNgrams(input, minGram, maxGram), expectedNGram);
   }
 
   @Test

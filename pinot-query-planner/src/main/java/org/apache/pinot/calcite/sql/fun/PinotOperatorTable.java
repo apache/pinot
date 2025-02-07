@@ -234,21 +234,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.TIMESTAMP_ADD,
       SqlStdOperatorTable.TIMESTAMP_DIFF,
       SqlStdOperatorTable.CAST,
-
       SqlStdOperatorTable.EXTRACT,
-      // TODO: The following operators are all rewritten to EXTRACT. Consider removing them because they are all
-      //       supported without rewrite.
-      SqlStdOperatorTable.YEAR,
-      SqlStdOperatorTable.QUARTER,
-      SqlStdOperatorTable.MONTH,
-      SqlStdOperatorTable.WEEK,
-      SqlStdOperatorTable.DAYOFYEAR,
-      SqlStdOperatorTable.DAYOFMONTH,
-      SqlStdOperatorTable.DAYOFWEEK,
-      SqlStdOperatorTable.HOUR,
-      SqlStdOperatorTable.MINUTE,
-      SqlStdOperatorTable.SECOND,
-
       SqlStdOperatorTable.ITEM,
       SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
       SqlStdOperatorTable.LISTAGG

@@ -262,6 +262,7 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1) FROM a"},
         new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3, 1024) FROM a"},
         new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3) FROM a"},
+        new Object[]{"SELECT DAY_OF_WEEK(ts_timestamp, 'UTC') FROM a"}
     };
   }
 

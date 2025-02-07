@@ -157,7 +157,7 @@
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.19.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.20.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
@@ -175,10 +175,10 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.10</aws.sdk.version>
+    <aws.sdk.version>2.30.13</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.18.0</azure.msal4j.version>
-    <joda-time.version>2.13.0</joda-time.version>
+    <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
@@ -227,13 +227,13 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.3.1</httpclient5.version>
+    <httpclient5.version>5.4.2</httpclient5.version>
     <httpcore5.version>5.3.3</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.70.0</grpc.version>
-    <google.cloud.libraries.version>26.53.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.54.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
@@ -270,7 +270,7 @@
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.10.1</c3p0.version>
+    <c3p0.version>0.10.2</c3p0.version>
     <mchange-commons-java.version>0.3.1</mchange-commons-java.version>
 
     <!-- Test Libraries -->
@@ -788,7 +788,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.48.4</version>
+        <version>3.49.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>

@@ -202,14 +202,15 @@ public class ImmutableSegmentLoader {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() > 0) {
       if (segmentPreprocessThrottler != null) {
-        segmentPreprocessThrottler.acquire();
+        segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().acquire();
       }
       try {
         convertSegmentFormat(indexDir, indexLoadingConfig, segmentMetadata);
-        preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig, schema);
+        preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig, schema,
+            segmentPreprocessThrottler);
       } finally {
         if (segmentPreprocessThrottler != null) {
-          segmentPreprocessThrottler.release();
+          segmentPreprocessThrottler.getSegmentAllIndexPreprocessThrottler().release();
         }
       }
     }
@@ -282,6 +283,9 @@ public class ImmutableSegmentLoader {
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
+    if (indexLoadingConfig.isSkipSegmentPreprocess()) {
+      return false;
+    }
     if (needConvertSegmentFormat(indexLoadingConfig, segmentDirectory.getSegmentMetadata())) {
       return true;
     }
@@ -319,7 +323,8 @@ public class ImmutableSegmentLoader {
   }
 
   private static void preprocessSegment(File indexDir, String segmentName, String segmentCrc,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
+      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
     SegmentDirectoryLoaderContext segmentLoaderContext =
@@ -334,7 +339,7 @@ public class ImmutableSegmentLoader {
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
-      preProcessor.process();
+      preProcessor.process(segmentPreprocessThrottler);
     }
   }
 }

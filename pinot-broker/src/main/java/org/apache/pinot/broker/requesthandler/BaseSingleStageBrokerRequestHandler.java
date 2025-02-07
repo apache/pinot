@@ -386,6 +386,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
 
+      AuthorizationResult authorizationResult =
+          accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
+
+      if (!authorizationResult.hasAccess()) {
+        throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+      }
+
       try {
         Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
         if (columnNameMap != null) {
@@ -403,6 +410,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
             e.getMessage());
       }
+
       if (_defaultHllLog2m > 0) {
         handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
       }
@@ -430,24 +438,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
-      if (authorizationResult.hasAccess()) {
-        authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
-      }
+      authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
 
       if (!authorizationResult.hasAccess()) {
-        _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
-            authorizationResult.getFailureMessage());
-        requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        String failureMessage = authorizationResult.getFailureMessage();
-        if (StringUtils.isNotBlank(failureMessage)) {
-          failureMessage = "Reason: " + failureMessage;
-        }
-        throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+        throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
 
       // Get the tables hit by the request
@@ -890,12 +887,27 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       // Log query and stats
       _queryLogger.log(
-          new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, serverStats));
+          new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+              QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
 
       return brokerResponse;
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
+  }
+
+  private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
+      AuthorizationResult authorizationResult) {
+    _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+    LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
+        authorizationResult.getFailureMessage());
+
+    requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+    String failureMessage = authorizationResult.getFailureMessage();
+    if (StringUtils.isNotBlank(failureMessage)) {
+      failureMessage = "Reason: " + failureMessage;
+    }
+    throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
   }
 
   private boolean isDefaultQueryResponseLimitEnabled() {
@@ -947,7 +959,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
-        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, null));
+        new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
+            QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, null));
     return brokerResponse;
   }
 

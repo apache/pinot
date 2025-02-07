@@ -18,19 +18,14 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -47,9 +42,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class StringFunctions {
   private StringFunctions() {
   }
-
-  private final static Pattern LTRIM = Pattern.compile("^\\s+");
-  private final static Pattern RTRIM = Pattern.compile("\\s+$");
 
   /**
    * @see StringUtils#reverse(String)
@@ -137,22 +129,6 @@ public class StringFunctions {
   }
 
   /**
-   * Joins two input strings with separator in between.
-   */
-  @ScalarFunction
-  public static String concatWS(String separator, String input1, String input2) {
-    return input1 + separator + input2;
-  }
-
-  /**
-   * Joins two input strings with separator in between.
-   */
-  @ScalarFunction
-  public static String concat(String input1, String input2, String separator) {
-    return input1 + separator + input2;
-  }
-
-  /**
    * Joins two input strings with no separator in between.
    */
   @ScalarFunction
@@ -209,24 +185,6 @@ public class StringFunctions {
   }
 
   /**
-   * @param input
-   * @return trim spaces from left side of the string
-   */
-  @ScalarFunction
-  public static String ltrim(String input) {
-    return LTRIM.matcher(input).replaceAll("");
-  }
-
-  /**
-   * @param input
-   * @return trim spaces from right side of the string
-   */
-  @ScalarFunction
-  public static String rtrim(String input) {
-    return RTRIM.matcher(input).replaceAll("");
-  }
-
-  /**
    * @see StringUtils#left(String, int)
    * @param input
    * @return get substring starting from the first index and extending upto specified length.
@@ -244,48 +202,6 @@ public class StringFunctions {
   @ScalarFunction(names = {"rightSubStr", "right"})
   public static String rightSubStr(String input, int length) {
     return StringUtils.right(input, length);
-  }
-
-  /**
-   * @see #StringFunctions#regexpExtract(String, String, int, String)
-   * @param value
-   * @param regexp
-   * @return the matched result.
-   */
-  @ScalarFunction
-  public static String regexpExtract(String value, String regexp) {
-    return regexpExtract(value, regexp, 0, "");
-  }
-
-  /**
-   * @see #StringFunctions#regexpExtract(String, String, int, String)
-   * @param value
-   * @param regexp
-   * @param group
-   * @return the matched result.
-   */
-  @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int group) {
-    return regexpExtract(value, regexp, group, "");
-  }
-
-  /**
-   * Regular expression that extract first matched substring.
-   * @param value input value
-   * @param regexp regular expression
-   * @param group the group number within the regular expression to extract.
-   * @param defaultValue the default value if no match found
-   * @return the matched result
-   */
-  @ScalarFunction
-  public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
-    Pattern p = Pattern.compile(regexp);
-    Matcher matcher = p.matcher(value);
-    if (matcher.find() && matcher.groupCount() >= group) {
-      return matcher.group(group);
-    } else {
-      return defaultValue;
-    }
   }
 
   /**
@@ -368,17 +284,6 @@ public class StringFunctions {
   @ScalarFunction
   public static boolean endsWith(String input, String suffix) {
     return StringUtils.endsWith(input, suffix);
-  }
-
-  /**
-   * @see String#replaceAll(String, String)
-   * @param input
-   * @param find target substring to replace
-   * @param substitute new substring to be replaced with target
-   */
-  @ScalarFunction
-  public static String replace(String input, String find, String substitute) {
-    return StringUtils.replace(input, find, substitute);
   }
 
   /**
@@ -638,43 +543,6 @@ public class StringFunctions {
   }
 
   /**
-   * @param input an input string for ngram generations.
-   * @param length the max length of the ngram for the string.
-   * @return generate an array of unique ngram of the string that length are exactly matching the specified length.
-   */
-  @ScalarFunction
-  public static String[] uniqueNgrams(String input, int length) {
-    if (length == 0 || length > input.length()) {
-      return new String[0];
-    }
-    ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
-    for (int i = 0; i < input.length() - length + 1; i++) {
-      ngramSet.add(input.substring(i, i + length));
-    }
-    return ngramSet.toArray(new String[0]);
-  }
-
-  /**
-   * @param input an input string for ngram generations.
-   * @param minGram the min length of the ngram for the string.
-   * @param maxGram the max length of the ngram for the string.
-   * @return generate an array of ngram of the string that length are within the specified range [minGram, maxGram].
-   */
-  @ScalarFunction
-  public static String[] uniqueNgrams(String input, int minGram, int maxGram) {
-    ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
-    for (int n = minGram; n <= maxGram && n <= input.length(); n++) {
-      if (n == 0) {
-        continue;
-      }
-      for (int i = 0; i < input.length() - n + 1; i++) {
-        ngramSet.add(input.substring(i, i + n));
-      }
-    }
-    return ngramSet.toArray(new String[0]);
-  }
-
-  /**
    * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input
    * @param delimiter
@@ -822,125 +690,6 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] fromBase64(String input) {
     return Base64.getDecoder().decode(input);
-  }
-
-  /**
-   * Replace a regular expression pattern. If matchStr is not found, inputStr will be returned. By default, all
-   * occurences of match pattern in the input string will be replaced. Default matching pattern is case sensitive.
-   *
-   * @param inputStr Input string to apply the regexpReplace
-   * @param matchStr Regexp or string to match against inputStr
-   * @param replaceStr Regexp or string to replace if matchStr is found
-   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
-   * @param occurence Controls which occurence of the matched pattern must be replaced. Counting starts at 0. Default
-   *                  is -1
-   * @param flag Single character flag that controls how the regex finds matches in inputStr. If an incorrect flag is
-   *            specified, the function applies default case sensitive match. Only one flag can be specified. Supported
-   *             flags:
-   *             i -> Case insensitive
-   * @return replaced input string
-   */
-  @ScalarFunction
-  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
-      int occurence, String flag) {
-    Integer patternFlag;
-
-    // TODO: Support more flags like MULTILINE, COMMENTS, etc.
-    switch (flag) {
-      case "i":
-        patternFlag = Pattern.CASE_INSENSITIVE;
-        break;
-      default:
-        patternFlag = null;
-        break;
-    }
-
-    Pattern p;
-    if (patternFlag != null) {
-      p = Pattern.compile(matchStr, patternFlag);
-    } else {
-      p = Pattern.compile(matchStr);
-    }
-
-    Matcher matcher = p.matcher(inputStr).region(matchStartPos, inputStr.length());
-    StringBuffer sb;
-
-    if (occurence >= 0) {
-      sb = new StringBuffer(inputStr);
-      while (occurence >= 0 && matcher.find()) {
-        if (occurence == 0) {
-          sb.replace(matcher.start(), matcher.end(), replaceStr);
-          break;
-        }
-        occurence--;
-      }
-    } else {
-      sb = new StringBuffer();
-      while (matcher.find()) {
-        matcher.appendReplacement(sb, replaceStr);
-      }
-      matcher.appendTail(sb);
-    }
-
-    return sb.toString();
-  }
-
-  /**
-   * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
-   * occurences. Match is performed in case-sensitive mode.
-   *
-   * @param inputStr Input string to apply the regexpReplace
-   * @param matchStr Regexp or string to match against inputStr
-   * @param replaceStr Regexp or string to replace if matchStr is found
-   * @return replaced input string
-   */
-  @ScalarFunction
-  public static String regexpReplace(String inputStr, String matchStr, String replaceStr) {
-    return regexpReplace(inputStr, matchStr, replaceStr, 0, -1, "");
-  }
-
-  /**
-   * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
-   * occurences. Match is performed in case-sensitive mode.
-   *
-   * @param inputStr Input string to apply the regexpReplace
-   * @param matchStr Regexp or string to match against inputStr
-   * @param replaceStr Regexp or string to replace if matchStr is found
-   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
-   * @return replaced input string
-   */
-  @ScalarFunction
-  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
-    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
-  }
-
-  /**
-   * See #regexpReplace(String, String, String, int, int, String). Match is performed in case-sensitive mode.
-   *
-   * @param inputStr Input string to apply the regexpReplace
-   * @param matchStr Regexp or string to match against inputStr
-   * @param replaceStr Regexp or string to replace if matchStr is found
-   * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
-   * @param occurence Controls which occurence of the matched pattern must be replaced. Counting starts
-   *                    at 0. Default is -1
-   * @return replaced input string
-   */
-  @ScalarFunction
-  public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
-      int occurence) {
-    return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
-  }
-
-  @ScalarFunction
-  public static boolean regexpLike(String inputStr, String regexPatternStr) {
-    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
-    return pattern.matcher(inputStr).find();
-  }
-
-  @ScalarFunction
-  public static boolean like(String inputStr, String likePatternStr) {
-    String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLike(inputStr, regexPatternStr);
   }
 
   /**

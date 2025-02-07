@@ -60,7 +60,7 @@ public class SegmentErrorInfo {
    * @param errorMessage Error message
    * @param exception Exception
    */
-  public SegmentErrorInfo(long timestampMs, String errorMessage, Exception exception) {
+  public SegmentErrorInfo(long timestampMs, String errorMessage, Throwable exception) {
     _timestamp = DateTimeUtils.epochToDefaultDateFormat(timestampMs);
     _errorMessage = errorMessage;
     _stackTrace = (exception != null) ? ExceptionUtils.getStackTrace(exception) : null;

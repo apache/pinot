@@ -28,8 +28,8 @@ public class OneObjectKeyGroupIdGenerator implements GroupIdGenerator {
   private final Object2IntOpenHashMap<Object> _groupIdMap;
   private final int _numGroupsLimit;
 
-  public OneObjectKeyGroupIdGenerator(int numGroupsLimit) {
-    _groupIdMap = new Object2IntOpenHashMap<>();
+  public OneObjectKeyGroupIdGenerator(int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Object2IntOpenHashMap<>(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
   }

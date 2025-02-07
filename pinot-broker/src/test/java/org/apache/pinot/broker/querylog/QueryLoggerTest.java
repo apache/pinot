@@ -110,6 +110,7 @@ public class QueryLoggerTest {
         + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):45/14/15/16,"
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
+        + "queryEngine=singleStage,"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }
@@ -281,6 +282,7 @@ public class QueryLoggerTest {
     ServerStats serverStats = new ServerStats();
     serverStats.setServerStats("serverStats");
 
-    return new QueryLogger.QueryLogParams(requestContext, "table", response, identity, serverStats);
+    return new QueryLogger.QueryLogParams(requestContext, "table", response,
+        QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, identity, serverStats);
   }
 }
