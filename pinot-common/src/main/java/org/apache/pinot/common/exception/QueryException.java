@@ -23,6 +23,7 @@ import java.io.StringWriter;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.spi.exception.QException;
 
 
 // TODO: Clean up ProcessingException (thrift) because we don't send it through the wire
@@ -46,109 +47,299 @@ public class QueryException {
     _maxLinesOfStackTracePerFrame = maxLinesOfStackTracePerFrame;
   }
 
-  // TODO: several ProcessingExceptions are never used, clean them up.
-  public static final int JSON_PARSING_ERROR_CODE = 100;
-  public static final int JSON_COMPILATION_ERROR_CODE = 101;
-  public static final int SQL_PARSING_ERROR_CODE = 150;
-  public static final int SEGMENT_PLAN_EXECUTION_ERROR_CODE = 160;
-  public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
-  public static final int ACCESS_DENIED_ERROR_CODE = 180;
-  public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
-  public static final int TABLE_IS_DISABLED_ERROR_CODE = 191;
-  public static final int QUERY_EXECUTION_ERROR_CODE = 200;
-  public static final int QUERY_CANCELLATION_ERROR_CODE = 503;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int JSON_PARSING_ERROR_CODE = QException.JSON_PARSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SQL_PARSING_ERROR_CODE = QException.SQL_PARSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int ACCESS_DENIED_ERROR_CODE = QException.ACCESS_DENIED_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = QException.TABLE_DOES_NOT_EXIST_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int TABLE_IS_DISABLED_ERROR_CODE = QException.TABLE_IS_DISABLED_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int QUERY_EXECUTION_ERROR_CODE = QException.QUERY_EXECUTION_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int QUERY_CANCELLATION_ERROR_CODE = QException.QUERY_CANCELLATION_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
   // TODO: Handle these errors in broker
-  public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
-  public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
-  public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
-  public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
-  public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
-  public static final int SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE = 245;
-  public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
-  public static final int DATA_TABLE_SERIALIZATION_ERROR_CODE = 260;
-  public static final int BROKER_GATHER_ERROR_CODE = 300;
-  public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = 305;
-  public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
-  public static final int FUTURE_CALL_ERROR_CODE = 350;
-  public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
-  public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
-  public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
-  public static final int BROKER_REQUEST_SEND_ERROR_CODE = 425;
-  public static final int SERVER_NOT_RESPONDING_ERROR_CODE = 427;
-  public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
-  public static final int INTERNAL_ERROR_CODE = 450;
-  public static final int MERGE_RESPONSE_ERROR_CODE = 500;
-  public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
-  public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
-  public static final int QUERY_VALIDATION_ERROR_CODE = 700;
-  public static final int UNKNOWN_COLUMN_ERROR_CODE = 710;
-  public static final int QUERY_PLANNING_ERROR_CODE = 720;
-  public static final int UNKNOWN_ERROR_CODE = 1000;
+  public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = QException.SERVER_SHUTTING_DOWN_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = QException.SERVER_OUT_OF_CAPACITY_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SERVER_TABLE_MISSING_ERROR_CODE = QException.SERVER_TABLE_MISSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = QException.SERVER_SEGMENT_MISSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = QException.QUERY_SCHEDULING_TIMEOUT_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE =
+      QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int EXECUTION_TIMEOUT_ERROR_CODE = QException.EXECUTION_TIMEOUT_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE = QException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int BROKER_TIMEOUT_ERROR_CODE = QException.BROKER_TIMEOUT_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = QException.BROKER_RESOURCE_MISSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = QException.BROKER_INSTANCE_MISSING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int BROKER_REQUEST_SEND_ERROR_CODE = QException.BROKER_REQUEST_SEND_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int SERVER_NOT_RESPONDING_ERROR_CODE = QException.SERVER_NOT_RESPONDING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int TOO_MANY_REQUESTS_ERROR_CODE = QException.TOO_MANY_REQUESTS_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int INTERNAL_ERROR_CODE = QException.INTERNAL_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int MERGE_RESPONSE_ERROR_CODE = QException.MERGE_RESPONSE_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int QUERY_VALIDATION_ERROR_CODE = QException.QUERY_VALIDATION_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int UNKNOWN_COLUMN_ERROR_CODE = QException.UNKNOWN_COLUMN_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int QUERY_PLANNING_ERROR_CODE = QException.QUERY_PLANNING_ERROR_CODE;
+  /**
+   * @deprecated Use QException error code instead
+   */
+  @Deprecated
+  public static final int UNKNOWN_ERROR_CODE = QException.UNKNOWN_ERROR_CODE;
   // NOTE: update isClientError() method appropriately when new codes are added
 
-  public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
-  public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
-  public static final ProcessingException SQL_PARSING_ERROR = new ProcessingException(SQL_PARSING_ERROR_CODE);
-  public static final ProcessingException QUERY_PLANNING_ERROR = new ProcessingException(QUERY_PLANNING_ERROR_CODE);
-  public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
-  public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
-      new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
-  public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =
-      new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException JSON_PARSING_ERROR =
+      new ProcessingException(QException.JSON_PARSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException SQL_PARSING_ERROR =
+      new ProcessingException(QException.SQL_PARSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException QUERY_PLANNING_ERROR =
+      new ProcessingException(QException.QUERY_PLANNING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
-      new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
+      new ProcessingException(QException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException TABLE_IS_DISABLED_ERROR =
-      new ProcessingException(TABLE_IS_DISABLED_ERROR_CODE);
-  public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
+      new ProcessingException(QException.TABLE_IS_DISABLED_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException QUERY_EXECUTION_ERROR =
+      new ProcessingException(QException.QUERY_EXECUTION_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException QUERY_CANCELLATION_ERROR =
-      new ProcessingException(QUERY_CANCELLATION_ERROR_CODE);
+      new ProcessingException(QException.QUERY_CANCELLATION_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
-      new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
+      new ProcessingException(QException.SERVER_SHUTTING_DOWN_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =
-      new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
+      new ProcessingException(QException.SERVER_OUT_OF_CAPACITY_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException SERVER_TABLE_MISSING_ERROR =
-      new ProcessingException(SERVER_TABLE_MISSING_ERROR_CODE);
+      new ProcessingException(QException.SERVER_TABLE_MISSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException SERVER_SEGMENT_MISSING_ERROR =
-      new ProcessingException(SERVER_SEGMENT_MISSING_ERROR_CODE);
+      new ProcessingException(QException.SERVER_SEGMENT_MISSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
-      new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
+      new ProcessingException(QException.QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR =
-      new ProcessingException(SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+      new ProcessingException(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
-      new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
-  public static final ProcessingException DATA_TABLE_SERIALIZATION_ERROR =
-      new ProcessingException(DATA_TABLE_SERIALIZATION_ERROR_CODE);
-  public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
-  public static final ProcessingException DATA_TABLE_DESERIALIZATION_ERROR =
-      new ProcessingException(DATA_TABLE_DESERIALIZATION_ERROR_CODE);
-  public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(FUTURE_CALL_ERROR_CODE);
+      new ProcessingException(QException.EXECUTION_TIMEOUT_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException BROKER_SEGMENT_UNAVAILABLE_ERROR =
-      new ProcessingException(BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE);
-  public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(BROKER_TIMEOUT_ERROR_CODE);
+      new ProcessingException(QException.BROKER_SEGMENT_UNAVAILABLE_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException BROKER_TIMEOUT_ERROR =
+      new ProcessingException(QException.BROKER_TIMEOUT_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR =
-      new ProcessingException(BROKER_RESOURCE_MISSING_ERROR_CODE);
+      new ProcessingException(QException.BROKER_RESOURCE_MISSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException BROKER_INSTANCE_MISSING_ERROR =
-      new ProcessingException(BROKER_INSTANCE_MISSING_ERROR_CODE);
-  public static final ProcessingException INTERNAL_ERROR = new ProcessingException(INTERNAL_ERROR_CODE);
-  public static final ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(MERGE_RESPONSE_ERROR_CODE);
-  public static final ProcessingException FEDERATED_BROKER_UNAVAILABLE_ERROR =
-      new ProcessingException(FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE);
-  public static final ProcessingException COMBINE_GROUP_BY_EXCEPTION_ERROR =
-      new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
-  public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
-  public static final ProcessingException UNKNOWN_COLUMN_ERROR = new ProcessingException(UNKNOWN_COLUMN_ERROR_CODE);
-  public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
-  public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
+      new ProcessingException(QException.BROKER_INSTANCE_MISSING_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException INTERNAL_ERROR =
+      new ProcessingException(QException.INTERNAL_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException MERGE_RESPONSE_ERROR =
+      new ProcessingException(QException.MERGE_RESPONSE_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException QUERY_VALIDATION_ERROR =
+      new ProcessingException(QException.QUERY_VALIDATION_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException UNKNOWN_COLUMN_ERROR =
+      new ProcessingException(QException.UNKNOWN_COLUMN_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException UNKNOWN_ERROR =
+      new ProcessingException(QException.UNKNOWN_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
+  public static final ProcessingException QUOTA_EXCEEDED_ERROR =
+      new ProcessingException(QException.TOO_MANY_REQUESTS_ERROR_CODE);
+  /**
+   * @deprecated Use QException instance or error code instead
+   */
+  @Deprecated
   public static final ProcessingException BROKER_REQUEST_SEND_ERROR =
-      new ProcessingException(BROKER_REQUEST_SEND_ERROR_CODE);
+      new ProcessingException(QException.BROKER_REQUEST_SEND_ERROR_CODE);
 
   static {
-    JSON_PARSING_ERROR.setMessage("JsonParsingError");
-    JSON_COMPILATION_ERROR.setMessage("JsonCompilationError");
     SQL_PARSING_ERROR.setMessage("SQLParsingError");
     QUERY_PLANNING_ERROR.setMessage("QueryPlanningError");
-    SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
-    COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
     TABLE_IS_DISABLED_ERROR.setMessage("TableIsDisabledError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
@@ -160,17 +351,11 @@ public class QueryException {
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR.setMessage("ServerResourceLimitExceededError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
-    DATA_TABLE_SERIALIZATION_ERROR.setMessage("DataTableSerializationError");
-    BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
-    DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
-    FUTURE_CALL_ERROR.setMessage("FutureCallError");
     BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeoutError");
     BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceMissingError");
     BROKER_INSTANCE_MISSING_ERROR.setMessage("BrokerInstanceMissingError");
     INTERNAL_ERROR.setMessage("InternalError");
     MERGE_RESPONSE_ERROR.setMessage("MergeResponseError");
-    FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailableError");
-    COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_COLUMN_ERROR.setMessage("UnknownColumnError");
     UNKNOWN_ERROR.setMessage("UnknownError");
@@ -225,18 +410,17 @@ public class QueryException {
       // with EV updates. For cases where access to tables is controlled via ACLs, for an
       // incorrect table name we expect ACCESS_DENIED_ERROR to be thrown. Hence, we currently
       // don't treat BROKER_RESOURCE_MISSING_ERROR as client error.
-      case QueryException.ACCESS_DENIED_ERROR_CODE:
-      case QueryException.JSON_COMPILATION_ERROR_CODE:
-      case QueryException.JSON_PARSING_ERROR_CODE:
-      case QueryException.QUERY_CANCELLATION_ERROR_CODE:
-      case QueryException.QUERY_VALIDATION_ERROR_CODE:
-      case QueryException.SERVER_OUT_OF_CAPACITY_ERROR_CODE:
-      case QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE:
-      case QueryException.SQL_PARSING_ERROR_CODE:
-      case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
-      case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
-      case QueryException.TABLE_IS_DISABLED_ERROR_CODE:
-      case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
+      case QException.ACCESS_DENIED_ERROR_CODE:
+      case QException.JSON_PARSING_ERROR_CODE:
+      case QException.QUERY_CANCELLATION_ERROR_CODE:
+      case QException.QUERY_VALIDATION_ERROR_CODE:
+      case QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE:
+      case QException.SQL_PARSING_ERROR_CODE:
+      case QException.SQL_RUNTIME_ERROR_CODE:
+      case QException.TOO_MANY_REQUESTS_ERROR_CODE:
+      case QException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
+      case QException.TABLE_IS_DISABLED_ERROR_CODE:
+      case QException.UNKNOWN_COLUMN_ERROR_CODE:
         return true;
       default:
         return false;

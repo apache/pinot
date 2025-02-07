@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
@@ -32,6 +33,7 @@ import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,12 +50,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final int _port;
   private final long _deadlineMs;
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
-  private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
+  private final MailboxStatusObserver _statusObserver;
 
   private StreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap) {
+      StatMap<MailboxSendOperator.StatKey> statMap, StreamObserver<Mailbox.MailboxStatus> callbackListener) {
+    _statusObserver = new MailboxStatusObserver(callbackListener);
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
@@ -110,8 +113,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-      _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-          new RuntimeException("Cancelled by sender with exception: " + msg, t))));
+      LOGGER.debug("Cancelling GRPC mailbox: {} with error message: {}", _id, msg, t);
+      // The user message should be simple to understand and ideally the same in all mailboxes
+      String userMessage = "Cancelled inter server connection";
+      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
+          QException.INTERNAL_ERROR_CODE, userMessage);
+      MailboxContent block = toMailboxContent(errorBlock);
+      _contentObserver.onNext(block);
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it

@@ -35,6 +35,8 @@ import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +58,7 @@ public class ReceivingMailbox {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ReceivingMailbox.class);
   private static final TransferableBlock CANCELLED_ERROR_BLOCK =
-      TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
+      TransferableBlockUtils.getErrorTransferableBlock(QException.INTERNAL_ERROR_CODE, "Cancelled by receiver");
 
   private final String _id;
   // TODO: Make the queue size configurable
@@ -69,6 +71,7 @@ public class ReceivingMailbox {
   @Nullable
   private volatile Reader _reader;
   private final StatMap<StatKey> _stats = new StatMap<>(StatKey.class);
+  private volatile OpChainExecutionContext _context;
 
   public ReceivingMailbox(String id) {
     _id = id;
@@ -167,13 +170,12 @@ public class ReceivingMailbox {
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
-        setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-            new TimeoutException("Timed out while waiting for receive operator to consume data from mailbox: " + _id)));
+        setErrorBlock(QException.EXECUTION_TIMEOUT_ERROR_CODE, "Timed out offering new data into mailbox: " + _id);
         return ReceivingMailboxStatus.TIMEOUT;
       }
     } catch (InterruptedException e) {
       LOGGER.error("Interrupted while offering block into mailbox: {}", _id);
-      setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(e));
+      setErrorBlock(QException.INTERNAL_ERROR_CODE, "Interrupted while offering block into mailbox " + _id);
       return ReceivingMailboxStatus.ERROR;
     }
   }
@@ -186,6 +188,10 @@ public class ReceivingMailbox {
       _blocks.clear();
       notifyReader();
     }
+  }
+
+  public void setErrorBlock(int errorCode, String errorMessage) {
+    setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(errorCode, errorMessage));
   }
 
   /**
@@ -233,6 +239,15 @@ public class ReceivingMailbox {
 
   public StatMap<StatKey> getStatMap() {
     return _stats;
+  }
+
+  public void setOpChainContext(OpChainExecutionContext context) {
+    _context = context;
+  }
+
+  @Nullable
+  public OpChainExecutionContext getContext() {
+    return _context;
   }
 
   public interface Reader {

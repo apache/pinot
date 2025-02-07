@@ -121,7 +121,14 @@ public abstract class QueryScheduler {
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
-    return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
+    return ListenableFutureTask.create(() -> {
+      try {
+        queryRequest.registerOnMdc();
+        return processQueryAndSerialize(queryRequest, executorService);
+      } finally {
+        queryRequest.unregisterFromMdc();
+      }
+    });
   }
 
   /**

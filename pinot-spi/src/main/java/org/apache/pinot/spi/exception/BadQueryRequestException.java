@@ -18,16 +18,28 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class BadQueryRequestException extends RuntimeException {
+public class BadQueryRequestException extends QException {
   public BadQueryRequestException(String message) {
-    super(message);
+    super(SQL_RUNTIME_ERROR_CODE, message);
   }
 
   public BadQueryRequestException(String message, Throwable cause) {
-    super(message, cause);
+    super(SQL_RUNTIME_ERROR_CODE, message, cause);
   }
 
   public BadQueryRequestException(Throwable cause) {
-    super(cause);
+    super(SQL_RUNTIME_ERROR_CODE, cause);
+  }
+
+  public BadQueryRequestException(int errorCode, String message) {
+    super(errorCode, message);
+  }
+
+  public BadQueryRequestException(int errorCode, String message, Throwable cause) {
+    super(errorCode, message, cause);
+  }
+
+  public BadQueryRequestException(int errorCode, Throwable cause) {
+    super(errorCode, cause);
   }
 }

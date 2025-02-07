@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import io.grpc.stub.StreamObserver;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -71,6 +73,24 @@ public class MailboxServiceTest {
     _mailboxService2.shutdown();
   }
 
+  SendingMailbox newSendingMailbox(MailboxService mailboxService, int port, String mailboxId,
+      long deadlineMs, StatMap<MailboxSendOperator.StatKey> statMap) {
+    StreamObserver<Mailbox.MailboxStatus> callbackListener = new StreamObserver<>() {
+      @Override
+      public void onNext(Mailbox.MailboxStatus value) {
+      }
+
+      @Override
+      public void onError(Throwable t) {
+      }
+
+      @Override
+      public void onCompleted() {
+      }
+    };
+    return mailboxService.getSendingMailbox("localhost", port, mailboxId, deadlineMs, statMap, callbackListener);
+  }
+
   @BeforeTest
   public void setUpStats() {
     _stats = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -83,7 +103,7 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
@@ -122,7 +142,7 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
@@ -152,7 +172,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
@@ -180,7 +200,7 @@ public class MailboxServiceTest {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     StatMap<MailboxSendOperator.StatKey> stats = new StatMap<>(MailboxSendOperator.StatKey.class);
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
@@ -207,7 +227,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
@@ -236,7 +256,7 @@ public class MailboxServiceTest {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, deadlineMs, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
@@ -270,7 +290,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
@@ -308,7 +328,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService1, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     receivingMailbox.registeredReader(() -> {
     });
@@ -336,7 +356,7 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
@@ -384,7 +404,7 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
@@ -416,7 +436,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(2);
@@ -451,7 +471,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(1);
@@ -485,7 +505,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(1);
@@ -519,7 +539,7 @@ public class MailboxServiceTest {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, deadlineMs, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(2);
@@ -561,7 +581,7 @@ public class MailboxServiceTest {
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
@@ -601,7 +621,7 @@ public class MailboxServiceTest {
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
-        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
+        newSendingMailbox(_mailboxService2, _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE, _stats);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     receivingMailbox.registeredReader(() -> {
     });

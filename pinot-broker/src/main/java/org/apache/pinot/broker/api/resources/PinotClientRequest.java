@@ -78,6 +78,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.MdcRequestScope;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -475,7 +476,7 @@ public class PinotClientRequest {
     }
     switch (sqlType) {
       case DQL:
-        try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+        try (RequestScope requestContext = new MdcRequestScope(Tracing.getTracer().createRequestScope())) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
               httpHeaders);

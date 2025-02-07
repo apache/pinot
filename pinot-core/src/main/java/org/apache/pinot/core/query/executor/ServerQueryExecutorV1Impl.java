@@ -82,8 +82,10 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -140,8 +142,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+      @Override
+      protected boolean alreadyRegistered() {
+        return LoggerConstants.QUERY_ID_KEY.isRegistered();
+      }
+
+      @Override
+      protected void registerOnMDC() {
+        queryRequest.registerOnMdc();
+      }
+
+      @Override
+      protected void unregisterFromMDC() {
+        queryRequest.unregisterFromMdc();
+      }
+    };
+
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -150,7 +169,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
@@ -324,7 +343,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
       if (e instanceof BadQueryRequestException) {
         LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
+        instanceResponse.addException(QException.QUERY_VALIDATION_ERROR_CODE, e.getMessage());
       } else if (e instanceof QueryCancelledException) {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);
@@ -334,12 +353,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // NOTE most likely the onFailure() callback registered on query future in InstanceRequestHandler would
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e));
+        instanceResponse.addException(QException.QUERY_CANCELLATION_ERROR_CODE,
+            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
-            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e));
+        instanceResponse.addException(QException.QUERY_EXECUTION_ERROR_CODE,
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -371,9 +390,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               .collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
-        instanceResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
+        instanceResponse.addException(QException.SERVER_SEGMENT_MISSING_ERROR_CODE,
             numMissingSegments + " segments " + missingSegments + " missing on server: "
-                + _instanceDataManager.getInstanceId()));
+                + _instanceDataManager.getInstanceId());
         _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
       }
     }

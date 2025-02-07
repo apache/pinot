@@ -31,6 +31,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.exception.QException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -57,7 +58,7 @@ public class DataBlockTest {
     String actual = dataBlock.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
     Assert.assertEquals(actual, expected);
     Assert.assertTrue(
-        dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(originalException.getMessage()));
+        dataBlock.getExceptions().get(QException.UNKNOWN_ERROR_CODE).contains(originalException.getMessage()));
   }
 
   @Test(dataProvider = "testTypeNullPercentile")

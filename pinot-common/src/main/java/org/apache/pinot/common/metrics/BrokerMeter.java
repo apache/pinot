@@ -47,13 +47,20 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * <p>
    * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.
    * That means it can be used to know how many multi-stage queries have been started in total.
+   *
+   * This metric includes queries that have been started but not necessarily completed yet. It also includes
+   * queries that failed.
    */
   MULTI_STAGE_QUERIES_GLOBAL("queries", true),
   /**
    * Number of multi-stage queries that have been started touched a given table.
    * <p>
-   * In case the query touch multiple tables (ie using joins)1, this metric will be incremented for each table, so the
-   * sum of this metric across all tables should be greater or equal than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
+   * In case the query touch multiple tables (ie using joins), this metric will be incremented for each table, so the
+   * sum of this metric across all tables should be greater than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
+   *
+   * This metric includes queries that can be parsed, validated and optimized but also queries that are not completed
+   * yet or fail after being optimized in the broker. This means that the sum of this metric across all tables can also
+   * be smaller than {@link #MULTI_STAGE_QUERIES_GLOBAL}.
    */
   MULTI_STAGE_QUERIES("queries", false),
   /**
@@ -69,15 +76,19 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    */
   TIME_SERIES_GLOBAL_QUERIES_FAILED("queries", true),
   // These metrics track the exceptions caught during query execution in broker side.
-  // Query rejected by Jersey thread pool executor
+
+  // Query rejected by Jersey thread pool executor  (too many requests)
   QUERY_REJECTED_EXCEPTIONS("exceptions", true),
   // Query compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   // Get resource phase.
+  // Doesn't count MSE queries
   RESOURCE_MISSING_EXCEPTIONS("exceptions", true),
   // Query validation phase.
+  // MSE queries use this metric as global
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Query validation phase.
+  // MSE queries use this metric as global
   UNKNOWN_COLUMN_EXCEPTIONS("exceptions", false),
   // Queries preempted by accountant
   QUERIES_KILLED("query", true),
@@ -98,6 +109,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // These metrics track the number of bad broker responses.
   // This metric track the number of broker responses with processing exceptions inside.
   // The processing exceptions could be caught from both server side and broker side.
+  // MSE treats this as global
   BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS("badResponses", false),
   // This metric tracks the number of broker responses with unavailable segments.
   BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS("badResponses", false),

@@ -28,7 +28,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -44,6 +43,7 @@ import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,7 +220,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
           ProcessingException resourceLimitExceededException =
-              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+              new ProcessingException(QException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
           resourceLimitExceededException.setMessage(
               "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
                   + _maxRowsInWindowCache);

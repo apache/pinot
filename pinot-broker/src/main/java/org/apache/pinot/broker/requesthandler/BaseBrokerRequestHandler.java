@@ -50,6 +50,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -118,7 +119,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      requestContext.setErrorCode(QException.ACCESS_DENIED_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       String failureMessage = authorizationResult.getFailureMessage();
       if (StringUtils.isNotBlank(failureMessage)) {
@@ -129,7 +130,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null || !sql.isTextual()) {
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      requestContext.setErrorCode(QException.SQL_PARSING_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
@@ -143,7 +144,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        requestContext.setErrorCode(QException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
     }
@@ -154,8 +155,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage =
           "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
       LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      requestContext.setErrorCode(QException.TOO_MANY_REQUESTS_ERROR_CODE);
+      return new BrokerResponseNative(QException.TOO_MANY_REQUESTS_ERROR_CODE, errorMessage);
     }
 
     // Add null handling option from broker config only if there is no override in the query

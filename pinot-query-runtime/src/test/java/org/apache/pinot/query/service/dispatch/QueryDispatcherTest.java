@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.exception.QException;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mockito;
@@ -144,7 +145,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       // will throw b/c mailboxService is mocked
       _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap());
       Assert.fail("Method call above should have failed");
-    } catch (NullPointerException e) {
+    } catch (QException e) {
       // Expected
     }
     // wait just a little, until the cancel is being called.
