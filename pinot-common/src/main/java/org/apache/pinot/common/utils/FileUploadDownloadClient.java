@@ -1255,6 +1255,25 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @param connectionRequestTimeoutMs Connection request timeout in milliseconds
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadFile(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders);
+  }
+
+  /**
    * Download and untar a file in a streamed way with rate limit
    *
    * @param uri URI
@@ -1271,6 +1290,26 @@ public class FileUploadDownloadClient implements AutoCloseable {
       long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
+        httpHeaders, maxStreamRateInByte);
+  }
+
+  /**
+   * Download and untar a file in a streamed way with rate limit
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth token
+   * @param httpHeaders http headers
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      long maxStreamRateInByte, int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadUntarFileStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
   }
 
