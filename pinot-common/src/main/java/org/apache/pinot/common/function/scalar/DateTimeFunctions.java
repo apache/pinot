@@ -555,8 +555,8 @@ public class DateTimeFunctions {
         Thread.sleep(millis);
       }
     } catch (InterruptedException e) {
-      //TODO: handle interruption
-      //Thread.currentThread().interrupt();
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
     return millis;
   }

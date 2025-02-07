@@ -81,9 +81,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
-  // maps broker-generated query id to the query string
+  /**
+   * Maps broker-generated query id to the query string.
+   */
   protected final Map<Long, String> _queriesById;
-  // maps broker-generated query id to client-provided query id
+  /**
+   * Maps broker-generated query id to client-provided query id.
+   */
   protected final Map<Long, String> _clientQueryIds;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
