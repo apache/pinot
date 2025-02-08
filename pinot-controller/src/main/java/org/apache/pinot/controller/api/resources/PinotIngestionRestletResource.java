@@ -128,6 +128,8 @@ public class PinotIngestionRestletResource {
    *                          fs class name (input.fs.className)
    *                          fs configs (input.fs.prop.<property>)
    * @param fileUpload file to upload as a multipart
+   * @param fileUri file URI to download from the public remote file.
+   *                It's prioritized over fileUpload param if both are provided
    * @param asyncResponse injected async response to return result
    */
   @POST
