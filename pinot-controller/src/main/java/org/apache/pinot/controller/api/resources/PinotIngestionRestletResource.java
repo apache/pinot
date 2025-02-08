@@ -151,7 +151,7 @@ public class PinotIngestionRestletResource {
       "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. "
           + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
       FormDataMultiPart fileUpload, @ApiParam(value = "File URI to download from the public remote file. "
-          + "It's prioritized over fileUpload param if both are provided.") URI fileUri,
+          + "It's prioritized over fileUpload param if both are provided.") @QueryParam("fileUri") URI fileUri,
       @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
