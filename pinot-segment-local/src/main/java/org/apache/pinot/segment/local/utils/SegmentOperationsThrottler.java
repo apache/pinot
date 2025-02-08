@@ -24,28 +24,34 @@ import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 
 
 /**
- * Contains all the segment preprocess throttlers used to control the total index rebuilds that can happen on a given
- * Pinot server. For now this class supports index rebuild throttling at the following levels:
- * - All index throttling
- * - StarTree index throttling
- * Code paths that do no need to rebuild the index or which don't happen on the server need not utilize this throttler.
- * The throttlers passed in for now cannot be 'null', instead for code paths that do not need throttling, this object
- * itself will be passed in as 'null'.
+ * Contains all the segment operation throttlers used to control the total parallel segment related operations that can
+ * happen on a given Pinot server. For now this class supports download throttling and index rebuild throttling at the
+ * following levels:
+ * - All index rebuild throttling
+ * - StarTree index rebuild throttling
+ * - Server level segment download throttling (this is taken after the table level download semaphore is taken)
+ * Code paths that do not need to download or rebuild the index or which don't happen on the server need not utilize
+ * this throttler. The throttlers passed in for now cannot be 'null', instead for code paths that do not need
+ * throttling, this object itself will be passed in as 'null'.
  */
-public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListener {
+public class SegmentOperationsThrottler implements PinotClusterConfigChangeListener {
 
   private final SegmentAllIndexPreprocessThrottler _segmentAllIndexPreprocessThrottler;
   private final SegmentStarTreePreprocessThrottler _segmentStarTreePreprocessThrottler;
+  private final SegmentDownloadThrottler _segmentDownloadThrottler;
 
   /**
-   * Constructor for SegmentPreprocessThrottler
+   * Constructor for SegmentOperationsThrottler
    * @param segmentAllIndexPreprocessThrottler segment preprocess throttler to use for all indexes
    * @param segmentStarTreePreprocessThrottler segment preprocess throttler to use for StarTree index
+   * @param segmentDownloadThrottler segment download throttler to throttle download at server level
    */
-  public SegmentPreprocessThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
-      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler) {
+  public SegmentOperationsThrottler(SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler,
+      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler,
+      SegmentDownloadThrottler segmentDownloadThrottler) {
     _segmentAllIndexPreprocessThrottler = segmentAllIndexPreprocessThrottler;
     _segmentStarTreePreprocessThrottler = segmentStarTreePreprocessThrottler;
+    _segmentDownloadThrottler = segmentDownloadThrottler;
   }
 
   public SegmentAllIndexPreprocessThrottler getSegmentAllIndexPreprocessThrottler() {
@@ -56,14 +62,20 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
     return _segmentStarTreePreprocessThrottler;
   }
 
+  public SegmentDownloadThrottler getSegmentDownloadThrottler() {
+    return _segmentDownloadThrottler;
+  }
+
   public void startServingQueries() {
     _segmentAllIndexPreprocessThrottler.startServingQueries();
     _segmentStarTreePreprocessThrottler.startServingQueries();
+    _segmentDownloadThrottler.startServingQueries();
   }
 
   @Override
   public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     _segmentAllIndexPreprocessThrottler.onChange(changedConfigs, clusterConfigs);
     _segmentStarTreePreprocessThrottler.onChange(changedConfigs, clusterConfigs);
+    _segmentDownloadThrottler.onChange(changedConfigs, clusterConfigs);
   }
 }
