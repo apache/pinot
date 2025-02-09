@@ -21,6 +21,7 @@ package org.apache.pinot.controller.validation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -61,6 +62,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
+  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -83,8 +85,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     Context context = new Context();
     // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
-        >= _segmentLevelValidationIntervalInSeconds) {
+    if (shouldRunSegmentValidation(periodicTaskProperties, currentTimeMs)) {
       LOGGER.info("Run segment-level validation");
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
@@ -184,6 +185,24 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (_segmentAutoResetOnErrorAtValidation) {
       _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
     }
+  }
+
+  private boolean shouldRunSegmentValidation(Properties periodicTaskProperties, long currentTimeMs) {
+    boolean runValidation = Optional.ofNullable(
+            periodicTaskProperties.getProperty(RUN_SEGMENT_LEVEL_VALIDATION))
+        .map(value -> {
+          try {
+            return Boolean.parseBoolean(value);
+          } catch (Exception e) {
+            return false;
+          }
+        })
+        .orElse(false);
+
+    boolean timeThresholdMet = TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
+        >= _segmentLevelValidationIntervalInSeconds;
+
+    return runValidation || timeThresholdMet;
   }
 
   @Override
