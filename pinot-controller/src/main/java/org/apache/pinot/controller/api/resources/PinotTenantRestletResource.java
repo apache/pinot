@@ -388,10 +388,27 @@ public class PinotTenantRestletResource {
       if (tenantName.equals(tableConfigTenant)) {
         tables.add(table);
       }
+      if (tableConfig.getTenantConfig().getTagOverrideConfig() != null) {
+        String completed = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted();
+        if (completed != null && getRawTenantName(completed).equals(tenantName)) {
+          tables.add(table);
+        }
+        String consuming = tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming();
+        if (consuming != null && getRawTenantName(consuming).equals(tenantName)) {
+          tables.add(table);
+        }
+      }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
+  }
+
+  private String getRawTenantName(String tenantName) {
+    if (tenantName.lastIndexOf("_") > 0) {
+      return tenantName.substring(0, tenantName.lastIndexOf("_"));
+    }
+    return tenantName;
   }
 
   private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {

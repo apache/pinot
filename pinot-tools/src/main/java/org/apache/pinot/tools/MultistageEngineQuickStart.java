@@ -300,6 +300,13 @@ public class MultistageEngineQuickStart extends Quickstart {
   }
 
   @Override
+  protected Map<String, String> getClusterConfigOverrides() {
+    return Map.of(
+        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "50"
+    );
+  }
+
+  @Override
   protected int getNumQuickstartRunnerServers() {
     return 3;
   }
