@@ -155,7 +155,7 @@ public class PinotLLCRealtimeSegmentManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
 
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f);
-  private static final String COMMITTING_SEGMENTS = "committingSegments";
+  public static final String COMMITTING_SEGMENTS = "committingSegments";
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
@@ -2327,24 +2327,67 @@ public class PinotLLCRealtimeSegmentManager {
         return true;
       }
 
-      List<String> committingSegmentList = new ArrayList<>(znRecord.getListField(COMMITTING_SEGMENTS));
-
-      for (String segment : znRecord.getListField(COMMITTING_SEGMENTS)) {
-        SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segment);
-        // Remove the segment from the committing list if:
-        // 1. The segment metadata is missing (likely deleted).
-        // 2. The segment status is DONE (indicating it has been successfully committed).
-        if (segmentZKMetadata == null || Status.DONE.equals(segmentZKMetadata.getStatus())) {
-          committingSegmentList.remove(segment);
-        }
-      }
-
-      znRecord.setListField(COMMITTING_SEGMENTS, committingSegmentList);
+      znRecord.setListField(COMMITTING_SEGMENTS,
+          getCommittingSegments(realtimeTableName, znRecord.getListField(COMMITTING_SEGMENTS)));
       try {
         return _propertyStore.set(committingSegmentsListPath, znRecord, stat.getVersion(), AccessOption.PERSISTENT);
       } catch (ZkBadVersionException e) {
         return false;
       }
     });
+  }
+
+  /**
+   * Filters and returns a list of committing segments for a realtime table.
+   * This method excludes segments that are either:
+   * 1. Missing from ZK metadata (likely deleted)
+   * 2. Already committed (status: DONE)
+   *
+   * @param realtimeTableName The name of the realtime table
+   * @param committingSegmentsFromPropertyStore List of segments from property store, can be null
+   * @return Filtered list of committing segments, or null if input is null
+   */
+  @Nullable
+  private List<String> getCommittingSegments(String realtimeTableName,
+      @Nullable List<String> committingSegmentsFromPropertyStore) {
+
+    if (committingSegmentsFromPropertyStore == null) {
+      return null;
+    }
+
+    List<String> committingSegments = new ArrayList<>();
+    for (String segment : committingSegmentsFromPropertyStore) {
+      SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segment);
+      if (segmentZKMetadata == null || Status.DONE.equals(segmentZKMetadata.getStatus())) {
+        continue;
+      }
+      committingSegments.add(segment);
+    }
+    return committingSegments;
+  }
+
+  /**
+   * Retrieves and filters the list of committing segments for a realtime table from the property store.
+   * This method:
+   * 1. Constructs the ZK path for pauseless debug metadata
+   * 2. Fetches the committing segments record from the property store
+   * 3. Filters out segments that are either deleted or already committed
+   *
+   * @param realtimeTableName The name of the realtime table to fetch committing segments for
+   * @return Filtered list of committing segments, or null if no committing segments record exists
+   *         or if the COMMITTING_SEGMENTS field is not present in the ZNRecord
+   */
+  public List<String> getCommittingSegments(String realtimeTableName) {
+    String committingSegmentsListPath =
+        ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
+
+    // Fetch the committing segments record from the property store.
+    Stat stat = new Stat();
+    ZNRecord znRecord = _propertyStore.get(committingSegmentsListPath, stat, AccessOption.PERSISTENT);
+    if (znRecord == null || znRecord.getListField(COMMITTING_SEGMENTS) == null) {
+      return null;
+    }
+
+    return getCommittingSegments(realtimeTableName, znRecord.getListField(COMMITTING_SEGMENTS));
   }
 }

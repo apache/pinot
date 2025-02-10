@@ -44,6 +44,7 @@ import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -53,6 +54,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -94,6 +96,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS;
+import static org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager.COMMITTING_SEGMENTS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -1480,6 +1483,94 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4", "s5");
     Set<String> segmentsYetToBeCommitted = realtimeSegmentManager.getSegmentsYetToBeCommitted("test", segmentsToCheck);
     assert ImmutableSet.of("s2", "s4", "s5").equals(segmentsYetToBeCommitted);
+  }
+
+  @Test
+  public void testGetCommittingSegments()
+      throws HttpErrorStatusException, IOException, URISyntaxException {
+    // mock the behavior for PinotHelixResourceManager
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
+        (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+    when(pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
+    when(pinotHelixResourceManager.getPropertyStore()).thenReturn(zkHelixPropertyStore);
+
+    // init fake PinotLLCRealtimeSegmentManager
+    ControllerConf controllerConfig = new ControllerConf();
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
+
+    // Test table name
+    String realtimeTableName = "githubEvents_2_REALTIME";
+
+    // Create test segments
+    List<String> testSegments = List.of(
+        "githubEvents_2__0__0__20250210T1142Z",
+        "githubEvents_2__0__1__20250210T1142Z",
+        "githubEvents_2__0__2__20250210T1142Z",
+        "githubEvents_2__0__3__20250210T1142Z"
+    );
+
+    // mock response of propertyStore
+    String committingSegmentsListPath =
+        ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
+
+    ZNRecord znRecord = new ZNRecord(realtimeTableName);
+    znRecord.setListField(COMMITTING_SEGMENTS, testSegments);
+
+    when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(znRecord);
+
+    // mock response for fetching segmentZKMetadata with different scenarios
+    // Segment 0: COMMITTING status
+    SegmentZKMetadata segmentZKMetadata0 = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata0.getStatus()).thenReturn(Status.COMMITTING);
+    when(pinotHelixResourceManager.getSegmentZKMetadata(realtimeTableName, testSegments.get(0)))
+        .thenReturn(segmentZKMetadata0);
+
+    // Segment 1: null metadata (deleted)
+    when(pinotHelixResourceManager.getSegmentZKMetadata(realtimeTableName, testSegments.get(1)))
+        .thenReturn(null);
+
+    // Segment 2: DONE status
+    SegmentZKMetadata segmentZKMetadata2 = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata2.getStatus()).thenReturn(Status.DONE);
+    when(pinotHelixResourceManager.getSegmentZKMetadata(realtimeTableName, testSegments.get(2)))
+        .thenReturn(segmentZKMetadata2);
+
+    // Segment 3: COMMITTING status
+    SegmentZKMetadata segmentZKMetadata3 = mock(SegmentZKMetadata.class);
+    when(segmentZKMetadata3.getStatus()).thenReturn(Status.COMMITTING);
+    when(pinotHelixResourceManager.getSegmentZKMetadata(realtimeTableName, testSegments.get(3)))
+        .thenReturn(segmentZKMetadata3);
+
+    // Execute test
+    List<String> result = segmentManager.getCommittingSegments(realtimeTableName);
+
+    // Verify results
+    assertNotNull(result);
+    assertEquals(2, result.size());
+    assertTrue(result.contains(testSegments.get(0))); // Should include COMMITTING segment
+    assertFalse(result.contains(testSegments.get(1))); // Should exclude null metadata segment
+    assertFalse(result.contains(testSegments.get(2))); // Should exclude DONE segment
+    assertTrue(result.contains(testSegments.get(3))); // Should include COMMITTING segment
+
+    // Test null case
+    when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(null);
+    result = segmentManager.getCommittingSegments(realtimeTableName);
+    assertNull(result);
+
+    // Test empty COMMITTING_SEGMENTS field
+    ZNRecord emptyRecord = new ZNRecord("CommittingSegments");
+    when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(emptyRecord);
+    result = segmentManager.getCommittingSegments(realtimeTableName);
+    assertNull(result);
   }
 
   //////////////////////////////////////////////////////////////////////////////////
