@@ -89,12 +89,29 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
   @Override
   public void onSubstitution(int receiver, int oldSender, int newSender) {
+    // Change the sender of the receiver to the new sender
     IntList senders = _childPlanFragmentIdsMap.get(receiver);
     senders.rem(oldSender);
     if (!senders.contains(newSender)) {
       senders.add(newSender);
     }
+
+    // Remove the old sender and its children from the plan fragment map
     _planFragmentMap.remove(oldSender);
+
+    IntList pending = new IntArrayList();
+    IntList nullableOrphans = _childPlanFragmentIdsMap.remove(oldSender);
+    if (nullableOrphans != null) {
+      pending.addAll(nullableOrphans);
+    }
+    while (!pending.isEmpty()) {
+      int orphan = pending.removeInt(pending.size() - 1);
+      IntList children = _childPlanFragmentIdsMap.remove(orphan);
+      if (children != null) {
+        pending.addAll(children);
+      }
+      _planFragmentMap.remove(orphan);
+    }
   }
 
   @Override
