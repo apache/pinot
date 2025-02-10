@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -222,8 +223,8 @@ public class ServerSegmentMetadataReader {
    * This method will return metadata of all the servers along with need reload flag.
    * In future additional details like segments list can also be added
    */
-  public List<String> getCheckReloadSegmentsFromServer(String tableNameWithType, Set<String> serverInstances,
-      BiMap<String, String> endpoints, int timeoutMs) {
+  public Pair<Integer, List<String>> getCheckReloadSegmentsFromServer(String tableNameWithType,
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
@@ -250,7 +251,7 @@ public class ServerSegmentMetadataReader {
     }
 
     LOGGER.debug("Retrieved metadata of reload check from servers.");
-    return serversNeedReloadResponses;
+    return new ImmutablePair<>(serviceResponse._failedResponseCount, serversNeedReloadResponses);
   }
 
   /**

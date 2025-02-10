@@ -34,7 +34,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -61,6 +63,11 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -73,6 +80,10 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -160,6 +171,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // Store the table size. Table size is platform dependent because of the native library used by the ChunkCompressor.
   // Once this value is set, assert that table size always gets back to this value after removing the added indices.
   private long _tableSize;
+
+  private PinotHelixResourceManager _resourceManager;
+  private TableRebalancer _tableRebalancer;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -265,6 +279,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     waitForAllDocsLoaded(600_000L);
 
     _tableSize = getTableSize(getTableName());
+
+    _resourceManager = _controllerStarter.getHelixResourceManager();
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, _helixResourceManager);
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -772,6 +789,81 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
+  }
+
+  @Test
+  public void testRebalancePreChecks()
+      throws Exception {
+    // setup the rebalance config
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setPreChecks(true);
+    rebalanceConfig.setDryRun(true);
+
+    TableConfig tableConfig = getOfflineTableConfig();
+
+    // Nothing is set
+    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, false, false);
+
+    // Enable minimizeDataMovement
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, true, false);
+
+    // Undo minimizeDataMovement, update the table config to add a column to bloom filter
+    tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
+    tableConfig.setInstanceAssignmentConfigMap(null);
+    updateTableConfig(tableConfig);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, false, true);
+
+    // Undo tableConfig change
+    tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
+    updateTableConfig(tableConfig);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, false, false);
+
+    // Add a schema change
+    Schema schema = createSchema();
+    schema.addField(new MetricFieldSpec("NewAddedIntMetric", DataType.INT, 1));
+    updateSchema(schema);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, false, true);
+
+    // Keep schema change and update table config to add minimizeDataMovement
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, true, true);
+  }
+
+  private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult,
+      boolean expectedMinimizeDataMovement, boolean expectedNeedsReloadStatus) {
+    Map<String, String> preChecksResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preChecksResult);
+    assertEquals(preChecksResult.size(), 2);
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
+        String.valueOf(expectedMinimizeDataMovement));
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS),
+        String.valueOf(expectedNeedsReloadStatus));
+  }
+
+  private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap() {
+    InstanceTagPoolConfig instanceTagPoolConfig =
+        new InstanceTagPoolConfig("tag", false, 1, null);
+    List<String> constraints = new ArrayList<>();
+    constraints.add("constraints1");
+    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 1, 1,
+            1, 1, 1, true,
+            null);
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,
+        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, true);
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put("OFFLINE", instanceAssignmentConfig);
+    return instanceAssignmentConfigMap;
   }
 
   @Test(dataProvider = "useBothQueryEngines")

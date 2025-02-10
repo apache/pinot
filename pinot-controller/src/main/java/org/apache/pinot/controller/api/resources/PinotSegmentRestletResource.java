@@ -948,7 +948,7 @@ public class PinotSegmentRestletResource {
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       Map<String, JsonNode> needReloadMetadata =
           tableMetadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType,
-              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000).getRight();
       boolean needReload =
           needReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       Map<String, ServerSegmentsReloadCheckResponse> serverResponses = new HashMap<>();

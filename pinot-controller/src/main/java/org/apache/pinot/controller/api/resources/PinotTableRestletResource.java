@@ -682,7 +682,8 @@ public class PinotTableRestletResource {
             } catch (Throwable t) {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
               LOGGER.error(errorMsg, t);
-              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null,
+                  null);
             }
           });
           boolean isJobIdPersisted = waitForRebalanceToPersist(
@@ -702,7 +703,8 @@ public class PinotTableRestletResource {
 
           return new RebalanceResult(dryRunResult.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
-              dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment());
+              dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment(),
+              dryRunResult.getPreChecksResult());
         } else {
           // If dry-run failed or is no-op, return the dry-run result
           return dryRunResult;

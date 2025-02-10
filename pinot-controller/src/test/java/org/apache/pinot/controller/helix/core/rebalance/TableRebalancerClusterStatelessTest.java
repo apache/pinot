@@ -90,7 +90,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, _helixResourceManager);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -137,8 +137,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance in dry-run mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    Map<String, String> preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertEquals(preCheckResult.size(), 2);
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
+    // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
+    // manual check is needed
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS), "error");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT), "false");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();

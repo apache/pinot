@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
@@ -59,18 +61,25 @@ public class TableMetadataReader {
     _pinotHelixResourceManager = helixResourceManager;
   }
 
-  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableNameWithType, int timeoutMs)
+  /**
+   * Check if segments need a reload on any servers
+   * @return pair of: a) number of failed responses, b) reload responses returned
+   */
+  public Pair<Integer, Map<String, JsonNode>> getServerCheckSegmentsReloadMetadata(String tableNameWithType,
+      int timeoutMs)
       throws InvalidConfigException, IOException {
-    List<String> segmentsMetadata = getReloadCheckResponses(tableNameWithType, timeoutMs);
+    Pair<Integer, List<String>> segmentsMetadataPair = getReloadCheckResponses(tableNameWithType, timeoutMs);
+    List<String> segmentsMetadata = segmentsMetadataPair.getRight();
     Map<String, JsonNode> response = new HashMap<>();
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
       response.put(responseJson.get("instanceId").asText(), responseJson);
     }
-    return response;
+    Pair<Integer, Map<String, JsonNode>> result = new ImmutablePair<>(segmentsMetadataPair.getLeft(), response);
+    return result;
   }
 
-  public List<String> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
+  public Pair<Integer, List<String>> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
