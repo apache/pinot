@@ -543,7 +543,7 @@ public class TableRebalancer {
   /**
    * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
    */
-  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+  public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -585,7 +585,7 @@ public class TableRebalancer {
   /**
    * Fetches/computes the instance partitions and also returns a boolean for whether they are unchanged
    */
-  private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
+  public Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
@@ -668,7 +668,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private List<Tier> getSortedTiers(TableConfig tableConfig) {
+  public List<Tier> getSortedTiers(TableConfig tableConfig) {
     List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
     if (CollectionUtils.isNotEmpty(tierConfigs)) {
       // Get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
@@ -684,7 +684,7 @@ public class TableRebalancer {
    * Fetches/computes the instance partitions for sorted tiers and also returns a boolean for whether the
    * instance partitions are unchanged.
    */
-  private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
+  public Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     if (sortedTiers == null) {
       return Pair.of(null, true);
