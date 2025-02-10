@@ -28,6 +28,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
@@ -113,6 +114,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
+    }
+
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      _llcRealtimeSegmentManager.cleanUpCommittedSegments(tableNameWithType);
     }
 
     if (context._runSegmentLevelValidation) {
