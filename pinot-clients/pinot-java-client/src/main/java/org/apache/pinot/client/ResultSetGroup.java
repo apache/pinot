@@ -32,7 +32,7 @@ public class ResultSetGroup {
   private final ExecutionStats _executionStats;
   private final List<PinotClientException> _exceptions;
 
-  ResultSetGroup(BrokerResponse brokerResponse) {
+  public ResultSetGroup(BrokerResponse brokerResponse) {
     _resultSets = new ArrayList<>();
 
     if (brokerResponse.getResultTable() != null) {
