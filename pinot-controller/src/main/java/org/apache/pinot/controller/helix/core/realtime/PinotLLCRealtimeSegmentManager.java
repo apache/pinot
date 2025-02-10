@@ -468,8 +468,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     znRecord.setListField(COMMITTING_SEGMENTS, committingSegmentList);
     try {
-      boolean result = _propertyStore.set(committingSegmentsListPath, znRecord, expectedVersion, AccessOption.PERSISTENT);
-      return result;
+      return _propertyStore.set(committingSegmentsListPath, znRecord, expectedVersion, AccessOption.PERSISTENT);
     } catch (ZkBadVersionException e) {
       return false;
     }
