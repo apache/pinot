@@ -215,8 +215,7 @@ public class PinotClusterConfigs {
               _pinotHelixResourceManager.getHelixClusterName()).build();
       Map<String, String> properties = new TreeMap<>();
       GroovyStaticAnalyzerConfig groovyConfig = GroovyStaticAnalyzerConfig.fromJson(body);
-      properties.put(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG,
-          groovyConfig == null ? null : groovyConfig.toJson());
+      properties.put(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG, groovyConfig.toJson());
       admin.setConfig(configScope, properties);
       GroovyFunctionEvaluator.setConfig(groovyConfig);
       return new SuccessResponse("Updated Groovy Static Analyzer config.");

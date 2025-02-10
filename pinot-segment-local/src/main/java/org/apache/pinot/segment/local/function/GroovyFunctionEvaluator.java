@@ -192,7 +192,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return _expression;
   }
 
-  private static GroovyStaticAnalyzerConfig getConfig() {
+  public static GroovyStaticAnalyzerConfig getConfig() {
     synchronized (GroovyFunctionEvaluator.class) {
       return _config;
     }
@@ -243,7 +243,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         // object and whenever a GroovyFunctionEvaluator is created it makes a local copy of that address by reading
         // the static variable atomically.  So, if the static config variable changes it will have no effect on
         // any currently running evaluators.
-        LOGGER.info("Updating Groovy Static Analyzer: {}", config.toJson());
         _config = config;
       }
     }
