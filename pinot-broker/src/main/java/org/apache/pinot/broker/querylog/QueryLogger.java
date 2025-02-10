@@ -120,19 +120,36 @@ public class QueryLogger {
     private final RequestContext _requestContext;
     private final String _table;
     private final BrokerResponse _response;
+    private final QueryEngine _queryEngine;
     @Nullable
     private final RequesterIdentity _identity;
     @Nullable
     private final ServerStats _serverStats;
 
     public QueryLogParams(RequestContext requestContext, String table, BrokerResponse response,
-        @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
+        QueryEngine queryEngine, @Nullable RequesterIdentity identity, @Nullable ServerStats serverStats) {
       _requestContext = requestContext;
       // NOTE: Passing table name separately because table name within request context is always raw table name.
       _table = table;
       _response = response;
+      _queryEngine = queryEngine;
       _identity = identity;
       _serverStats = serverStats;
+    }
+
+    public enum QueryEngine {
+      SINGLE_STAGE("singleStage"),
+      MULTI_STAGE("multiStage");
+
+      private final String _name;
+
+      QueryEngine(String name) {
+        _name = name;
+      }
+
+      private String getName() {
+        return _name;
+      }
     }
   }
 
@@ -254,6 +271,12 @@ public class QueryLogger {
         } else {
           builder.append(CommonConstants.UNKNOWN);
         }
+      }
+    },
+    QUERY_ENGINE("queryEngine") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._queryEngine.getName());
       }
     };
 

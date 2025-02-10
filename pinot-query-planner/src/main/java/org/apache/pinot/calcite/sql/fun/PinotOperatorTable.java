@@ -234,21 +234,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.TIMESTAMP_ADD,
       SqlStdOperatorTable.TIMESTAMP_DIFF,
       SqlStdOperatorTable.CAST,
-
       SqlStdOperatorTable.EXTRACT,
-      // TODO: The following operators are all rewritten to EXTRACT. Consider removing them because they are all
-      //       supported without rewrite.
-      SqlStdOperatorTable.YEAR,
-      SqlStdOperatorTable.QUARTER,
-      SqlStdOperatorTable.MONTH,
-      SqlStdOperatorTable.WEEK,
-      SqlStdOperatorTable.DAYOFYEAR,
-      SqlStdOperatorTable.DAYOFMONTH,
-      SqlStdOperatorTable.DAYOFWEEK,
-      SqlStdOperatorTable.HOUR,
-      SqlStdOperatorTable.MINUTE,
-      SqlStdOperatorTable.SECOND,
-
       SqlStdOperatorTable.ITEM,
       SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
       SqlStdOperatorTable.LISTAGG
@@ -273,7 +259,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
    */
   private static final List<SqlOperator> PINOT_OPERATORS = List.of(
       // Placeholder for special predicates
-      new PinotSqlFunction("TEXT_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("TEXT_CONTAINS", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("JSON_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("VECTOR_SIMILARITY", ReturnTypes.BOOLEAN,
