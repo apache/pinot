@@ -58,6 +58,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsEntry;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -271,8 +272,8 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Server routing Stats not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public String getServerRoutingStats() {
-    return _serverRoutingStatsManager.getServerRoutingStatsStr();
+  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats() {
+    return _serverRoutingStatsManager.getServerRoutingStats();
   }
 
   private long getRequestId() {
