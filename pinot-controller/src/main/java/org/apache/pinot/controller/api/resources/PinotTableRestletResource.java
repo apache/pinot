@@ -1312,7 +1312,8 @@ public class PinotTableRestletResource {
     try {
       sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
-          tableRebalancer.getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
+          tableRebalancer.getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
+              dryRun);
       tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
     } catch (Exception e) {
       LOGGER.error("Cannot host table with the provided configs", e);

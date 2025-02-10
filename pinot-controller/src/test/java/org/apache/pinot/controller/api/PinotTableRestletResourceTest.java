@@ -44,6 +44,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -708,7 +709,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @Test
   public void testCanHostAllReplicas()
       throws Exception {
-    // Create a valid REALTIME table without tenant overrides
+
+    // Create a valid REALTIME table (with #replicas < #servers)
     String tableName = "testTable";
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig realtimeTableConfigWithoutTagOverrides =
@@ -719,13 +721,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
-      fail("Create table with a replication > no of servers in the tenant should fail");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Insufficient servers (tenant: DefaultTenant, count: 4) to accommodate the requested replication of 5"));
+      fail("Preconditions failure: Could not create table" + tableName + "with #replicas < #servers");
     }
 
-    // Create a valid REALTIME table with tenant overrides
+    //now, update the table config with #replicas > #servers
     TableConfig realtimeTableConfigWithTagOverrides =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
@@ -733,14 +733,27 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             .setNumReplicas(5)
             .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
 
+    String controllerURLForUpdateTableConfig =
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName);
+
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfigWithTagOverrides.toJsonString());
-      fail("Create table with a replication > no of servers in the tenant should fail");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Insufficient CONSUMING servers (tag: DefaultTenant_REALTIME, count: 4) and COMPLETED servers (tag: "
-              + "DefaultTenant_OFFLINE, count: 4) to " + "accommodate the requested replication of 5."));
+      sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "There are less instances: 4 in instance partitions: testTable_CONSUMING than the table replication: 5"));
     }
+
+    //now, update the table config with #replicas <= #servers
+    realtimeTableConfigWithTagOverrides =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(3)
+            .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
+
+
+    //this should not throw an exception
+    sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig =
@@ -750,7 +763,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-      fail("Create table with a replication > no of servers in the tenant should fail");
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
