@@ -715,7 +715,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5).build();
+            .setNumReplicas(3).build();
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
