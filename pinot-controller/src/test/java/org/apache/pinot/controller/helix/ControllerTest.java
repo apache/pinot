@@ -123,6 +123,7 @@ public class ControllerTest {
   protected int _nextBrokerPort = _nextControllerPort + 1000;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
+  protected int _nextBrokerGrpcPort = _nextMinionPort + 1000;
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
