@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +40,7 @@ import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -117,7 +119,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
 
     if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
-      _llcRealtimeSegmentManager.cleanUpCommittedSegments(tableNameWithType);
+      if (!_llcRealtimeSegmentManager.cleanUpCommittedSegments(tableNameWithType)) {
+        LOGGER.error("Failed to cleanup committed segments for table: {}", tableNameWithType);
+      }
     }
 
     if (context._runSegmentLevelValidation) {
@@ -181,6 +185,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
 
+    // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
+    // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
+    addSegmentsInCommittingStatus(realtimeTableName, segmentsZKMetadata);
+
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
@@ -188,6 +196,19 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     if (_segmentAutoResetOnErrorAtValidation) {
       _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
+    }
+  }
+
+  private void addSegmentsInCommittingStatus(String realtimeTableName,
+      List<SegmentZKMetadata> segmentsZKMetadata) {
+    List<String> committingSegments = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (CommonConstants.Segment.Realtime.Status.COMMITTING.equals(segmentZKMetadata.getStatus())) {
+        committingSegments.add(segmentZKMetadata.getSegmentName());
+      }
+    }
+    if (!_llcRealtimeSegmentManager.addCommittingSegments(realtimeTableName, committingSegments)) {
+      LOGGER.error("Failed to add committing segments for table: {}", realtimeTableName);
     }
   }
 

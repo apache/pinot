@@ -1573,6 +1573,73 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertNull(result);
   }
 
+  @Test
+  public void testAddCommittingSegments() throws Exception {
+    // mock the behavior for PinotHelixResourceManager
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
+        (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+    when(pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
+    when(pinotHelixResourceManager.getPropertyStore()).thenReturn(zkHelixPropertyStore);
+
+    // init fake PinotLLCRealtimeSegmentManager
+    ControllerConf controllerConfig = new ControllerConf();
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
+
+    // Test table name
+    String realtimeTableName = "githubEvents_2_REALTIME";
+
+    // Create test segments
+    List<String> newSegments = List.of(
+        "githubEvents_2__0__0__20250210T1142Z",
+        "githubEvents_2__0__1__20250210T1142Z"
+    );
+
+    List<String> existingSegments = List.of(
+        "githubEvents_2__0__1__20250210T1142Z",  // duplicate with newSegments
+        "githubEvents_2__0__2__20250210T1142Z"
+    );
+
+    String committingSegmentsListPath =
+        ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
+
+    // Test 1: Adding segments when ZNRecord is null (create new record)
+    when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(null);
+    when(zkHelixPropertyStore.create(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(true);
+
+    assertTrue(segmentManager.addCommittingSegments(realtimeTableName, newSegments));
+
+    // Test 2: Adding segments to existing record (merge with deduplication)
+    ZNRecord existingRecord = new ZNRecord(realtimeTableName);
+    existingRecord.setListField(COMMITTING_SEGMENTS, existingSegments);
+
+    when(zkHelixPropertyStore.get(eq(committingSegmentsListPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(existingRecord);
+    when(zkHelixPropertyStore.set(eq(committingSegmentsListPath), any(), anyInt(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(true);
+
+    assertTrue(segmentManager.addCommittingSegments(realtimeTableName, newSegments));
+    assertEquals(new HashSet<>(existingRecord.getListField(COMMITTING_SEGMENTS)),
+        new HashSet<>(List.of("githubEvents_2__0__0__20250210T1142Z", "githubEvents_2__0__1__20250210T1142Z",
+            "githubEvents_2__0__2__20250210T1142Z")));
+
+    // Test 3: Null input segments
+    assertTrue(segmentManager.addCommittingSegments(realtimeTableName, null));
+
+    // Test 4: Exception handling
+    when(zkHelixPropertyStore.set(eq(committingSegmentsListPath), any(), anyInt(), eq(AccessOption.PERSISTENT)))
+        .thenThrow(new RuntimeException("ZooKeeper connection failed"));
+    assertFalse(segmentManager.addCommittingSegments(realtimeTableName, newSegments));
+  }
+
+
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
   /////////////////////////////////////////////////////////////////////////////////

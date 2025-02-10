@@ -665,15 +665,16 @@ public class PinotLLCRealtimeSegmentManager {
     // No-op
   }
 
-  private void updateCommittingSegmentsList(String realtimeTableName,
+  private boolean updateCommittingSegmentsList(String realtimeTableName,
       Callable<Boolean> operation) {
     try {
       DEFAULT_RETRY_POLICY.attempt(operation);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
       LOGGER.error("Failed to update committing segments list for table: {}", realtimeTableName, e);
-      throw new RuntimeException(e);
+      return false;
     }
+    return true;
   }
 
   // Step 1: Update committing segment metadata
@@ -761,8 +762,11 @@ public class PinotLLCRealtimeSegmentManager {
       _numCompletingSegments.addAndGet(1);
       LOGGER.info("Adding segment: {} to committing segment list",
           committingSegmentDescriptor.getSegmentName());
-      updateCommittingSegmentsList(realtimeTableName,
-          () -> addSegmentToCommittingSegmentsList(realtimeTableName, committingSegmentDescriptor.getSegmentName()));
+      if (!updateCommittingSegmentsList(realtimeTableName,
+          () -> addSegmentToCommittingSegmentsList(realtimeTableName, committingSegmentDescriptor.getSegmentName()))) {
+        LOGGER.error("Failed to update committing segments list for table: {}, segment: {}", realtimeTableName,
+            committingSegmentDescriptor.getSegmentName());
+      }
       commitSegmentMetadataInternal(realtimeTableName, committingSegmentDescriptor, true);
     } finally {
       _numCompletingSegments.addAndGet(-1);
@@ -813,8 +817,11 @@ public class PinotLLCRealtimeSegmentManager {
       // remove the segment from the committing segment list
       LOGGER.info("Removing segment: {} from committing segment list",
           committingSegmentDescriptor.getSegmentName());
-      updateCommittingSegmentsList(realtimeTableName,
-          () -> removeSegmentFromCommittingSegmentsList(realtimeTableName, committingSegmentName));
+      if (!updateCommittingSegmentsList(realtimeTableName,
+          () -> removeSegmentFromCommittingSegmentsList(realtimeTableName, committingSegmentName))) {
+        LOGGER.error("Failed to update committing segments list for table: {}, segment: {}", realtimeTableName,
+            committingSegmentDescriptor.getSegmentName());
+      }
     } finally {
       _numCompletingSegments.addAndGet(-1);
     }
@@ -2312,9 +2319,8 @@ public class PinotLLCRealtimeSegmentManager {
    *
    * @param realtimeTableName The name of the real-time table.
    */
-  public void cleanUpCommittedSegments(String realtimeTableName) {
-
-    updateCommittingSegmentsList(realtimeTableName, () -> {
+  public boolean cleanUpCommittedSegments(String realtimeTableName) {
+    return updateCommittingSegmentsList(realtimeTableName, () -> {
       String committingSegmentsListPath =
           ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
 
@@ -2334,6 +2340,46 @@ public class PinotLLCRealtimeSegmentManager {
       } catch (ZkBadVersionException e) {
         return false;
       }
+    });
+  }
+
+  /**
+   * Adds segments to the list of committing segments for a realtime table in ZooKeeper.
+   * If the segments list already exists, merges the new segments with existing ones while maintaining uniqueness.
+   * If the segments list doesn't exist, creates a new list with the provided segments.
+   *
+   * @param realtimeTableName Name of the realtime table
+   * @param committingSegments List of segment names to be added to the committing segments list.
+   *                          If null, returns true without making any changes.
+   * @return true if the operation succeeds, false if there's a failure in updating ZooKeeper
+   */
+  public boolean addCommittingSegments(String realtimeTableName, @Nullable List<String> committingSegments) {
+    if (committingSegments == null) {
+      return true;
+    }
+    return updateCommittingSegmentsList(realtimeTableName, () -> {
+      String committingSegmentsListPath =
+          ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
+
+      // Fetch the committing segments record from the property store.
+      Stat stat = new Stat();
+      ZNRecord znRecord = _propertyStore.get(committingSegmentsListPath, stat, AccessOption.PERSISTENT);
+
+      // empty ZN record for the table
+      if (znRecord == null) {
+        znRecord = new ZNRecord(realtimeTableName);
+        znRecord.setListField(COMMITTING_SEGMENTS, committingSegments);
+        return _propertyStore.create(committingSegmentsListPath, znRecord, AccessOption.PERSISTENT);
+      }
+
+      Set<String> mergedSegments = new HashSet<>(committingSegments);
+      List<String> existingSegments = znRecord.getListField(COMMITTING_SEGMENTS);
+      if (existingSegments != null) {
+        mergedSegments.addAll(existingSegments);
+      }
+
+      znRecord.setListField(COMMITTING_SEGMENTS, new ArrayList<>(mergedSegments));
+      return _propertyStore.set(committingSegmentsListPath, znRecord, stat.getVersion(), AccessOption.PERSISTENT);
     });
   }
 
