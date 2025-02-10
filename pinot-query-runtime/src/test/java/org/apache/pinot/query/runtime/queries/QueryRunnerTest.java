@@ -298,6 +298,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     List<Object[]> testCases = new ArrayList<>();
     // Missing index
     testCases.add(new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"});
+    testCases.add(new Object[]{"SELECT col1, textMatch(col1, 'f') FROM a LIMIT 10", "without text index"});
 
     // Query hint with dynamic broadcast pipeline breaker should return error upstream
     testCases.add(new Object[]{
