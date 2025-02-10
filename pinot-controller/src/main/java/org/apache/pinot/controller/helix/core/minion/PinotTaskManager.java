@@ -604,19 +604,19 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
-    Set<String> tablesToSchedule = context.getTablesToSchedule();
-    Set<String> databasesToSchedule = context.getDatabasesToSchedule();
+    Set<String> targetTables = context.getTablesToSchedule();
+    Set<String> targetDatabases = context.getDatabasesToSchedule();
     Set<String> tasksToSchedule = context.getTasksToSchedule();
-    Set<String> finalTablesToSchedule = new HashSet<>();
-    if (tablesToSchedule != null) {
-      finalTablesToSchedule.addAll(tablesToSchedule);
+    Set<String> consolidatedTables = new HashSet<>();
+    if (targetTables != null) {
+      consolidatedTables.addAll(targetTables);
     }
-    if (databasesToSchedule != null) {
-      databasesToSchedule.forEach(database ->
-          finalTablesToSchedule.addAll(_pinotHelixResourceManager.getAllTables(database)));
+    if (targetDatabases != null) {
+      targetDatabases.forEach(database ->
+          consolidatedTables.addAll(_pinotHelixResourceManager.getAllTables(database)));
     }
-    for (String tableNameWithType : finalTablesToSchedule.isEmpty()
-        ? _pinotHelixResourceManager.getAllTables() : finalTablesToSchedule) {
+    for (String tableNameWithType : consolidatedTables.isEmpty()
+        ? _pinotHelixResourceManager.getAllTables() : consolidatedTables) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig != null && tableConfig.getTaskConfig() != null) {
         Set<String> enabledTaskTypes = tableConfig.getTaskConfig().getTaskTypeConfigsMap().keySet();
@@ -662,23 +662,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   @Deprecated(forRemoval = true)
   protected synchronized TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
       @Nullable String minionInstanceTag) {
-    PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
-    Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
-
-    // Scan all table configs to get the tables with task enabled
-    List<TableConfig> enabledTableConfigs = new ArrayList<>();
-    for (String tableNameWithType : tables) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
-          .isTaskTypeEnabled(taskType)) {
-        enabledTableConfigs.add(tableConfig);
-      }
-    }
-
-    _helixTaskResourceManager.ensureTaskQueueExists(taskType);
-    addTaskTypeMetricsUpdaterIfNeeded(taskType);
-    return scheduleTask(taskGenerator, enabledTableConfigs, false, minionInstanceTag,
-        CommonConstants.TaskTriggers.UNKNOWN.name());
+    Preconditions.checkState(_taskGeneratorRegistry.getAllTaskTypes().contains(taskType),
+        "Task type: %s is not registered", taskType);
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(new HashSet<>(tables))
+        .setTasksToSchedule(Collections.singleton(taskType))
+        .setMinionInstanceTag(minionInstanceTag);
+    return scheduleTasks(context).get(taskType);
   }
 
   /**
