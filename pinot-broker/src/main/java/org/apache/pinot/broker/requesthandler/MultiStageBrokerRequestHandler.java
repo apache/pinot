@@ -202,9 +202,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         case SELECT:
         default:
           try {
-            QueryEnvironment finalQueryEnvironment1 = queryEnvironment;
+            QueryEnvironment finalQueryEnvironment = queryEnvironment;
             queryPlanResult = planQueryWithTimeout(requestId, query,
-                () -> finalQueryEnvironment1.planQuery(query, sqlNodeAndOptions, requestId), queryTimer.getRemainingTime());
+                () -> finalQueryEnvironment.planQuery(query, sqlNodeAndOptions, requestId),
+                queryTimer.getRemainingTime());
           } catch (TimeoutException | InterruptedException e) {
             requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
             return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
@@ -221,7 +222,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     } catch (Throwable t) {
       if (queryEnvironment != null) {
         Set<String> resolvedTables = queryEnvironment.getResolvedTables();
-        if (resolvedTables != null && resolvedTables.size() > 0) {
+        if (resolvedTables != null && !resolvedTables.isEmpty()) {
           // validate table access to prevent schema leak via error messages
           TableAuthorizationResult tableAuthorizationResult =
               hasTableAccess(requesterIdentity, resolvedTables, requestContext, httpHeaders);
