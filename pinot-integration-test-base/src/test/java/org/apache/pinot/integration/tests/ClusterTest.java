@@ -19,16 +19,20 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.luben.zstd.Zstd;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +53,11 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.client.BrokerResponse;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.grpc.GrpcConnection;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -99,6 +107,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected final List<BaseBrokerStarter> _brokerStarters = new ArrayList<>();
   protected final List<Integer> _brokerPorts = new ArrayList<>();
   protected String _brokerBaseApiUrl;
+  protected String _brokerGrpcEndpoint;
 
   protected final List<BaseServerStarter> _serverStarters = new ArrayList<>();
   protected int _serverGrpcPort;
@@ -124,6 +133,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  protected String getBrokerGrpcEndpoint() {
+    return _brokerGrpcEndpoint;
   }
 
   public String getMinionBaseApiUrl() {
@@ -174,6 +187,13 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+
+    int brokerGrpcPort = NetUtils.findOpenPort(_nextBrokerGrpcPort);
+    brokerConf.setProperty(Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
+    if (_brokerGrpcEndpoint == null) {
+      _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
+    }
+    _nextBrokerGrpcPort = brokerGrpcPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -330,6 +350,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters.clear();
     _brokerPorts.clear();
     _brokerBaseApiUrl = null;
+    _brokerGrpcEndpoint = null;
   }
 
   protected void stopServer() {
@@ -510,11 +531,122 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.stringToJsonNode(sendGetRequest(getBrokerBaseApiUrl() + "/" + uri));
   }
 
+  public BrokerResponse queryGrpc(String query, Map<String, String> metadata)
+      throws IOException {
+    GrpcConnection grpcConnection =
+        ConnectionFactory.fromHostListGrpc(new Properties(), List.of(getBrokerGrpcEndpoint()));
+    Iterator<org.apache.pinot.common.proto.Broker.BrokerResponse> response =
+        grpcConnection.executeAsync(query);
+
+    // Process metadata
+    ObjectNode brokerResponseJson = JsonUtils.newObjectNode();
+    if (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      JsonNode jsonNode = JsonUtils.bytesToJsonNode(uncompressedPayload);
+      for (int i = 0; i < jsonNode.size(); i++) {
+        brokerResponseJson.set(String.valueOf(i), jsonNode.get(i));
+      }
+    }
+    // Process schema
+    JsonNode schemaJsonNode = null;
+    if (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      schemaJsonNode = JsonUtils.bytesToJsonNode(uncompressedPayload);
+    }
+    // Process rows
+    ArrayNode rows = JsonUtils.newArrayNode();
+    while (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      ArrayNode jsonRows = (ArrayNode) JsonUtils.bytesToJsonNode(uncompressedPayload);
+      rows.addAll(jsonRows);
+    }
+    grpcConnection.close();
+    if (schemaJsonNode != null && rows != null) {
+      ObjectNode resultTable = JsonUtils.newObjectNode();
+      resultTable.putIfAbsent("rows", rows);
+      resultTable.putIfAbsent("dataSchema", schemaJsonNode);
+      brokerResponseJson.putIfAbsent("resultTable", resultTable);
+    }
+    BrokerResponse brokerResponse = BrokerResponse.fromJson(brokerResponseJson);
+    grpcConnection.close();
+    return brokerResponse;
+  }
+
+  public JsonNode sendGrpcQuery(String query)
+      throws IOException {
+    GrpcConnection grpcConnection =
+        ConnectionFactory.fromHostListGrpc(new Properties(), List.of(getBrokerGrpcEndpoint()));
+    String queryOptionStr =
+        String.format("%s=%s", Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, useMultiStageQueryEngine());
+    Map<String, String> metadataMap = Map.of(Broker.Request.QUERY_OPTIONS, queryOptionStr);
+    Iterator<org.apache.pinot.common.proto.Broker.BrokerResponse> response =
+        grpcConnection.executeAsync(null, query, metadataMap);
+
+    // Process metadata
+    ObjectNode brokerResponseJson = JsonUtils.newObjectNode();
+    if (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      JsonNode jsonNode = JsonUtils.bytesToJsonNode(brokerResponse.getPayload().toByteArray());
+      Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
+      while (fieldNamesIterator.hasNext()) {
+        String fieldName = fieldNamesIterator.next();
+        brokerResponseJson.set(fieldName, jsonNode.get(fieldName));
+      }
+    }
+    // Directly return when there is exception
+    if (brokerResponseJson.has("exceptions") && !brokerResponseJson.get("exceptions").isEmpty()) {
+      return brokerResponseJson;
+    }
+    // Process schema
+    JsonNode schemaJsonNode = null;
+    if (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      DataSchema schema = DataSchema.fromBytes(brokerResponse.getPayload().asReadOnlyByteBuffer());
+      schemaJsonNode = JsonUtils.objectToJsonNode(schema);
+    }
+    // Process rows
+    ArrayNode rows = JsonUtils.newArrayNode();
+    while (response.hasNext()) {
+      org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse = response.next();
+      byte[] respBytes = brokerResponse.getPayload().toByteArray();
+      int originalSize = Integer.parseInt(brokerResponse.getMetadataOrThrow("originalSize"));
+      int rowSize = Integer.parseInt(brokerResponse.getMetadataOrThrow("rowSize"));
+      byte[] uncompressedPayload = Zstd.decompress(respBytes, originalSize);
+      ArrayNode jsonRows = JsonUtils.newArrayNode();
+      int bytesRead = 0;
+      ByteBuffer byteBuffer = ByteBuffer.wrap(uncompressedPayload);
+      for (int i = 0; i < rowSize; i++) {
+        int nextRowSize = byteBuffer.getInt(bytesRead);
+        bytesRead += 4;
+        byte[] rowBytes = new byte[nextRowSize];
+        byteBuffer.position(bytesRead);
+        byteBuffer.get(rowBytes);
+        bytesRead += nextRowSize;
+        String rowString = new String(rowBytes);
+        jsonRows.add(JsonUtils.stringToJsonNode(rowString));
+      }
+      rows.addAll(jsonRows);
+    }
+    if (schemaJsonNode != null && rows != null) {
+      ObjectNode resultTable = JsonUtils.newObjectNode();
+      resultTable.putIfAbsent("dataSchema", schemaJsonNode);
+      resultTable.putIfAbsent("rows", rows);
+      brokerResponseJson.putIfAbsent("resultTable", resultTable);
+    }
+    return brokerResponseJson;
+  }
+
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
   public JsonNode postQuery(String query)
       throws Exception {
+    if (System.currentTimeMillis() % 2 == 0) {
+      return sendGrpcQuery(query);
+    }
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
   }
@@ -566,7 +698,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public JsonNode cancelQuery(String clientQueryId)
-    throws Exception {
+      throws Exception {
     URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
     Object o = _httpClient.sendDeleteRequest(cancelURI);
     return null; // TODO

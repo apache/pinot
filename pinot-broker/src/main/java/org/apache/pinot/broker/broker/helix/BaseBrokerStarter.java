@@ -43,6 +43,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -146,6 +147,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
   protected AbstractResponseStore _responseStore;
+  protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
 
   @Override
@@ -413,6 +415,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication = createBrokerAdminApp();
     _brokerAdminApplication.start(_listenerConfigs);
 
+    LOGGER.info("Initializing BrokerGrpcServer");
+    _brokerGrpcServer = new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler);
+    _brokerGrpcServer.start();
+
     LOGGER.info("Initializing cluster change mediator");
     for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
@@ -639,6 +645,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       LOGGER.error("Caught exception while waiting for shutdown delay of {}ms", delayShutdownTimeMs, e);
     }
 
+    LOGGER.info("Stopping broker grpc server");
+    _brokerGrpcServer.shutdown();
     LOGGER.info("Shutting down request handler and broker admin application");
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();

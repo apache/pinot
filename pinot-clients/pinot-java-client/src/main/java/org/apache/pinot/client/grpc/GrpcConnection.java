@@ -1,0 +1,293 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.client.grpc;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.luben.zstd.Zstd;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
+import org.apache.pinot.client.BrokerResponse;
+import org.apache.pinot.client.BrokerSelector;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.SimpleBrokerSelector;
+import org.apache.pinot.common.config.GrpcConfig;
+import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.utils.grpc.BrokerGrpcQueryClient;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+/**
+ * A grpc connection to Pinot, normally created through calls to the {@link org.apache.pinot.client.ConnectionFactory}.
+ */
+public class GrpcConnection {
+  public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcConnection.class);
+
+  private final BrokerSelector _brokerSelector;
+  private final boolean _failOnExceptions;
+  private final BrokerStreamingQueryClient _grpcQueryClient;
+
+  public GrpcConnection(List<String> brokerList) {
+    this(new Properties(), new SimpleBrokerSelector(brokerList));
+  }
+
+  public GrpcConnection(Properties properties, List<String> brokerList) {
+    this(properties, new SimpleBrokerSelector(brokerList));
+    LOGGER.info("Created connection to broker list {}", brokerList);
+  }
+
+  GrpcConnection(BrokerSelector brokerSelector) {
+    this(new Properties(), brokerSelector);
+  }
+
+  GrpcConnection(Properties properties, BrokerSelector brokerSelector) {
+    _brokerSelector = brokerSelector;
+    // Convert Properties properties to a Map
+    Map<String, Object> propertiesMap = new HashMap<>();
+    properties.forEach((key, value) -> propertiesMap.put(key.toString(), value));
+    _grpcQueryClient = new BrokerStreamingQueryClient(new GrpcConfig(new PinotConfiguration(propertiesMap)));
+    // Default fail Pinot query if response contains any exception.
+    _failOnExceptions = Boolean.parseBoolean(properties.getProperty(FAIL_ON_EXCEPTIONS, "TRUE"));
+  }
+
+  /**
+   * Creates a prepared statement, to escape query parameters.
+   *
+   * @param query The query for which to create a prepared statement
+   * @return A prepared statement for this connection
+   */
+  public GrpcPreparedStatement prepareStatement(String query) {
+    return new GrpcPreparedStatement(this, query);
+  }
+
+  /**
+   * Executes a query.
+   *
+   * @param query The query to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup execute(String query) {
+    try {
+      return execute(null, query);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Executes a query.
+   *
+   * @param tableName Name of the table to execute the query on
+   * @param query The query to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup execute(@Nullable String tableName, String query)
+      throws PinotClientException, IOException {
+    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
+          : "for table(s): " + Arrays.asList(tableNames)));
+    }
+    String brokerHost = brokerHostPort.split(":")[0];
+    int brokerPort = Integer.parseInt(brokerHostPort.split(":")[1]);
+    Broker.BrokerRequest brokerRequest = Broker.BrokerRequest.newBuilder().setSql(query).build();
+    ObjectNode brokerResponseJson = JsonUtils.newObjectNode();
+    Iterator<Broker.BrokerResponse> response = _grpcQueryClient.submit(brokerHost, brokerPort, brokerRequest);
+
+    // Process metadata
+    if (response.hasNext()) {
+      Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      JsonNode jsonNode = JsonUtils.bytesToJsonNode(uncompressedPayload);
+      for (int i = 0; i < jsonNode.size(); i++) {
+        brokerResponseJson.set(String.valueOf(i), jsonNode.get(i));
+      }
+    }
+    // Process schema
+    JsonNode schemaJsonNode = null;
+    if (response.hasNext()) {
+      Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      schemaJsonNode = JsonUtils.bytesToJsonNode(uncompressedPayload);
+    }
+    // Process rows
+    ArrayNode rows = JsonUtils.newArrayNode();
+    while (response.hasNext()) {
+      Broker.BrokerResponse brokerResponse = response.next();
+      byte[] uncompressedPayload = Zstd.decompress(brokerResponse.getPayload().toByteArray(), 0);
+      ArrayNode jsonRows = (ArrayNode) JsonUtils.bytesToJsonNode(uncompressedPayload);
+      rows.addAll(jsonRows);
+    }
+    if (schemaJsonNode != null && rows != null) {
+      ObjectNode resultTable = JsonUtils.newObjectNode();
+      resultTable.putIfAbsent("dataSchema", schemaJsonNode);
+      resultTable.putIfAbsent("rows", rows);
+      brokerResponseJson.putIfAbsent("resultTable", resultTable);
+    }
+    BrokerResponse brokerResponse = BrokerResponse.fromJson(brokerResponseJson);
+    if (!brokerResponse.getExceptions().isEmpty() && _failOnExceptions) {
+      throw new PinotClientException("Query had processing exceptions: \n" + brokerResponse.getExceptions());
+    }
+    return new ResultSetGroup(brokerResponse);
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Iterator<Broker.BrokerResponse> executeAsync(String query)
+      throws PinotClientException {
+    return executeAsync(null, query);
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Iterator<Broker.BrokerResponse> executeAsync(@Nullable String tableName, String query)
+      throws PinotClientException {
+    return executeAsync(tableName, query, new HashMap<>());
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Iterator<Broker.BrokerResponse> executeAsync(@Nullable String tableName, String query,
+      Map<String, String> metadata)
+      throws PinotClientException {
+    String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
+          : "for table(s): " + Arrays.asList(tableNames)));
+    }
+    String brokerHost = brokerHostPort.split(":")[0];
+    int brokerPort = Integer.parseInt(brokerHostPort.split(":")[1]);
+    Broker.BrokerRequest brokerRequest =
+        Broker.BrokerRequest.newBuilder().setSql(query).putAllMetadata(metadata).build();
+    return _grpcQueryClient.submit(brokerHost, brokerPort, brokerRequest);
+  }
+
+  /**
+   * Returns the name of all the tables used in a sql query.
+   *
+   * @return name of all the tables used in a sql query.
+   */
+  @Nullable
+  private static String[] resolveTableName(String query) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      Set<String> tableNames =
+          RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()));
+      if (tableNames != null) {
+        return tableNames.toArray(new String[0]);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Cannot parse table name from query: {}. Fallback to broker selector default.", query, e);
+    }
+    return null;
+  }
+
+  /**
+   * Returns the list of brokers to which this connection can connect to.
+   *
+   * @return The list of brokers to which this connection can connect to.
+   */
+  List<String> getBrokerList() {
+    return _brokerSelector.getBrokers();
+  }
+
+  /**
+   * Close the connection for further processing
+   *
+   * @throws PinotClientException when connection is already closed
+   */
+  public void close()
+      throws PinotClientException {
+    _grpcQueryClient.shutdown();
+    _brokerSelector.close();
+  }
+
+  /**
+   * Provides access to the underlying grpc clients for this connection.
+   * There may be client metrics useful for monitoring and other observability goals.
+   *
+   * @return pinot client.
+   */
+  public BrokerStreamingQueryClient getGrpcQueryClient() {
+    return _grpcQueryClient;
+  }
+
+  public static class BrokerStreamingQueryClient {
+    private final Map<String, BrokerGrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
+    private final GrpcConfig _config;
+
+    public BrokerStreamingQueryClient(GrpcConfig config) {
+      _config = config;
+    }
+
+    public Iterator<Broker.BrokerResponse> submit(String brokerHost, int brokerGrpcPort,
+        Broker.BrokerRequest brokerRequest) {
+      BrokerGrpcQueryClient client = getOrCreateGrpcQueryClient(brokerHost, brokerGrpcPort);
+      return client.submit(brokerRequest);
+    }
+
+    private BrokerGrpcQueryClient getOrCreateGrpcQueryClient(String brokerHost, int brokerGrpcPort) {
+      String hostnamePort = String.format("%s_%d", brokerHost, brokerGrpcPort);
+      return _grpcQueryClientMap.computeIfAbsent(hostnamePort,
+          k -> new BrokerGrpcQueryClient(brokerHost, brokerGrpcPort, _config));
+    }
+
+    public void shutdown() {
+      for (BrokerGrpcQueryClient client : _grpcQueryClientMap.values()) {
+        client.close();
+      }
+    }
+  }
+}
