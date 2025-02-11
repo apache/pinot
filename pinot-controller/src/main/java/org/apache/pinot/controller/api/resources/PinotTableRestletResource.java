@@ -523,7 +523,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateUpdatedTargetAssignment(tableConfig);
+        validateInstanceAssignmentPossible(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -1295,7 +1295,7 @@ public class PinotTableRestletResource {
   /*
   For the given table config, calculates a target assignment, if possible. Otherwise, throws an exception
    */
-  private void validateUpdatedTargetAssignment(TableConfig tableConfig) {
+  private void validateInstanceAssignmentPossible(TableConfig tableConfig) {
 
     String tableNameWithType = tableConfig.getTableName();
 
