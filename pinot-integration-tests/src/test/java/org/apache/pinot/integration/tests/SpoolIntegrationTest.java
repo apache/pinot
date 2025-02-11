@@ -118,12 +118,10 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     assertNoError(jsonNode);
     DocumentContext parsed = JsonPath.parse(stats.toString());
     List<Map<String, Object>> stage4On3 = parsed.read("$..[?(@.stage == 3)]..[?(@.stage == 4)]");
-    Assert.assertNotNull(stage4On3, "Stage 4 should be a descendant of stage 3");
-    Assert.assertEquals(stage4On3.size(), 1, "Stage 4 should only be descended from stage 3 once");
+    Assert.assertEquals(stage4On3.size(), 1, "Stage 4 should be descended from stage 3 exactly once");
 
     List<Map<String, Object>> stage4On7 = parsed.read("$..[?(@.stage == 7)]..[?(@.stage == 4)]");
-    Assert.assertNotNull(stage4On7, "Stage 4 should be a descendant of stage 7");
-    Assert.assertEquals(stage4On7.size(), 1, "Stage 4 should only be descended from stage 7 once");
+    Assert.assertEquals(stage4On3.size(), 1, "Stage 4 should be descended from stage 7 exactly once");
 
     Assert.assertEquals(stage4On3, stage4On7, "Stage 4 should be the same in both stage 3 and stage 7");
   }
