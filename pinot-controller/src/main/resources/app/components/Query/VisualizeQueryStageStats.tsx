@@ -128,27 +128,53 @@ const layoutNodesAndEdges = (nodes, edges, direction = "TB") => {
  * Recursively generates nodes and edges for the flowchart from a hierarchical data structure.
  */
 const generateFlowElements = (stats) => {
+  const stageRoots: Map<Number, Node> = new Map();
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  /**
-   * Traverses the hierarchy and builds nodes and edges.
-   */
-  const traverseTree = (node, level, index, parentId) => {
-    const { children, ...data } = node;
+  const createFlowNode = (data, level, index, parentId) => {
+
     const id = `${level}-${index}`; // Unique ID for the node
     const { width, height } = calculateNodeDimensions(data);
 
     // Add the node
-    nodes.push({ id, type: "customNode", data, position: { x: 0, y: 0 }, width, height });
+    const flowNode: Node = { id, type: "customNode", data, position: { x: 0, y: 0 }, width, height };
+    nodes.push(flowNode);
 
     // Add an edge if this node has a parent
     if (parentId) {
       edges.push({ id: `edge-${parentId}-${id}`, source: parentId, target: id });
     }
+    return flowNode;
+  }
 
+  /**
+   * Traverses the hierarchy and builds nodes and edges.
+   *
+   * Nodes that have been already added to the graph are not added again.
+   */
+  const traverseTree = (node, level, index, parentId) => {
+    const { children, ...data } = node;
+
+    const stageId = data["stage"];
+    if (stageId) {
+      const oldFlowNode = stageRoots.get(stageId);
+      if (oldFlowNode) {
+        // Add an edge if this node has a parent
+        if (parentId) {
+          const id = oldFlowNode.id;
+          edges.push({ id: `edge-${parentId}-${id}`, source: parentId, target: id });
+          return;
+        }
+      }
+    }
+
+    const newFlowNode = createFlowNode(data, level, index, parentId);
+    if (stageId) {
+      stageRoots.set(stageId, newFlowNode);
+    }
     // Recursively process children
-    children?.forEach((child, idx) => traverseTree(child, level + 1, index + idx, id));
+    children?.forEach((child, idx) => traverseTree(child, level + 1, index + idx, newFlowNode.id));
   };
 
   traverseTree(stats, 0, 0, null); // Start traversal from the root node
