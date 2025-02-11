@@ -323,6 +323,14 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, targetAssignment, preChecksResult);
     }
 
+    if (preChecks) {
+      String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
+          + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
+      LOGGER.error(errorMsg);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+          tierToInstancePartitionsMap, targetAssignment, preChecksResult);
+    }
+
     if (downtime) {
       LOGGER.info("For rebalanceId: {}, rebalancing table: {} with downtime", rebalanceJobId, tableNameWithType);
 

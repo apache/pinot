@@ -72,6 +72,7 @@ import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -807,41 +808,59 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Enable pre-checks, nothing is set
     rebalanceConfig.setPreChecks(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, false, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, false);
 
     // Enable minimizeDataMovement
     tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, true, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, true, false);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, false, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, true);
 
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
     updateTableConfig(tableConfig);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, false, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, false);
 
     // Add a schema change
     Schema schema = createSchema();
     schema.addField(new MetricFieldSpec("NewAddedIntMetric", DataType.INT, 1));
     updateSchema(schema);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, false, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, true);
 
     // Keep schema change and update table config to add minimizeDataMovement
     tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, true, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, true, true);
+
+    // Add a new server (to force change in instance assignment) and enable reassignInstances
+    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+    rebalanceConfig.setReassignInstances(true);
+    tableConfig.setInstanceAssignmentConfigMap(null);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE, false, true);
+
+    // Disable dry-run
+    rebalanceConfig.setDryRun(false);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.FAILED, false, true);
+
+    // Stop the added server
+    serverStarter1.stop();
+    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
   }
 
-  private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult,
+  private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
       boolean expectedMinimizeDataMovement, boolean expectedNeedsReloadStatus) {
+    assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, String> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
     assertEquals(preChecksResult.size(), 2);
