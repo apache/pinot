@@ -26,7 +26,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -56,6 +61,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -94,6 +100,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
+  private final ExecutorService _queryCompileExecutor;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -114,6 +121,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
+    _queryCompileExecutor = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
+        new NamedThreadFactory("multi-stage-query-compile-executor"));
   }
 
   @Override
@@ -123,6 +132,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public void shutDown() {
+    _queryCompileExecutor.shutdown();
     _queryDispatcher.shutdown();
   }
 
@@ -138,11 +148,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
     QueryEnvironment queryEnvironment = null;
+    Timer queryTimer;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
     String database;
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
+      queryTimer = new Timer(queryTimeoutMs);
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
@@ -166,7 +178,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
               ? fragment -> requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions)
               : null;
 
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
+          try {
+            QueryEnvironment finalQueryEnvironment = queryEnvironment;
+            queryPlanResult = planQueryWithTimeout(requestId, query,
+                () -> finalQueryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode),
+                queryTimer.getRemainingTime());
+          } catch (TimeoutException | InterruptedException e) {
+            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
+          }
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
@@ -181,7 +201,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
+          try {
+            QueryEnvironment finalQueryEnvironment = queryEnvironment;
+            queryPlanResult = planQueryWithTimeout(requestId, query,
+                () -> finalQueryEnvironment.planQuery(query, sqlNodeAndOptions, requestId),
+                queryTimer.getRemainingTime());
+          } catch (TimeoutException | InterruptedException e) {
+            requestContext.setErrorCode(QueryException.BROKER_TIMEOUT_ERROR_CODE);
+            return new BrokerResponseNative(QueryException.BROKER_TIMEOUT_ERROR);
+          }
           break;
       }
     } catch (DatabaseConflictException e) {
@@ -191,10 +219,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     } catch (WebApplicationException e) {
       throw e;
-    } catch (RuntimeException e) {
+    } catch (Throwable t) {
       if (queryEnvironment != null) {
         Set<String> resolvedTables = queryEnvironment.getResolvedTables();
-        if (resolvedTables != null && resolvedTables.size() > 0) {
+        if (resolvedTables != null && !resolvedTables.isEmpty()) {
           // validate table access to prevent schema leak via error messages
           TableAuthorizationResult tableAuthorizationResult =
               hasTableAccess(requesterIdentity, resolvedTables, requestContext, httpHeaders);
@@ -204,10 +232,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
-      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
+      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      if (e.getMessage().matches(".* Column .* not found in any table'")) {
+      if (t.getMessage() != null && t.getMessage().matches(".* Column .* not found in any table'")) {
         requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
         return new BrokerResponseNative(
             QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, consolidatedMessage));
@@ -250,12 +278,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
-    Timer queryTimer = new Timer(queryTimeoutMs);
     int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
-      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimeoutMs, TimeUnit.MILLISECONDS)) {
+      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimer.getRemainingTime(),
+          TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
@@ -354,6 +382,29 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       failureMessage = "Reason: " + failureMessage;
     }
     throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+  }
+
+  /**
+   * Runs the query planning in a separate thread so that we can enforce a timeout on it (in some rare cases,
+   * we can see query compilation taking a very long time).
+   */
+  private QueryEnvironment.QueryPlannerResult planQueryWithTimeout(long requestId, String query,
+      Callable<QueryEnvironment.QueryPlannerResult> queryPlannerResultCallable, long timeoutMs)
+      throws Throwable {
+    Future<QueryEnvironment.QueryPlannerResult> queryPlanResultFuture = _queryCompileExecutor.submit(
+        queryPlannerResultCallable);
+    try {
+      return queryPlanResultFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timed out while planning query {}: {}", requestId, query);
+      queryPlanResultFuture.cancel(true);
+      throw e;
+    } catch (InterruptedException e) {
+      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+      throw e;
+    } catch (ExecutionException e) {
+      throw e.getCause();
+    }
   }
 
   private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,

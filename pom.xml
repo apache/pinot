@@ -162,7 +162,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.6-9</zstd-jni.version>
+    <zstd-jni.version>1.5.6-10</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.24.3</log4j.version>
@@ -175,9 +175,9 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.13</aws.sdk.version>
+    <aws.sdk.version>2.30.16</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
-    <azure.msal4j.version>1.18.0</azure.msal4j.version>
+    <azure.msal4j.version>1.19.0</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>

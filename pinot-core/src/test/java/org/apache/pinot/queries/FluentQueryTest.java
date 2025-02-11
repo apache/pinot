@@ -40,6 +40,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -502,6 +503,49 @@ public class FluentQueryTest {
           tableText
       );
       thenResultIs(rows);
+
+      return this;
+    }
+
+    /**
+     * Asserts that the result of the query as string is the same as given "table".
+     *
+     * The table is a text table. The first row is the header, and the rest of the rows are
+     * the data. Each column must be separated by pipes ({@code |}).
+     * The header is a list of column names and types, e.g. {@code "column1[INT] | column2[STRING]"}.
+     * The data is a list of rows, each row is a list of values separated by pipes, ending with '\n'.
+     *
+     * Contrary to {@link #thenResultIs(String...)}, this method compares input table and query result as strings.
+     *
+     */
+    public QueryExecuted thenResultTextIs(String expected) {
+      if (_brokerResponse.getExceptionsSize() > 0) {
+        Assert.fail("Query failed with " + _brokerResponse.getExceptions());
+      }
+
+      DataSchema schema = _brokerResponse.getResultTable().getDataSchema();
+      DataSchema.ColumnDataType[] dataTypes = schema.getColumnDataTypes();
+      List<Object[]> actualRows = _brokerResponse.getResultTable().getRows();
+      StringBuilder buffer = new StringBuilder();
+      for (int i = 0, n = schema.size(); i < n; i++) {
+        if (i > 0) {
+          buffer.append(" | ");
+        }
+        buffer.append(schema.getColumnName(i)).append('[').append(schema.getColumnDataType(i)).append(']');
+      }
+
+      for (int row = 0; row < actualRows.size(); row++) {
+        buffer.append("\n");
+        Object[] rowData = actualRows.get(row);
+        for (int col = 0; col < rowData.length; col++) {
+          if (col > 0) {
+            buffer.append(" | ");
+          }
+          buffer.append(dataTypes[col].toDataType().toString(rowData[col]));
+        }
+      }
+
+      Assert.assertEquals(buffer.toString(), expected);
 
       return this;
     }
