@@ -106,7 +106,6 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
       public Boolean apply(@Nullable Void aVoid) {
         try {
           return _adminClient.listTopics().names().get().contains(topic);
-          // return _adminClient.describeTopics(Collections.singletonList(topic)).values().get(topic).get().partitions().size() > 0;
         } catch (Exception e) {
           LOGGER.warn("Could not fetch Kafka topics", e);
           return null;
