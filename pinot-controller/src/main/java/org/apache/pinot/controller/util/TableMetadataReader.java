@@ -29,8 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
@@ -65,22 +63,22 @@ public class TableMetadataReader {
    * Check if segments need a reload on any servers
    * @return pair of: a) number of failed responses, b) reload responses returned
    */
-  public Pair<Integer, Map<String, JsonNode>> getServerCheckSegmentsReloadMetadata(String tableNameWithType,
+  public TableReloadJsonResponse getServerCheckSegmentsReloadMetadata(String tableNameWithType,
       int timeoutMs)
       throws InvalidConfigException, IOException {
-    Pair<Integer, List<String>> segmentsMetadataPair = getReloadCheckResponses(tableNameWithType, timeoutMs);
-    List<String> segmentsMetadata = segmentsMetadataPair.getRight();
+    ServerSegmentMetadataReader.TableReloadResponse segmentsMetadataPair =
+        getReloadCheckResponses(tableNameWithType, timeoutMs);
+    List<String> segmentsMetadata = segmentsMetadataPair.getServerReloadResponses();
     Map<String, JsonNode> response = new HashMap<>();
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
       response.put(responseJson.get("instanceId").asText(), responseJson);
     }
-    Pair<Integer, Map<String, JsonNode>> result = new ImmutablePair<>(segmentsMetadataPair.getLeft(), response);
-    return result;
+    return new TableReloadJsonResponse(segmentsMetadataPair.getNumFailedResponses(), response);
   }
 
-  public Pair<Integer, List<String>> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
-      throws InvalidConfigException {
+  public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponses(String tableNameWithType,
+      int timeoutMs) throws InvalidConfigException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
     Set<String> serverInstanceSet = new HashSet<>(serverInstances);
@@ -221,5 +219,23 @@ public class TableMetadataReader {
         new ServerSegmentMetadataReader(_executor, _connectionManager);
     return serverSegmentMetadataReader.getStaleSegmentsFromServer(tableNameWithType, serverInstanceSet, endpoints,
         timeoutMs);
+  }
+
+  public class TableReloadJsonResponse {
+    private int _numFailedResponses;
+    private Map<String, JsonNode> _serverReloadJsonResponses;
+
+    TableReloadJsonResponse(int numFailedResponses, Map<String, JsonNode> serverReloadJsonResponses) {
+      _numFailedResponses = numFailedResponses;
+      _serverReloadJsonResponses = serverReloadJsonResponses;
+    }
+
+    public int getNumFailedResponses() {
+      return _numFailedResponses;
+    }
+
+    public Map<String, JsonNode> getServerReloadJsonResponses() {
+      return _serverReloadJsonResponses;
+    }
   }
 }

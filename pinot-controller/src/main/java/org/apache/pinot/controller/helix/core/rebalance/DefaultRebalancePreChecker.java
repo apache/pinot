@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -75,10 +74,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
       TableMetadataReader metadataReader = new TableMetadataReader(executorService, connectionManager,
           pinotHelixResourceManager);
-      Pair<Integer, Map<String, JsonNode>> needsReloadMetadataPair =
+      TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
           metadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType, 30_000);
-      Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getRight();
-      int failedResponses = needsReloadMetadataPair.getLeft();
+      Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
+      int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
               + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
       needsReload =
