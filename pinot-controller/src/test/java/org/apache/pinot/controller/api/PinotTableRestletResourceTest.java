@@ -746,8 +746,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
   }
 
+  /**
+   * When a table config is updated with a new replica count that is greater than the number of servers in that
+   * tenant, then the call should fail
+   * @throws Exception
+   */
   @Test
-  public void testCanHostAllReplicas()
+  public void validateInvalidReplicaChange()
       throws Exception {
 
     // Create a valid REALTIME table (with #replicas < #servers)
@@ -783,28 +788,18 @@ public class PinotTableRestletResourceTest extends ControllerTest {
           "There are less instances: 4 in instance partitions: testTable_CONSUMING than the table replication: 5"));
     }
 
-    //now, update the table config with #replicas <= #servers
+    //now, update the table config with #replicas <= #servers. This request should pass
     realtimeTableConfigWithTagOverrides =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(3)
+            .setNumReplicas(2)
             .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
 
-
-    //this should not throw an exception
-    sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
-
-    // Create a valid OFFLINE table
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(5).build();
-
     try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      fail("Updating a table config when replication <= #servers in the tenant fails");
     }
   }
 
