@@ -38,7 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -142,9 +141,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableQueryLimitOverride;
   protected final boolean _enableDistinctCountBitmapOverride;
   protected final int _queryResponseLimit;
+  // maps broker-generated query id with the servers that are running the query
+  protected final Map<Long, QueryServers> _serversById;
   // if >= 0, then overrides default limit of 10, otherwise setting is ignored
   protected final int _defaultQueryLimit;
-  protected final Map<Long, QueryServers> _queriesById;
   protected final boolean _enableMultistageMigrationMetric;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
@@ -162,11 +162,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _config.getProperty(CommonConstants.Helix.ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY, false);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    if (this.isQueryCancellationEnabled()) {
+      _serversById = new ConcurrentHashMap<>();
+    } else {
+      _serversById = null;
+    }
     _defaultQueryLimit = config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT,
         Broker.DEFAULT_BROKER_QUERY_LIMIT);
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
-    _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
@@ -215,31 +219,33 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  @Override
-  public Map<Long, String> getRunningQueries() {
-    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
-    return _queriesById.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()._query));
-  }
-
   @VisibleForTesting
   Set<ServerInstance> getRunningServers(long requestId) {
-    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
-    QueryServers queryServers = _queriesById.get(requestId);
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    QueryServers queryServers = _serversById.get(requestId);
     return queryServers != null ? queryServers._servers : Collections.emptySet();
   }
 
   @Override
-  public boolean cancelQuery(long requestId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+  protected void onQueryFinish(long requestId) {
+    super.onQueryFinish(requestId);
+    if (isQueryCancellationEnabled()) {
+      _serversById.remove(requestId);
+    }
+  }
+
+  @Override
+  protected boolean handleCancel(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    Preconditions.checkState(_queriesById != null, "Query cancellation is not enabled on broker");
-    QueryServers queryServers = _queriesById.get(requestId);
+    QueryServers queryServers = _serversById.get(queryId);
     if (queryServers == null) {
       return false;
     }
+
     // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
     //       details
-    String globalQueryId = getGlobalQueryId(requestId);
+    String globalQueryId = getGlobalQueryId(queryId);
     List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
       serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
@@ -807,7 +813,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
       BrokerResponseNative brokerResponse;
-      if (_queriesById != null) {
+      if (isQueryCancellationEnabled()) {
         // Start to track the running query for cancellation just before sending it out to servers to avoid any
         // potential failures that could happen before sending it out, like failures to calculate the routing table etc.
         // TODO: Even tracking the query as late as here, a potential race condition between calling cancel API and
@@ -816,14 +822,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         //       can always list the running queries and cancel query again until it ends. Just that such race
         //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
         //       servers takes time, but will address later if needed.
-        _queriesById.put(requestId, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
-        LOGGER.debug("Keep track of running query: {}", requestId);
+        String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
+        onQueryStart(
+            requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
         try {
           brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
               offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
               requestContext);
+          brokerResponse.setClientRequestId(clientRequestId);
         } finally {
-          _queriesById.remove(requestId);
+          onQueryFinish(requestId);
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
@@ -920,6 +928,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return errorMessage + ", with routing policy: " + offlineRoutingPolicy + " [offline]";
     }
     return errorMessage;
+  }
+
+  @Override
+  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+    super.onQueryStart(requestId, clientRequestId, query, extras);
+    if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
+      _serversById.put(requestId, (QueryServers) extras[0]);
+    }
   }
 
   private static String getRoutingPolicy(TableConfig tableConfig) {

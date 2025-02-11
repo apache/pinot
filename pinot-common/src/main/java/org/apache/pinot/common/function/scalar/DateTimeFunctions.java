@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
+import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -545,6 +546,19 @@ public class DateTimeFunctions {
   @ScalarFunction
   public static long now() {
     return System.currentTimeMillis();
+  }
+
+  @ScalarFunction
+  public static long sleep(long millis) {
+    try {
+      if (FunctionUtils.isAssertEnabled()) {
+        Thread.sleep(millis);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
+    return millis;
   }
 
   /**
