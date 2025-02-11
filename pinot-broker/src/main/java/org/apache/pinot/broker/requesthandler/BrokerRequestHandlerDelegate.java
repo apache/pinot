@@ -133,19 +133,35 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    // TODO: add support for multiStaged engine: track running queries for multiStaged engine and combine its
-    //       running queries with those from singleStaged engine. Both engines share the same request Id generator, so
-    //       the query will have unique ids across the two engines.
-    return _singleStageBrokerRequestHandler.getRunningQueries();
+    // Both engines share the same request Id generator, so the query will have unique ids across the two engines.
+    Map<Long, String> queries = _singleStageBrokerRequestHandler.getRunningQueries();
+    if (_multiStageBrokerRequestHandler != null) {
+      queries.putAll(_multiStageBrokerRequestHandler.getRunningQueries());
+    }
+    return queries;
   }
 
   @Override
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
-    // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
-    //       not found, try on the singleStaged engine.
+    if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
+        queryId, timeoutMs, executor, connMgr, serverResponses)) {
+        return true;
+    }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQueryByClientId(
+        clientQueryId, timeoutMs, executor, connMgr, serverResponses)) {
+      return true;
+    }
+    return _singleStageBrokerRequestHandler.cancelQueryByClientId(
+        clientQueryId, timeoutMs, executor, connMgr, serverResponses);
   }
 
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
