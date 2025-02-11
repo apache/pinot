@@ -58,6 +58,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+
 
 public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_SERVERS = 1;
@@ -91,7 +94,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, _helixResourceManager);
 
     createSchemaAndTable();
   }
@@ -106,6 +109,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // setup the rebalance config
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(false);
+    // Ensure that rebalance works when pre-checks are enabled
+    rebalanceConfig.setPreChecks(true);
     rebalanceConfig.setMinAvailableReplicas(0);
     rebalanceConfig.setIncludeConsuming(true);
 
@@ -115,6 +120,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Now we trigger a rebalance operation
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNotNull(rebalanceResult.getPreChecksResult());
+    assertEquals(rebalanceResult.getPreChecksResult().size(), 2);
 
     // Check the number of replicas after rebalancing
     int finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
@@ -130,6 +137,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Add a new server
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNotNull(rebalanceResult.getPreChecksResult());
+    assertEquals(rebalanceResult.getPreChecksResult().size(), 2);
 
     // Check the number of replicas after rebalancing
     finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
@@ -150,6 +159,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setDowntime(true);
 
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNotNull(rebalanceResult.getPreChecksResult());
+    assertEquals(rebalanceResult.getPreChecksResult().size(), 2);
 
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
 

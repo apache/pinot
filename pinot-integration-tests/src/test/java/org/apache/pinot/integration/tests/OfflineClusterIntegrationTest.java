@@ -796,13 +796,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // setup the rebalance config
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setPreChecks(true);
     rebalanceConfig.setDryRun(true);
 
     TableConfig tableConfig = getOfflineTableConfig();
 
-    // Nothing is set
+    // Ensure pre-check status is null if not enabled
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNull(rebalanceResult.getPreChecksResult());
+
+    // Enable pre-checks, nothing is set
+    rebalanceConfig.setPreChecks(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, false, false);
 
     // Enable minimizeDataMovement
