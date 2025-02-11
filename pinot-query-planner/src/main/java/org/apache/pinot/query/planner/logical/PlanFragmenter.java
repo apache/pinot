@@ -99,16 +99,13 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     // Remove the old sender and its children from the plan fragment map
     _planFragmentMap.remove(oldSender);
 
-    IntList pending = new IntArrayList();
-    IntList nullableOrphans = _childPlanFragmentIdsMap.remove(oldSender);
-    if (nullableOrphans != null) {
-      pending.addAll(nullableOrphans);
-    }
-    while (!pending.isEmpty()) {
-      int orphan = pending.removeInt(pending.size() - 1);
+    IntList fragmentsToRemove = new IntArrayList();
+    fragmentsToRemove.add(oldSender);
+    while (!fragmentsToRemove.isEmpty()) {
+      int orphan = fragmentsToRemove.removeInt(fragmentsToRemove.size() - 1);
       IntList children = _childPlanFragmentIdsMap.remove(orphan);
       if (children != null) {
-        pending.addAll(children);
+        fragmentsToRemove.addAll(children);
       }
       _planFragmentMap.remove(orphan);
     }
