@@ -66,7 +66,7 @@ public class SegmentOperationsThrottler implements PinotClusterConfigChangeListe
     return _segmentDownloadThrottler;
   }
 
-  public void startServingQueries() {
+  public synchronized void startServingQueries() {
     _segmentAllIndexPreprocessThrottler.startServingQueries();
     _segmentStarTreePreprocessThrottler.startServingQueries();
     _segmentDownloadThrottler.startServingQueries();
