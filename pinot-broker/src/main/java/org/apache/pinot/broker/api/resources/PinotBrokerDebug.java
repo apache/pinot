@@ -273,7 +273,11 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public Map<String, ServerRoutingStatsEntry> getServerRoutingStats() {
-    return _serverRoutingStatsManager.getServerRoutingStats();
+    if (_serverRoutingStatsManager.isEnabled()) {
+      return _serverRoutingStatsManager.getServerRoutingStats();
+    } else {
+      throw new WebApplicationException("Server routing stats is not enabled", Response.Status.NOT_FOUND);
+    }
   }
 
   private long getRequestId() {
