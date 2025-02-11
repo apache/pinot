@@ -1279,7 +1279,7 @@ public class PinotTableRestletResource {
   }
 
   /*
-  For the given table config, calculates a target assignment if possible (which means the cluster can host the table)
+  For the given table config, calculates a target assignment, if possible. Otherwise, throws an exception
    */
   private void validateUpdatedTargetAssignment(TableConfig tableConfig) {
 
@@ -1296,53 +1296,39 @@ public class PinotTableRestletResource {
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
     boolean bootstrap = rebalanceConfig.isBootstrap();
 
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
     try {
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+
       Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
           tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
       instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
-    } catch (Exception e) {
-      LOGGER.error("Could not calculate instance partitions for table: {}", tableNameWithType, e);
-      throw e;
-    }
 
-    // Calculate instance partitions for tiers if configured
-    List<Tier> sortedTiers;
-    Map<String, InstancePartitions> tierToInstancePartitionsMap;
-    try {
-      sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
+      // Calculate instance partitions for tiers if configured
+      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
           tableRebalancer.getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
               dryRun);
-      tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
-    } catch (Exception e) {
-      LOGGER.error("Could not calculate instance partitions for tiers for table: {}", tableNameWithType, e);
-      throw e;
-    }
+      Map<String, InstancePartitions> tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
 
-    // this will be null for new tables
-    IdealState currentIdealState;
-    try {
       PropertyKey idealStatePropertyKey =
           _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().keyBuilder()
               .idealStates(tableNameWithType);
-      currentIdealState =
+      IdealState currentIdealState =
           _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getProperty(idealStatePropertyKey);
-    } catch (Exception e) {
-      LOGGER.error("Cannot host table with the provided configs", e);
-      throw e;
-    }
 
-    SegmentAssignment segmentAssignment =
-        SegmentAssignmentFactory.getSegmentAssignment(_pinotHelixResourceManager.getHelixZkManager(), tableConfig,
-            _controllerMetrics);
-    Map<String, Map<String, String>> currentAssignment =
-        currentIdealState != null ? currentIdealState.getRecord().getMapFields() : Map.of();
-    try {
+      Preconditions.checkState(currentIdealState != null, "Ideal state for table: %s is null", tableNameWithType);
+
+      SegmentAssignment segmentAssignment =
+          SegmentAssignmentFactory.getSegmentAssignment(_pinotHelixResourceManager.getHelixZkManager(), tableConfig,
+              _controllerMetrics);
+
+      Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
+
       segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
           tierToInstancePartitionsMap, rebalanceConfig);
     } catch (Exception e) {
-      LOGGER.error("Could not calculate target assignment for table: {}", tableNameWithType, e);
+      LOGGER.error("Could not calculate target assignment for table: {} for the provided table config",
+          tableNameWithType);
       throw e;
     }
   }
