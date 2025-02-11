@@ -115,7 +115,7 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
         + "FROM joined\n"
         + "LIMIT 1");
     JsonNode stats = jsonNode.get("stageStats");
-    Assert.assertNotNull(stats, "Stage stats should be present. Please verify the query didn't fail");
+    assertNoError(jsonNode);
     DocumentContext parsed = JsonPath.parse(stats.toString());
     List<Map<String, Object>> stage4On3 = parsed.read("$..[?(@.stage == 3)]..[?(@.stage == 4)]");
     Assert.assertNotNull(stage4On3, "Stage 4 should be a descendant of stage 3");
