@@ -213,7 +213,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-  public static void configureGroovySecurity(String groovyASTConfig) throws Exception {
+  public static void configureGroovySecurity(String groovyASTConfig)
+      throws Exception {
     try {
       if (groovyASTConfig != null) {
         setConfig(GroovyStaticAnalyzerConfig.fromJson(groovyASTConfig));
@@ -227,7 +228,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-
   /**
    * Initialize or update the configuration for the Groovy Static Analyzer.
    * @param config GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
@@ -235,16 +235,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   public static void setConfig(GroovyStaticAnalyzerConfig config)
       throws JsonProcessingException {
     synchronized (GroovyFunctionEvaluator.class) {
-      if (_config == null) {
-        LOGGER.info("Initializing Groovy Static Analyzer: {}", config.toJson());
-        _config = config;
-      } else {
-        // It's fine to update the configuration because the static variable stores the address to a configuration
-        // object and whenever a GroovyFunctionEvaluator is created it makes a local copy of that address by reading
-        // the static variable atomically.  So, if the static config variable changes it will have no effect on
-        // any currently running evaluators.
-        _config = config;
-      }
+      _config = config;
     }
   }
 }

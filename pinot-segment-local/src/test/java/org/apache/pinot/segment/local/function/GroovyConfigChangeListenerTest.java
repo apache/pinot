@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,6 +64,18 @@ public class GroovyConfigChangeListenerTest {
     groovyConfigChangeListener.onChange(changedConfigs, clusterConfigs);
     assertNotNull(GroovyFunctionEvaluator.getConfig());
     assertEquals(GroovyFunctionEvaluator.getConfig().getAllowedReceivers(), List.of("java.lang.String"));
+  }
+
+  @Test
+  public void testGroovyConfigIsDeleted() {
+    Set<String> changedConfigs = Set.of(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG);
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG, null);
+    assertEquals(GroovyFunctionEvaluator.getConfig().getAllowedReceivers(), List.of("java.lang.Math"));
+
+    GroovyConfigChangeListener groovyConfigChangeListener = new GroovyConfigChangeListener();
+    groovyConfigChangeListener.onChange(changedConfigs, clusterConfigs);
+    assertNull(GroovyFunctionEvaluator.getConfig());
   }
 
   @Test

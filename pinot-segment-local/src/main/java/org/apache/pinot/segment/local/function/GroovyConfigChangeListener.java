@@ -35,7 +35,10 @@ public class GroovyConfigChangeListener implements PinotClusterConfigChangeListe
       try {
         String configJson = clusterConfigs.get(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG);
         LOGGER.info("Updating Groovy Static Analyzer configuration with latest config: {}", configJson);
-        GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.fromJson(configJson);
+        GroovyStaticAnalyzerConfig config = null;
+        if (configJson != null) {
+          config = GroovyStaticAnalyzerConfig.fromJson(configJson);
+        }
         GroovyFunctionEvaluator.setConfig(config);
       } catch (Exception e) {
         LOGGER.error("Failed to update Groovy Static Analyzer configuration", e);
