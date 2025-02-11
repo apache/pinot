@@ -19,23 +19,18 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -64,21 +59,22 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
+public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "forward";
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
-  private static final List<String> EXTENSIONS = Lists.newArrayList(
+  //@formatter:off
+  private static final List<String> EXTENSIONS = List.of(
       V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION
   );
+  //@formatter:on
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -90,37 +86,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
-  public Map<String, ForwardIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    Set<String> disabledColumns = indexLoadingConfig.getForwardIndexDisabledColumns();
-    Map<String, CompressionCodec> compressionCodecMap = indexLoadingConfig.getCompressionConfigs();
-    Map<String, ForwardIndexConfig> result = new HashMap<>();
-    for (String column : indexLoadingConfig.getAllKnownColumns()) {
-      ForwardIndexConfig forwardIndexConfig;
-      if (!disabledColumns.contains(column)) {
-        CompressionCodec compressionCodec = compressionCodecMap.get(column);
-        if (compressionCodec == null) {
-          TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-          if (tableConfig != null && tableConfig.getFieldConfigList() != null) {
-            FieldConfig fieldConfig =
-                tableConfig.getFieldConfigList().stream().filter(fc -> fc.getName().equals(column)).findAny()
-                    .orElse(null);
-            if (fieldConfig != null) {
-              compressionCodec = fieldConfig.getCompressionCodec();
-            }
-          }
-        }
-        forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(compressionCodec).build();
-      } else {
-        forwardIndexConfig = ForwardIndexConfig.DISABLED;
-      }
-      result.put(column, forwardIndexConfig);
-    }
-    return result;
-  }
-
-  @Override
   public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.DEFAULT;
+    return ForwardIndexConfig.getDefault();
   }
 
   @Override
@@ -134,18 +101,18 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     ColumnConfigDeserializer<ForwardIndexConfig> fromOld = (tableConfig, schema) -> {
       Map<String, DictionaryIndexConfig> dictConfigs = StandardIndexes.dictionary().getConfig(tableConfig, schema);
 
-      Map<String, ForwardIndexConfig> fwdConfig = Maps.newHashMapWithExpectedSize(
-          Math.max(dictConfigs.size(), schema.size()));
+      Map<String, ForwardIndexConfig> fwdConfig =
+          Maps.newHashMapWithExpectedSize(Math.max(dictConfigs.size(), schema.size()));
 
       Collection<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
       if (fieldConfigs != null) {
         for (FieldConfig fieldConfig : fieldConfigs) {
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.getDisabled());
           } else {
             ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
-            if (!config.equals(ForwardIndexConfig.DEFAULT)) {
+            if (!config.equals(ForwardIndexConfig.getDefault())) {
               fwdConfig.put(fieldConfig.getName(), config);
             }
             // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
@@ -228,8 +195,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
    *
    * This method will return the default reader, skipping any index overload.
    */
-  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
+  public static ForwardIndexReader<?> read(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.forward());
     return read(dataBuffer, columnMetadata);
@@ -282,10 +248,20 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           //       columns as well
           // TODO: Use the stats to get estimated average length
           // Use a smaller capacity as opposed to segment flush size
-          int initialCapacity = Math.min(context.getCapacity(),
-              NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
+          int initialCapacity =
+              Math.min(context.getCapacity(), NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
           if (config.getCompressionCodec() == CompressionCodec.CLP) {
-            return new CLPMutableForwardIndex(column, storedType, context.getMemoryManager(), context.getCapacity());
+            CLPMutableForwardIndexV2 clpMutableForwardIndex =
+                new CLPMutableForwardIndexV2(column, context.getMemoryManager());
+            // CLP (V1) always have clp encoding enabled whereas V2 is dynamic
+            clpMutableForwardIndex.forceClpEncoding();
+            return clpMutableForwardIndex;
+          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_ZSTD
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_LZ4) {
+            CLPMutableForwardIndexV2 clpMutableForwardIndex =
+                new CLPMutableForwardIndexV2(column, context.getMemoryManager());
+            return clpMutableForwardIndex;
           }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
               initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
@@ -298,8 +274,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                 V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
         // TODO: Start with a smaller capacity on FixedByteMVForwardIndexReaderWriter and let it expand
         return new FixedByteMVMutableForwardIndex(MAX_MULTI_VALUES_PER_ROW, context.getAvgNumMultiValues(),
-            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false,
-            storedType);
+            context.getCapacity(), storedType.size(), context.getMemoryManager(), allocationContext, false, storedType);
       }
     } else {
       if (isSingleValue) {

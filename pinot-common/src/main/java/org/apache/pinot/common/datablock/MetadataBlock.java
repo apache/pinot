@@ -19,16 +19,11 @@
 package org.apache.pinot.common.datablock;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +38,7 @@ public class MetadataBlock extends BaseDataBlock {
   @VisibleForTesting
   static final int VERSION = 2;
   @Nullable
-  private List<ByteBuffer> _statsByStage;
+  private List<DataBuffer> _statsByStage;
 
   private MetadataBlock() {
     this(Collections.emptyList());
@@ -61,80 +56,9 @@ public class MetadataBlock extends BaseDataBlock {
     return errorBlock;
   }
 
-  public MetadataBlock(List<ByteBuffer> statsByStage) {
+  public MetadataBlock(List<DataBuffer> statsByStage) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
-  }
-
-  MetadataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
-  }
-
-  @Override
-  protected void serializeMetadata(DataOutputStream output)
-      throws IOException {
-    if (_statsByStage == null) {
-      output.writeInt(0);
-      return;
-    }
-    int size = _statsByStage.size();
-    output.writeInt(size);
-    if (size > 0) {
-      byte[] bytes = new byte[4096];
-      for (ByteBuffer stat : _statsByStage) {
-        if (stat == null) {
-          output.writeBoolean(false);
-        } else {
-          output.writeBoolean(true);
-          output.writeInt(stat.remaining());
-          ByteBuffer duplicate = stat.duplicate();
-          while (duplicate.hasRemaining()) {
-            int length = Math.min(duplicate.remaining(), bytes.length);
-            duplicate.get(bytes, 0, length);
-            output.write(bytes, 0, length);
-          }
-        }
-      }
-    }
-  }
-
-  public static MetadataBlock deserialize(ByteBuffer byteBuffer, int version)
-      throws IOException {
-    switch (version) {
-      case 1:
-      case 2:
-        return new MetadataBlock(byteBuffer);
-      default:
-        throw new IOException("Unsupported metadata block version: " + version);
-    }
-  }
-
-  @Override
-  protected void deserializeMetadata(ByteBuffer buffer)
-      throws IOException {
-    try {
-      int statsSize = buffer.getInt();
-
-      List<ByteBuffer> stats = new ArrayList<>(statsSize);
-
-      for (int i = 0; i < statsSize; i++) {
-        if (buffer.get() != 0) {
-          int length = buffer.getInt();
-          buffer.limit(buffer.position() + length);
-          stats.add(buffer.slice());
-          buffer.position(buffer.limit());
-          buffer.limit(buffer.capacity());
-        } else {
-          stats.add(null);
-        }
-      }
-      _statsByStage = stats;
-    } catch (BufferUnderflowException e) {
-      LOGGER.info("Failed to read stats from metadata block. Considering it empty", e);;
-    } catch (RuntimeException e) {
-      LOGGER.warn("Failed to read stats from metadata block. Considering it empty", e);;
-    }
   }
 
   public MetadataBlockType getType() {
@@ -147,41 +71,24 @@ public class MetadataBlock extends BaseDataBlock {
    * The returned list may contain nulls, which would mean that no stats were available for that stage.
    */
   @Nullable
-  public List<ByteBuffer> getStatsByStage() {
+  @Override
+  public List<DataBuffer> getStatsByStage() {
     return _statsByStage;
   }
 
   @Override
-  public int getDataBlockVersionType() {
-    return VERSION + (Type.METADATA.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+  public Type getDataBlockType() {
+    return Type.METADATA;
   }
 
   @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
-    throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
+    throw new UnsupportedOperationException("Not supported in metadata block");
   }
 
   @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof MetadataBlock)) {
-      return false;
-    }
-    MetadataBlock that = (MetadataBlock) o;
-    return Objects.equals(_statsByStage, that._statsByStage)
-        && _errCodeToExceptionMap.equals(that._errCodeToExceptionMap);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(_statsByStage, _errCodeToExceptionMap);
+  protected int getFixDataSize() {
+    return 0;
   }
 
   public enum MetadataBlockType {

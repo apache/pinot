@@ -26,6 +26,7 @@ import org.apache.pinot.common.response.ProcessingException;
 
 
 // TODO: Clean up ProcessingException (thrift) because we don't send it through the wire
+// TODO: Rename this class to QueryExceptionUtil because it doesn't extend Exception
 public class QueryException {
   private QueryException() {
   }
@@ -53,6 +54,7 @@ public class QueryException {
   public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
+  public static final int TABLE_IS_DISABLED_ERROR_CODE = 191;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
   public static final int QUERY_CANCELLATION_ERROR_CODE = 503;
   // TODO: Handle these errors in broker
@@ -95,6 +97,8 @@ public class QueryException {
       new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
   public static final ProcessingException TABLE_DOES_NOT_EXIST_ERROR =
       new ProcessingException(TABLE_DOES_NOT_EXIST_ERROR_CODE);
+  public static final ProcessingException TABLE_IS_DISABLED_ERROR =
+      new ProcessingException(TABLE_IS_DISABLED_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
   public static final ProcessingException QUERY_CANCELLATION_ERROR =
       new ProcessingException(QUERY_CANCELLATION_ERROR_CODE);
@@ -146,6 +150,7 @@ public class QueryException {
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
+    TABLE_IS_DISABLED_ERROR.setMessage("TableIsDisabledError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
     QUERY_CANCELLATION_ERROR.setMessage("QueryCancellationError");
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
@@ -230,6 +235,7 @@ public class QueryException {
       case QueryException.SQL_PARSING_ERROR_CODE:
       case QueryException.TOO_MANY_REQUESTS_ERROR_CODE:
       case QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE:
+      case QueryException.TABLE_IS_DISABLED_ERROR_CODE:
       case QueryException.UNKNOWN_COLUMN_ERROR_CODE:
         return true;
       default:

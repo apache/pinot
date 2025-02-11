@@ -60,7 +60,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
 
   // Double underscore is reserved for real-time segment name delimiter
-  private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
+  public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
 
   /* MANDATORY FIELDS */
 
@@ -77,10 +77,9 @@ public class TableConfig extends BaseJsonConfig {
   private TenantConfig _tenantConfig;
   private IndexingConfig _indexingConfig;
 
-  // TODO: Make TableCustomConfig optional and use another key other than 'metadata'
-  private TableCustomConfig _customConfig;
-
   /* OPTIONAL FIELDS */
+
+  private TableCustomConfig _customConfig;
 
   @JsonPropertyDescription("Resource quota associated with this table")
   private QuotaConfig _quotaConfig;
@@ -96,7 +95,7 @@ public class TableConfig extends BaseJsonConfig {
   private Map<String, SegmentAssignmentConfig> _segmentAssignmentConfigMap;
   private List<FieldConfig> _fieldConfigList;
 
-  @JsonPropertyDescription(value = "upsert related config")
+  @JsonPropertyDescription(value = "Upsert related config")
   private UpsertConfig _upsertConfig;
 
   @JsonPropertyDescription(value = "Dedup related config")
@@ -121,7 +120,7 @@ public class TableConfig extends BaseJsonConfig {
       SegmentsValidationAndRetentionConfig validationConfig,
       @JsonProperty(value = TENANT_CONFIG_KEY, required = true) TenantConfig tenantConfig,
       @JsonProperty(value = INDEXING_CONFIG_KEY, required = true) IndexingConfig indexingConfig,
-      @JsonProperty(value = CUSTOM_CONFIG_KEY, required = true) TableCustomConfig customConfig,
+      @JsonProperty(value = CUSTOM_CONFIG_KEY) TableCustomConfig customConfig,
       @JsonProperty(QUOTA_CONFIG_KEY) @Nullable QuotaConfig quotaConfig,
       @JsonProperty(TASK_CONFIG_KEY) @Nullable TableTaskConfig taskConfig,
       @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig,
@@ -147,7 +146,6 @@ public class TableConfig extends BaseJsonConfig {
     Preconditions.checkArgument(validationConfig != null, "'segmentsConfig' must be configured");
     Preconditions.checkArgument(tenantConfig != null, "'tenants' must be configured");
     Preconditions.checkArgument(indexingConfig != null, "'tableIndexConfig' must be configured");
-    Preconditions.checkArgument(customConfig != null, "'metadata' must be configured");
 
     // NOTE: Handle lower case table type and raw table name for backward-compatibility
     _tableType = TableType.valueOf(tableType.toUpperCase());
@@ -203,6 +201,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setTableName(String tableNameWithType) {
+    Preconditions.checkArgument(tableNameWithType != null, "'tableName' must be configured");
     _tableName = tableNameWithType;
   }
 
@@ -222,6 +221,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setValidationConfig(SegmentsValidationAndRetentionConfig validationConfig) {
+    Preconditions.checkArgument(validationConfig != null, "'segmentsConfig' must be configured");
     _validationConfig = validationConfig;
   }
 
@@ -231,6 +231,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setTenantConfig(TenantConfig tenantConfig) {
+    Preconditions.checkArgument(tenantConfig != null, "'tenants' must be configured");
     _tenantConfig = tenantConfig;
   }
 
@@ -240,12 +241,13 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setIndexingConfig(IndexingConfig indexingConfig) {
+    Preconditions.checkArgument(indexingConfig != null, "'tableIndexConfig' must be configured");
     _indexingConfig = indexingConfig;
   }
 
   @JsonProperty(CUSTOM_CONFIG_KEY)
   public TableCustomConfig getCustomConfig() {
-    return _customConfig;
+    return (_customConfig == null) ? new TableCustomConfig(Map.of()) : _customConfig;
   }
 
   public void setCustomConfig(TableCustomConfig customConfig) {

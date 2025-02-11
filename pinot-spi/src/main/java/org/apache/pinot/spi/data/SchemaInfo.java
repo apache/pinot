@@ -40,6 +40,9 @@ public class SchemaInfo {
   @JsonProperty("numMetricFields")
   private int _numMetricFields;
 
+  @JsonProperty("numComplexFields")
+  private int _numComplexFields;
+
   public String getSchemaName() {
     return _schemaName;
   }
@@ -56,6 +59,10 @@ public class SchemaInfo {
     return _numMetricFields;
   }
 
+  public int getNumComplexFields() {
+    return _numComplexFields;
+  }
+
   public SchemaInfo() {
   }
 
@@ -66,5 +73,6 @@ public class SchemaInfo {
     _numDimensionFields = schema.getDimensionFieldSpecs().size() - 3;
     _numDateTimeFields = schema.getDateTimeFieldSpecs().size();
     _numMetricFields = schema.getMetricFieldSpecs().size();
+    _numComplexFields = schema.getComplexFieldSpecs().size();
   }
 }

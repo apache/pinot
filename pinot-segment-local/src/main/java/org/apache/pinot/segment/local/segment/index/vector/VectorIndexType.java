@@ -21,14 +21,11 @@ package org.apache.pinot.segment.local.segment.index.vector;
 import com.clearspring.analytics.util.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.vector.MutableVectorIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.VectorIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.vector.HnswVectorIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -48,6 +45,7 @@ import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -58,8 +56,7 @@ import org.apache.pinot.spi.data.Schema;
  * Currently only supports for float array columns and the supported vector index type is: HNSW.
  *
  */
-public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<VectorIndexConfig> {
+public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "vector";
 
   protected VectorIndexType() {
@@ -69,11 +66,6 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public Class<VectorIndexConfig> getIndexConfigClass() {
     return VectorIndexConfig.class;
-  }
-
-  @Override
-  public Map<String, VectorIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getVectorIndexConfigs();
   }
 
   @Override
@@ -88,32 +80,20 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public ColumnConfigDeserializer<VectorIndexConfig> createDeserializer() {
-
-    // reads tableConfig.indexingConfig.jsonIndexColumns
-    ColumnConfigDeserializer<VectorIndexConfig> fromVectorIndexCols =
-        IndexConfigDeserializer.fromCollection(
-            tableConfig -> tableConfig.getIndexingConfig().getVectorIndexColumns(),
-            (accum, column) -> accum.put(column, new VectorIndexConfig(new HashMap<>())));
-
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(fromVectorIndexCols));
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
+        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
+            (tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties())));
   }
 
   @Override
   public VectorIndexCreator createIndexCreator(IndexCreationContext context, VectorIndexConfig indexConfig)
       throws IOException {
-    Preconditions.checkState(context.getFieldSpec().getDataType() == FieldSpec.DataType.FLOAT
-            && !context.getFieldSpec().isSingleValueField(),
-        "Vector index is currently only supported on float array columns");
-
-    switch (IndexType.valueOf(indexConfig.getVectorIndexType())) {
-      case HNSW:
-        return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
-      // TODO: Support more vector index types.
-      default:
-        throw new UnsupportedOperationException("Unsupported vector index type: " + indexConfig.getVectorIndexType());
-    }
+    Preconditions.checkState(context.getFieldSpec().getDataType() == FieldSpec.DataType.FLOAT && !context.getFieldSpec()
+        .isSingleValueField(), "Vector index is currently only supported on float array columns");
+    // TODO: Support more vector index types.
+    Preconditions.checkState("HNSW".equals(indexConfig.getVectorIndexType()),
+        "Unsupported vector index type: %s, only 'HNSW' is support", indexConfig.getVectorIndexType());
+    return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
   }
 
   @Override
@@ -130,7 +110,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return List.of(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION,
-        V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION);
+        V1Constants.Indexes.VECTOR_V99_INDEX_FILE_EXTENSION,
+        V1Constants.Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
   }
 
   private static class ReaderFactory implements IndexReaderFactory<VectorIndexReader> {
@@ -143,7 +124,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
     @Override
     public VectorIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-        throws IOException, IndexReaderConstraintException {
+        throws IndexReaderConstraintException {
       if (metadata.getDataType() != FieldSpec.DataType.FLOAT || metadata.getFieldSpec().isSingleValueField()) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.vector(),
             "HNSW Vector index is currently only supported on float array type columns");

@@ -61,9 +61,11 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -111,8 +113,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    QueryEnvironment.QueryPlannerResult queryPlannerResult =
-        _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    QueryEnvironment.QueryPlannerResult queryPlannerResult = _queryEnvironment.planQuery(sql, sqlNodeAndOptions,
+        requestId);
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
@@ -133,7 +135,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
-        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap));
+        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
+            requestMetadataMap));
       }
     }
     try {
@@ -155,20 +158,22 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
-      int stageId, Map<String, String> requestMetadataMap) {
+      long requestId, int stageId, Map<String, String> requestMetadataMap) {
     DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(stageId);
     List<WorkerMetadata> stageWorkerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
         .entrySet()) {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
+      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
+      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
       StageMetadata stageMetadata =
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext));
       }
     }
     return submissionStubs;
@@ -555,6 +560,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<String> _partitionColumns;
       @JsonProperty("partitionCount")
       public Integer _partitionCount;
+      @JsonProperty("replicated")
+      public boolean _replicated;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -53,11 +53,13 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
@@ -95,6 +97,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -106,6 +109,7 @@ import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -114,6 +118,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.MAP;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
 
@@ -145,6 +150,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
+  private boolean _indexCapacityThresholdBreached;
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
@@ -156,6 +162,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
+  private final Collection<ComplexFieldSpec> _physicalComplexFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -226,6 +233,7 @@ public class MutableSegmentImpl implements MutableSegment {
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
     List<String> physicalTimeColumnNames = new ArrayList<>();
+    List<ComplexFieldSpec> physicalComplexFieldSpecs = new ArrayList<>();
 
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -237,6 +245,8 @@ public class MutableSegmentImpl implements MutableSegment {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         } else if (fieldType == FieldSpec.FieldType.DATE_TIME || fieldType == FieldSpec.FieldType.TIME) {
           physicalTimeColumnNames.add(fieldSpec.getName());
+        } else if (fieldType == FieldSpec.FieldType.COMPLEX) {
+          physicalComplexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         }
       }
     }
@@ -244,6 +254,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _physicalDimensionFieldSpecs = Collections.unmodifiableCollection(physicalDimensionFieldSpecs);
     _physicalMetricFieldSpecs = Collections.unmodifiableCollection(physicalMetricFieldSpecs);
     _physicalTimeColumnNames = Collections.unmodifiableCollection(physicalTimeColumnNames);
+    _physicalComplexFieldSpecs = Collections.unmodifiableCollection(physicalComplexFieldSpecs);
 
     _numKeyColumns = _physicalDimensionFieldSpecs.size() + _physicalTimeColumnNames.size();
 
@@ -436,6 +447,9 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
+    if (dataType == DataType.MAP) {
+      return true;
+    }
     if (indexConfigs == null) {
       return false;
     }
@@ -512,6 +526,13 @@ public class MutableSegmentImpl implements MutableSegment {
         return true;
       }
     }
+
+    // Validate the length of each multi-value to ensure it can be properly stored in the underlying forward index.
+    // If the length of any MV column exceeds the capacity of a chunk in the forward index, an exception is thrown.
+    // If an exception is not thrown, it leads to a mismatch in the number of values in the MV column compared to
+    // other columns when sealing the segment (due to the overflow), causing the sealing process to fail.
+    // NOTE: We must do this before we index a single column to avoid partially indexing the row
+    validateLengthOfMVColumns(row);
 
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
@@ -632,6 +653,34 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
     return new ComparisonColumns(comparisonValues, comparableIndex);
   }
+
+  /**
+   * @param row
+   * @throws UnsupportedOperationException if the length of an MV column would exceed the
+   * capacity of a chunk in the ForwardIndex
+   */
+  private void validateLengthOfMVColumns(GenericRow row) throws UnsupportedOperationException {
+    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      IndexContainer indexContainer = entry.getValue();
+      FieldSpec fieldSpec = indexContainer._fieldSpec;
+      MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
+      if (fieldSpec.isSingleValueField() || !(forwardIndex instanceof FixedByteMVMutableForwardIndex)) {
+        continue;
+      }
+
+      Object[] values = (Object[]) row.getValue(entry.getKey());
+      // Note that max chunk capacity is derived from "FixedByteMVMutableForwardIndex._maxNumberOfMultiValuesPerRow"
+      // which is set to "1000" in "ForwardIndexType.MAX_MULTI_VALUES_PER_ROW". If the number of values in the
+      // multi-value entry that we are attempting to ingest is greater than the maximum accepted value, we throw an
+      // UnsupportedOperationException.
+      int maxChunkCapacity = ((FixedByteMVMutableForwardIndex) forwardIndex).getMaxChunkCapacity();
+      if (values.length > maxChunkCapacity) {
+        throw new UnsupportedOperationException(
+            "Length of MV column " + entry.getKey() + " is longer than ForwardIndex's capacity per chunk.");
+      }
+    }
+  }
+
 
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -754,6 +803,8 @@ public class MutableSegmentImpl implements MutableSegment {
             Comparable comparable;
             if (dataType == BYTES) {
               comparable = new ByteArray((byte[]) value);
+            } else if (dataType == MAP) {
+              comparable = new ByteArray(MapUtils.serializeMap((Map) value));
             } else {
               comparable = (Comparable) value;
             }
@@ -778,7 +829,20 @@ public class MutableSegmentImpl implements MutableSegment {
         Object[] values = (Object[]) value;
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
-            indexEntry.getValue().add(values, dictIds, docId);
+            MutableIndex mutableIndex = indexEntry.getValue();
+            mutableIndex.add(values, dictIds, docId);
+            // Few of the Immutable version of the mutable index are bounded by size like FixedBitMVForwardIndex.
+            // If num of values overflows or size is above limit, A mutable index is unable to convert to
+            // an immutable index and segment build fails causing the realtime consumption to stop.
+            // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
+            // implementations are changed.
+            if (!_indexCapacityThresholdBreached && !mutableIndex.canAddMore()) {
+              _logger.info(
+                  "Index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
+                  indexEntry.getKey(), column
+              );
+              _indexCapacityThresholdBreached = true;
+            }
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
@@ -1215,6 +1279,10 @@ public class MutableSegmentImpl implements MutableSegment {
     return _recordIdMap != null;
   }
 
+  public boolean canAddMore() {
+    return !_indexCapacityThresholdBreached;
+  }
+
   // NOTE: Okay for single-writer
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   private static class ValuesInfo {
@@ -1314,7 +1382,8 @@ public class MutableSegmentImpl implements MutableSegment {
           "aggregator function argument must be a identifier: %s", config);
 
       columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
-          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
+          ValueAggregatorFactory.getValueAggregator(functionType,
+              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
     }
 
     return columnNameToAggregator;
@@ -1362,6 +1431,12 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     DataSource toDataSource() {
+      if (_fieldSpec.getDataType() == MAP) {
+        return new MutableMapDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
+            _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
+            _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
+            _valuesInfo._varByteMVMaxRowLengthInBytes);
+      }
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
           _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
           _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,

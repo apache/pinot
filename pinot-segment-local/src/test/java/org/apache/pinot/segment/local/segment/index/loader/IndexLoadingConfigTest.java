@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -38,9 +41,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class IndexLoadingConfigTest {
@@ -57,6 +58,7 @@ public class IndexLoadingConfigTest {
             .addSingleValueDimension("col2", FieldSpec.DataType.STRING).build();
     // On the default tier, both are dict-encoded. col1 has inverted index as set in `tableIndexConfig` and col2 has
     // bloom filter as configured with `fieldConfigList`; and there is one ST index built with col1.
+    //@formatter:off
     String col2CfgStr = "{"
         + "  \"name\": \"col2\","
         + "  \"indexes\": {"
@@ -69,6 +71,7 @@ public class IndexLoadingConfigTest {
         + "  \"functionColumnPairs\": [\"MAX__col1\"],"
         + "  \"maxLeafRecords\": 10"
         + "}";
+    //@formatter:on
     StarTreeIndexConfig stIdxCfg = JsonUtils.stringToObject(stIdxCfgStr, StarTreeIndexConfig.class);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList("col1"))
@@ -100,6 +103,7 @@ public class IndexLoadingConfigTest {
     // On the default tier, both are dict-encoded. col1 has inverted index as set in `tableIndexConfig` and col2 has
     // bloom filter as configured with `fieldConfigList`; and there is one ST index built with col1.
     // On the coldTier, we overwrite col1 to use bloom filter only and col2 to use raw encoding w/o any index.
+    //@formatter:off
     String col1CfgStr = "{"
         + "  \"name\": \"col1\","
         + "  \"indexes\": {"
@@ -132,6 +136,7 @@ public class IndexLoadingConfigTest {
         + "  \"functionColumnPairs\": [\"MAX__col1\"],"
         + "  \"maxLeafRecords\": 10"
         + "}";
+    //@formatter:on
     StarTreeIndexConfig stIdxCfg = JsonUtils.stringToObject(stIdxCfgStr, StarTreeIndexConfig.class);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Collections.singletonList(stIdxCfg))
@@ -150,5 +155,95 @@ public class IndexLoadingConfigTest {
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+  }
+
+  @Test
+  public void testCalculateForwardIndexConfig()
+      throws JsonProcessingException {
+    // Check default settings
+    //@formatter:off
+    String col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"indexes\": {"
+        + "    \"forward\": {}"
+        + "  }"
+        + "}";
+    //@formatter:on
+    FieldConfig col1Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(List.of(col1Cfg)).build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    FieldIndexConfigs indexConfigs = indexLoadingConfig.getFieldIndexConfig("col1");
+    assertNotNull(indexConfigs);
+    ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    assertTrue(forwardIndexConfig.isEnabled());
+    assertNull(forwardIndexConfig.getCompressionCodec());
+    assertFalse(forwardIndexConfig.isDeriveNumDocsPerChunk());
+    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
+    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
+
+    // Check custom settings
+    //@formatter:off
+    col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"indexes\": {"
+        + "    \"forward\": {"
+        + "      \"compressionCodec\": \"SNAPPY\","
+        + "      \"deriveNumDocsPerChunk\": true,"
+        + "      \"rawIndexWriterVersion\": 4,"
+        + "      \"targetMaxChunkSize\": \"100K\","
+        + "      \"targetDocsPerChunk\": 100"
+        + "    }"
+        + "  }"
+        + "}";
+    //@formatter:on
+    col1Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(List.of(col1Cfg)).build();
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    indexConfigs = indexLoadingConfig.getFieldIndexConfig("col1");
+    assertNotNull(indexConfigs);
+    forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    assertTrue(forwardIndexConfig.isEnabled());
+    assertEquals(forwardIndexConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
+    assertTrue(forwardIndexConfig.isDeriveNumDocsPerChunk());
+    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), 4);
+    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), "100K");
+    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), 100);
+
+    // Check disabled settings
+    //@formatter:off
+    col1CfgStr = "{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"indexes\": {"
+        + "    \"forward\": {"
+        + "      \"disabled\": true"
+        + "    }"
+        + "  }"
+        + "}";
+    //@formatter:on
+    col1Cfg = JsonUtils.stringToObject(col1CfgStr, FieldConfig.class);
+    tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(List.of(col1Cfg)).build();
+    indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    indexConfigs = indexLoadingConfig.getFieldIndexConfig("col1");
+    assertNotNull(indexConfigs);
+    forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
+    assertFalse(forwardIndexConfig.isEnabled());
+    assertNull(forwardIndexConfig.getCompressionCodec());
+    assertFalse(forwardIndexConfig.isDeriveNumDocsPerChunk());
+    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
+    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 }

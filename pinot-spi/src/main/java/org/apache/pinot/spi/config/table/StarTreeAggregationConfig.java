@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -31,6 +32,7 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 public class StarTreeAggregationConfig extends BaseJsonConfig {
   private final String _columnName;
   private final String _aggregationFunction;
+  private final Map<String, Object> _functionParameters;
   private final CompressionCodec _compressionCodec;
   private final Boolean _deriveNumDocsPerChunk;
   private final Integer _indexVersion;
@@ -40,12 +42,13 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
 
   @VisibleForTesting
   public StarTreeAggregationConfig(String columnName, String aggregationFunction) {
-    this(columnName, aggregationFunction, null, null, null, null, null);
+    this(columnName, aggregationFunction, null, null, null, null, null, null);
   }
 
   @JsonCreator
   public StarTreeAggregationConfig(@JsonProperty(value = "columnName", required = true) String columnName,
       @JsonProperty(value = "aggregationFunction", required = true) String aggregationFunction,
+      @JsonProperty(value = "functionParameters") @Nullable Map<String, Object> functionParameters,
       @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty(value = "deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
       @JsonProperty(value = "indexVersion") @Nullable Integer indexVersion,
@@ -53,6 +56,7 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
       @JsonProperty(value = "targetDocsPerChunk") @Nullable Integer targetDocsPerChunk) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
+    _functionParameters = functionParameters;
     _compressionCodec = compressionCodec;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk;
     _indexVersion = indexVersion;
@@ -67,6 +71,11 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
 
   public String getAggregationFunction() {
     return _aggregationFunction;
+  }
+
+  @Nullable
+  public Map<String, Object> getFunctionParameters() {
+    return _functionParameters;
   }
 
   @Nullable

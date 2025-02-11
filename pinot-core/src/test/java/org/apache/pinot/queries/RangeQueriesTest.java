@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
@@ -41,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -93,6 +95,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
+  private Set<String> _noDictionaryColumns;
+  private Set<String> _rangeIndexColumns;
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -108,7 +113,6 @@ public class RangeQueriesTest extends BaseQueriesTest {
       record.putValue(RAW_DOUBLE_COL, (double) intValue);
       records.add(record);
     }
-
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
@@ -118,14 +122,25 @@ public class RangeQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setRangeIndexColumns(
-        new HashSet<>(Arrays.asList(DICTIONARIZED_INT_COL, RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL)));
+    _noDictionaryColumns = new HashSet<>(Arrays.asList(RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
+    _rangeIndexColumns =
+        new HashSet<>(Arrays.asList(DICTIONARIZED_INT_COL, RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
 
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+  }
+
+  private IndexLoadingConfig createIndexLoadingConfig() {
+    return new IndexLoadingConfig(createTableConfig(), SCHEMA);
+  }
+
+  private TableConfig createTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
+        .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns)).build();
   }
 
   @DataProvider
@@ -300,8 +315,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
   public void testSelectionOverRangeFilterAfterReload(String query, int min, int max, boolean inclusive)
       throws Exception {
     // Enable dictionary on RAW_INT_COL and reload the segment.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
-    indexLoadingConfig.removeNoDictionaryColumns(RAW_INT_COL);
+    _noDictionaryColumns.remove(RAW_INT_COL);
+    IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
+
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
     ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
     _indexSegment = immutableSegment;
@@ -315,9 +331,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
       assertTrue(inclusive ? value <= max : value < max);
     }
 
+    _noDictionaryColumns.remove(RAW_DOUBLE_COL);
     // Enable dictionary on RAW_DOUBLE_COL and reload the segment.
-    indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
-    indexLoadingConfig.removeNoDictionaryColumns(RAW_DOUBLE_COL);
+    indexLoadingConfig = createIndexLoadingConfig();
     indexDir = new File(INDEX_DIR, SEGMENT_NAME);
     immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
     _indexSegment = immutableSegment;
@@ -346,8 +362,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
   public void testCountOverRangeFilterAfterReload(String query, int expectedCount)
       throws Exception {
     // Enable dictionary on RAW_LONG_COL and reload the segment.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
-    indexLoadingConfig.removeNoDictionaryColumns(RAW_LONG_COL);
+    _noDictionaryColumns.remove(RAW_LONG_COL);
+
+    IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
     ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
     _indexSegment = immutableSegment;
@@ -361,8 +378,8 @@ public class RangeQueriesTest extends BaseQueriesTest {
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
 
     // Enable dictionary on RAW_FLOAT_COL and reload the segment.
-    indexLoadingConfig = new IndexLoadingConfig(null, TABLE_CONFIG);
-    indexLoadingConfig.removeNoDictionaryColumns(RAW_FLOAT_COL);
+    _noDictionaryColumns.remove(RAW_FLOAT_COL);
+    indexLoadingConfig = createIndexLoadingConfig();
     immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
@@ -373,5 +390,11 @@ public class RangeQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _indexSegment.destroy();
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 }

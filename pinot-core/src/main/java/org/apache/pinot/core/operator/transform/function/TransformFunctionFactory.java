@@ -36,12 +36,15 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
+import org.apache.pinot.core.geospatial.transform.function.StAsGeoJsonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StEqualsFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeogFromGeoJsonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeogFromWKBFunction;
+import org.apache.pinot.core.geospatial.transform.function.StGeomFromGeoJsonFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromTextFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction;
 import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
@@ -161,6 +164,7 @@ public class TransformFunctionFactory {
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
@@ -180,8 +184,12 @@ public class TransformFunctionFactory {
     // geo constructors
     typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_TEXT, StGeogFromTextFunction.class);
     typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_WKB, StGeogFromWKBFunction.class);
+    typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_GEO_JSON, StGeogFromGeoJsonFunction.class);
+
     typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_TEXT, StGeomFromTextFunction.class);
     typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_WKB, StGeomFromWKBFunction.class);
+    typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_GEO_JSON, StGeomFromGeoJsonFunction.class);
+
     typeToImplementation.put(TransformFunctionType.ST_POINT, StPointFunction.class);
     typeToImplementation.put(TransformFunctionType.ST_POLYGON, StPolygonFunction.class);
 
@@ -193,6 +201,7 @@ public class TransformFunctionFactory {
     // geo outputs
     typeToImplementation.put(TransformFunctionType.ST_AS_BINARY, StAsBinaryFunction.class);
     typeToImplementation.put(TransformFunctionType.ST_AS_TEXT, StAsTextFunction.class);
+    typeToImplementation.put(TransformFunctionType.ST_AS_GEO_JSON, StAsGeoJsonFunction.class);
 
     // geo relationship
     typeToImplementation.put(TransformFunctionType.ST_CONTAINS, StContainsFunction.class);
@@ -239,6 +248,12 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.L2_DISTANCE, L2DistanceTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
+
+    // Item functions
+    typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
+
+    // Time Series functions
+    typeToImplementation.put(TransformFunctionType.TIME_SERIES_BUCKET, TimeSeriesBucketTransformFunction.class);
 
     Map<String, Class<? extends TransformFunction>> registry =
         new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));

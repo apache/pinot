@@ -118,6 +118,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       _indexFile = getV1TextIndexFile(segmentIndexDir);
 
+      // write properties file for the immutable segment
+      if (_commitOnClose) {
+        TextIndexUtils.writeConfigToPropertiesFile(_indexFile, config);
+      }
+
       Analyzer luceneAnalyzer = TextIndexUtils.getAnalyzer(config);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
@@ -348,14 +353,14 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 
   private File getMutableIndexDir(File indexDir, File consumerDir) {
     String segmentName = getSegmentName(indexDir);
     return new File(new File(consumerDir, segmentName),
-        _textColumn + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION);
+        _textColumn + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
   }
 
   private String getSegmentName(File indexDir) {

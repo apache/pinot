@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -35,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
+import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.lang3.StringUtils;
@@ -48,6 +50,8 @@ public class CommonsConfigurationUtils {
   // the value is same of PropertiesConfiguration `DEFAULT_SEPARATOR` constant.
   public static final String VERSIONED_CONFIG_SEPARATOR = " = ";
   private static final Character DEFAULT_LIST_DELIMITER = ',';
+  private static final ListDelimiterHandler DEFAULT_LIST_DELIMITER_HANDLER =
+      new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER);
   public static final String VERSION_HEADER_IDENTIFIER = "version";
 
   // usage: default header version of all configurations.
@@ -372,7 +376,7 @@ public class CommonsConfigurationUtils {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
         String fileFirstLine = reader.readLine();
         // header version is written as a comment and start with '# '
-        String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
+        String versionHeaderCommentPrefix = "# " + VERSION_HEADER_IDENTIFIER;
         // check whether the file has the version header or not
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
           String[] headerKeyValue = StringUtils.splitByWholeSeparator(fileFirstLine, VERSIONED_CONFIG_SEPARATOR, 2);
@@ -391,6 +395,20 @@ public class CommonsConfigurationUtils {
   // Returns the version header string based on the version header value provided.
   // The return statement follow the pattern 'version = <value>'
   static String getVersionHeaderString(String versionHeaderValue) {
-    return String.format("%s%s%s", VERSION_HEADER_IDENTIFIER, VERSIONED_CONFIG_SEPARATOR, versionHeaderValue);
+    return VERSION_HEADER_IDENTIFIER + VERSIONED_CONFIG_SEPARATOR + versionHeaderValue;
+  }
+
+  /**
+   * Get the {@link PropertiesConfiguration.PropertiesWriter} from the provided generic writer. PropertiesWriter
+   * ensures properties are written correctly with default delimiter/separators.
+   * <p>
+   * This method is useful when writing is done incrementally and modifying a PropertiesConfiguration instance
+   * is not ideal.
+   */
+  public static PropertiesConfiguration.PropertiesWriter getPropertiesWriterFromWriter(Writer writer) {
+    PropertiesConfiguration.PropertiesWriter propertiesWriter =
+        new PropertiesConfiguration.PropertiesWriter(writer, DEFAULT_LIST_DELIMITER_HANDLER);
+    propertiesWriter.setGlobalSeparator(VERSIONED_CONFIG_SEPARATOR);
+    return propertiesWriter;
   }
 }

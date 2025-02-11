@@ -18,18 +18,23 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -60,7 +65,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
+  static void walkPlanNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
 
@@ -68,19 +73,32 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      if (pinotQuery.getGroupByList() == null) {
-        List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
+      List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
+      if (!groupByList.isEmpty()) {
         pinotQuery.setGroupByList(groupByList);
-        pinotQuery.setSelectList(
-            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
-                pinotQuery));
-        if (node.getAggType() == AggregateNode.AggType.DIRECT) {
-          pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
-              "true");
-        }
-        // there cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
-        context.setLeafStageBoundaryNode(node);
       }
+      List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
+          node.getFilterArgs(), pinotQuery);
+      for (Expression expression : selectList) {
+        applyTimestampIndex(expression, pinotQuery);
+      }
+      pinotQuery.setSelectList(selectList);
+      if (node.getAggType() == AggregateNode.AggType.DIRECT) {
+        pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+      } else if (node.isLeafReturnFinalResult()) {
+        pinotQuery.putToQueryOptions(
+            CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
+      }
+      int limit = node.getLimit();
+      if (limit > 0) {
+        List<RelFieldCollation> collations = node.getCollations();
+        if (!collations.isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
+        }
+        pinotQuery.setLimit(limit);
+      }
+      // There cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
+      context.setLeafStageBoundaryNode(node);
     }
     return null;
   }
@@ -113,7 +131,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
-        pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery));
+        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery);
+        applyTimestampIndex(expression, pinotQuery);
+        pinotQuery.setFilterExpression(expression);
       } else {
         // if filter is already applied then it cannot have another one on leaf.
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
@@ -124,28 +144,39 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
-    // visit only the static side, turn the dynamic side into a lookup from the pipeline breaker resultDataContainer
-    PlanNode staticSide = node.getInputs().get(0);
-    PlanNode dynamicSide = node.getInputs().get(1);
-    if (staticSide instanceof MailboxReceiveNode) {
-      dynamicSide = node.getInputs().get(0);
-      staticSide = node.getInputs().get(1);
-    }
-    if (visit(staticSide, context)) {
-      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
-      int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
-      List<TransferableBlock> transferableBlocks =
-          pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
-      List<Object[]> resultDataContainer = new ArrayList<>();
-      DataSchema dataSchema = dynamicSide.getDataSchema();
-      for (TransferableBlock block : transferableBlocks) {
-        if (block.getType() == DataBlock.Type.ROW) {
-          resultDataContainer.addAll(block.getContainer());
+    // We can reach here for dynamic broadcast SEMI join and lookup join.
+    List<PlanNode> inputs = node.getInputs();
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+
+    if (right instanceof MailboxReceiveNode
+        && ((MailboxReceiveNode) right).getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
+      // For dynamic broadcast SEMI join, right child should be a PIPELINE_BREAKER exchange. Visit the left child and
+      // attach the dynamic filter to the query.
+      if (visit(left, context)) {
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
+        List<TransferableBlock> transferableBlocks =
+            pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<Object[]> resultDataContainer = new ArrayList<>();
+        DataSchema dataSchema = right.getDataSchema();
+        for (TransferableBlock block : transferableBlocks) {
+          if (block.getType() == DataBlock.Type.ROW) {
+            resultDataContainer.addAll(block.getContainer());
+          }
         }
+        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+            resultDataContainer, dataSchema);
       }
-      ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
-          resultDataContainer, dataSchema);
+    } else {
+      // For lookup join, visit the right child and set it as the leaf boundary.
+      Preconditions.checkState(node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP,
+          "Leaf stage should not visit regular JoinNode");
+      if (visit(right, context)) {
+        context.setLeafStageBoundaryNode(right);
+      }
     }
+
     return null;
   }
 
@@ -166,7 +197,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery));
+      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery);
+      for (Expression expression : selectList) {
+        applyTimestampIndex(expression, pinotQuery);
+      }
+      pinotQuery.setSelectList(selectList);
     }
     return null;
   }
@@ -176,8 +211,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getOrderByList() == null) {
-        if (!node.getCollations().isEmpty()) {
-          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
+        List<RelFieldCollation> collations = node.getCollations();
+        if (!collations.isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
         }
         if (node.getFetch() >= 0) {
           pinotQuery.setLimit(node.getFetch());
@@ -214,8 +250,23 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
   }
 
+  @Override
+  public Void visitExplained(ExplainedNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ExplainedNode!");
+  }
+
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {
     node.visit(this, context);
     return context.getLeafStageBoundaryNode() == null;
+  }
+
+  private void applyTimestampIndex(Expression expression, PinotQuery pinotQuery) {
+    RequestUtils.applyTimestampIndexOverrideHints(expression, pinotQuery);
+    Function functionCall = expression.getFunctionCall();
+    if (expression.isSetFunctionCall()) {
+      for (Expression operand : functionCall.getOperands()) {
+        applyTimestampIndex(operand, pinotQuery);
+      }
+    }
   }
 }

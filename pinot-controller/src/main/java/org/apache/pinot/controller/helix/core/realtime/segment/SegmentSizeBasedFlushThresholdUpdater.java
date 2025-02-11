@@ -20,6 +20,8 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +38,15 @@ import org.slf4j.LoggerFactory;
 public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
   public static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
   private final SegmentFlushThresholdComputer _flushThresholdComputer;
+  private final String _realtimeTableName;
+  private final String _topicName;
 
-  public SegmentSizeBasedFlushThresholdUpdater() {
+  private final ControllerMetrics _controllerMetrics = ControllerMetrics.get();
+
+  public SegmentSizeBasedFlushThresholdUpdater(String realtimeTableName, String topicName) {
     _flushThresholdComputer = new SegmentFlushThresholdComputer();
+    _realtimeTableName = realtimeTableName;
+    _topicName = topicName;
   }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
@@ -50,5 +58,16 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
         _flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
             newSegmentZKMetadata.getSegmentName());
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
+
+    // metrics tagged with table only
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.NUM_ROWS_THRESHOLD, threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.COMMITTING_SEGMENT_SIZE,
+        committingSegmentDescriptor.getSegmentSizeBytes());
+
+    // metrics tagged with topic and table
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC, threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName,
+        ControllerGauge.COMMITTING_SEGMENT_SIZE_WITH_TOPIC, committingSegmentDescriptor.getSegmentSizeBytes());
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -29,29 +30,32 @@ import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 
 public class AggregationSpec {
   public static final CompressionCodec DEFAULT_COMPRESSION_CODEC = CompressionCodec.PASS_THROUGH;
-  public static final AggregationSpec DEFAULT = new AggregationSpec(null, null, null, null, null);
+  public static final AggregationSpec DEFAULT = new AggregationSpec(null, null, null, null, null, Map.of());
 
   private final CompressionCodec _compressionCodec;
   private final boolean _deriveNumDocsPerChunk;
   private final int _indexVersion;
   private final int _targetMaxChunkSizeBytes;
   private final int _targetDocsPerChunk;
+  private final Map<String, Object> _functionParameters;
 
   public AggregationSpec(StarTreeAggregationConfig aggregationConfig) {
     this(aggregationConfig.getCompressionCodec(), aggregationConfig.getDeriveNumDocsPerChunk(),
         aggregationConfig.getIndexVersion(), aggregationConfig.getTargetMaxChunkSizeBytes(),
-        aggregationConfig.getTargetDocsPerChunk());
+        aggregationConfig.getTargetDocsPerChunk(), aggregationConfig.getFunctionParameters());
   }
 
   public AggregationSpec(@Nullable CompressionCodec compressionCodec, @Nullable Boolean deriveNumDocsPerChunk,
-      @Nullable Integer indexVersion, @Nullable Integer targetMaxChunkSizeBytes, @Nullable Integer targetDocsPerChunk) {
-    _indexVersion = indexVersion != null ? indexVersion : ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION;
+      @Nullable Integer indexVersion, @Nullable Integer targetMaxChunkSizeBytes, @Nullable Integer targetDocsPerChunk,
+      @Nullable Map<String, Object> functionParameters) {
+    _indexVersion = indexVersion != null ? indexVersion : ForwardIndexConfig.getDefaultRawWriterVersion();
     _compressionCodec = compressionCodec != null ? compressionCodec : DEFAULT_COMPRESSION_CODEC;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null ? deriveNumDocsPerChunk : false;
     _targetMaxChunkSizeBytes = targetMaxChunkSizeBytes != null ? targetMaxChunkSizeBytes
-        : ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES;
+        : ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes();
     _targetDocsPerChunk =
-        targetDocsPerChunk != null ? targetDocsPerChunk : ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK;
+        targetDocsPerChunk != null ? targetDocsPerChunk : ForwardIndexConfig.getDefaultTargetDocsPerChunk();
+    _functionParameters = functionParameters == null ? Map.of() : functionParameters;
   }
 
   public CompressionCodec getCompressionCodec() {
@@ -74,6 +78,10 @@ public class AggregationSpec {
     return _targetDocsPerChunk;
   }
 
+  public Map<String, Object> getFunctionParameters() {
+    return _functionParameters;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -85,13 +93,13 @@ public class AggregationSpec {
     AggregationSpec that = (AggregationSpec) o;
     return _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk && _indexVersion == that._indexVersion
         && _targetMaxChunkSizeBytes == that._targetMaxChunkSizeBytes && _targetDocsPerChunk == that._targetDocsPerChunk
-        && _compressionCodec == that._compressionCodec;
+        && _compressionCodec == that._compressionCodec && Objects.equals(_functionParameters, that._functionParameters);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_compressionCodec, _deriveNumDocsPerChunk, _indexVersion, _targetMaxChunkSizeBytes,
-        _targetDocsPerChunk);
+        _targetDocsPerChunk, _functionParameters);
   }
 
   @Override
@@ -103,6 +111,7 @@ public class AggregationSpec {
         .append("indexVersion", _indexVersion)
         .append("targetMaxChunkSizeBytes", _targetMaxChunkSizeBytes)
         .append("targetDocsPerChunk", _targetDocsPerChunk)
+        .append("functionParameters", _functionParameters)
         .toString();
     //@formatter:on
   }

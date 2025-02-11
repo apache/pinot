@@ -31,6 +31,7 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -42,17 +43,18 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 
 /**
  * The <code>FieldSpec</code> class contains all specs related to any field (column) in {@link Schema}.
- * <p>There are 3 types of <code>FieldSpec</code>:
- * {@link DimensionFieldSpec}, {@link MetricFieldSpec}, {@link TimeFieldSpec}
  * <p>Specs stored are as followings:
- * <p>- <code>Name</code>: name of the field.
- * <p>- <code>DataType</code>: type of the data stored (e.g. INTEGER, LONG, FLOAT, DOUBLE, STRING).
- * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
- * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
- * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
- * <p>- <code>NotNull</code>: whether the column accepts nulls or not. Defaults to false.
- * <p>- <code>MaxLength</code>: the maximum length of the string column. Defaults to 512.
- * <p>- <code>MaxLengthExceedStrategy</code>: the strategy to handle the case when the string column exceeds the max
+ * <ul>
+ *   <li>"name": name of the field.</li>
+ *   <li>"dataType": type of the data stored (e.g. INTEGER, LONG, FLOAT, DOUBLE, STRING).</li>
+ *   <li>"singleValueField": single-value or multi-value field.</li>
+ *   <li>"notNull": whether the column accepts nulls or not. Defaults to false (accepts nulls).</li>
+ *   <li>"maxLength": maximum length of the column. Defaults to 512.</li>
+ *   <li>"maxLengthExceedStrategy": the strategy to handle the case when the column exceeds the max length.</li>
+ *   <li>"allowTrailingZeros": whether to allow trailing zeros for a BIG_DECIMAL column.</li>
+ *   <li>"defaultNullValue": when no value found for this field, use this value.</li>
+ *   <li>"virtualColumnProvider": the virtual column provider to use for this field.</li>
+ * </ul>
  */
 @SuppressWarnings("unused")
 @JsonTypeInfo(
@@ -126,14 +128,18 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   protected String _name;
   protected DataType _dataType;
-  protected boolean _isSingleValueField = true;
-  protected boolean _notNull = false;
+  protected boolean _singleValueField = true;
+  protected boolean _notNull;
 
-  // NOTE: This only applies to STRING column, which is the max number of characters
-  private int _maxLength = DEFAULT_MAX_LENGTH;
-
-  // NOTE: This only applies to STRING column during {@link SanitizationTransformer}
+  // Max length applies to STRING, JSON, BYTES columns, and is enforced in {@link SanitizationTransformer}.
+  protected int _maxLength = DEFAULT_MAX_LENGTH;
   protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
+
+  // Whether to allow trailing zeros for BIG_DECIMAL columns. Trailing zeros are stripped by default in
+  // {@link SpecialValueTransformer}. If this flag is set to true, trailing zeros will be preserved, and it is users'
+  // responsibility to ensure there are no big decimal values with same value but different trailing zeros. Read more
+  // about why trailing zeros need to be stripped in {@link SpecialValueTransformer}.
+  protected boolean _allowTrailingZeros;
 
   protected Object _defaultNullValue;
   private transient String _stringDefaultNullValue;
@@ -165,7 +171,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       @Nullable Object defaultNullValue, @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _name = name;
     _dataType = dataType;
-    _isSingleValueField = isSingleValueField;
+    _singleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
     _maxLengthExceedStrategy = maxLengthExceedStrategy;
@@ -193,12 +199,37 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public boolean isSingleValueField() {
-    return _isSingleValueField;
+    return _singleValueField;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
-    _isSingleValueField = isSingleValueField;
+    _singleValueField = isSingleValueField;
+  }
+
+  /**
+   * Returns whether the column is nullable or not.
+   */
+  @JsonIgnore
+  public boolean isNullable() {
+    return !_notNull;
+  }
+
+  /**
+   * @see #isNullable()
+   */
+  @JsonIgnore
+  public void setNullable(Boolean nullable) {
+    _notNull = !nullable;
+  }
+
+  public boolean isNotNull() {
+    return _notNull;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setNotNull(boolean notNull) {
+    _notNull = notNull;
   }
 
   public int getMaxLength() {
@@ -220,22 +251,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _maxLengthExceedStrategy = maxLengthExceedStrategy;
   }
 
-  public String getVirtualColumnProvider() {
-    return _virtualColumnProvider;
+  public boolean isAllowTrailingZeros() {
+    return _allowTrailingZeros;
   }
 
-  public void setVirtualColumnProvider(String virtualColumnProvider) {
-    _virtualColumnProvider = virtualColumnProvider;
-  }
-
-  /**
-   * Returns whether the column is virtual. Virtual columns are constructed while loading the segment, thus do not exist
-   * in the record, nor should be persisted to the disk.
-   * <p>Identify a column as virtual if the virtual column provider is configured.
-   */
-  @JsonIgnore
-  public boolean isVirtualColumn() {
-    return _virtualColumnProvider != null && !_virtualColumnProvider.isEmpty();
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setAllowTrailingZeros(boolean allowTrailingZeros) {
+    _allowTrailingZeros = allowTrailingZeros;
   }
 
   public Object getDefaultNullValue() {
@@ -248,7 +270,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   /**
    * Helper method to return the String value for the given object.
-   * This is required as not all data types have a toString() (eg byte[]).
+   * This is required as not all data types have a toString() (e.g. byte[]).
    *
    * @param value Value for which String value needs to be returned
    * @return String value for the object.
@@ -350,38 +372,32 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return _transformFunction;
   }
 
-  // Required by JSON de-serializer. DO NOT REMOVE.
-
   /**
    * Deprecated. Use TableConfig -> IngestionConfig -> TransformConfigs
    */
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Deprecated
   public void setTransformFunction(@Nullable String transformFunction) {
     _transformFunction = transformFunction;
   }
 
-  /**
-   * Returns whether the column is nullable or not.
-   */
-  @JsonIgnore
-  public boolean isNullable() {
-    return !_notNull;
+  public String getVirtualColumnProvider() {
+    return _virtualColumnProvider;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setVirtualColumnProvider(String virtualColumnProvider) {
+    _virtualColumnProvider = virtualColumnProvider;
   }
 
   /**
-   * @see #isNullable()
+   * Returns whether the column is virtual. Virtual columns are constructed while loading the segment, thus do not exist
+   * in the record, nor should be persisted to the disk.
+   * <p>Identify a column as virtual if the virtual column provider is configured.
    */
   @JsonIgnore
-  public void setNullable(Boolean nullable) {
-    _notNull = !nullable;
-  }
-
-  public boolean isNotNull() {
-    return _notNull;
-  }
-
-  public void setNotNull(boolean notNull) {
-    _notNull = notNull;
+  public boolean isVirtualColumn() {
+    return _virtualColumnProvider != null && !_virtualColumnProvider.isEmpty();
   }
 
   /**
@@ -394,15 +410,26 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     jsonObject.put("name", _name);
     jsonObject.put("dataType", _dataType.name());
     jsonObject.put("fieldType", getFieldType().toString());
-    if (!_isSingleValueField) {
+    if (!_singleValueField) {
       jsonObject.put("singleValueField", false);
+    }
+    if (_notNull) {
+      jsonObject.put("notNull", true);
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);
     }
+    if (_maxLengthExceedStrategy != null) {
+      jsonObject.put("maxLengthExceedStrategy", _maxLengthExceedStrategy.name());
+    }
+    if (_allowTrailingZeros) {
+      jsonObject.put("allowTrailingZeros", true);
+    }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
-    jsonObject.put("notNull", _notNull);
+    if (_virtualColumnProvider != null) {
+      jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
+    }
     return jsonObject;
   }
 
@@ -457,39 +484,31 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
   }
 
-  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+    if (this == o) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-
     FieldSpec that = (FieldSpec) o;
-    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
-        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
-        .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
-        && EqualityUtils.isEqual(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
-        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
-        && EqualityUtils.isEqual(_notNull, that._notNull);
+    return _name.equals(that._name)
+        && _dataType == that._dataType
+        && _singleValueField == that._singleValueField
+        && _notNull == that._notNull
+        && _maxLength == that._maxLength
+        && _maxLengthExceedStrategy == that._maxLengthExceedStrategy
+        && _allowTrailingZeros == that._allowTrailingZeros
+        && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
+        && Objects.equals(_transformFunction, that._transformFunction)
+        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider);
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(_name);
-    result = EqualityUtils.hashCodeOf(result, _dataType);
-    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
-    result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
-    result = EqualityUtils.hashCodeOf(result, _maxLength);
-    result = EqualityUtils.hashCodeOf(result, _maxLengthExceedStrategy);
-    result = EqualityUtils.hashCodeOf(result, _transformFunction);
-    result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
-    result = EqualityUtils.hashCodeOf(result, _notNull);
-    return result;
+    return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
+        _allowTrailingZeros, getStringValue(_defaultNullValue), _transformFunction, _virtualColumnProvider);
   }
 
   /**
@@ -629,7 +648,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             throw new IllegalStateException();
         }
       } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+        throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
 
@@ -721,7 +740,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             throw new IllegalStateException();
         }
       } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+        throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
 
@@ -748,10 +767,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * @return
    */
   public boolean isBackwardCompatibleWith(FieldSpec oldFieldSpec) {
-
     return EqualityUtils.isEqual(_name, oldFieldSpec._name)
         && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
-        && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
+        && EqualityUtils.isEqual(_singleValueField, oldFieldSpec._singleValueField);
   }
 
   public static class FieldSpecMetadata {

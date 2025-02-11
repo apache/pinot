@@ -365,7 +365,7 @@ public class ExpressionTransformerTest {
       expressionTransformer.transform(genericRow);
       Assert.fail();
     } catch (Exception e) {
-      Assert.assertEquals(e.getCause().getMessage(), "Caught exception while executing function: plus(x,'10')");
+      Assert.assertTrue(e.getCause().getMessage().contains("Caught exception while executing function"));
     }
   }
 

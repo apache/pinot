@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -72,7 +73,18 @@ public class ForwardIndexCreatorFactory {
       // Dictionary disabled columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
         return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      }
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
+        // Use the default chunk compression codec for CLP, currently configured to use ZStandard
+        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
+      }
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
+        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
+      }
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
+        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       }
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
       if (chunkCompressionType == null) {
@@ -112,6 +124,7 @@ public class ForwardIndexCreatorFactory {
       case BIG_DECIMAL:
       case STRING:
       case BYTES:
+      case MAP:
         return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
             lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize, targetDocsPerChunk);
       default:

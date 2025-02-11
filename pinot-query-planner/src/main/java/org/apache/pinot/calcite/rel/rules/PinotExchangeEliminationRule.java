@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
@@ -36,17 +37,14 @@ public class PinotExchangeEliminationRule extends RelOptRule {
       new PinotExchangeEliminationRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotExchangeEliminationRule(RelBuilderFactory factory) {
-    super(operand(PinotLogicalExchange.class,
-        some(operand(PinotLogicalExchange.class, some(operand(RelNode.class, any()))))), factory, null);
+    super(operand(Exchange.class, some(operand(Exchange.class, some(operand(RelNode.class, any()))))), factory, null);
   }
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    PinotLogicalExchange exchange0 = call.rel(0);
-    PinotLogicalExchange exchange1 = call.rel(1);
+    Exchange exchange0 = call.rel(0);
     RelNode input = call.rel(2);
     // convert the call to skip the exchange.
-    RelNode rel = exchange0.copy(input.getTraitSet(), Collections.singletonList(input));
-    call.transformTo(rel);
+    call.transformTo(exchange0.copy(input.getTraitSet(), List.of(input)));
   }
 }

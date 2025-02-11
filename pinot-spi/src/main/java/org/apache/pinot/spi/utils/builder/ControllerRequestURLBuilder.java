@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -117,7 +118,7 @@ public class ControllerRequestURLBuilder {
     if (StringUtils.isNotBlank(username)) {
       params.append("?component=" + componentTypeStr);
     }
-    params.append(String.format("&&passwordChanged=%s", passwordChanged));
+    params.append("&&passwordChanged=" + passwordChanged);
     return StringUtil.join("/", _baseUrl, "users", username, params.toString());
   }
 
@@ -170,8 +171,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTenantInstancesToggle(String tenant, String tenantType, String state) {
-    return StringUtil.join("/", _baseUrl, "tenants", tenant)
-        + "?type=" + tenantType + "&state=" + state;
+    return StringUtil.join("/", _baseUrl, "tenants", tenant) + "?type=" + tenantType + "&state=" + state;
   }
 
   public String forLiveBrokerTablesGet() {
@@ -235,13 +235,17 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReload(String tableName, TableType tableType, boolean forceDownload) {
-    String query = String.format("reload?type=%s&forceDownload=%s", tableType.name(), forceDownload);
+    String query = "reload?type=" + tableType.name() + "&forceDownload=" + forceDownload;
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
   public String forTableNeedReload(String tableNameWithType, boolean verbose) {
-    String query = String.format("needReload?verbose=%s", verbose);
+    String query = "needReload?verbose=" + verbose;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
+  }
+
+  public String forStaleSegments(String tableNameWithType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "isStale");
   }
 
   public String forTableRebalanceStatus(String jobId) {
@@ -249,7 +253,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableReset(String tableNameWithType, @Nullable String targetInstance) {
-    String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
+    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
@@ -295,6 +299,31 @@ public class ControllerRequestURLBuilder {
 
   public String forTableExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
+
+  public String forTableAggregateMetadata(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "metadata");
+  }
+
+  public String forTableAggregateMetadata(String tableName, @Nullable List<String> columns) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "metadata") + constructColumnsParameter(columns);
+  }
+
+  private String constructColumnsParameter(@Nullable List<String> columns) {
+    if (!CollectionUtils.isEmpty(columns)) {
+      StringBuilder parameter = new StringBuilder();
+      parameter.append("?columns=");
+      parameter.append(columns.get(0));
+      int numColumns = columns.size();
+      if (numColumns > 1) {
+        for (int i = 1; i < numColumns; i++) {
+          parameter.append("&columns=").append(columns.get(i));
+        }
+      }
+      return parameter.toString();
+    } else {
+      return "";
+    }
   }
 
   public String forSchemaValidate() {
@@ -347,7 +376,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentReset(String tableNameWithType, String segmentName, String targetInstance) {
-    String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
+    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, encode(segmentName), query);
   }
 
@@ -368,15 +397,20 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentsMetadataFromServer(String tableName) {
-    return forSegmentsMetadataFromServer(tableName, null);
+    return forSegmentsMetadataFromServer(tableName, (List<String>) null);
   }
 
+  @Deprecated
   public String forSegmentsMetadataFromServer(String tableName, @Nullable String columns) {
     String url = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
     if (columns != null) {
       url += "?columns=" + columns;
     }
     return url;
+  }
+
+  public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + constructColumnsParameter(columns);
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
@@ -393,6 +427,10 @@ public class ControllerRequestURLBuilder {
 
   public String forDeleteTableWithType(String tableName, String tableType) {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
+  }
+
+  public String forServersToSegmentsMap(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "servers?type=" + tableType);
   }
 
   public String forSegmentListAPI(String tableName) {
@@ -435,14 +473,13 @@ public class ControllerRequestURLBuilder {
       long endTimeInMilliSeconds) {
     StringBuilder url = new StringBuilder();
     url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
-        String.format("choose?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
+        "choose?startTimestamp=" + startTimeInMilliSeconds + "&endTimestamp=" + endTimeInMilliSeconds));
     return url.toString();
   }
 
   public String forDeleteMultipleSegments(String tableName, String tableType, List<String> segments) {
     StringBuilder fullUrl = new StringBuilder(
-        StringUtil.join("?", StringUtil.join("/", _baseUrl, "segments", tableName),
-             "type=" + tableType));
+        StringUtil.join("?", StringUtil.join("/", _baseUrl, "segments", tableName), "type=" + tableType));
     for (String segment : segments) {
       fullUrl.append("&segments=").append(segment);
     }
@@ -493,28 +530,26 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forIngestFromFile(String tableNameWithType, String batchConfigMapStr) {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s",
-        StringUtil.join("/", _baseUrl, "ingestFromFile"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8));
+    return StringUtil.join("/", _baseUrl, "ingestFromFile") + "?tableNameWithType=" + tableNameWithType
+        + "&batchConfigMapStr=" + URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8);
   }
 
   public String forIngestFromFile(String tableNameWithType, Map<String, String> batchConfigMap) {
     String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+        batchConfigMap.entrySet().stream().map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromFile(tableNameWithType, batchConfigMapStr);
   }
 
   public String forIngestFromURI(String tableNameWithType, String batchConfigMapStr, String sourceURIStr) {
-    return String.format("%s?tableNameWithType=%s&batchConfigMapStr=%s&sourceURIStr=%s",
-        StringUtil.join("/", _baseUrl, "ingestFromURI"), tableNameWithType,
-        URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8),
-        URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8));
+    return StringUtil.join("/", _baseUrl, "ingestFromURI") + "?tableNameWithType=" + tableNameWithType
+        + "&batchConfigMapStr=" + URLEncoder.encode(batchConfigMapStr, StandardCharsets.UTF_8) + "&sourceURIStr="
+        + URLEncoder.encode(sourceURIStr, StandardCharsets.UTF_8);
   }
 
   public String forIngestFromURI(String tableNameWithType, Map<String, String> batchConfigMap, String sourceURIStr) {
     String batchConfigMapStr =
-        batchConfigMap.entrySet().stream().map(e -> String.format("\"%s\":\"%s\"", e.getKey(), e.getValue()))
+        batchConfigMap.entrySet().stream().map(e -> "\"" + e.getKey() + "\":\"" + e.getValue() + "\"")
             .collect(Collectors.joining(",", "{", "}"));
     return forIngestFromURI(tableNameWithType, batchConfigMapStr, sourceURIStr);
   }
@@ -569,7 +604,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forUpdateTagsValidation() {
-    return String.format("%s/instances/updateTags/validate", _baseUrl);
+    return _baseUrl + "/instances/updateTags/validate";
   }
 
   private static String encode(String s) {

@@ -52,6 +52,7 @@ public class StarTreeV2Constants {
     public static final String AGGREGATION_COUNT = "aggregation.count";
     public static final String AGGREGATION_PREFIX = "aggregation.";
     public static final String FUNCTION_TYPE = "function.type";
+    public static final String FUNCTION_PARAMETERS = "function.parameters";
     public static final String COLUMN_NAME = "column.name";
     public static final String INDEX_VERSION = "index.version";
     public static final String COMPRESSION_CODEC = "compression.codec";

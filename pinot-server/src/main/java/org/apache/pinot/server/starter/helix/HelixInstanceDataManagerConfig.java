@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,26 +45,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Average number of values in multi-valued columns in any table in this instance.
   // This value is used to allocate initial memory for multi-valued columns in realtime segments in consuming state.
   private static final String AVERAGE_MV_COUNT = "realtime.averageMultiValueEntriesPerRow";
-  // Key of instance id
-  public static final String INSTANCE_ID = "id";
-  // Key of instance data directory
-  public static final String INSTANCE_DATA_DIR = "dataDir";
-  // Key of consumer directory
-  public static final String CONSUMER_DIR = "consumerDir";
-  // Key of instance segment tar directory
-  public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
-  // Key of segment directory
-  public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of instance level segment read mode
-  public static final String READ_MODE = "readMode";
-  // Key of the segment format this server can read
-  public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
-  // Key of whether to enable reloading consuming segments
-  public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
   // Key of segment directory loader
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
   // Prefix for upsert config
   public static final String UPSERT_CONFIG_PREFIX = "upsert";
+  // Prefix for dedup config
+  public static final String DEDUP_CONFIG_PREFIX = "dedup";
   // Prefix for auth config
   public static final String AUTH_CONFIG_PREFIX = "auth";
   // Prefix for tier configs
@@ -99,13 +84,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
   private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
 
-  // Whether memory for realtime consuming segments should be allocated off-heap.
-  private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
-  // And whether the allocation should be direct (default is to allocate via mmap)
-  // Direct memory allocation may mean setting heap size appropriately when starting JVM.
-  // The metric ServerGauge.REALTIME_OFFHEAP_MEMORY_USED should indicate how much memory is needed.
-  private static final String DIRECT_REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap.direct";
-
   // Number of simultaneous segments that can be refreshed on one server.
   // Segment refresh works by loading the old as well as new versions of segments in memory, assigning
   // new incoming queries to use the new version. The old version is dropped when all the queries that
@@ -118,7 +96,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // NOTE: While segment load can be faster, multiple threads will be taken up loading segments, so
   //       it is possible that the query latencies increase during that period.
   //
-  private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
+  public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
@@ -126,24 +104,23 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Size of cache that holds errors.
   private static final String ERROR_CACHE_SIZE = "error.cache.size";
 
+  private static final String DELETED_TABLES_CACHE_TTL_MINUTES = "table.deleted.tables.cache.ttl.minutes";
   private static final String DELETED_SEGMENTS_CACHE_SIZE = "table.deleted.segments.cache.size";
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
   private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
 
-  // Check if the external view is dropped for a table, and if so, wait for the external view to
-  // be updated for a maximum of this time.
-  private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
-  private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
+  public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
+  public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
+  private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
-  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L;
-  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = 1_000L;
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
+  private final PinotConfiguration _dedupConfig;
   private final PinotConfiguration _authConfig;
   private final Map<String, Map<String, String>> _tierConfigs;
 
@@ -159,6 +136,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
     _authConfig = serverConfig.subset(AUTH_CONFIG_PREFIX);
     _upsertConfig = serverConfig.subset(UPSERT_CONFIG_PREFIX);
+    _dedupConfig = serverConfig.subset(DEDUP_CONFIG_PREFIX);
 
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
     List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
@@ -208,18 +186,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getConsumerClientIdSuffix() {
-    return _serverConfig.getProperty(CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX);
+  public String getTableDataManagerProviderClass() {
+    return _serverConfig.getProperty(TABLE_DATA_MANAGER_PROVIDER_CLASS, DEFAULT_TABLE_DATA_MANAGER_PROVIDER_CLASS);
   }
 
   @Override
-  public String getInstanceBootstrapSegmentDir() {
-    return _serverConfig.getProperty(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+  public String getConsumerClientIdSuffix() {
+    return _serverConfig.getProperty(CONSUMER_CLIENT_ID_SUFFIX);
   }
 
   @Override
   public String getSegmentStoreUri() {
-    return _serverConfig.getProperty(CONFIG_OF_SEGMENT_STORE_URI);
+    return _serverConfig.getProperty(SEGMENT_STORE_URI);
   }
 
   @Override
@@ -234,16 +212,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isRealtimeOffHeapAllocation() {
-    return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, true);
+    return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_ALLOCATION);
   }
 
   @Override
   public boolean isDirectRealtimeOffHeapAllocation() {
-    return _serverConfig.getProperty(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
+    return _serverConfig.getProperty(REALTIME_OFFHEAP_DIRECT_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION);
   }
 
   public boolean shouldReloadConsumingSegment() {
-    return _serverConfig.getProperty(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
+    return _serverConfig.getProperty(RELOAD_CONSUMING_SEGMENT, DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override
@@ -291,6 +269,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public int getDeletedTablesCacheTtlMinutes() {
+    return _serverConfig.getProperty(DELETED_TABLES_CACHE_TTL_MINUTES, DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES);
+  }
+
+  @Override
   public int getDeletedSegmentsCacheSize() {
     return _serverConfig.getProperty(DELETED_SEGMENTS_CACHE_SIZE, DEFAULT_DELETED_SEGMENTS_CACHE_SIZE);
   }
@@ -306,19 +289,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public long getExternalViewDroppedMaxWaitMs() {
-    return _serverConfig.getProperty(EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS, DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS);
-  }
-
-  @Override
-  public long getExternalViewDroppedCheckIntervalMs() {
-    return _serverConfig.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
-        DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
-  }
-
-  @Override
   public PinotConfiguration getUpsertConfig() {
     return _upsertConfig;
+  }
+
+  @Override
+  public PinotConfiguration getDedupConfig() {
+    return _dedupConfig;
   }
 
   @Override
@@ -329,5 +306,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public Map<String, Map<String, String>> getTierConfigs() {
     return _tierConfigs;
+  }
+
+  @Override
+  public boolean isUploadSegmentToDeepStore() {
+    return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
   }
 }

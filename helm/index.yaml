@@ -3,7 +3,35 @@ entries:
   pinot:
   - apiVersion: v1
     appVersion: 1.0.0
-    created: "2024-05-30T09:29:30.175007-04:00"
+    created: "2024-10-04T14:07:23.8044492-04:00"
+    dependencies:
+    - condition: pinot.zookeeper.enabled,zookeeper.enabled
+      name: zookeeper
+      repository: https://charts.bitnami.com/bitnami
+      version: 13.x.x
+    description: Apache Pinot is a realtime distributed OLAP datastore, which is used
+      to deliver scalable real time analytics with low latency. It can ingest data
+      from offline data sources (such as Hadoop and flat files) as well as online
+      sources (such as Kafka). Pinot is designed to scale horizontally.
+    digest: e1d403bd3315e3e162b70cb3e481f024afcce2a8ccd3cf4193532d8ae1455d5a
+    home: https://pinot.apache.org/
+    keywords:
+    - olap
+    - analytics
+    - database
+    - pinot
+    maintainers:
+    - email: dev@pinot.apache.org
+      name: pinot-dev
+    name: pinot
+    sources:
+    - https://github.com/apache/pinot/tree/master/helm
+    urls:
+    - pinot-0.3.0.tgz
+    version: 0.3.0
+  - apiVersion: v1
+    appVersion: 1.0.0
+    created: "2024-10-04T14:07:23.7984481-04:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper

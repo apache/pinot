@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Objects;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
 /**
@@ -32,10 +30,7 @@ public class RowDataBlock extends BaseDataBlock {
   private static final int VERSION = 2;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
-
-  public RowDataBlock() {
-    super();
-  }
+  private int _fixDataSize;
 
   public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
       byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
@@ -43,9 +38,9 @@ public class RowDataBlock extends BaseDataBlock {
     computeBlockObjectConstants();
   }
 
-  public RowDataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
+  public RowDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
+      DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
+    super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
     computeBlockObjectConstants();
   }
 
@@ -58,8 +53,8 @@ public class RowDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
-    return VERSION + (Type.ROW.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
+  protected int getFixDataSize() {
+    return _fixDataSize;
   }
 
   @Override
@@ -67,32 +62,20 @@ public class RowDataBlock extends BaseDataBlock {
     return rowId * _rowSizeInBytes + _columnOffsets[colId];
   }
 
-  @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    int offset = getOffsetInFixedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt(offset));
-    return _fixedSizeData.getInt(offset + 4);
-  }
-
   public int getRowSizeInBytes() {
     return _rowSizeInBytes;
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof RowDataBlock)) {
-      return false;
-    }
-    RowDataBlock that = (RowDataBlock) o;
-    return _rowSizeInBytes == that._rowSizeInBytes && Objects.deepEquals(_columnOffsets, that._columnOffsets);
+  public Type getDataBlockType() {
+    return Type.ROW;
   }
 
+  @Nonnull // the method is override just to override its nullability annotation
   @Override
-  public int hashCode() {
-    return Objects.hash(Arrays.hashCode(_columnOffsets), _rowSizeInBytes);
+  public DataSchema getDataSchema() {
+    return super.getDataSchema();
   }
+
 // TODO: add whole-row access methods.
 }

@@ -24,8 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-spi</artifactId>
   <name>Pinot Service Provider Interface</name>
@@ -36,6 +35,87 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+
+                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
+                 and non-existence of classes in these jars.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-dropwizard</artifactId>
+                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-dropwizard</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>commons-io</groupId>
+                  <artifactId>commons-io</artifactId>
+                  <version>2.11.0</version> <!-- @dependabot ignore -->
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.yammer.metrics</groupId>
+                  <artifactId>metrics-core</artifactId>
+                  <version>2.1.5</version> <!-- @dependabot ignore -->
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>unpack-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+
+                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
+                 and non-existence of classes in these jars.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -64,6 +144,11 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-configuration2</artifactId>
     </dependency>
+    <!-- commons-beanutils is required by commons-configuration2 -->
+    <dependency>
+      <groupId>commons-beanutils</groupId>
+      <artifactId>commons-beanutils</artifactId>
+    </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
@@ -73,6 +158,10 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-classworlds</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
@@ -147,6 +236,12 @@
       </activation>
       <properties>
         <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
   </profiles>

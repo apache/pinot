@@ -29,6 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -69,6 +74,7 @@ public class QuickstartRunner {
   private final boolean _enableTenantIsolation;
   private final AuthProvider _authProvider;
   private final Map<String, Object> _configOverrides;
+  private final Map<String, String> _clusterConfigOverrides;
   private final boolean _deleteExistingData;
 
   // If this field is non-null, an embedded Zookeeper instance will not be launched
@@ -82,12 +88,13 @@ public class QuickstartRunner {
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
       throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
-        true);
+        true, Map.of());
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
-      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData)
+      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
+      Map<String, String> clusterConfigOverrides)
       throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
@@ -98,6 +105,7 @@ public class QuickstartRunner {
     _enableTenantIsolation = enableIsolation;
     _authProvider = authProvider;
     _configOverrides = new HashMap<>(configOverrides);
+    _clusterConfigOverrides = clusterConfigOverrides;
     if (numMinions > 0) {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
@@ -127,10 +135,21 @@ public class QuickstartRunner {
           .setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
+
       if (!controllerStarter.execute()) {
         throw new RuntimeException("Failed to start Controller");
       }
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
+    }
+
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(CLUSTER_NAME, "localhost_" + _controllerPorts.get(0),
+            InstanceType.CONTROLLER, _zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS);
+    helixManager.connect();
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(CLUSTER_NAME).build();
+    for (Map.Entry<String, String> entry : _clusterConfigOverrides.entrySet()) {
+      helixManager.getConfigAccessor().set(scope, entry.getKey(), entry.getValue());
     }
   }
 
@@ -229,7 +248,7 @@ public class QuickstartRunner {
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authProvider).execute()) {
+          request.getBootstrapTableDir(), _authProvider, request.getValidationTypesToSkip()).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

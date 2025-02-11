@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -78,7 +79,7 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
     // This assumes that if planFragmentId(S1) > planFragmentId(S2), then S1 is not an ancestor of S2.
     // TODO: If this assumption is wrong, we can compute the reverse topological ordering explicitly.
     for (int planFragmentId = dispatchablePlanMetadataMap.size() - 1; planFragmentId >= 0; planFragmentId--) {
-      PlanNode planNode = context.getRootStageNode(planFragmentId);
+      PlanNode planNode = context.getRootPlanNode(planFragmentId);
       planNode.visit(new GreedyShuffleRewriteVisitor(tableCache, dispatchablePlanMetadataMap), context);
     }
   }
@@ -208,22 +209,41 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
 
     boolean canSkipShuffleBasic = colocationKeyCondition(oldColocationKeys, distributionKeys);
     // If receiver is not a join-stage, then we can determine distribution type now.
-    if (!context.isJoinStage(node.getReceiverStageId())) {
+    Iterable<Integer> receiverStageIds = node.getReceiverStageIds();
+    if (noneIsJoin(receiverStageIds, context)) {
       Set<ColocationKey> colocationKeys;
-      if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getStageId())) {
+      if (canSkipShuffleBasic && allAreSuperSet(receiverStageIds, node)) {
         // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
         node.setDistributionType(RelDistribution.Type.SINGLETON);
         colocationKeys = oldColocationKeys;
       } else {
         colocationKeys = new HashSet<>();
       }
-      context.setColocationKeys(node.getStageId(), colocationKeys);
-      return colocationKeys;
-    }
+        context.setColocationKeys(node.getStageId(), colocationKeys);
+        return colocationKeys;
+      }
     // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
     Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
     context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
     return mailboxSendColocationKeys;
+  }
+
+  private boolean noneIsJoin(Iterable<Integer> receiveStageIds, GreedyShuffleRewriteContext context) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (context.isJoinStage(receiveStageId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean allAreSuperSet(Iterable<Integer> receiveStageIds, MailboxSendNode node) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (!areServersSuperset(receiveStageId, node.getStageId())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -291,6 +311,11 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
       }
     }
     return new HashSet<>();
+  }
+
+  @Override
+  public Set<ColocationKey> visitExplained(ExplainedNode node, GreedyShuffleRewriteContext context) {
+    throw new UnsupportedOperationException("ExplainedNode should not be visited by this visitor");
   }
 
   @Override

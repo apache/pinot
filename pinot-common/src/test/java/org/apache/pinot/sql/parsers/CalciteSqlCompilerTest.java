@@ -117,7 +117,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testCaseWhenStatements() {
+  public void testCaseWhenTransformStatements() {
     //@formatter:off
     PinotQuery pinotQuery = compileToPinotQuery(
         "SELECT OrderID, Quantity,\n"
@@ -235,6 +235,17 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
             .getName(), "Quantity");
+  }
+
+  @Test
+  public void testCaseWhenScalar() {
+    PinotQuery pinotQuery = compileToPinotQuery("SELECT CASE WHEN NOW() > 0 THEN 1 ELSE -1 END FROM myTable");
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 1);
+
+    Assert.assertThrows(SqlCompilationException.class,
+        () -> compileToPinotQuery("SELECT CASE WHEN 1 > 0 END FROM myTable"));
   }
 
   @Test
@@ -2315,6 +2326,18 @@ public class CalciteSqlCompilerTest {
     pinotQuery = compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
+
+    query = "select * from mytable where 'm' between 'a' and 'z'";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select * from mytable where 5 between 0 and 10";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
   }
 
   @Test
@@ -2337,6 +2360,30 @@ public class CalciteSqlCompilerTest {
     Assert.assertNotNull(expression.getLiteral());
     long upperBound = System.currentTimeMillis();
     long result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() - 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() + 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() * 1");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;

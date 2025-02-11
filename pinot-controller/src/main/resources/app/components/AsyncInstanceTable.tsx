@@ -19,33 +19,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { get, lowerCase, mapKeys, startCase } from 'lodash';
-import { InstanceType, TableData } from 'Models';
+import { DataTable, InstanceType, TableData } from 'Models';
 import CustomizedTables from './Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Utils from '../utils/Utils';
 import Loading from './Loading';
 
-type BaseProps = {
+type Props = {
   instanceType: InstanceType;
   showInstanceDetails?: boolean;
+  instanceNames: string[] | null;
+  liveInstanceNames?: string[];
 };
-
-type ClusterProps = BaseProps & {
-  cluster: string;
-  tenant?: never;
-};
-
-type TenantProps = BaseProps & {
-  tenant: string;
-  cluster?: never;
-};
-
-type Props = ClusterProps | TenantProps;
 
 export const AsyncInstanceTable = ({
   instanceType,
-  cluster,
-  tenant,
+  instanceNames,
+  liveInstanceNames,
   showInstanceDetails = false,
 }: Props) => {
   const instanceColumns = showInstanceDetails
@@ -55,68 +45,30 @@ export const AsyncInstanceTable = ({
     Utils.getLoadingTableData(instanceColumns)
   );
 
-  const fetchInstances = async (
-    instanceType: InstanceType,
-    tenant?: string
-  ): Promise<string[]> => {
-    if (tenant) {
-      if (instanceType === InstanceType.BROKER) {
-        return PinotMethodUtils.getBrokerOfTenant(tenant).then(
-          (brokersData) => {
-            return Array.isArray(brokersData) ? brokersData : [];
-          }
-        );
-      } else if (instanceType === InstanceType.SERVER) {
-        return PinotMethodUtils.getServerOfTenant(tenant).then(
-          (serversData) => {
-            return Array.isArray(serversData) ? serversData : [];
-          }
-        );
-      }
-    } else {
-      return fetchInstancesOfType(instanceType);
+  useEffect(() => {
+    if(instanceNames) {
+      const loadingColumns = Array(instanceColumns.length - 1).fill(Loading);
+      setInstanceData({
+        columns: instanceColumns,
+        records: instanceNames.map((name) => [name, ...loadingColumns]) || [],
+      });
     }
-  };
-
-  const fetchInstancesOfType = async (instanceType: InstanceType) => {
-    return PinotMethodUtils.getAllInstances().then((instancesData) => {
-      const lowercaseInstanceData = mapKeys(instancesData, (value, key) =>
-        lowerCase(key)
-      );
-      return get(lowercaseInstanceData, lowerCase(instanceType));
-    });
-  };
+  }, [instanceNames]);
 
   useEffect(() => {
-    const instances = fetchInstances(instanceType, tenant);
-    if (showInstanceDetails && cluster.length > 0) {
-      const instanceDetails = instances.then(async (instancesData) => {
-        const liveInstanceArr = await PinotMethodUtils.getLiveInstance(cluster);
-        return PinotMethodUtils.getInstanceData(
-          instancesData,
-          liveInstanceArr.data
-        );
-      });
-      instanceDetails.then((instanceDetailsData) => {
-        setInstanceData(instanceDetailsData);
-      });
-    } else if (showInstanceDetails && cluster.length == 0) {
-      instances.then((instancesData) => {
-        const defaultLoadingArray = Array(4).fill(Loading);
-        setInstanceData({
-          columns: instanceColumns,
-          records:  [[instancesData[0], ...defaultLoadingArray ]],
-        });
-      });
-    } else {
-      instances.then((instancesData) => {
-        setInstanceData({
-          columns: instanceColumns,
-          records: instancesData.map((instance) => [instance]),
-        });
-      });
+    // async load all the other details
+    if(showInstanceDetails && instanceNames && liveInstanceNames) {
+      fetchAdditionalInstanceDetails();
     }
-  }, [instanceType, cluster, tenant, showInstanceDetails]);
+  }, [showInstanceDetails, instanceNames, liveInstanceNames]);
+
+  const fetchAdditionalInstanceDetails = async () => {
+    const additionalData = await PinotMethodUtils.getInstanceData(
+      instanceNames,
+      liveInstanceNames
+    );
+    setInstanceData(additionalData);
+  }
 
   return (
     <CustomizedTables

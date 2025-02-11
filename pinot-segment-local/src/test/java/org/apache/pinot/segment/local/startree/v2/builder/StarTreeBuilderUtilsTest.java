@@ -26,12 +26,27 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountHLLPlusValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountULLValueAggregator;
+import org.apache.pinot.segment.local.aggregator.IntegerTupleSketchValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -189,6 +204,136 @@ public class StarTreeBuilderUtilsTest {
 
     // They should be equal.
     assertEquals(builderConfig1, builderConfig2);
+  }
+
+  @Test
+  public void testShouldModifyExistingStarTreesDifferentParameters() {
+    Configuration metadataProperties = new PropertiesConfiguration();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col2"),
+        new AggregationSpec(null, null, null, null, null, Map.of(Constants.HLL_LOG2M_KEY, 16)));
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("col1"), aggregationSpecs, 100, Set.of());
+    StarTreeV2Metadata existingStarTreeMetadata = new StarTreeV2Metadata(metadataProperties);
+
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
+        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+            null, null, null, null, null)), 100);
+    assertFalse(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
+        List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
+
+    // Change log2m value
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
+        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
+            null, null, null, null, null)), 100);
+    assertTrue(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
+        List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
+  }
+
+  @Test
+  public void testExpressionContextFromFunctionParameters() {
+    // DISTINCTCOUNTHLL
+    DistinctCountHLLValueAggregator hllValueAggregator = (DistinctCountHLLValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLL,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
+            Map.of(Constants.HLL_LOG2M_KEY, "10")));
+    assertEquals(10, hllValueAggregator.getLog2m());
+
+    hllValueAggregator = (DistinctCountHLLValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLL,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLL,
+                Map.of()));
+    // Verify default value used
+    assertEquals(8, hllValueAggregator.getLog2m());
+
+    // DISTINCTCOUNTHLLPLUS
+    DistinctCountHLLPlusValueAggregator hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            Map.of(Constants.HLLPLUS_ULL_P_KEY, "10", Constants.HLLPLUS_SP_KEY, 20)));
+    assertEquals(10, hllPlusValueAggregator.getP());
+    assertEquals(20, hllPlusValueAggregator.getSp());
+
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            Map.of("garbage", "value")));
+    // Verify default values used
+    assertEquals(14, hllPlusValueAggregator.getP());
+    assertEquals(0, hllPlusValueAggregator.getSp());
+
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            Map.of(Constants.HLLPLUS_ULL_P_KEY, "10")));
+    assertEquals(10, hllPlusValueAggregator.getP());
+    assertEquals(0, hllPlusValueAggregator.getSp());
+
+    hllPlusValueAggregator = (DistinctCountHLLPlusValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
+                Map.of(Constants.HLLPLUS_SP_KEY, 20)));
+    assertEquals(14, hllPlusValueAggregator.getP());
+    assertEquals(20, hllPlusValueAggregator.getSp());
+
+    // DISTINCTCOUNTULL
+    DistinctCountULLValueAggregator ullValueAggregator = (DistinctCountULLValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTULL,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTULL,
+            Map.of(Constants.HLLPLUS_ULL_P_KEY, "10")));
+    assertEquals(10, ullValueAggregator.getP());
+
+    ullValueAggregator = (DistinctCountULLValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTULL,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTULL,
+            Map.of("garbage", "value")));
+    // Verify default value used
+    assertEquals(12, ullValueAggregator.getP());
+
+    // DISTINCTCOUNTCPCSKETCH
+    DistinctCountCPCSketchValueAggregator cpcSketchValueAggregator = (DistinctCountCPCSketchValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+            Map.of(Constants.CPCSKETCH_LGK_KEY, 20)));
+    assertEquals(20, cpcSketchValueAggregator.getLgK());
+
+    cpcSketchValueAggregator = (DistinctCountCPCSketchValueAggregator)
+        ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTCPCSKETCH,
+            Map.of()));
+    // Verify default value used
+    assertEquals(12, cpcSketchValueAggregator.getLgK());
+
+    // DISTINCTCOUNTTHETASKETCH
+    DistinctCountThetaSketchValueAggregator thetaSketchValueAggregator =
+        (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+                AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
+    assertEquals(4096, thetaSketchValueAggregator.getNominalEntries());
+
+    thetaSketchValueAggregator = (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+            Map.of()));
+    // Verify default value used
+    assertEquals(16384, thetaSketchValueAggregator.getNominalEntries());
+
+    // DISTINCTCOUNTUPLESKETCH
+    IntegerTupleSketchValueAggregator tupleSketchValueAggregator =
+        (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+                AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
+    assertEquals(4096, tupleSketchValueAggregator.getNominalEntries());
+
+    tupleSketchValueAggregator = (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+            Map.of()));
+    // Verify default value used
+    assertEquals(16384, tupleSketchValueAggregator.getNominalEntries());
   }
 
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {

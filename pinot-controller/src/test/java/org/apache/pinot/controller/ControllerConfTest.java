@@ -142,6 +142,33 @@ public class ControllerConfTest {
   }
 
   @Test
+  public void validateSegmentRelocatorRebalanceDefaultConfigs() {
+    ControllerConf conf = new ControllerConf(Map.of());
+    Assert.assertFalse(conf.getSegmentRelocatorReassignInstances());
+    Assert.assertFalse(conf.getSegmentRelocatorBootstrap());
+    Assert.assertFalse(conf.getSegmentRelocatorDowntime());
+    Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -1);
+    Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+  }
+
+  @Test
+  public void validateSegmentRelocatorRebalanceConfigs() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(SEGMENT_RELOCATOR_REASSIGN_INSTANCES, true);
+    properties.put(SEGMENT_RELOCATOR_BOOTSTRAP, false);
+    properties.put(SEGMENT_RELOCATOR_DOWNTIME, true);
+    properties.put(SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS, -2);
+    properties.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
+
+    ControllerConf conf = new ControllerConf(properties);
+    Assert.assertTrue(conf.getSegmentRelocatorReassignInstances());
+    Assert.assertFalse(conf.getSegmentRelocatorBootstrap());
+    Assert.assertTrue(conf.getSegmentRelocatorDowntime());
+    Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -2);
+    Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
+  }
+
+  @Test
   public void shouldBeAbleToDisableUsingNewConfig() {
     Map<String, Object> controllerConfig = new HashMap<>();
     ControllerConf conf = new ControllerConf(controllerConfig);

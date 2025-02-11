@@ -45,9 +45,9 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
+import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -142,7 +142,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode mailboxReceiveNode2 = getPBReceiveNode(2);
     JoinNode joinNode =
         new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(mailboxReceiveNode1, mailboxReceiveNode2),
-            JoinRelType.INNER, List.of(0), List.of(0), List.of());
+            JoinRelType.INNER, List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
@@ -231,7 +231,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode = getPBReceiveNode(3);
     JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY,
         List.of(mailboxReceiveNode1, incorrectlyConfiguredMailboxNode), JoinRelType.INNER, List.of(0), List.of(0),
-        List.of());
+        List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
@@ -264,7 +264,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode = getPBReceiveNode(2);
     JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY,
         List.of(mailboxReceiveNode1, incorrectlyConfiguredMailboxNode), JoinRelType.INNER, List.of(0), List.of(0),
-        List.of());
+        List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
@@ -290,7 +290,7 @@ public class PipelineBreakerExecutorTest {
   }
 
   private static MailboxReceiveNode getPBReceiveNode(int senderStageId) {
-    return new MailboxReceiveNode(0, DATA_SCHEMA, List.of(), senderStageId, PinotRelExchangeType.PIPELINE_BREAKER,
+    return new MailboxReceiveNode(0, DATA_SCHEMA, senderStageId, PinotRelExchangeType.PIPELINE_BREAKER,
         RelDistribution.Type.SINGLETON, null, null, false, false, null);
   }
 }

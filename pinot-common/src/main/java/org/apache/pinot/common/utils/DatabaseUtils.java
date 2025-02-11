@@ -33,6 +33,20 @@ public class DatabaseUtils {
   }
 
   /**
+   * Returns the fully qualified table name. Do not prefix the database name if it is the default database.
+   */
+  public static String constructFullyQualifiedTableName(String databaseName, String tableName) {
+    return databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableName : databaseName + "." + tableName;
+  }
+
+  /**
+   * Splits a fully qualified table name i.e. {databaseName}.{tableName} into different components.
+   */
+  public static String[] splitTableName(String tableName) {
+    return StringUtils.split(tableName, '.');
+  }
+
+  /**
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
    * @param databaseName database name
@@ -45,14 +59,11 @@ public class DatabaseUtils {
    */
   public static String translateTableName(String tableName, @Nullable String databaseName, boolean ignoreCase) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(tableName), "'tableName' cannot be null or empty");
-    String[] tableSplit = StringUtils.split(tableName, '.');
+    String[] tableSplit = splitTableName(tableName);
     switch (tableSplit.length) {
       case 1:
-        // do not concat the database name prefix if it's a 'default' database
-        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-          return databaseName + "." + tableName;
-        }
-        return tableName;
+        return StringUtils.isEmpty(databaseName) ? tableName
+            : constructFullyQualifiedTableName(databaseName, tableName);
       case 2:
         Preconditions.checkArgument(!tableSplit[1].isEmpty(), "Invalid table name '%s'", tableName);
         String databasePrefix = tableSplit[0];
@@ -112,6 +123,26 @@ public class DatabaseUtils {
   }
 
   /**
+   * Checks if the databaseName refers to the default one.
+   * A null or blank databaseName is considered as default.
+   * @param databaseName database name
+   * @return true if database refers to the default one
+   */
+  private static boolean isDefaultDatabase(@Nullable String databaseName) {
+    return StringUtils.isBlank(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE);
+  }
+
+  /**
+   * Checks if the table belongs to the default database.
+   * If table is not fully qualified (has no prefix) it is assumed to belong to the default database.
+   * @param tableName the table name
+   * @return the table belongs to the default database
+   */
+  private static boolean isPartOfDefaultDatabase(String tableName) {
+    return !tableName.contains(".") || tableName.startsWith(CommonConstants.DEFAULT_DATABASE + ".");
+  }
+
+  /**
    * Checks if the fully qualified {@code tableName} belongs to the provided {@code databaseName}
    * @param tableName fully qualified table name
    * @param databaseName database name
@@ -127,12 +158,22 @@ public class DatabaseUtils {
    * else false
    */
   public static boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
-    // assumes tableName will not have default database prefix ('default.')
-    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return !tableName.contains(".");
+    if (isDefaultDatabase(databaseName)) {
+      return isPartOfDefaultDatabase(tableName);
     } else {
       return tableName.startsWith(databaseName + ".");
     }
+  }
+
+  /**
+   * Removes the provided {@code databaseName} from the fully qualified {@code tableName}.
+   * If table does not belong to the given database the tableName is returned as is.
+   * @param tableName fully qualified table name
+   * @param databaseName database name
+   * @return The tableName without the database prefix.
+   */
+  public static String removeDatabasePrefix(String tableName, String databaseName) {
+    return tableName.replaceFirst(databaseName + "\\.", "");
   }
 
   /**

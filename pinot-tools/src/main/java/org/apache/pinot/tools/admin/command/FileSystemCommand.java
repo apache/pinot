@@ -35,7 +35,7 @@ import picocli.CommandLine;
     CopyFiles.class,
     MoveFiles.class,
     DeleteFiles.class
-})
+}, mixinStandardHelpOptions = true)
 public class FileSystemCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileSystemCommand.class.getName());
 
@@ -43,20 +43,11 @@ public class FileSystemCommand extends AbstractBaseAdminCommand implements Comma
       CommandLine.ScopeType.INHERIT, description = "PinotFS Config file.")
   private String _configFile;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, usageHelp = true, description = "Print this message.",
-      scope = CommandLine.ScopeType.INHERIT)
-  private boolean _help = false;
-
   @CommandLine.Parameters
   private String[] _parameters;
 
   public FileSystemCommand setConfigFile(String configFile) {
     _configFile = configFile;
-    return this;
-  }
-
-  public FileSystemCommand setHelp(boolean help) {
-    _help = help;
     return this;
   }
 
@@ -67,11 +58,6 @@ public class FileSystemCommand extends AbstractBaseAdminCommand implements Comma
   public FileSystemCommand setParameters(String[] parameters) {
     _parameters = parameters;
     return this;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

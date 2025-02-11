@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.MapIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
@@ -36,6 +37,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -43,6 +45,7 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 
 
 /**
@@ -78,6 +81,7 @@ public class StandardIndexes {
   public static final String TEXT_ID = "text_index";
   public static final String H3_ID = "h3_index";
   public static final String VECTOR_ID = "vector_index";
+  public static final String MAP_ID = "map_index";
 
   private StandardIndexes() {
   }
@@ -135,5 +139,10 @@ public class StandardIndexes {
   public static IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> vector() {
     return (IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>)
         IndexService.getInstance().get(VECTOR_ID);
+  }
+
+  public static IndexType<MapIndexConfig, MapIndexReader, MapIndexCreator> map() {
+    return (IndexType<MapIndexConfig, MapIndexReader, MapIndexCreator>)
+        IndexService.getInstance().get(MAP_ID);
   }
 }

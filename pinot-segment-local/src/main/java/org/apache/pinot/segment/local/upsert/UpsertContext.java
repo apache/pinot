@@ -44,6 +44,7 @@ public class UpsertContext {
   private final double _deletedKeysTTL;
   private final UpsertConfig.ConsistencyMode _consistencyMode;
   private final long _upsertViewRefreshIntervalMs;
+  private final long _newSegmentTrackingTimeMs;
   private final File _tableIndexDir;
   private final boolean _dropOutOfOrderRecord;
   private final boolean _enableDeletedKeysCompactionConsistency;
@@ -53,7 +54,7 @@ public class UpsertContext {
       List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
       double metadataTTL, double deletedKeysTTL, UpsertConfig.ConsistencyMode consistencyMode,
-      long upsertViewRefreshIntervalMs, File tableIndexDir, boolean dropOutOfOrderRecord,
+      long upsertViewRefreshIntervalMs, long newSegmentTrackingTimeMs, File tableIndexDir, boolean dropOutOfOrderRecord,
       boolean enableDeletedKeysCompactionConsistency, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
@@ -68,6 +69,7 @@ public class UpsertContext {
     _deletedKeysTTL = deletedKeysTTL;
     _consistencyMode = consistencyMode;
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
+    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
     _tableIndexDir = tableIndexDir;
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
     _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
@@ -126,6 +128,10 @@ public class UpsertContext {
     return _upsertViewRefreshIntervalMs;
   }
 
+  public long getNewSegmentTrackingTimeMs() {
+    return _newSegmentTrackingTimeMs;
+  }
+
   public File getTableIndexDir() {
     return _tableIndexDir;
   }
@@ -156,6 +162,7 @@ public class UpsertContext {
     private double _deletedKeysTTL;
     private UpsertConfig.ConsistencyMode _consistencyMode;
     private long _upsertViewRefreshIntervalMs;
+    private long _newSegmentTrackingTimeMs;
     private File _tableIndexDir;
     private boolean _dropOutOfOrderRecord;
     private boolean _enableDeletedKeysCompactionConsistency;
@@ -226,6 +233,11 @@ public class UpsertContext {
       return this;
     }
 
+    public Builder setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
+      _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
+      return this;
+    }
+
     public Builder setTableIndexDir(File tableIndexDir) {
       _tableIndexDir = tableIndexDir;
       return this;
@@ -255,8 +267,8 @@ public class UpsertContext {
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
-          _consistencyMode, _upsertViewRefreshIntervalMs, _tableIndexDir, _dropOutOfOrderRecord,
-          _enableDeletedKeysCompactionConsistency, _tableDataManager);
+          _consistencyMode, _upsertViewRefreshIntervalMs, _newSegmentTrackingTimeMs, _tableIndexDir,
+          _dropOutOfOrderRecord, _enableDeletedKeysCompactionConsistency, _tableDataManager);
     }
   }
 }

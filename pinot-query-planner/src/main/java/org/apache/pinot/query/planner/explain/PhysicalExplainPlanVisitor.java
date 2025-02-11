@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.query.planner.explain;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -211,14 +215,22 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   private StringBuilder appendMailboxSend(MailboxSendNode node, Context context) {
     appendInfo(node, context);
 
-    int receiverStageId = node.getReceiverStageId();
-    List<MailboxInfo> receiverMailboxInfos =
-        _dispatchableSubPlan.getQueryStageList().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
-            .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+    List<Stream<String>> perStageDescriptions = new ArrayList<>();
+    // This iterator is guaranteed to be sorted by stageId
+    for (Integer receiverStageId : node.getReceiverStageIds()) {
+      List<MailboxInfo> receiverMailboxInfos =
+          _dispatchableSubPlan.getQueryStageList().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
+              .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+      // Sort to ensure print order
+      Stream<String> stageDescriptions = receiverMailboxInfos.stream()
+          .sorted(Comparator.comparingInt(MailboxInfo::getPort))
+          .map(v -> "[" + receiverStageId + "]@" + v);
+      perStageDescriptions.add(stageDescriptions);
+    }
     context._builder.append("->");
-    // Sort to ensure print order
-    String receivers = receiverMailboxInfos.stream().sorted(Comparator.comparingInt(MailboxInfo::getPort))
-        .map(v -> "[" + receiverStageId + "]@" + v).collect(Collectors.joining(",", "{", "}"));
+    String receivers = perStageDescriptions.stream()
+        .flatMap(Function.identity())
+        .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
   }
 
@@ -245,6 +257,11 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
   @Override
   public StringBuilder visitValue(ValueNode node, Context context) {
+    return appendInfo(node, context);
+  }
+
+  @Override
+  public StringBuilder visitExplained(ExplainedNode node, Context context) {
     return appendInfo(node, context);
   }
 

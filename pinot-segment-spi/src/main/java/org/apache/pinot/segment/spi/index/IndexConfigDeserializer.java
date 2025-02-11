@@ -41,12 +41,6 @@ public class IndexConfigDeserializer {
   private IndexConfigDeserializer() {
   }
 
-  public static <C extends IndexConfig> ColumnConfigDeserializer<C> ifIndexingConfig(
-      ColumnConfigDeserializer<C> delegate) {
-    return ((tableConfig, schema) -> tableConfig.getIndexingConfig() != null
-        ? delegate.deserialize(tableConfig, schema) : Collections.emptyMap());
-  }
-
   /**
    * Returns a {@link ColumnConfigDeserializer} that always returns the same config object
    */

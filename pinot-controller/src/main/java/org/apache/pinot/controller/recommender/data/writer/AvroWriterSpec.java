@@ -30,8 +30,8 @@ public class AvroWriterSpec extends WriterSpec {
   private final int _numFiles;
   private final Schema _schema;
 
-  public AvroWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles) {
-    super(generator);
+  public AvroWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles, int fileIndex) {
+    super(generator, fileIndex);
     _baseDir = baseDir;
     _totalDocs = totalDocs;
     _numFiles = numFiles;

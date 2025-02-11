@@ -23,6 +23,8 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -198,11 +200,11 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testTotalCountWithNullHandlingQueryOptionEnabled(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String pinotQuery = "SELECT COUNT(*) FROM " + getTableName() + " option(enableNullHandling=true)";
+    String pinotQuery = "SELECT COUNT(*) FROM " + getTableName();
     String h2Query = "SELECT COUNT(*) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT COUNT(1) FROM " + getTableName() + " option(enableNullHandling=true)";
+    pinotQuery = "SELECT COUNT(1) FROM " + getTableName();
     h2Query = "SELECT COUNT(1) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
   }
@@ -256,41 +258,34 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testOrderByByNullableKeepsOtherColNulls()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    String h2Query = "select salary from mytable"
+    String query = "select salary from mytable"
         + " where salary is null"
         + " order by description";
-    String pinotQuery = h2Query + " option(enableNullHandling=true)";
-    testQuery(pinotQuery, h2Query);
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testOrderByNullsFirst(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
-    String pinotQuery = h2Query + " option(enableNullHandling=true)";
-
-    testQuery(pinotQuery, h2Query);
+    String query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testOrderByNullsLast(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
-    String pinotQuery = h2Query + " option(enableNullHandling=true)";
-
-    testQuery(pinotQuery, h2Query);
+    String query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctOrderByNullsLast(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String h2Query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
-    String pinotQuery = h2Query + " option(enableNullHandling=true)";
-
-    testQuery(pinotQuery, h2Query);
+    String query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -299,7 +294,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Need to also select an identifier column to skip the all literal query optimization which returns without
     // querying the segment.
-    String sqlQuery = "SELECT NULL, salary FROM mytable OPTION(enableNullHandling=true)";
+    String sqlQuery = "SELECT NULL, salary FROM mytable";
 
     JsonNode response = postQuery(sqlQuery);
 
@@ -311,12 +306,54 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testCaseWhenAllLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sqlQuery =
-        "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable OPTION(enableNullHandling=true)";
-
+    String sqlQuery = "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable";
     JsonNode response = postQuery(sqlQuery);
-
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregateServerReturnFinalResult(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoError(response);
+    assertEquals(5429377.34, response.get("resultTable").get("rows").get(0).get(0).asDouble(), 0.1);
+
+    sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable WHERE city = 'does_not_exist'";
+    response = postQuery(sqlQuery);
+    assertNoError(response);
+    assertTrue(response.get("resultTable").get("rows").get(0).get(0).isNull());
+  }
+
+  @Test
+  public void testWindowFunctionIgnoreNulls()
+      throws Exception {
+    // Window functions are only supported in the multi-stage query engine
+    setUseMultiStageQueryEngine(true);
+    String sqlQuery =
+        "SELECT salary, LAST_VALUE(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS gapfilledSalary from "
+            + "mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoError(response);
+
+    // Check if the LAST_VALUE window function with IGNORE NULLS has effectively gap-filled the salary values
+    Integer lastSalary = null;
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      if (!row.get(0).isNull()) {
+        assertEquals(row.get(0).asInt(), row.get(1).asInt());
+        lastSalary = row.get(0).asInt();
+      } else {
+        assertEquals(lastSalary, row.get(1).numberValue());
+      }
+    }
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING, "true");
   }
 
   @DataProvider(name = "nullLiteralQueries")
@@ -324,32 +361,24 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     // Query string, expected value
     return new Object[][]{
         // Null literal only
-        {String.format("SELECT null FROM %s OPTION(enableNullHandling=true)", getTableName()), "null"},
+        {String.format("SELECT null FROM %s", getTableName()), "null"},
         // Null related functions
-        {String.format("SELECT isNull(null) FROM %s OPTION (enableNullHandling=true)", getTableName()), true},
-        {String.format("SELECT isNotNull(null) FROM %s OPTION (enableNullHandling=true)", getTableName()), false},
-        {String.format("SELECT coalesce(null, 1) FROM %s OPTION (enableNullHandling=true)", getTableName()), 1},
-        {String.format("SELECT coalesce(null, null) FROM %s OPTION (enableNullHandling=true)", getTableName()), "null"},
-        {String.format("SELECT isDistinctFrom(null, null) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            false},
-        {String.format("SELECT isNotDistinctFrom(null, null) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            true},
-        {String.format("SELECT isDistinctFrom(null, 1) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            true},
-        {String.format("SELECT isNotDistinctFrom(null, 1) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            false},
-        {String.format("SELECT case when true then null end FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            "null"},
-        {String.format("SELECT case when false then 1 end FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            "null"},
+        {String.format("SELECT isNull(null) FROM %s", getTableName()), true},
+        {String.format("SELECT isNotNull(null) FROM %s", getTableName()), false},
+        {String.format("SELECT coalesce(null, 1) FROM %s", getTableName()), 1},
+        {String.format("SELECT coalesce(null, null) FROM %s", getTableName()), "null"},
+        {String.format("SELECT isDistinctFrom(null, null) FROM %s", getTableName()), false},
+        {String.format("SELECT isNotDistinctFrom(null, null) FROM %s", getTableName()), true},
+        {String.format("SELECT isDistinctFrom(null, 1) FROM %s", getTableName()), true},
+        {String.format("SELECT isNotDistinctFrom(null, 1) FROM %s", getTableName()), false},
+        {String.format("SELECT case when true then null end FROM %s", getTableName()), "null"},
+        {String.format("SELECT case when false then 1 end FROM %s", getTableName()), "null"},
         // Null intolerant functions
-        {String.format("SELECT add(null, 1) FROM %s OPTION (enableNullHandling=true)", getTableName()), "null"},
-        {String.format("SELECT greater_than(null, 1) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            "null"},
-        {String.format("SELECT to_epoch_seconds(null) FROM %s OPTION (enableNullHandling=true)", getTableName()),
-            "null"},
-        {String.format("SELECT not(null) FROM %s OPTION (enableNullHandling=true)", getTableName()), "null"},
-        {String.format("SELECT tan(null) FROM %s OPTION (enableNullHandling=true)", getTableName()), "null"}
+        {String.format("SELECT add(null, 1) FROM %s", getTableName()), "null"},
+        {String.format("SELECT greater_than(null, 1) FROM %s", getTableName()), "null"},
+        {String.format("SELECT to_epoch_seconds(null) FROM %s", getTableName()), "null"},
+        {String.format("SELECT not(null) FROM %s", getTableName()), "null"},
+        {String.format("SELECT tan(null) FROM %s", getTableName()), "null"}
     };
   }
 }

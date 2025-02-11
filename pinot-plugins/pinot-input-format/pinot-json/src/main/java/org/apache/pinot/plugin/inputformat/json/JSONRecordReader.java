@@ -78,11 +78,6 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse) {
     Map<String, Object> record = _iterator.next();
     _recordExtractor.extract(record, reuse);

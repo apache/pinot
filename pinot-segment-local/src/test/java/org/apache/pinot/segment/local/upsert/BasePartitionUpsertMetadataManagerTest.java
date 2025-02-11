@@ -18,30 +18,24 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -54,19 +48,18 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -90,110 +83,22 @@ public class BasePartitionUpsertMetadataManagerTest {
 
   @Test
   public void testPreloadSegments()
-      throws Exception {
+      throws IOException {
     String realtimeTableName = "testTable_REALTIME";
-    String instanceId = "server01";
-    Map<String, Map<String, String>> segmentAssignment = new HashMap<>();
-    Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
-    Set<String> preloadedSegments = new HashSet<>();
-    AtomicBoolean wasPreloading = new AtomicBoolean(false);
-    TableDataManager tableDataManager = mock(TableDataManager.class);
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
     when(upsertContext.isPreloadEnabled()).thenReturn(true);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
     when(upsertContext.getTableDataManager()).thenReturn(tableDataManager);
-    DummyPartitionUpsertMetadataManager upsertMetadataManager =
-        new DummyPartitionUpsertMetadataManager(realtimeTableName, 0, upsertContext) {
-
-          @Override
-          Map<String, Map<String, String>> getSegmentAssignment(HelixManager helixManager) {
-            return segmentAssignment;
-          }
-
-          @Override
-          Map<String, SegmentZKMetadata> getSegmentsZKMetadata(HelixManager helixManager) {
-            return segmentMetadataMap;
-          }
-
-          @Override
-          void doPreloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
-              IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata) {
-            wasPreloading.set(isPreloading());
-            preloadedSegments.add(segmentName);
-          }
-        };
-
-    // Setup mocks for TableConfig and Schema.
-    TableConfig tableConfig = mock(TableConfig.class);
-    UpsertConfig upsertConfig = new UpsertConfig();
-    upsertConfig.setComparisonColumn("ts");
-    upsertConfig.setEnablePreload(true);
-    upsertConfig.setEnableSnapshot(true);
-    when(tableConfig.getUpsertConfig()).thenReturn(upsertConfig);
-    when(tableConfig.getTableName()).thenReturn(realtimeTableName);
-    Schema schema = mock(Schema.class);
-    when(schema.getPrimaryKeyColumns()).thenReturn(Collections.singletonList("pk"));
     IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
-    when(indexLoadingConfig.getTableConfig()).thenReturn(tableConfig);
+    when(indexLoadingConfig.getTableConfig()).thenReturn(mock(TableConfig.class));
 
-    // Setup mocks for HelixManager.
-    HelixManager helixManager = mock(HelixManager.class);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-
-    // Setup segment assignment. Only ONLINE segments are preloaded.
-    segmentAssignment.put("consuming_seg01", ImmutableMap.of(instanceId, "CONSUMING"));
-    segmentAssignment.put("consuming_seg02", ImmutableMap.of(instanceId, "CONSUMING"));
-    segmentAssignment.put("offline_seg01", ImmutableMap.of(instanceId, "OFFLINE"));
-    segmentAssignment.put("offline_seg02", ImmutableMap.of(instanceId, "OFFLINE"));
-    String seg01Name = "testTable__0__1__" + System.currentTimeMillis();
-    segmentAssignment.put(seg01Name, ImmutableMap.of(instanceId, "ONLINE"));
-    String seg02Name = "testTable__0__2__" + System.currentTimeMillis();
-    segmentAssignment.put(seg02Name, ImmutableMap.of(instanceId, "ONLINE"));
-    // This segment is skipped as it's not from partition 0.
-    String seg03Name = "testTable__1__3__" + System.currentTimeMillis();
-    segmentAssignment.put(seg03Name, ImmutableMap.of(instanceId, "ONLINE"));
-
-    SegmentZKMetadata zkMetadata = new SegmentZKMetadata(seg01Name);
-    zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    segmentMetadataMap.put(seg01Name, zkMetadata);
-    zkMetadata = new SegmentZKMetadata(seg02Name);
-    zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    segmentMetadataMap.put(seg02Name, zkMetadata);
-    zkMetadata = new SegmentZKMetadata(seg03Name);
-    zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    segmentMetadataMap.put(seg03Name, zkMetadata);
-
-    // Setup mocks to get file path to validDocIds snapshot.
-    ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
-    File tableDataDir = new File(TEMP_DIR, realtimeTableName);
-    when(tableDataManager.getHelixManager()).thenReturn(helixManager);
-    when(tableDataManager.getSegmentPreloadExecutor()).thenReturn(segmentPreloadExecutor);
-    when(tableDataManager.getTableDataDir()).thenReturn(tableDataDir);
-    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getInstanceId()).thenReturn(instanceId);
-    when(tableDataManager.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
-
-    // No snapshot file for seg01, so it's skipped.
-    File seg01IdxDir = new File(tableDataDir, seg01Name);
-    FileUtils.forceMkdir(seg01IdxDir);
-    when(tableDataManager.getSegmentDataDir(seg01Name, null, tableConfig)).thenReturn(seg01IdxDir);
-
-    File seg02IdxDir = new File(tableDataDir, seg02Name);
-    FileUtils.forceMkdir(seg02IdxDir);
-    FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
-    when(tableDataManager.getSegmentDataDir(seg02Name, null, tableConfig)).thenReturn(seg02IdxDir);
-
-    try {
-      // If preloading is enabled, the _isPreloading flag is true initially, until preloading is done.
+    try (DummyPartitionUpsertMetadataManager upsertMetadataManager = new DummyPartitionUpsertMetadataManager(
+        realtimeTableName, 0, upsertContext)) {
       assertTrue(upsertMetadataManager.isPreloading());
       upsertMetadataManager.preloadSegments(indexLoadingConfig);
-      assertEquals(preloadedSegments.size(), 1);
-      assertTrue(preloadedSegments.contains(seg02Name));
-      assertTrue(wasPreloading.get());
       assertFalse(upsertMetadataManager.isPreloading());
-    } finally {
-      segmentPreloadExecutor.shutdownNow();
+      upsertMetadataManager.stop();
     }
   }
 
@@ -202,6 +107,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -248,10 +156,96 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testSkipTakeSnapshotUponRaceCondition()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    Map<String, Lock> segmentLocks = new HashMap<>();
+    segmentLocks.put("seg01", new ReentrantLock());
+    segmentLocks.put("seg02", new ReentrantLock());
+    segmentLocks.put("seg03", new ReentrantLock());
+    segmentLocks.put("seg04", new ReentrantLock());
+    when(tdm.getSegmentLock(anyString())).thenAnswer(invocation -> {
+      String segmentName = invocation.getArgument(0);
+      return segmentLocks.get(segmentName);
+    });
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot);
+    seg01.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3), null);
+    upsertMetadataManager.addSegment(seg01);
+    // seg01 has a tmp snapshot file, but no snapshot file
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot);
+    seg02.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3, 4, 5), null);
+    upsertMetadataManager.addSegment(seg02);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot);
+    seg03.enableUpsert(upsertMetadataManager, createValidDocIds(3, 4, 7), null);
+    upsertMetadataManager.addSegment(seg03);
+
+    // The mutable segments will be skipped.
+    MutableSegmentImpl seg04 = mock(MutableSegmentImpl.class);
+    upsertMetadataManager.addRecord(seg04, mock(RecordInfo.class));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      // seg02 is the only segment with existing snapshot file, so skipping it should skip other segments w/o snapshots.
+      Lock seg02Lock = segmentLocks.get("seg02");
+      AtomicBoolean seg02Locked = new AtomicBoolean(false);
+      ReentrantLock holderLock = new ReentrantLock();
+      holderLock.lock();
+      executor.submit(() -> {
+        seg02Lock.lock();
+        seg02Locked.set(true);
+        // Block this thread a while to test if snapshots are skipped.
+        holderLock.lock();
+        seg02Lock.unlock();
+      });
+      // Make sure the bg thread has acquired the seg02Lock before testing to avoid flakiness.
+      TestUtils.waitForCondition(aVoid -> seg02Locked.get(), 1000L, "Failed to acquire seg02Lock in time");
+      // Since seg02 is skipped, no snapshots would be taken.
+      upsertMetadataManager.doTakeSnapshot();
+      assertEquals(segmentsTakenSnapshot.size(), 0);
+
+      // Unblock the bg thread so that it releases the segmentLock.
+      holderLock.unlock();
+      // Acquire the segmentLock once, in case the bg thread is not running in time and causes flakiness.
+      seg02Lock.lock();
+      seg02Lock.unlock();
+      // Now the segmentLock can be acquired for sure, and snapshots should be taken.
+      upsertMetadataManager.doTakeSnapshot();
+      assertEquals(segmentsTakenSnapshot.size(), 3);
+      assertTrue(segDir01.exists());
+      assertEquals(seg01.loadValidDocIdsFromSnapshot().getCardinality(), 4);
+      assertTrue(segDir02.exists());
+      assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
+      assertTrue(segDir03.exists());
+      assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testTakeSnapshotInOrderBasedOnUpdates()
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -305,6 +299,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -630,12 +627,27 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
   }
 
-  private static ThreadSafeMutableRoaringBitmap createThreadSafeMutableRoaringBitmap(int docCnt) {
-    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
-    for (int i = 0; i < docCnt; i++) {
-      bitmap.add(i);
-    }
-    return bitmap;
+  @Test
+  public void testTrackNewlyAddedSegments() {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(0L);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    upsertMetadataManager.trackNewlyAddedSegment("seg1");
+    upsertMetadataManager.trackNewlyAddedSegment("seg2");
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 0);
+
+    when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(100L);
+    upsertMetadataManager = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    upsertMetadataManager.trackNewlyAddedSegment("seg1");
+    upsertMetadataManager.trackNewlyAddedSegment("seg2");
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
+    // There is 100ms delay before removal of stale segments.
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
+    DummyPartitionUpsertMetadataManager finalUpsertMetadataManager = upsertMetadataManager;
+    TestUtils.waitForCondition(aVoid -> finalUpsertMetadataManager.getNewlyAddedSegments().isEmpty(), 300L,
+        "Failed to remove stale segments");
   }
 
   @Test
@@ -663,6 +675,14 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 5);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 4);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
+  }
+
+  private static ThreadSafeMutableRoaringBitmap createThreadSafeMutableRoaringBitmap(int docCnt) {
+    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
+    for (int i = 0; i < docCnt; i++) {
+      bitmap.add(i);
+    }
+    return bitmap;
   }
 
   private static ThreadSafeMutableRoaringBitmap createValidDocIds(int... docIds) {

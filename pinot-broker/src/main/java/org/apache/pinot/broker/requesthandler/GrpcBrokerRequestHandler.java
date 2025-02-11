@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -38,6 +37,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -76,9 +76,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
@@ -106,12 +106,12 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
    * Query pinot server for data table.
    */
   private void sendRequest(long requestId, TableType tableType, BrokerRequest brokerRequest,
-      Map<ServerInstance, Pair<List<String>, List<String>>> routingTable,
+      Map<ServerInstance, ServerRouteInfo> routingTable,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
-    for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> routingEntry : routingTable.entrySet()) {
+    for (Map.Entry<ServerInstance, ServerRouteInfo> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
       // TODO: support optional segments for GrpcQueryServer.
-      List<String> segments = routingEntry.getValue().getLeft();
+      List<String> segments = routingEntry.getValue().getSegments();
       String serverHost = serverInstance.getHostname();
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.

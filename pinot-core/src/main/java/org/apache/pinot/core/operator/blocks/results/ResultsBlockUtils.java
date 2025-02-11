@@ -29,7 +29,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.EmptyDistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 
@@ -113,8 +114,9 @@ public class ResultsBlockUtils {
     ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DistinctTable distinctTable = new DistinctTable(new DataSchema(columns, columnDataTypes), Collections.emptySet(),
-        queryContext.isNullHandlingEnabled());
+    DistinctTable distinctTable =
+        new EmptyDistinctTable(new DataSchema(columns, columnDataTypes), queryContext.getLimit(),
+            queryContext.isNullHandlingEnabled());
     return new DistinctResultsBlock(distinctTable, queryContext);
   }
 }

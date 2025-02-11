@@ -32,28 +32,26 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
+import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
-import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
@@ -65,7 +63,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -109,10 +106,9 @@ public final class IngestionUtils {
       BatchIngestionConfig batchIngestionConfig)
       throws ClassNotFoundException, IOException {
     Preconditions.checkState(batchIngestionConfig != null && batchIngestionConfig.getBatchConfigMaps() != null
-        && batchIngestionConfig.getBatchConfigMaps().size() == 1,
+            && batchIngestionConfig.getBatchConfigMaps().size() == 1,
         "Must provide batchIngestionConfig and contains exactly 1 batchConfigMap for table: %s, "
-            + "for generating SegmentGeneratorConfig",
-        tableConfig.getTableName());
+            + "for generating SegmentGeneratorConfig", tableConfig.getTableName());
 
     // apply config override provided by user.
     BatchConfig batchConfig =
@@ -125,8 +121,8 @@ public final class IngestionUtils {
     segmentGeneratorConfig.setOutDir(batchConfig.getOutputDirURI());
 
     // Reader configs
-    segmentGeneratorConfig
-        .setRecordReaderPath(RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
+    segmentGeneratorConfig.setRecordReaderPath(
+        RecordReaderFactory.getRecordReaderClassName(batchConfig.getInputFormat().toString()));
     Map<String, String> recordReaderProps = batchConfig.getRecordReaderProps();
     segmentGeneratorConfig.setReaderConfig(RecordReaderFactory.getRecordReaderConfig(batchConfig.getInputFormat(),
         IngestionConfigUtils.getRecordReaderProps(recordReaderProps)));
@@ -169,9 +165,19 @@ public final class IngestionUtils {
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix(),
             batchConfig.isAppendUUIDToSegmentName(), batchConfig.isExcludeTimeInSegmentName());
+      case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
+        int uploadedRealtimePartitionId;
+        try {
+          uploadedRealtimePartitionId = Integer.parseInt(batchConfig.getSegmentPartitionId());
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+              String.format("Invalid segment partition id: %s", batchConfig.getSegmentPartitionId()));
+        }
+        return new UploadedRealtimeSegmentNameGenerator(rawTableName, uploadedRealtimePartitionId,
+            batchConfig.getSegmentUploadTimeMs(), batchConfig.getSegmentNamePrefix(), batchConfig.getSequenceId());
       default:
-        throw new IllegalStateException(String
-            .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,
+        throw new IllegalStateException(
+            String.format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,
                 tableConfig.getTableName()));
     }
   }
@@ -198,9 +204,8 @@ public final class IngestionUtils {
   public static void uploadSegment(String tableNameWithType, BatchConfig batchConfig, List<URI> segmentTarURIs,
       @Nullable AuthProvider authProvider)
       throws Exception {
-
-    SegmentGenerationJobSpec segmentUploadSpec = generateSegmentUploadSpec(tableNameWithType, batchConfig,
-        authProvider);
+    SegmentGenerationJobSpec segmentUploadSpec =
+        generateSegmentUploadSpec(tableNameWithType, batchConfig, authProvider);
 
     List<String> segmentTarURIStrs = segmentTarURIs.stream().map(URI::toString).collect(Collectors.toList());
     String pushMode = batchConfig.getPushMode();
@@ -209,8 +214,8 @@ public final class IngestionUtils {
         try {
           SegmentPushUtils.pushSegments(segmentUploadSpec, LOCAL_PINOT_FS, segmentTarURIStrs);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: TAR, segment tars: [%s]",
                   segmentTarURIStrs), e);
         }
         break;
@@ -229,8 +234,9 @@ public final class IngestionUtils {
           }
           SegmentPushUtils.sendSegmentUris(segmentUploadSpec, segmentUris);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]", segmentUris), e);
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: URI, segment URIs: [%s]",
+                  segmentUris), e);
         }
         break;
       case METADATA:
@@ -240,12 +246,13 @@ public final class IngestionUtils {
             outputSegmentDirURI = URI.create(batchConfig.getOutputSegmentDirURI());
           }
           PinotFS outputFileFS = getOutputPinotFS(batchConfig, outputSegmentDirURI);
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI,
-              segmentUploadSpec.getPushJobSpec(), segmentTarURIStrs.toArray(new String[0]));
+          Map<String, String> segmentUriToTarPathMap =
+              SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, segmentUploadSpec.getPushJobSpec(),
+                  segmentTarURIStrs.toArray(new String[0]));
           SegmentPushUtils.sendSegmentUriAndMetadata(segmentUploadSpec, outputFileFS, segmentUriToTarPathMap);
         } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(String
-              .format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
+          throw new RuntimeException(
+              String.format("Caught exception while uploading segments. Push mode: METADATA, segment URIs: [%s]",
                   segmentTarURIStrs), e);
         }
         break;
@@ -300,27 +307,33 @@ public final class IngestionUtils {
   }
 
   /**
-   * Extracts all fields required by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
-   * TableConfig and Schema
+   * Extracts all fields required by the {@link RecordExtractor} from the given TableConfig and Schema.
    * Fields for ingestion come from 2 places:
    * 1. The schema
    * 2. The ingestion config in the table config. The ingestion config (e.g. filter, complexType) can have fields which
    * are not in the schema.
    */
-  public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
-    Set<String> fieldsForRecordExtractor = new HashSet<>();
-
-    if (null != ingestionConfig && (null != ingestionConfig.getSchemaConformingTransformerConfig()
-        || null != ingestionConfig.getSchemaConformingTransformerV2Config())) {
+  public static Set<String> getFieldsForRecordExtractor(TableConfig tableConfig, Schema schema) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getSchemaConformingTransformerConfig() != null) {
       // The SchemaConformingTransformer requires that all fields are extracted, indicated by returning an empty set
       // here. Compared to extracting the fields specified below, extracting all fields should be a superset.
-      return fieldsForRecordExtractor;
+      return Set.of();
     }
 
-    extractFieldsFromIngestionConfig(ingestionConfig, fieldsForRecordExtractor);
-    extractFieldsFromSchema(schema, fieldsForRecordExtractor);
-    fieldsForRecordExtractor = getFieldsToReadWithComplexType(fieldsForRecordExtractor, ingestionConfig);
-    return fieldsForRecordExtractor;
+    Set<String> fields = new HashSet<>();
+    if (ingestionConfig != null) {
+      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
+      if (aggregationConfigs != null) {
+        for (AggregationConfig aggregationConfig : aggregationConfigs) {
+          ExpressionContext expressionContext =
+              RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
+          expressionContext.getColumns(fields);
+        }
+      }
+    }
+    fields.addAll(new TransformPipeline(tableConfig, schema).getInputColumns());
+    return getFieldsToReadWithComplexType(fields, ingestionConfig);
   }
 
   /**
@@ -340,64 +353,6 @@ public final class IngestionUtils {
       result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
-  }
-
-  /**
-   * Extracts all the fields needed by the {@link org.apache.pinot.spi.data.readers.RecordExtractor} from the given
-   * Schema
-   * TODO: for now, we assume that arguments to transform function are in the source i.e. no columns are derived from
-   * transformed columns
-   */
-  private static void extractFieldsFromSchema(Schema schema, Set<String> fields) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
-        if (functionEvaluator != null) {
-          fields.addAll(functionEvaluator.getArguments());
-        }
-        fields.add(fieldSpec.getName());
-      }
-    }
-  }
-
-  /**
-   * Extracts the fields needed by a RecordExtractor from given {@link IngestionConfig}
-   */
-  private static void extractFieldsFromIngestionConfig(@Nullable IngestionConfig ingestionConfig, Set<String> fields) {
-    if (ingestionConfig != null) {
-      FilterConfig filterConfig = ingestionConfig.getFilterConfig();
-      if (filterConfig != null) {
-        String filterFunction = filterConfig.getFilterFunction();
-        if (filterFunction != null) {
-          FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
-          fields.addAll(functionEvaluator.getArguments());
-        }
-      }
-      List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
-      if (aggregationConfigs != null) {
-        for (AggregationConfig aggregationConfig : aggregationConfigs) {
-          ExpressionContext expressionContext =
-              RequestContextUtils.getExpression(aggregationConfig.getAggregationFunction());
-          expressionContext.getColumns(fields);
-        }
-      }
-
-      fields.addAll(RecordEnricherPipeline.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
-      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
-      if (transformConfigs != null) {
-        for (TransformConfig transformConfig : transformConfigs) {
-          FunctionEvaluator expressionEvaluator =
-              FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
-          fields.addAll(expressionEvaluator.getArguments());
-          // add the column itself too, so that if it is already transformed, we won't transform again
-          fields.add(transformConfig.getColumnName());
-        }
-      }
-      ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
-      if (complexTypeConfig != null && complexTypeConfig.getFieldsToUnnest() != null) {
-        fields.addAll(complexTypeConfig.getFieldsToUnnest());
-      }
-    }
   }
 
   /**

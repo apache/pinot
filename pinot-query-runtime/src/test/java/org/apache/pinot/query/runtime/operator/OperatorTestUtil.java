@@ -83,11 +83,15 @@ public class OperatorTestUtil {
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
     return new OpChainExecutionContext(mailboxService, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
-        stageMetadata.getWorkerMetadataList().get(0), null);
+        stageMetadata.getWorkerMetadataList().get(0), null, null);
   }
 
   public static OpChainExecutionContext getTracingContext() {
     return getTracingContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
+  }
+
+  public static OpChainExecutionContext getContext(Map<String, String> opChainMetadata) {
+    return getTracingContext(opChainMetadata);
   }
 
   public static OpChainExecutionContext getNoTracingContext() {
@@ -101,7 +105,7 @@ public class OperatorTestUtil {
     WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
     StageMetadata stageMetadata = new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of());
     OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE,
-        opChainMetadata, stageMetadata, workerMetadata, null);
+        opChainMetadata, stageMetadata, workerMetadata, null, null);
 
     StagePlan stagePlan = new StagePlan(null, stageMetadata);
 

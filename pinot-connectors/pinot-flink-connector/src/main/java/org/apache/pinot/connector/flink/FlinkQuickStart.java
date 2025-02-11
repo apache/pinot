@@ -58,13 +58,10 @@ public final class FlinkQuickStart {
     ClassLoader classLoader = FlinkQuickStart.class.getClassLoader();
     final URL resource = classLoader.getResource("starbucks-stores-world.csv");
     try (BufferedReader br = new BufferedReader(new InputStreamReader(resource.openStream()))) {
-      String line = null;
+      String line;
       while ((line = br.readLine()) != null) {
         // split by comma, but in quotes
         String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-        if (parts[0].isEmpty() || parts[1].isEmpty()) {
-          System.out.println(line);
-        }
         rows.add(Row.of(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]), parts[2], parts[3]));
       }
     }

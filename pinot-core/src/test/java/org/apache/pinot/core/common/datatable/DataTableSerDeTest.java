@@ -21,6 +21,8 @@ package org.apache.pinot.core.common.datatable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -68,6 +70,7 @@ public class DataTableSerDeTest {
   private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
+  private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
 
   @Test(dataProvider = "versionProvider")
   public void testException(int dataTableVersion)
@@ -434,6 +437,14 @@ public class DataTableSerDeTest {
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
             break;
+          case MAP:
+            Map<String, Object> map = new HashMap<>();
+            for (int j = 0; j < 1 + RANDOM.nextInt(20); j++) {
+              map.put("k" + j, RandomStringUtils.random(RANDOM.nextInt(20)));
+            }
+            MAPS[rowId] = map;
+            dataTableBuilder.setColumn(colId, map);
+            break;
           case UNKNOWN:
             dataTableBuilder.setColumn(colId, (Object) null);
             break;
@@ -534,6 +545,9 @@ public class DataTableSerDeTest {
           case STRING_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getStringArray(rowId, colId), STRING_ARRAYS[rowId]),
                 ERROR_MESSAGE);
+            break;
+          case MAP:
+            Assert.assertEquals(newDataTable.getMap(rowId, colId), MAPS[rowId], ERROR_MESSAGE);
             break;
           case UNKNOWN:
             Object nulValue = newDataTable.getCustomObject(rowId, colId);

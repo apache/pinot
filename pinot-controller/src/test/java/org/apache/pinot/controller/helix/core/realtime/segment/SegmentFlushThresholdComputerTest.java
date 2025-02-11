@@ -20,16 +20,18 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.*;
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentFlushThresholdComputerTest {
@@ -301,5 +303,28 @@ public class SegmentFlushThresholdComputerTest {
     // (0.1 * (50000 / 200000)) + (0.9 * 0.15)
     // (0.1 * 0.25) + (0.9 * 0.15)
     assertEquals(computer.getLatestSegmentRowsToSizeRatio(), 0.16);
+  }
+
+  @Test(invocationCount = 1000)
+  public void testSegmentFlushThresholdVariance() {
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    int threshold = 90000;
+    for (double var = 0; var <= 0.5; var += 0.05) {
+      StreamConfig streamConfig = mock(StreamConfig.class);
+      when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(200_0000L);
+      when(streamConfig.getStreamConfigsMap()).thenReturn(
+          Map.of("realtime.segment.flush.threshold.variance.percentage", String.valueOf(var)));
+
+      CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
+      when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(300_000L);
+
+      SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
+      when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(60_000L, 50_000L);
+      when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(60_000);
+
+      int computedThreshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor,
+          committingSegmentZKMetadata, "events3__0__0__20211222T1646Z");
+      assertTrue(computedThreshold >= (1.0 - var) * threshold && computedThreshold <= (1.0 + var) * threshold);
+    }
   }
 }

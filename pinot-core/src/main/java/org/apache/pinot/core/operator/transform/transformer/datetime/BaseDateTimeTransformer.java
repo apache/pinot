@@ -20,11 +20,15 @@ package org.apache.pinot.core.operator.transform.transformer.datetime;
 
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
-import org.joda.time.DateTime;
+import org.joda.time.Chronology;
+import org.joda.time.DateTimeZone;
+import org.joda.time.MutableDateTime;
+import org.joda.time.chrono.ISOChronology;
 import org.joda.time.format.DateTimeFormatter;
 
 
@@ -42,14 +46,27 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   private final DateTimeFormatter _outputDateTimeFormatter;
   private final DateTimeGranularitySpec _outputGranularity;
   private final long _outputGranularityMillis;
-  private final SDFDateTimeTruncate _dateTimeTruncate;
+  private final SDFDateTimeTruncate _sdfDateTimeTruncate;
+  private final MillisDateTimeTruncate _millisDateTimeTruncate;
+  private final Chronology _bucketingChronology;
+  // use reusable objects for parsing and formatting dates, instead of allocating them on each function call
+  private final MutableDateTime _dateTime;
+  private final StringBuilder _printBuffer;
 
   private interface SDFDateTimeTruncate {
-    String truncate(DateTime dateTime);
+    String truncate(MutableDateTime dateTime);
   }
 
-  public BaseDateTimeTransformer(@Nonnull DateTimeFormatSpec inputFormat, @Nonnull DateTimeFormatSpec outputFormat,
-      @Nonnull DateTimeGranularitySpec outputGranularity) {
+  private interface MillisDateTimeTruncate {
+    long truncate(MutableDateTime dateTime);
+  }
+
+  public BaseDateTimeTransformer(
+      DateTimeFormatSpec inputFormat,
+      DateTimeFormatSpec outputFormat,
+      DateTimeGranularitySpec outputGranularity,
+      @Nullable DateTimeZone bucketingTimeZone) {
+
     _inputTimeSize = inputFormat.getColumnSize();
     _inputTimeUnit = inputFormat.getColumnUnit();
     _inputDateTimeFormatter = inputFormat.getDateTimeFormatter();
@@ -58,39 +75,145 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     _outputDateTimeFormatter = outputFormat.getDateTimeFormatter();
     _outputGranularity = outputGranularity;
     _outputGranularityMillis = outputGranularity.granularityToMillis();
+    _bucketingChronology = bucketingTimeZone != null ? ISOChronology.getInstance(bucketingTimeZone) : null;
+    _dateTime = new MutableDateTime(0L, DateTimeZone.UTC);
+    _printBuffer = new StringBuilder();
+
+    final int size = _outputGranularity.getSize();
 
     // setup date time truncating based on output granularity
-    final int sz = _outputGranularity.getSize();
+    // when size == 1, skip the needless set() calls
     switch (_outputGranularity.getTimeUnit()) {
       case MILLISECONDS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
-            .print(dateTime.withMillisOfSecond((dateTime.getMillisOfSecond() / sz) * sz));
+        if (size != 1) {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.setMillisOfSecond((dateTime.getMillisOfSecond() / size) * size);
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.setMillisOfSecond((dateTime.getMillisOfSecond() / size) * size);
+            return dateTime.getMillis();
+          };
+        } else {
+          _sdfDateTimeTruncate = (dateTime) -> print(dateTime);
+          _millisDateTimeTruncate = (dateTime) -> dateTime.getMillis();
+        }
         break;
       case SECONDS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-            dateTime.withSecondOfMinute((dateTime.getSecondOfMinute() / sz) * sz).secondOfMinute().roundFloorCopy());
+        if (size != 1) {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.setSecondOfMinute((dateTime.getSecondOfMinute() / size) * size);
+            dateTime.secondOfMinute().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.setSecondOfMinute((dateTime.getSecondOfMinute() / size) * size);
+            dateTime.secondOfMinute().roundFloor();
+            return dateTime.getMillis();
+          };
+        } else {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.secondOfMinute().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.secondOfMinute().roundFloor();
+            return dateTime.getMillis();
+          };
+        }
         break;
       case MINUTES:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
-            .print(dateTime.withMinuteOfHour((dateTime.getMinuteOfHour() / sz) * sz).minuteOfHour().roundFloorCopy());
+        if (size != 1) {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.setMinuteOfHour((dateTime.getMinuteOfHour() / size) * size);
+            dateTime.minuteOfHour().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.setMinuteOfHour((dateTime.getMinuteOfHour() / size) * size);
+            dateTime.minuteOfHour().roundFloor();
+            return dateTime.getMillis();
+          };
+        } else {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.minuteOfHour().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.minuteOfHour().roundFloor();
+            return dateTime.getMillis();
+          };
+        }
         break;
       case HOURS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
-            .print(dateTime.withHourOfDay((dateTime.getHourOfDay() / sz) * sz).hourOfDay().roundFloorCopy());
+        if (size != 1) {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.setHourOfDay((dateTime.getHourOfDay() / size) * size);
+            dateTime.hourOfDay().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.setHourOfDay((dateTime.getHourOfDay() / size) * size);
+            dateTime.hourOfDay().roundFloor();
+            return dateTime.getMillis();
+          };
+        } else {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.hourOfDay().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.hourOfDay().roundFloor();
+            return dateTime.getMillis();
+          };
+        }
         break;
       case DAYS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
-            .print(dateTime.withDayOfMonth(((dateTime.getDayOfMonth() - 1) / sz) * sz + 1).dayOfMonth()
-                .roundFloorCopy());
+        if (size != 1) {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.setDayOfMonth(((dateTime.getDayOfMonth() - 1) / size) * size + 1);
+            dateTime.dayOfMonth().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.setDayOfMonth(((dateTime.getDayOfMonth() - 1) / size) * size + 1);
+            dateTime.dayOfMonth().roundFloor();
+            return dateTime.getMillis();
+          };
+        } else {
+          _sdfDateTimeTruncate = (dateTime) -> {
+            dateTime.dayOfMonth().roundFloor();
+            return print(dateTime);
+          };
+          _millisDateTimeTruncate = (dateTime) -> {
+            dateTime.dayOfMonth().roundFloor();
+            return dateTime.getMillis();
+          };
+        }
         break;
       default:
-        _dateTimeTruncate = _outputDateTimeFormatter::print;
+        // truncating to MICROSECONDS or NANOSECONDS doesn't do anything because timestamps are stored
+        // in milliseconds at most
+        _sdfDateTimeTruncate = _outputDateTimeFormatter::print;
+        _millisDateTimeTruncate = (dateTime) -> dateTime.getMillis();
         break;
     }
   }
 
+  private String print(MutableDateTime dateTime) {
+    _printBuffer.setLength(0);
+    _outputDateTimeFormatter.printTo(_printBuffer, dateTime);
+    return _printBuffer.toString();
+  }
+
   protected long transformEpochToMillis(long epochTime) {
     return _inputTimeUnit.toMillis(epochTime * _inputTimeSize);
+  }
+
+  protected MutableDateTime toDateWithTZ(long millis) {
+    _dateTime.setMillis(millis);
+    _dateTime.setChronology(_bucketingChronology);
+    return _dateTime;
   }
 
   protected long transformSDFToMillis(@Nonnull String sdfTime) {
@@ -103,10 +226,24 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
 
   protected String transformMillisToSDF(long millisSinceEpoch) {
     // convert to date time (with timezone), then truncate/bucket to the desired output granularity
-    return _dateTimeTruncate.truncate(new DateTime(millisSinceEpoch, _outputDateTimeFormatter.getZone()));
+    _dateTime.setZone(_outputDateTimeFormatter.getZone());
+    _dateTime.setMillis(millisSinceEpoch);
+    return _sdfDateTimeTruncate.truncate(_dateTime);
+  }
+
+  protected String truncateDateToSDF(MutableDateTime dateTime) {
+    return _sdfDateTimeTruncate.truncate(dateTime);
+  }
+
+  protected long truncateToMillis(MutableDateTime dateTime) {
+    return _millisDateTimeTruncate.truncate(dateTime);
   }
 
   protected long transformToOutputGranularity(long millisSinceEpoch) {
     return (millisSinceEpoch / _outputGranularityMillis) * _outputGranularityMillis;
+  }
+
+  protected boolean useCustomBucketingTimeZone() {
+    return _bucketingChronology != null;
   }
 }

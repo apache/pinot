@@ -29,10 +29,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
@@ -56,7 +59,6 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -67,16 +69,18 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class RealtimeSegmentConverterTest {
+public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final String STRING_COLUMN1 = "string_col1";
   private static final String STRING_COLUMN2 = "string_col2";
@@ -99,14 +103,31 @@ public class RealtimeSegmentConverterTest {
 
   @Test
   public void testNoVirtualColumnsInSchema() {
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+    // @formatter:off
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("someName")
+        .setEnableColumnBasedNullHandling(true)
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col1"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2"))
+        .build();
+    // @formatter:on
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-    assertEquals(schema.getColumnNames().size(), 5);
+    Set<FieldSpec> initialVirtualColumns = getVirtualColumns(schema);
+    assertNotEquals(initialVirtualColumns, Collections.emptySet(), "Initial virtual columns should not be empty");
     Schema newSchema = RealtimeSegmentConverter.getUpdatedSchema(schema);
-    assertEquals(newSchema.getColumnNames().size(), 2);
+    Set<FieldSpec> newVirtualColumns = getVirtualColumns(newSchema);
+    assertEquals(newVirtualColumns, Collections.emptySet(), "Virtual columns should be removed");
+    assertEquals(newSchema.getSchemaName(), schema.getSchemaName(), "Schema name should be the same");
+    assertEquals(newSchema.isEnableColumnBasedNullHandling(), schema.isEnableColumnBasedNullHandling(),
+        "Column based null handling should be the same");
+  }
+
+  private Set<FieldSpec> getVirtualColumns(Schema schema) {
+    return schema.getAllFieldSpecs().stream()
+        .filter(FieldSpec::isVirtualColumn)
+        .collect(Collectors.toSet());
   }
 
   @Test
@@ -133,7 +154,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -151,28 +171,29 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    try {
 
-    File outputDir = new File(tmpDir, "outputDir");
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
-    converter.build(SegmentVersion.v3, null);
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
 
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getTotalDocs(), 0);
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-    assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime());
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getTotalDocs(), 0);
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+      assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime());
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
   }
 
   @Test
@@ -205,7 +226,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -223,41 +243,42 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
-    List<GenericRow> rows = generateTestData();
+    try {
+      List<GenericRow> rows = generateTestData();
 
-    for (GenericRow row : rows) {
-      mutableSegmentImpl.index(row, null);
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+      assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+      long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+      long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+
+      testSegment(rows, indexDir, tableConfig, segmentMetadata);
+    } finally {
+      mutableSegmentImpl.destroy();
     }
-
-    File outputDir = new File(tmpDir, "outputDir");
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
-    converter.build(SegmentVersion.v3, null);
-
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
-    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-
-    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
-
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
-
-    testSegment(rows, indexDir, tableConfig, segmentMetadata);
   }
 
   @Test
@@ -285,7 +306,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -303,28 +323,29 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    try {
 
-    File outputDir = new File(tmpDir, "outputDir");
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
-    converter.build(SegmentVersion.v3, null);
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
 
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getTotalDocs(), 0);
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-    assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime());
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getTotalDocs(), 0);
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+      assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime());
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
   }
 
   @Test
@@ -357,7 +378,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -375,41 +395,42 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
-    List<GenericRow> rows = generateTestData();
+    try {
+      List<GenericRow> rows = generateTestData();
 
-    for (GenericRow row : rows) {
-      mutableSegmentImpl.index(row, null);
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+      assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+      long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+      long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+
+      testSegment(rows, indexDir, tableConfig, segmentMetadata);
+    } finally {
+      mutableSegmentImpl.destroy();
     }
-
-    File outputDir = new File(tmpDir, "outputDir");
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
-    converter.build(SegmentVersion.v3, null);
-
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
-    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-
-    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
-
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
-
-    testSegment(rows, indexDir, tableConfig, segmentMetadata);
   }
 
   private void testSegment(List<GenericRow> rows, File indexDir,
@@ -443,6 +464,92 @@ public class RealtimeSegmentConverterTest {
       assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
 
       docId += 1;
+    }
+
+    segmentFile.destroy();
+  }
+
+  @DataProvider
+  public static Object[][] optimizeDictionaryTypeParams() {
+    // Format: {optimizeDictionaryType, expectedCRC}, crc is used here to check the correct dictionary type was used
+    return new Object[][]{
+        {true, "2653526366"},
+        {false, "2948830084"},
+    };
+  }
+
+  @Test(dataProvider = "optimizeDictionaryTypeParams")
+  public void testOptimizeDictionaryTypeConversion(Object[] params)
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+            .setTimeColumnName(DATE_TIME_COLUMN)
+            .setColumnMajorSegmentBuilderEnabled(true)
+            .setOptimizeDictionaryType((boolean) params[0])
+            .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN1, STRING_COLUMN2)), StandardIndexes.dictionary(),
+                DictionaryIndexConfig.DEFAULT)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+
+    // create mutable segment impl
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    try {
+      List<GenericRow> rows = new ArrayList<>();
+      for (int i = 0; i < 10; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue(STRING_COLUMN1, "string" + i * 10); // var length
+        row.putValue(STRING_COLUMN2, "string" + i % 10); // fixed length
+        row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
+        rows.add(row);
+      }
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getCrc(), params[1]);
+
+      assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+      assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+      long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+      long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+    } finally {
+      mutableSegmentImpl.destroy();
     }
   }
 
@@ -500,7 +607,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TextIndexConfig textIndexConfig =
         new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).withReuseMutableIndex(reuseMutableIndex)
             .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
@@ -520,90 +626,93 @@ public class RealtimeSegmentConverterTest {
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);
     RealtimeLuceneIndexRefreshManager.init(1, 10);
+    ImmutableSegmentImpl segmentFile = null;
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
-    List<GenericRow> rows = generateTestDataForReusePath();
+    try {
+      List<GenericRow> rows = generateTestDataForReusePath();
 
-    for (GenericRow row : rows) {
-      mutableSegmentImpl.index(row, null);
-    }
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
 
-    // build converted segment
-    File outputDir = new File(new File(tmpDir, segmentName), "tmp-" + segmentName + "-" + System.currentTimeMillis());
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(sortedColumn,
-        indexingConfig.getInvertedIndexColumns(), Collections.singletonList(STRING_COLUMN1), null,
-        indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
-    converter.build(SegmentVersion.v3, null);
+      // build converted segment
+      File outputDir = new File(new File(tmpDir, segmentName), "tmp-" + segmentName + "-" + System.currentTimeMillis());
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
 
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
-    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+      assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
 
-    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+      long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+      long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
 
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
 
-    // read converted segment
-    SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
-    SegmentDirectory.Reader segmentReader = segmentDir.createReader();
+      // read converted segment
+      SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
+      SegmentDirectory.Reader segmentReader = segmentDir.createReader();
 
-    Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
-    Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
-    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-      indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
-    }
-    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
+      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+      Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+      for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+        indexContainerMap.put(entry.getKey(),
+            new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+      }
+      segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
 
-    // test forward index contents
-    GenericRow readRow = new GenericRow();
-    int docId = 0;
-    for (int i = 0; i < rows.size(); i++) {
-      GenericRow row;
+      // test forward index contents
+      GenericRow readRow = new GenericRow();
+      int docId = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        GenericRow row;
+        if (sortedColumn == null) {
+          row = rows.get(i);
+        } else {
+          row = rows.get(rows.size() - i - 1);
+        }
+
+        segmentFile.getRecord(docId, readRow);
+
+        // if rawValueForTextIndex is set and mutable index is reused, the forward index should return the dummy value
+        if (rawValueForTextIndex != null && reuseMutableIndex) {
+          assertEquals(readRow.getValue(STRING_COLUMN1), rawValueForTextIndex);
+          assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+        } else {
+          assertEquals(readRow.getValue(STRING_COLUMN1), row.getValue(STRING_COLUMN1));
+          assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+        }
+        docId += 1;
+      }
+
+      // test docId conversion
+      TextIndexReader textIndexReader = segmentFile.getIndex(STRING_COLUMN1, StandardIndexes.text());
       if (sortedColumn == null) {
-        row = rows.get(i);
+        assertEquals(textIndexReader.getDocIds("str-8"), ImmutableRoaringBitmap.bitmapOf(0));
+        assertEquals(textIndexReader.getDocIds("str-4"), ImmutableRoaringBitmap.bitmapOf(4));
       } else {
-        row = rows.get(rows.size() - i - 1);
+        assertEquals(textIndexReader.getDocIds("str-8"), ImmutableRoaringBitmap.bitmapOf(7));
+        assertEquals(textIndexReader.getDocIds("str-4"), ImmutableRoaringBitmap.bitmapOf(3));
       }
-
-      segmentFile.getRecord(docId, readRow);
-
-      // if rawValueForTextIndex is set and mutable index is reused, the forward index should return the dummy value
-      if (rawValueForTextIndex != null && reuseMutableIndex) {
-        assertEquals(readRow.getValue(STRING_COLUMN1), rawValueForTextIndex);
-        assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
-      } else {
-        assertEquals(readRow.getValue(STRING_COLUMN1), row.getValue(STRING_COLUMN1));
-        assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+    } finally {
+      mutableSegmentImpl.destroy();
+      if (segmentFile != null) {
+        segmentFile.destroy();
       }
-      docId += 1;
     }
-
-    // test docId conversion
-    TextIndexReader textIndexReader = segmentFile.getIndex(STRING_COLUMN1, StandardIndexes.text());
-    if (sortedColumn == null) {
-      assertEquals(textIndexReader.getDocIds("str-8"), ImmutableRoaringBitmap.bitmapOf(0));
-      assertEquals(textIndexReader.getDocIds("str-4"), ImmutableRoaringBitmap.bitmapOf(4));
-    } else {
-      assertEquals(textIndexReader.getDocIds("str-8"), ImmutableRoaringBitmap.bitmapOf(7));
-      assertEquals(textIndexReader.getDocIds("str-4"), ImmutableRoaringBitmap.bitmapOf(3));
-    }
-
-    mutableSegmentImpl.destroy();
   }
 
   private List<GenericRow> generateTestData() {
@@ -650,7 +759,8 @@ public class RealtimeSegmentConverterTest {
     return segmentZKMetadata;
   }
 
-  public void destroy() {
+  @AfterMethod
+  public void tearDownTest() {
     FileUtils.deleteQuietly(TMP_DIR);
   }
 }

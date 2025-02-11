@@ -24,8 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-integration-test-base</artifactId>
   <name>Pinot Test Utils</name>
@@ -78,6 +77,16 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-runtime</artifactId>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
       <type>test-jar</type>
     </dependency>
 

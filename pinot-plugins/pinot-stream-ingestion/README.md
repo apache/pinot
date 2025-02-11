@@ -20,4 +20,4 @@
 -->
 # Pinot connectors module
 
-The pinot-connectors module is the place to write any pinot connectors to streams. For exampple, the pinot-connector-kafka-0.9 sub module contains the stream implementation for kafka-0.9. Dependencies to be shared across all sub modules are to be added in the pinot-connectors/pom.xml, and dependencies specific to the specific connector should go in its own pom file
+The pinot-connectors module is the place to write any pinot connectors to streams. For example, the pinot-connector-kafka-2.0 sub module contains the stream implementation for kafka-2.0. Dependencies to be shared across all sub modules are to be added in the pinot-connectors/pom.xml, and dependencies specific to the specific connector should go in its own pom file

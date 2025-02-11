@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.google.common.collect.Maps;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 
 
 /**
@@ -31,16 +30,12 @@ import javax.annotation.Nullable;
  *
  * @param <T> the format of the input record
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
   /**
    * Converts the field value to either a single value (string, number, byte[]), multi value (Object[]) or a Map.
-   * Returns {@code null} if the value is an empty array/collection/map.
-   *
-   * Natively Pinot only understands single values and multi values.
-   * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
    */
-  @Nullable
   public Object convert(Object value) {
     Object convertedValue;
     if (isMultiValue(value)) {
@@ -68,7 +63,7 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * multi-value objects differently.
    */
   protected boolean isMultiValue(Object value) {
-    return value instanceof Collection;
+    return value instanceof Collection || (value.getClass().isArray() && !(value instanceof byte[]));
   }
 
   /**
@@ -83,90 +78,83 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * Handles the conversion of every field of the object for the particular data format. Override this method if the
    * extractor can convert nested record types.
    *
-   * @param value should be verified to be a record type prior to calling this method as it will be handled with this
-   *              assumption
+   * @param value should be verified to be a record type prior to calling this method
    */
-  @Nullable
-  protected Object convertRecord(Object value) {
+  protected Map<Object, Object> convertRecord(Object value) {
     throw new UnsupportedOperationException("Extractor cannot convert record type structures for this data format.");
   }
 
   /**
-   * Handles the conversion of each element of a multi-value object. Returns {@code null} if the field value is
-   * {@code null}.
+   * Handles the conversion of each element of a multi-value object, and returns an Object array. Override this method
+   * if the data format requires a different conversion for its multi-value objects.
    *
-   * This implementation converts the Collection to an Object array. Any elements of the Collection that are
-   * {@code null} will be excluded from the returned multi-value object.
-   *
-   * Override this method if the data format requires a different conversion for its multi-value objects.
-   *
-   * @param value should be verified to be a Collection type prior to calling this method as it will be casted
-   *              to a Collection without checking
+   * @param value should be verified to be a multi-value type prior to calling this method
    */
-  @Nullable
-  protected Object convertMultiValue(Object value) {
-    Collection collection = (Collection) value;
-    if (collection.isEmpty()) {
-      return null;
+  protected Object[] convertMultiValue(Object value) {
+    if (value instanceof Collection) {
+      return convertCollection((Collection) value);
     }
+    if (value instanceof Object[]) {
+      return convertArray((Object[]) value);
+    }
+    return convertPrimitiveArray(value);
+  }
 
+  protected Object[] convertCollection(Collection collection) {
     int numValues = collection.size();
-    Object[] array = new Object[numValues];
+    Object[] convertedValues = new Object[numValues];
     int index = 0;
-    for (Object element : collection) {
-      Object convertedValue = null;
-      if (element != null) {
-        convertedValue = convert(element);
-      }
-      if (convertedValue != null) {
-        array[index++] = convertedValue;
-      }
+    for (Object value : collection) {
+      Object convertedValue = value != null ? convert(value) : null;
+      convertedValues[index++] = convertedValue;
     }
+    return convertedValues;
+  }
 
-    if (index == numValues) {
-      return array;
-    } else if (index == 0) {
-      return null;
-    } else {
-      return Arrays.copyOf(array, index);
+  protected Object[] convertArray(Object[] array) {
+    int numValues = array.length;
+    Object[] convertedValues = new Object[numValues];
+    for (int i = 0; i < numValues; i++) {
+      Object value = array[i];
+      Object convertedValue = value != null ? convert(value) : null;
+      convertedValues[i] = convertedValue;
     }
+    return convertedValues;
+  }
+
+  protected Object[] convertPrimitiveArray(Object array) {
+    if (array instanceof int[]) {
+      return ArrayUtils.toObject((int[]) array);
+    }
+    if (array instanceof long[]) {
+      return ArrayUtils.toObject((long[]) array);
+    }
+    if (array instanceof float[]) {
+      return ArrayUtils.toObject((float[]) array);
+    }
+    if (array instanceof double[]) {
+      return ArrayUtils.toObject((double[]) array);
+    }
+    throw new IllegalArgumentException("Unsupported primitive array type: " + array.getClass().getName());
   }
 
   /**
-   * Handles the conversion of every value of the map. Note that map keys will be handled as a single-value type.
-   * Returns {@code null} if the field value is {@code null}. This should be overridden if the data format requires
-   * a different conversion for map values.
+   * Handles the conversion of every value of the map. Note that map keys will be handled as a single-value type. This
+   * should be overridden if the data format requires a different conversion for map values.
    *
-   * @param value should be verified to be a Map type prior to calling this method as it will be casted to a Map
-   *              without checking
+   * @param value should be verified to be a Map type prior to calling this method
    */
-  @Nullable
-  protected Object convertMap(Object value) {
+  protected Map<Object, Object> convertMap(Object value) {
     Map<Object, Object> map = (Map) value;
-    if (map.isEmpty()) {
-      return null;
-    }
-
-    Map<Object, Object> convertedMap = new HashMap<>();
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(map.size());
     for (Map.Entry<Object, Object> entry : map.entrySet()) {
       Object mapKey = entry.getKey();
-      Object mapValue = entry.getValue();
       if (mapKey != null) {
-        Object convertedMapValue = null;
-        if (mapValue != null) {
-          convertedMapValue = convert(mapValue);
-        }
-
-        if (convertedMapValue != null) {
-          convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
-        }
+        Object mapValue = entry.getValue();
+        Object convertedMapValue = mapValue != null ? convert(mapValue) : null;
+        convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
       }
     }
-
-    if (convertedMap.isEmpty()) {
-      return null;
-    }
-
     return convertedMap;
   }
 

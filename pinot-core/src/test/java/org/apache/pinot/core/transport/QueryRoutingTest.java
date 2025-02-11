@@ -22,18 +22,19 @@ import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
@@ -64,8 +65,9 @@ public class QueryRoutingTest {
       SERVER_INSTANCE.toServerRoutingInstance(TableType.REALTIME, ServerInstance.RoutingType.NETTY);
   private static final BrokerRequest BROKER_REQUEST =
       CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
-  private static final Map<ServerInstance, Pair<List<String>, List<String>>> ROUTING_TABLE =
-      Collections.singletonMap(SERVER_INSTANCE, Pair.of(Collections.emptyList(), Collections.emptyList()));
+  private static final Map<ServerInstance, ServerRouteInfo> ROUTING_TABLE =
+      Collections.singletonMap(SERVER_INSTANCE,
+          new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
   private QueryRouter _queryRouter;
   private ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -202,6 +204,180 @@ public class QueryRoutingTest {
   }
 
   @Test
+  public void testLatencyForQueryServerException()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    Exception exception = new UnsupportedOperationException("Caught exception.");
+    ProcessingException processingException =
+        QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, exception);
+    dataTable.addException(processingException);
+    byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
+    // Start the server
+    QueryServer queryServer = getQueryServer(0, responseBytes);
+    queryServer.start();
+
+    // Send a query with ServerSide exception and check if the latency is set to timeout value.
+    Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+
+    if (latencyBefore == null) {
+      // This means that no queries were run before this test. So we can just make sure that latencyAfter is equal to
+      //666.334.
+      // This corresponds to the EWMA value when a latency timeout value of 1000 is set. Latency set to timeout value
+      //when server side exception occurs.
+      double serverEWMALatency = 666.334;
+      // Leaving an error budget of 2%
+      double delta = 13.32;
+      assertEquals(latencyAfter, serverEWMALatency, delta);
+    } else {
+      assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
+    }
+
+    // Shut down the server
+    queryServer.shutDown();
+  }
+
+  @Test
+  public void testLatencyForClientException()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    Exception exception = new UnsupportedOperationException("Caught exception.");
+    ProcessingException processingException =
+        QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, exception);
+    dataTable.addException(processingException);
+    byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
+    // Start the server
+    QueryServer queryServer = getQueryServer(0, responseBytes);
+    queryServer.start();
+
+    // Send a query with client side errors.
+    Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+
+    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+
+    if (latencyBefore == null) {
+      // Latency for the server with client side exception is assigned as serverResponse.getResponseDelayMs() and the
+      //calculated
+      // EWMLatency for the server will be less than serverResponse.getResponseDelayMs()
+      assertTrue(latencyAfter <= serverResponse.getResponseDelayMs());
+    } else {
+      assertTrue(latencyAfter < latencyBefore, latencyAfter + " should be lesser than " + latencyBefore);
+    }
+
+    // Shut down the server
+    queryServer.shutDown();
+  }
+
+  @Test
+  public void testLatencyForMultipleExceptions()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    Exception exception = new UnsupportedOperationException("Caught exception.");
+    ProcessingException processingException =
+        QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, exception);
+    ProcessingException processingServerException =
+        QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, exception);
+    dataTable.addException(processingServerException);
+    dataTable.addException(processingException);
+    byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
+    // Start the server
+    QueryServer queryServer = getQueryServer(0, responseBytes);
+    queryServer.start();
+
+    // Send a query with multiple exceptions. Make sure that the latency is set to timeout value even if a single
+    //server-side exception is seen.
+    Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+
+    if (latencyBefore == null) {
+      // This means that no queries where run before this test. So we can just make sure that latencyAfter is equal
+      //to 666.334.
+      // This corresponds to the EWMA value when a latency timeout value of 1000 is set.
+      double serverEWMALatency = 666.334;
+      // Leaving an error budget of 2%
+      double delta = 13.32;
+      assertEquals(latencyAfter, serverEWMALatency, delta);
+    } else {
+      assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
+    }
+
+    // Shut down the server
+    queryServer.shutDown();
+  }
+
+  @Test
+  public void testLatencyForNoException()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] responseBytes = dataTable.toBytes();
+    String serverId = SERVER_INSTANCE.getInstanceId();
+    // Start the server
+    QueryServer queryServer = getQueryServer(0, responseBytes);
+    queryServer.start();
+
+    // Send a valid query and get latency
+    Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+    assertEquals(response.size(), 1);
+    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+
+    _requestCount += 2;
+    waitForStatsUpdate(_requestCount);
+    Double latencyAfter = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
+
+    if (latencyBefore == null) {
+      // Latency for the server with no exceptions is assigned as serverResponse.getResponseDelayMs() and the calculated
+      // EWMLatency for the server will be less than serverResponse.getResponseDelayMs()
+      assertTrue(latencyAfter <= serverResponse.getResponseDelayMs());
+    } else {
+      assertTrue(latencyAfter < latencyBefore, latencyAfter + " should be lesser than " + latencyBefore);
+    }
+
+    // Shut down the server
+    queryServer.shutDown();
+  }
+
+  @Test
   public void testNonMatchingRequestId()
       throws Exception {
     long requestId = 123;
@@ -305,9 +481,9 @@ public class QueryRoutingTest {
         serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
     ServerRoutingInstance serverRoutingInstance2 =
         serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
-    Map<ServerInstance, Pair<List<String>, List<String>>> routingTable =
-        Map.of(serverInstance1, Pair.of(Collections.emptyList(), Collections.emptyList()), serverInstance2,
-            Pair.of(Collections.emptyList(), Collections.emptyList()));
+    Map<ServerInstance, ServerRouteInfo> routingTable =
+        Map.of(serverInstance1, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()),
+            serverInstance2, new ServerRouteInfo(Collections.emptyList(), Collections.emptyList()));
 
     long requestId = 123;
     DataSchema dataSchema =

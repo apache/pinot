@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -94,13 +93,13 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
     schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new MetricFieldSpec(TDIGEST_CUSTOM_COMPRESSION_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUP_BY_COLUMN, FieldSpec.DataType.STRING, true));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(List.of(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN)).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Arrays.asList(TDIGEST_COLUMN, TDIGEST_CUSTOM_COMPRESSION_COLUMN));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {

@@ -21,7 +21,6 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -35,7 +34,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -99,6 +97,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(indexDir);
 
     TableConfig tableConfig = tableConfig();
+    Schema schema = schema();
 
     List<GenericRow> records = new ArrayList<>(numRecords());
     records.add(createRecord(1, 1, "daffy duck",
@@ -142,10 +141,13 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"days\": 111}"));
     records.add(createRecord(14, 14, "top level array", "[{\"i1\":1,\"i2\":2}, {\"i1\":3,\"i2\":4}]"));
 
-    List<String> jsonIndexColumns = new ArrayList<>();
-    jsonIndexColumns.add("jsonColumn");
-    tableConfig.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema());
+    records.add(createRecord(15, 15, "john doe", "{\"longVal\": \"9223372036854775807\"}"));
+    records.add(createRecord(16, 16, "john doe", "{\"longVal\": \"-9223372036854775808\" }"));
+    records.add(createRecord(17, 17, "john doe", "{\"longVal\": \"-100.12345\" }"));
+    records.add(createRecord(18, 18, "john doe", "{\"longVal\": \"10e2\" }"));
+
+    tableConfig.getIndexingConfig().setJsonIndexColumns(List.of("jsonColumn"));
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(indexDir.getPath());
@@ -154,11 +156,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(tableConfig);
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;

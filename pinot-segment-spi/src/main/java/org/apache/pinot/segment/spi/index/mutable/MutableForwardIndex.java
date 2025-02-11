@@ -19,10 +19,12 @@
 package org.apache.pinot.segment.spi.index.mutable;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -73,6 +75,15 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
             setString(docId, (String) value);
           } else if (value instanceof byte[]) {
             setBytes(docId, (byte[]) value);
+          }
+          break;
+        case MAP:
+          if (value instanceof Map) {
+            setBytes(docId, MapUtils.serializeMap((Map) value));
+          } else if (value instanceof byte[]) {
+            setBytes(docId, (byte[]) value);
+          } else {
+            throw new IllegalStateException("Unsupported value type for MAP column: " + value.getClass());
           }
           break;
         default:

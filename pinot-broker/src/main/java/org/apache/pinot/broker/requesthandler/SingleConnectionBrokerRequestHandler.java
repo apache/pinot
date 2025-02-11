@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
 import org.apache.pinot.broker.failuredetector.FailureDetectorFactory;
@@ -41,7 +40,9 @@ import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
@@ -98,9 +99,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -116,7 +117,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
+      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
     _failureDetector.notifyQueryFinished(asyncQueryResponse);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
@@ -162,7 +165,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     if (numServersNotResponded != 0) {
       brokerResponse.addException(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
+
+      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
+          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
+      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
     if (brokerResponse.getExceptionsSize() > 0) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);

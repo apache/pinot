@@ -19,6 +19,7 @@
 package org.apache.pinot.core.startree.v2;
 
 import com.tdunning.math.stats.TDigest;
+import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
@@ -35,7 +36,7 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
 
   @Override
   ValueAggregator<Object, TDigest> getValueAggregator() {
-    return new PercentileTDigestValueAggregator();
+    return new PercentileTDigestValueAggregator(Collections.emptyList());
   }
 
   @Override

@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.blocks;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +36,8 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+
 
 
 /**
@@ -86,9 +87,9 @@ public class TransferableBlock implements Block {
     _errCodeToExceptionMap = null;
   }
 
-  public List<ByteBuffer> getSerializedStatsByStage() {
+  public List<DataBuffer> getSerializedStatsByStage() {
     if (isSuccessfulEndOfStreamBlock()) {
-      List<ByteBuffer> statsByStage;
+      List<DataBuffer> statsByStage;
       if (_dataBlock instanceof MetadataBlock) {
         statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
         if (statsByStage == null) {
@@ -133,6 +134,14 @@ public class TransferableBlock implements Block {
    * Retrieve the extracted {@link TransferableBlock#_container} of the transferable block.
    * If not already constructed. It will use {@link DataBlockUtils} to extract the row/columnar data from the
    * binary-packed format.
+   *
+   * TODO: This method should never been called by operators, as it allocates a lot for no reason.
+   *   Instead, an iterable should be returned.
+   *   That iterable can materialize rows one by one, without allocating all of them at once.
+   *   In fact transformations and filters could be implemented in zero allocate fashion by having a special type of
+   *   block that wraps the child block and decorates it with a transformation/predicate.
+   *   By doing so only operators that actually require to keep multi-stage results in memory will allocate memory.
+   *   PS: the term _allocate memory_ here means _keep alive an amount of memory proportional to the number of rows_.
    *
    * @return data container.
    */
@@ -208,7 +217,6 @@ public class TransferableBlock implements Block {
    *
    * @return whether this block is the end of stream.
    */
-  // TODO: Update the name to isTerminateBlock.
   public boolean isEndOfStreamBlock() {
     return isType(MetadataBlock.MetadataBlockType.ERROR) || isType(MetadataBlock.MetadataBlockType.EOS);
   }

@@ -152,4 +152,24 @@ public class DynamicBrokerSelectorTest {
 
     Mockito.verify(_mockZkClient, times(1)).close();
   }
+
+  @Test
+  public void testSelectBrokerWithInvalidTable() {
+    Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
+    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker("invalidTable");
+    assertEquals(result, "broker1");
+  }
+
+  @Test
+  public void testSelectBrokerWithTwoTablesOneInvalid() {
+    Map<String, List<String>> tableToBrokerListMap = new HashMap<>();
+    tableToBrokerListMap.put("table1", Collections.singletonList("broker1"));
+    when(_mockExternalViewReader.getTableToBrokersMap()).thenReturn(tableToBrokerListMap);
+    _dynamicBrokerSelectorUnderTest.handleDataChange("dataPath", "data");
+    String result = _dynamicBrokerSelectorUnderTest.selectBroker("table1", "invalidTable");
+    assertEquals(result, "broker1");
+  }
 }

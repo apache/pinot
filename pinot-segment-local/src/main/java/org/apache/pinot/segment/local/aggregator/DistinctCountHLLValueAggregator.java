@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -38,11 +39,11 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   private int _maxByteSize;
 
   public DistinctCountHLLValueAggregator(List<ExpressionContext> arguments) {
-    // length 1 means we use the default _log2m of 8
-    if (arguments.size() <= 1) {
+    // No argument means we use the default _log2m of 8
+    if (arguments.isEmpty()) {
       _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
     } else {
-      _log2m = arguments.get(1).getLiteral().getIntValue();
+      _log2m = arguments.get(0).getLiteral().getIntValue();
     }
   }
 
@@ -115,5 +116,10 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   @Override
   public HyperLogLog deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
+  }
+
+  @VisibleForTesting
+  public int getLog2m() {
+    return _log2m;
   }
 }

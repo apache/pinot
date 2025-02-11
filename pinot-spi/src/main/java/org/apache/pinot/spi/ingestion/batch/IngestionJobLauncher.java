@@ -56,8 +56,7 @@ public class IngestionJobLauncher {
       try {
         properties.load(FileUtils.openInputStream(new File(propertyFilePath)));
       } catch (IOException e) {
-        throw new RuntimeException(
-            String.format("Unable to read property file [%s] into properties.", propertyFilePath), e);
+        throw new RuntimeException("Unable to read property file [" + propertyFilePath + "] into properties.", e);
       }
     }
     Map<String, Object> propertiesMap = (Map) properties;
@@ -75,7 +74,7 @@ public class IngestionJobLauncher {
     try {
       jobSpecTemplate = IOUtils.toString(new BufferedReader(new FileReader(jobSpecFilePath)));
     } catch (IOException e) {
-      throw new RuntimeException(String.format("Unable to read ingestion job spec file [%s].", jobSpecFilePath), e);
+      throw new RuntimeException("Unable to read ingestion job spec file [" + jobSpecFilePath + "].", e);
     }
     String jobSpecStr;
     try {

@@ -153,7 +153,8 @@ public abstract class BaseTransformFunctionTest {
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
       _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
-      _bigDecimalSVValues[i] = BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i]));
+      _bigDecimalSVValues[i] =
+          BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(_intSVValues[i])).stripTrailingZeros();
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _jsonSVValues[i] = String.format(
           "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
@@ -202,7 +203,6 @@ public abstract class BaseTransformFunctionTest {
         _doubleMV2Values[i][j] = 1.0;
       }
 
-      float range = 1.0f - 0.0f;
       Random random = new Random();
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
         _vector1Values[i][j] = random.nextFloat();;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -73,6 +75,8 @@ public class PlanNodeDeserializer {
         return deserializeValueNode(protoNode);
       case WINDOWNODE:
         return deserializeWindowNode(protoNode);
+      case EXPLAINNODE:
+        return deserializeExplainedNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -83,7 +87,8 @@ public class PlanNodeDeserializer {
     return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
         protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
-        convertAggType(protoAggregateNode.getAggType()));
+        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit());
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
@@ -96,12 +101,15 @@ public class PlanNodeDeserializer {
     Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
     return new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertJoinType(protoJoinNode.getJoinType()), protoJoinNode.getLeftKeysList(),
-        protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()));
+        protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()),
+        convertJoinStrategy(protoJoinNode.getJoinStrategy()));
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
+    List<PlanNode> planNodes = extractInputs(protoNode);
+    Preconditions.checkState(planNodes.isEmpty(), "MailboxReceiveNode should not have inputs but has: %s", planNodes);
     Plan.MailboxReceiveNode protoMailboxReceiveNode = protoNode.getMailboxReceiveNode();
-    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
+    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoMailboxReceiveNode.getSenderStageId(), convertExchangeType(protoMailboxReceiveNode.getExchangeType()),
         convertDistributionType(protoMailboxReceiveNode.getDistributionType()), protoMailboxReceiveNode.getKeysList(),
         convertCollations(protoMailboxReceiveNode.getCollationsList()), protoMailboxReceiveNode.getSort(),
@@ -110,8 +118,18 @@ public class PlanNodeDeserializer {
 
   private static MailboxSendNode deserializeMailboxSendNode(Plan.PlanNode protoNode) {
     Plan.MailboxSendNode protoMailboxSendNode = protoNode.getMailboxSendNode();
+
+    List<Integer> receiverIds;
+    List<Integer> protoReceiverIds = protoMailboxSendNode.getReceiverStageIdsList();
+    if (protoReceiverIds == null || protoReceiverIds.isEmpty()) {
+      // This should only happen if a not updated broker sends the request
+      receiverIds = List.of(protoMailboxSendNode.getReceiverStageId());
+    } else {
+      receiverIds = protoReceiverIds;
+    }
+
     return new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
-        protoMailboxSendNode.getReceiverStageId(), convertExchangeType(protoMailboxSendNode.getExchangeType()),
+        receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
         protoMailboxSendNode.getSort());
@@ -155,6 +173,12 @@ public class PlanNodeDeserializer {
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
         protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+  }
+
+  private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
+    Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
+    return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {
@@ -262,6 +286,17 @@ public class PlanNodeDeserializer {
         return JoinRelType.ANTI;
       default:
         throw new IllegalStateException("Unsupported JoinType: " + joinType);
+    }
+  }
+
+  private static JoinNode.JoinStrategy convertJoinStrategy(Plan.JoinStrategy joinStrategy) {
+    switch (joinStrategy) {
+      case HASH:
+        return JoinNode.JoinStrategy.HASH;
+      case LOOKUP:
+        return JoinNode.JoinStrategy.LOOKUP;
+      default:
+        throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
   }
 

@@ -1,0 +1,124 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.plugin.stream.kafka30;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.BytesDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
+import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * KafkaPartitionLevelConnectionHandler provides low level APIs to access Kafka partition level information.
+ * E.g. partition counts, offsets per partition.
+ *
+ */
+public abstract class KafkaPartitionLevelConnectionHandler {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConnectionHandler.class);
+  protected final KafkaPartitionLevelStreamConfig _config;
+  protected final String _clientId;
+  protected final int _partition;
+  protected final String _topic;
+  protected final Consumer<String, Bytes> _consumer;
+  protected final TopicPartition _topicPartition;
+  protected final Properties _consumerProp;
+
+  public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
+    _config = new KafkaPartitionLevelStreamConfig(streamConfig);
+    _clientId = clientId;
+    _partition = partition;
+    _topic = _config.getKafkaTopicName();
+    _consumerProp = buildProperties(streamConfig);
+    KafkaSSLUtils.initSSL(_consumerProp);
+    _consumer = createConsumer(_consumerProp);
+    _topicPartition = new TopicPartition(_topic, _partition);
+    _consumer.assign(Collections.singletonList(_topicPartition));
+  }
+
+  private Properties buildProperties(StreamConfig streamConfig) {
+    Properties consumerProp = new Properties();
+    consumerProp.putAll(streamConfig.getStreamConfigsMap());
+    consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _config.getBootstrapHosts());
+    consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
+    if (_config.getKafkaIsolationLevel() != null) {
+      consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
+    }
+    consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
+    return consumerProp;
+  }
+
+  private Consumer<String, Bytes> createConsumer(Properties consumerProp) {
+    return retry(() -> new KafkaConsumer<>(consumerProp), 5);
+  }
+
+  protected AdminClient createAdminClient() {
+    return retry(() -> AdminClient.create(_consumerProp), 5);
+  }
+
+  private static <T> T retry(Supplier<T> s, int nRetries) {
+    // Creation of the KafkaConsumer can fail for multiple reasons including DNS issues.
+    // We arbitrarily chose 5 retries with 2 seconds sleep in between retries. 10 seconds total felt
+    // like a good balance of not waiting too long for a retry, but also not retrying too many times.
+    int tries = 0;
+    while (true) {
+      try {
+        return s.get();
+      } catch (KafkaException e) {
+        tries++;
+        if (tries >= nRetries) {
+          LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
+          throw e;
+        }
+        LOGGER.warn("Caught exception while creating Kafka consumer, retrying {}/{}", tries, nRetries, e);
+        // We are choosing to sleepUniterruptibly here because other parts of the Kafka consumer code do this
+        // as well. We don't want random interrupts to cause us to fail to create the consumer and have the table
+        // stuck in ERROR state.
+        Uninterruptibles.sleepUninterruptibly(2, TimeUnit.SECONDS);
+      }
+    }
+  }
+
+  public void close()
+      throws IOException {
+    _consumer.close();
+  }
+
+  @VisibleForTesting
+  public KafkaPartitionLevelStreamConfig getKafkaPartitionLevelStreamConfig() {
+    return _config;
+  }
+}

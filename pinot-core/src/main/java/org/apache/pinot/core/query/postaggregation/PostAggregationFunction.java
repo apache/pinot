@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.postaggregation;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -33,40 +34,43 @@ import org.apache.pinot.common.utils.PinotDataType;
  */
 public class PostAggregationFunction {
   private final FunctionInvoker _functionInvoker;
-  private final PinotDataType[] _argumentTypes;
   private final ColumnDataType _resultType;
+  @Nullable
+  private PinotDataType[] _argumentTypes;
 
   public PostAggregationFunction(String functionName, ColumnDataType[] argumentTypes) {
     String canonicalName = FunctionRegistry.canonicalize(functionName);
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
-        throw new IllegalArgumentException(
-            String.format("Unsupported function: %s with argument types: %s", functionName,
-                Arrays.toString(argumentTypes)));
+        throw new IllegalArgumentException("Unsupported function: " + functionName + " with argument types: "
+            + Arrays.toString(argumentTypes));
       } else {
-        throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
+        throw new IllegalArgumentException("Unsupported function: " + functionName);
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);
-    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    int numArguments = argumentTypes.length;
-    int numParameters = parameterClasses.length;
-    Preconditions.checkArgument(numArguments == numParameters,
-        "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(), numParameters,
-        numArguments);
-    for (int i = 0; i < numParameters; i++) {
-      Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
-          parameterClasses[i], functionInfo.getMethod());
-    }
-    _argumentTypes = new PinotDataType[numArguments];
-    for (int i = 0; i < numArguments; i++) {
-      _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
-    }
     ColumnDataType resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
     _resultType = resultType != null ? resultType : ColumnDataType.STRING;
+
+    if (!_functionInvoker.getMethod().isVarArgs()) {
+      Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
+      PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+      int numArguments = argumentTypes.length;
+      int numParameters = parameterClasses.length;
+      Preconditions.checkArgument(numArguments == numParameters,
+          "Wrong number of arguments for method: %s, expected: %s, actual: %s", functionInfo.getMethod(), numParameters,
+          numArguments);
+      for (int i = 0; i < numParameters; i++) {
+        Preconditions.checkArgument(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
+            parameterClasses[i], functionInfo.getMethod());
+      }
+      _argumentTypes = new PinotDataType[numArguments];
+      for (int i = 0; i < numArguments; i++) {
+        _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
+      }
+    }
   }
 
   /**
@@ -81,16 +85,22 @@ public class PostAggregationFunction {
    * NOTE: The passed in arguments could be modified during the type conversion.
    */
   public Object invoke(Object[] arguments) {
-    int numArguments = arguments.length;
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    for (int i = 0; i < numArguments; i++) {
-      PinotDataType parameterType = parameterTypes[i];
-      PinotDataType argumentType = _argumentTypes[i];
-      if (parameterType != argumentType) {
-        arguments[i] = parameterType.convert(arguments[i], argumentType);
+    Object result;
+    if (_functionInvoker.getMethod().isVarArgs()) {
+      result = _functionInvoker.invoke(new Object[]{arguments});
+    } else {
+      int numArguments = arguments.length;
+      PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+      for (int i = 0; i < numArguments; i++) {
+        PinotDataType parameterType = parameterTypes[i];
+        PinotDataType argumentType = _argumentTypes[i];
+        if (parameterType != argumentType) {
+          arguments[i] = parameterType.convert(arguments[i], argumentType);
+        }
       }
+      result = _functionInvoker.invoke(arguments);
     }
-    Object result = _functionInvoker.invoke(arguments);
+
     return _resultType == ColumnDataType.STRING ? result.toString() : result;
   }
 }

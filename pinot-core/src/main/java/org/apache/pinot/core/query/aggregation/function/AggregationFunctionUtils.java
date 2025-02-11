@@ -39,6 +39,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -68,7 +69,6 @@ public class AggregationFunctionUtils {
    * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} in stored type from the
    * {@link AggregationFunction}. Returns {@code null} if the {@link AggregationFunction} cannot be represented as an
    * {@link AggregationFunctionColumnPair} (e.g. has multiple arguments, argument is not column etc.).
-   * TODO: Allow multiple arguments for aggregation functions, e.g. percentileEst
    */
   @Nullable
   public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
@@ -385,7 +385,14 @@ public class AggregationFunctionUtils {
       }
     }
 
-    if (!nonFilteredFunctions.isEmpty()) {
+    if (!nonFilteredFunctions.isEmpty() || ((queryContext.getGroupByExpressions() != null)
+        && !QueryOptionsUtils.isFilteredAggregationsSkipEmptyGroups(queryContext.getQueryOptions()))) {
+      // If there are no non-filtered aggregation functions for a group by query, we still add a new AggregationInfo
+      // with an empty AggregationFunction array and the main query filter so that the GroupByExecutor will compute all
+      // the groups (from the result of applying the main query filter) but no unnecessary additional aggregation will
+      // be done since the AggregationFunction array is empty. However, if the query option to skip empty groups is
+      // enabled, we don't do this in order to avoid unnecessary computation of empty groups (which can be very
+      // expensive if the main filter has high selectivity).
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       aggregationInfos.add(
           buildAggregationInfo(segmentContext, queryContext, aggregationFunctions, mainFilter, mainFilterOperator,

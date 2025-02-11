@@ -18,10 +18,18 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
+import org.apache.calcite.rel.externalize.RelDotWriter;
+import org.apache.calcite.rel.externalize.RelJsonWriter;
+import org.apache.calcite.rel.externalize.RelWriterImpl;
+import org.apache.calcite.rel.externalize.RelXmlWriter;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.pinot.query.planner.explain.PinotRelJsonWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +52,32 @@ public class PlannerUtils {
     return planFragmentId == 1;
   }
 
+  /**
+   * Like {@link RelOptUtil#dumpPlan(String, RelNode, SqlExplainFormat, SqlExplainLevel)} but uses a different json
+   * writer.
+   */
   public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel) {
-    return RelOptUtil.dumpPlan("Execution Plan", relRoot, format, explainLevel);
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+    pw.println("Execution Plan");
+    RelWriter planWriter;
+    switch (format) {
+      case XML:
+        planWriter = new RelXmlWriter(pw, explainLevel);
+        break;
+      case JSON:
+        planWriter = new PinotRelJsonWriter();
+        relRoot.explain(planWriter);
+        return ((RelJsonWriter) planWriter).asString();
+      case DOT:
+        planWriter = new RelDotWriter(pw, explainLevel, false);
+        break;
+      default:
+        planWriter = new RelWriterImpl(pw, explainLevel, false);
+        break;
+    }
+    relRoot.explain(planWriter);
+    pw.flush();
+    return sw.toString();
   }
 }

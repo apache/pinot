@@ -124,6 +124,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // track memory usage
     private final boolean _isThreadMemorySamplingEnabled;
 
+    // is sampling allowed for MSE queries
+    private final boolean _isThreadSamplingEnabledForMSE;
+
     private final Set<String> _inactiveQuery;
 
     // the periodical task that aggregates and preempts queries
@@ -156,6 +159,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadMemorySamplingEnabled = memorySamplingConfig && threadMemoryMeasurementEnabled;
       LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
           _isThreadMemorySamplingEnabled);
+
+      _isThreadSamplingEnabledForMSE =
+          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
+              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
+      LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
       // ThreadMXBean wrapper
       _threadResourceUsageProvider = new ThreadLocal<>();
@@ -232,6 +240,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     /**
+     * Sample Usage for Multi-stage engine queries
+     */
+    @Override
+    public void sampleUsageMSE() {
+      if (_isThreadSamplingEnabledForMSE) {
+        sampleThreadBytesAllocated();
+        sampleThreadCPUTime();
+      }
+    }
+
+    /**
      * for testing only
      */
     public int getEntryCount() {
@@ -286,17 +305,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void createExecutionContextInner(@Nullable String queryId, int taskId, @Nullable
-        ThreadExecutionContext parentContext) {
+    public void createExecutionContextInner(@Nullable String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (parentContext == null) {
         // is anchor thread
         assert queryId != null;
-        _threadLocalEntry.get().setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-            Thread.currentThread());
+        _threadLocalEntry.get()
+            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
       } else {
         // not anchor thread
-        _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId,
+        _threadLocalEntry.get().setThreadTaskStatus(queryId, taskId, parentContext.getTaskType(),
             parentContext.getAnchorThread());
       }
     }
@@ -304,6 +323,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public ThreadExecutionContext getThreadExecutionContext() {
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
+    }
+
+    public CPUMemThreadLevelAccountingObjects.ThreadEntry getThreadEntry() {
+      return _threadLocalEntry.get();
     }
 
     /**
@@ -316,7 +339,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // clear task info + stats
       threadEntry.setToIdle();
       // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.set(null);
+      _threadResourceUsageProvider.remove();
       // clear _anchorThread
       super.clear();
     }

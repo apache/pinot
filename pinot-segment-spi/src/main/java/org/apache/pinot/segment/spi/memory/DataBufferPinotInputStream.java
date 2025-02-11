@@ -124,9 +124,6 @@ public class DataBufferPinotInputStream extends PinotInputStream {
     if (off < 0 || off + len > b.length) {
       throw new IndexOutOfBoundsException("off=" + off + ", len=" + len + ", b.length=" + b.length);
     }
-    // the javadoc of DataInput.readFully(byte[], int, int) says that the method will block until the requested
-    // number of bytes has been read, end of file is detected, or an exception is thrown.
-    // So being formal, we should modify the buffer even if we know we are going to reach EOF.
     boolean eof = availableLong() < len;
     _dataBuffer.copyTo(_currentOffset, b, off, len);
     _currentOffset += len;

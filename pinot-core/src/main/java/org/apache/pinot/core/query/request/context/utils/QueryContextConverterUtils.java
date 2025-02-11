@@ -33,6 +33,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -155,11 +157,35 @@ public class QueryContextConverterUtils {
       }
     }
 
-    return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
-        .setSelectExpressions(selectExpressions).setDistinct(distinct).setAliasList(aliasList).setFilter(filter)
-        .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
-        .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
-        .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
-        .setExplain(pinotQuery.isExplain()).build();
+    ExplainMode explainMode;
+    if (!pinotQuery.isExplain()) {
+      explainMode = ExplainMode.NONE;
+    } else if (isMultiStage(pinotQuery)) {
+      explainMode = ExplainMode.NODE;
+    } else {
+      explainMode = ExplainMode.DESCRIPTION;
+    }
+
+    return new QueryContext.Builder()
+        .setTableName(tableName)
+        .setSubquery(subquery)
+        .setSelectExpressions(selectExpressions)
+        .setDistinct(distinct)
+        .setAliasList(aliasList)
+        .setFilter(filter)
+        .setGroupByExpressions(groupByExpressions)
+        .setOrderByExpressions(orderByExpressions)
+        .setHavingFilter(havingFilter)
+        .setLimit(pinotQuery.getLimit())
+        .setOffset(pinotQuery.getOffset())
+        .setQueryOptions(pinotQuery.getQueryOptions())
+        .setExpressionOverrideHints(expressionContextOverrideHints)
+        .setExplain(explainMode)
+        .build();
+  }
+
+  private static boolean isMultiStage(PinotQuery pinotQuery) {
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    return queryOptions != null && QueryOptionsUtils.isUseMultistageEngine(queryOptions);
   }
 }

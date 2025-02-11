@@ -67,7 +67,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
     SegmentPurger segmentPurger =
-        new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier);
+        new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier, null);
     long purgeTaskStartTimeNs = MX_BEAN.getCurrentThreadCpuTime();
     File purgedSegmentFile = segmentPurger.purgeSegment();
     long purgeTaskEndTimeNs = MX_BEAN.getCurrentThreadCpuTime();

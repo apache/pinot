@@ -19,6 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -26,7 +27,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,7 +40,6 @@ public class StAsTextFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_AsText";
 
   private TransformFunction _transformFunction;
-  private String[] _results;
 
   @Override
   public String getName() {
@@ -67,15 +66,23 @@ public class StAsTextFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
     byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
-    Geometry geometry;
-    for (int i = 0; i < valueBlock.getNumDocs(); i++) {
-      geometry = GeometrySerializer.deserialize(values[i]);
-      _results[i] = GeometryUtils.WKT_WRITER.write(geometry);
+    // use single buffer instead of allocating separate StringBuffer per row
+    StringBuilderWriter buffer = new StringBuilderWriter();
+
+    try {
+      for (int i = 0; i < numDocs; i++) {
+        Geometry geometry = GeometrySerializer.deserialize(values[i]);
+        GeometryUtils.WKT_WRITER.write(geometry, buffer);
+        _stringValuesSV[i] = buffer.getString();
+        buffer.clear();
+      }
+    } catch (IOException ioe) {
+      // should never happen
+      throw new RuntimeException(ioe);
     }
-    return _results;
+    return _stringValuesSV;
   }
 }

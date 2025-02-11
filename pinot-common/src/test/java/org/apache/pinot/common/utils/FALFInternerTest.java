@@ -53,10 +53,6 @@ public class FALFInternerTest {
     int nHits2 = runInterning(allObjs, falfInterner, true);
     int nHits3 = runInterning(allObjs, falfInternerCustomHash, true);
 
-    System.out.println(nHits1);
-    System.out.println(nHits2);
-    System.out.println(nHits3);
-
     // For the exact interner, we should get a hit for each object except the
     // first nUniqueObjs.
     Assert.assertEquals(nHits1, nTotalObjs - nUniqueObjs);

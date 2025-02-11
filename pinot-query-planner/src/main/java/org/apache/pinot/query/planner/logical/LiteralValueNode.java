@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
@@ -53,5 +54,13 @@ public class LiteralValueNode extends BasePlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     throw new UnsupportedOperationException("LiteralValueNode visit is not supported yet");
+  }
+
+  @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    if (!inputs.isEmpty()) {
+      throw new IllegalArgumentException("LiteralValueNode should not have any inputs");
+    }
+    return this;
   }
 }

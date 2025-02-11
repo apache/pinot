@@ -23,10 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
@@ -43,7 +41,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -79,7 +76,6 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Measurement(iterations = 5, time = 2)
 @State(Scope.Benchmark)
 public class BenchmarkColumnValueSegmentPruner {
-
   public static final String QUERY_1 = "SELECT * FROM MyTable WHERE SORTED_COL IN (1, 2, 3, 4)";
 
   @Param({"10"})
@@ -113,26 +109,32 @@ public class BenchmarkColumnValueSegmentPruner {
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
-
+  private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setFieldConfigList(FIELD_CONFIGS)
+      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME)).setSortedColumn(SORTED_COL_NAME)
+      .setVarLengthDictionaryColumns(Collections.singletonList(SORTED_COL_NAME))
+      .setRangeIndexColumns(Arrays.asList(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setBloomFilterColumns(Collections.singletonList(SORTED_COL_NAME)).setStarTreeIndexConfigs(
+          Collections.singletonList(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
+              Collections.singletonList(
+                  new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+              null, Integer.MAX_VALUE))).build();
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING).build();
 
   @Setup
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createLongSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(INT_COL_NAME);
-    invertedIndexCols.add(LOW_CARDINALITY_STRING_COL);
-
-    Map<String, BloomFilterConfig> bloomFilterConfigMap = new HashMap<>();
-    bloomFilterConfigMap.put(SORTED_COL_NAME, new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 10000, false));
-
-    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    indexLoadingConfig.setBloomFilterConfigs(bloomFilterConfigMap);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
 
     _indexSegments = new ArrayList<>();
     for (int i = 0; i < _numSegments; i++) {
@@ -178,30 +180,7 @@ public class BenchmarkColumnValueSegmentPruner {
   private void buildSegment(String segmentName)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME))
-        .setFieldConfigList(fieldConfigs)
-        .setNoDictionaryColumns(Arrays.asList(RAW_INT_COL_NAME, RAW_STRING_COL_NAME))
-        .setSortedColumn(SORTED_COL_NAME)
-        .setVarLengthDictionaryColumns(Collections.singletonList(SORTED_COL_NAME))
-        .setBloomFilterColumns(Collections.singletonList(SORTED_COL_NAME))
-        .setStarTreeIndexConfigs(Collections.singletonList(
-            new StarTreeIndexConfig(Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()), null,
-                Integer.MAX_VALUE)))
-        .build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
-        .build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);

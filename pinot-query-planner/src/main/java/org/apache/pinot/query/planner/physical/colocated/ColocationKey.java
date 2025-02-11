@@ -31,8 +31,8 @@ import org.apache.calcite.rex.RexInputRef;
  * behavior.
  *
  * <p>
- *  In other words, when a StageNode has the schema: (user_uuid, col1, col2, ...), and the ColocationKey is
- *  ([0], 8, murmur), then that means that the data for the StageNode is partitioned using the user_uuid column, into
+ *  In other words, when a PlanNode has the schema: (user_uuid, col1, col2, ...), and the ColocationKey is
+ *  ([0], 8, murmur), then that means that the data for the PlanNode is partitioned using the user_uuid column, into
  *  8 partitions where the partitionId is computed using murmur(user_uuid) % 8.
  *
  *  For a join stage the data is partitioned by the senders using their respective join-keys. In that case, we may

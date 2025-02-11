@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -58,6 +58,7 @@
     <module>pinot-compatibility-verifier</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
+    <module>pinot-timeseries</module>
   </modules>
 
   <licenses>
@@ -135,58 +136,60 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
-    <avro.version>1.11.3</avro.version>
-    <parquet.version>1.14.2</parquet.version>
-    <orc.version>1.9.3</orc.version>
+    <avro.version>1.11.4</avro.version>
+    <parquet.version>1.15.0</parquet.version>
+    <orc.version>1.9.5</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.17.2</jackson.version>
-    <zookeeper.version>3.9.2</zookeeper.version>
-    <async-http-client.version>3.0.0</async-http-client.version>
-    <jersey.version>2.42</jersey.version>
+    <jackson.version>2.18.2</jackson.version>
+    <zookeeper.version>3.9.3</zookeeper.version>
+    <async-http-client.version>3.0.1</async-http-client.version>
+    <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.14</swagger.version>
-    <swagger-ui.version>5.17.14</swagger-ui.version>
-    <hadoop.version>3.4.0</hadoop.version>
+    <swagger.version>1.6.15</swagger.version>
+    <swagger-ui.version>5.18.3</swagger-ui.version>
+    <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.1</jsonsmart.version>
-    <quartz.version>2.3.2</quartz.version>
+    <quartz.version>2.5.0</quartz.version>
     <calcite.version>1.37.0</calcite.version>
     <immutables.version>2.10.1</immutables.version>
-    <lucene.version>9.11.1</lucene.version>
+    <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.18.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.20.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.27</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.6</snappy-java.version>
-    <zstd-jni.version>1.5.6-5</zstd-jni.version>
+    <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
+    <snappy-java.version>1.1.10.7</snappy-java.version>
+    <zstd-jni.version>1.5.6-10</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
-    <log4j.version>2.23.1</log4j.version>
+    <log4j.version>2.24.3</log4j.version>
     <slf4j.version>2.0.16</slf4j.version>
-    <netty.version>4.1.112.Final</netty.version>
+    <netty.version>4.1.117.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
-    <clp-ffi.version>0.4.5</clp-ffi.version>
+    <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.27.16</aws.sdk.version>
-    <azure.sdk.version>1.2.27</azure.sdk.version>
-    <azure.msal4j.version>1.17.0</azure.msal4j.version>
-    <joda-time.version>2.12.7</joda-time.version>
+    <aws.sdk.version>2.30.16</aws.sdk.version>
+    <azure.sdk.version>1.2.31</azure.sdk.version>
+    <azure.msal4j.version>1.19.0</azure.msal4j.version>
+    <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
+    <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
-    <circe.version>0.14.9</circe.version>
+    <circe.version>0.14.10</circe.version>
 
     <spark2.version>2.4.8</spark2.version>
-    <spark3.version>3.5.2</spark3.version>
+    <spark3.version>3.5.3</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
+    <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>3.3.1</pulsar.version>
     <flink.version>1.20.0</flink.version>
@@ -194,13 +197,14 @@
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
-    <commons-text.version>1.12.0</commons-text.version>
+    <commons-text.version>1.13.0</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
-    <commons-csv.version>1.11.0</commons-csv.version>
+    <commons-csv.version>1.13.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
-    <commons-io.version>2.16.1</commons-io.version>
-    <commons-codec.version>1.17.1</commons-codec.version>
+    <commons-beanutils.version>1.10.0</commons-beanutils.version>
+    <commons-io.version>2.18.0</commons-io.version>
+    <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
@@ -223,60 +227,63 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.2.5</httpcore5.version>
+    <httpclient5.version>5.4.2</httpclient5.version>
+    <httpcore5.version>5.3.3</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>3.25.3</protobuf.version>
-    <grpc.version>1.66.0</grpc.version>
-    <google.cloud.libraries.version>26.44.0</google.cloud.libraries.version>
+    <protobuf.version>3.25.5</protobuf.version>
+    <grpc.version>1.70.0</grpc.version>
+    <google.cloud.libraries.version>26.54.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
-    <google.re2j.version>1.7</google.re2j.version>
-    <google.errorprone.version>2.31.0</google.errorprone.version>
+    <google.re2j.version>1.8</google.re2j.version>
+    <google.errorprone.version>2.36.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
-    <scala.version>2.12.19</scala.version>
+    <scala.version>2.12.20</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.26.3</jline.version>
-    <wildfly.version>2.0.0</wildfly.version>
+    <jline.version>3.29.0</jline.version>
+    <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.1</dnsjava.version>
-    <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
-    <woodstox.version>7.0.0</woodstox.version>
-    <curator.version>5.7.0</curator.version>
+    <nimbus-jose-jwt.version>10.0.1</nimbus-jose-jwt.version>
+    <dnsjava.version>3.6.3</dnsjava.version>
+    <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
+    <woodstox.version>7.1.0</woodstox.version>
+    <curator.version>5.7.1</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.14.0</jna.version>
-    <jnr-ffi.version>2.2.16</jnr-ffi.version>
+    <jna.version>5.16.0</jna.version>
+    <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.7</asm.version>
+    <asm.version>9.7.1</asm.version>
     <paranamer.version>2.8</paranamer.version>
-    <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
-    <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
-    <okio.version>3.9.0</okio.version>
+    <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
+    <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
+    <okio.version>3.10.2</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
-    <ivy.version>2.5.2</ivy.version>
-    <c3p0.version>0.10.1</c3p0.version>
+    <ivy.version>2.5.3</ivy.version>
+    <c3p0.version>0.10.2</c3p0.version>
     <mchange-commons-java.version>0.3.1</mchange-commons-java.version>
 
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>
-    <mockito-core.version>5.13.0</mockito-core.version>
-    <equalsverifier.version>3.16.2</equalsverifier.version>
-    <testcontainers.version>1.20.1</testcontainers.version>
+    <mockito-core.version>5.15.2</mockito-core.version>
+    <equalsverifier.version>3.19</equalsverifier.version>
+    <testcontainers.version>1.20.4</testcontainers.version>
     <h2.version>2.3.232</h2.version>
-    <jnr-posix.version>3.1.19</jnr-posix.version>
+    <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
+    <fmpp.version>0.9.16</fmpp.version>
+    <archiver.compress>true</archiver.compress>
+    <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
 
   <profiles>
@@ -290,6 +297,9 @@
         <!-- This plugin slows down the builds, most likely caused by an issue in the deprecated org.apache.maven.shared.utils.io.DirectoryScanner -->
         <rat.skip>true</rat.skip>
         <spotless.check.skip>true</spotless.check.skip>
+        <shade.phase.prop>none</shade.phase.prop>
+        <archiver.compress>false</archiver.compress>
+        <archiver.recompressZippedFiles>false</archiver.recompressZippedFiles>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
@@ -353,6 +363,31 @@
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
+    <profile>
+      <id>codecoverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+                <configuration>
+                  <append>true</append>
+                  <includes>
+                    <include>org/apache/pinot/**/*</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
       <id>apache-release</id>
@@ -377,7 +412,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <scala.version>2.13.3</scala.version>
+        <scala.version>2.13.16</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
       </properties>
     </profile>
@@ -461,6 +496,16 @@
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-timeseries-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-timeseries-planner</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- Pinot Plug-in Modules -->
       <!-- Batch Ingestion -->
@@ -472,6 +517,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-batch-ingestion-hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-spark-base</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -502,6 +552,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-3.0</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-kinesis</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -524,6 +579,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-confluent-avro</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-confluent-protobuf</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -597,6 +657,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-dropwizard</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-compound-metrics</artifactId>
         <version>${project.version}</version>
       </dependency>
       <!-- Minion Tasks -->
@@ -707,11 +772,23 @@
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-runtime</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-base</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
 
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.46.0</version>
+        <version>3.49.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -726,7 +803,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.2.1</version>
+        <version>1.3.0</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -742,6 +819,14 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+
+     <!-- JMX exporter-->
+      <dependency>
+        <groupId>io.prometheus.jmx</groupId>
+        <artifactId>jmx_prometheus_javaagent</artifactId>
+        <version>0.19.0</version>
+        <scope>test</scope>
       </dependency>
 
       <!-- netty BOM -->
@@ -766,7 +851,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.14</version>
+        <version>8.5.15</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -845,7 +930,7 @@
       </dependency>
       <dependency>
         <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-generator-annprocess</artifactId>
+        <artifactId>jmh-core</artifactId>
         <version>${jmh.version}</version>
       </dependency>
 
@@ -905,7 +990,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.2</version>
+        <version>2.3</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.larray</groupId>
@@ -972,6 +1057,17 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
         <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>commons-beanutils</groupId>
+        <artifactId>commons-beanutils</artifactId>
+        <version>${commons-beanutils.version}</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -1117,7 +1213,7 @@
       </dependency>
       <dependency>
         <groupId>com.google.auto.service</groupId>
-        <artifactId>auto-service</artifactId>
+        <artifactId>auto-service-annotations</artifactId>
         <version>${google.auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
@@ -1324,7 +1420,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>6.0.0</version>
+        <version>6.2.0</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1501,12 +1597,12 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.26ea2</version>
+        <version>2.27ea1</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.26ea1</version>
+        <version>2.27ea2</version>
       </dependency>
 
       <dependency>
@@ -1543,6 +1639,11 @@
         <groupId>io.circe</groupId>
         <artifactId>circe-generic_${scala.compat.version}</artifactId>
         <version>${circe.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-classworlds</artifactId>
+        <version>${plexus-classworlds.version}</version>
       </dependency>
 
       <!-- AWS SDK -->
@@ -1659,13 +1760,10 @@
       <!-- Dependencies in Hadoop libraries -->
       <dependency>
         <groupId>org.apache.kerby</groupId>
-        <artifactId>kerb-core</artifactId>
+        <artifactId>kerby-bom</artifactId>
         <version>${kerby.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.kerby</groupId>
-        <artifactId>kerb-simplekdc</artifactId>
-        <version>${kerby.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>org.jline</groupId>
@@ -1953,6 +2051,11 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>net.sourceforge.fmpp</groupId>
+        <artifactId>fmpp</artifactId>
+        <version>${fmpp.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -1972,7 +2075,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.43.0</version>
+          <version>2.44.2</version>
           <executions>
             <execution>
               <goals>
@@ -2115,19 +2218,14 @@
           <artifactId>maven-enforcer-plugin</artifactId>
           <executions>
             <execution>
-              <id>enforce-dependency-convergence</id>
+              <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
               <goals>
                 <goal>enforce</goal>
               </goals>
               <phase>validate</phase>
-            </execution>
-            <execution>
-              <id>enforce-banned-dependencies</id>
-              <goals>
-                <goal>enforce</goal>
-              </goals>
               <configuration>
                 <rules>
+                  <dependencyConvergence />
                   <bannedDependencies>
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
@@ -2150,20 +2248,14 @@
                     </excludes>
                   </bannedDependencies>
                 </rules>
-                <fail>true</fail> <!-- Fail the build if banned dependencies are found -->
               </configuration>
             </execution>
           </executions>
-          <configuration>
-            <rules>
-              <dependencyConvergence />
-            </rules>
-          </configuration>
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>4.5</version>
+          <version>4.6</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2173,7 +2265,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>versions-maven-plugin</artifactId>
-          <version>2.17.1</version>
+          <version>2.18.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2218,12 +2310,27 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.glassfish.hk2</groupId>
+                <artifactId>hk2-metadata-generator</artifactId>
+              </path>
+              <path>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-core</artifactId>
+              </path>
+              <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+                <version>${google.auto-service.version}</version>
+              </path>
+              <path>
+                <groupId>org.immutables</groupId>
+                <artifactId>value-processor</artifactId>
+                <version>${immutables.version}</version>
+              </path>
+            </annotationProcessorPaths>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>com.googlecode.fmpp-maven-plugin</groupId>
-          <artifactId>fmpp-maven-plugin</artifactId>
-          <version>1.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2315,7 +2422,7 @@
         <plugin>
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>
-          <version>1.15.0</version>
+          <version>1.15.1</version>
         </plugin>
         <plugin>
           <groupId>net.nicoulaj.maven.plugins</groupId>
@@ -2325,7 +2432,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
-          <version>3.4.1</version>
+          <version>3.5.0</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2347,7 +2454,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.18.0</version>
+            <version>10.21.2</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2420,33 +2527,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report-aggregate</goal>
-            </goals>
-            <configuration>
-              <includeCurrentProject>true</includeCurrentProject>
-            </configuration>
-          </execution>
-        </executions>
-        <configuration>
-          <append>true</append>
-          <includes>
-            <include>org/apache/pinot/**/*</include>
-          </includes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
@@ -2690,7 +2770,7 @@
           <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
-            <version>0.1.0</version>
+            <version>0.2.0</version>
           </dependency>
         </dependencies>
         <executions>
@@ -2749,21 +2829,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>process</goal>
-            </goals>
-            <configuration>
-              <properties>
-                <projectName>Apache Pinot</projectName>
-              </properties>
-              <resourceBundles>
-                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
-              </resourceBundles>
-            </configuration>
-          </execution>
-        </executions>
+        <configuration>
+          <properties>
+            <projectName>Apache Pinot</projectName>
+          </properties>
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -2774,7 +2844,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jxr-plugin</artifactId>
-        <version>3.5.0</version>
+        <version>3.6.0</version>
         <configuration>
           <aggregate>true</aggregate>
         </configuration>

@@ -142,11 +142,16 @@ public class TableRebalancer {
 
   public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
       @Nullable String rebalanceJobId) {
+    return rebalance(tableConfig, rebalanceConfig, rebalanceJobId, null);
+  }
+
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     long startTime = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
     RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
     try {
-      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId, providedTierToSegmentsMap);
       status = result.getStatus();
       return result;
     } finally {
@@ -159,7 +164,7 @@ public class TableRebalancer {
   }
 
   private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
-      @Nullable String rebalanceJobId) {
+      @Nullable String rebalanceJobId, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
     if (rebalanceJobId == null) {
@@ -238,7 +243,7 @@ public class TableRebalancer {
     Map<String, InstancePartitions> tierToInstancePartitionsMap;
     boolean tierInstancePartitionsUnchanged;
     try {
-      sortedTiers = getSortedTiers(tableConfig);
+      sortedTiers = getSortedTiers(tableConfig, providedTierToSegmentsMap);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
           getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
       tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
@@ -389,16 +394,15 @@ public class TableRebalancer {
     // 3. Check if the target assignment is reached. Rebalance is done if it is reached.
     // 4. Calculate the next assignment based on the current assignment, target assignment and min available replicas.
     // 5. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
+    //
+    // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
+    //       in the previous round are also converged.
+    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
-      // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
-      //       in the previous round are also converged.
-      Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
-      segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
-      segmentsToMonitor.addAll(segmentsToMove);
       IdealState idealState;
       try {
-        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMonitor,
+        idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
             externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
       } catch (Exception e) {
         String errorMsg = String.format(
@@ -500,9 +504,9 @@ public class TableRebalancer {
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
               lowDiskMode);
-      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
-              + "each instance: {}", rebalanceJobId, tableNameWithType,
-          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
+      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be "
+              + "added/removed for each instance: {}", rebalanceJobId, tableNameWithType,
+          SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
 
       // Reuse current IdealState to update the IdealState in cluster
       idealStateRecord.setMapFields(nextAssignment);
@@ -528,6 +532,10 @@ public class TableRebalancer {
             "Caught exception while updating IdealState: " + e, instancePartitionsMap, tierToInstancePartitionsMap,
             targetAssignment);
       }
+
+      segmentsToMonitor = new HashSet<>(segmentsToMove);
+      segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+      segmentsToMonitor.addAll(segmentsToMove);
     }
   }
 
@@ -668,13 +676,14 @@ public class TableRebalancer {
   }
 
   @Nullable
-  public List<Tier> getSortedTiers(TableConfig tableConfig) {
+  public List<Tier> getSortedTiers(TableConfig tableConfig,
+      @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
     if (CollectionUtils.isNotEmpty(tierConfigs)) {
       // Get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
       // Other types should be treated differently
       return TierConfigUtils.getSortedTiersForStorageType(tierConfigs, TierFactory.PINOT_SERVER_STORAGE_TYPE,
-          _helixManager);
+          _helixManager, providedTierToSegmentsMap);
     } else {
       return null;
     }
@@ -762,7 +771,7 @@ public class TableRebalancer {
     }
   }
 
-  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
+  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
       Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
@@ -788,7 +797,7 @@ public class TableRebalancer {
                   _tableRebalanceObserver.getStopStatus()));
         }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-            idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
+            idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);
           return idealState;
         }
@@ -808,15 +817,21 @@ public class TableRebalancer {
   }
 
   /**
-   * NOTE: Only check the segments and instances in the IdealState. It is okay to have extra segments or instances in
-   * ExternalView as long as the instance states for all the segments in IdealState are reached. For ERROR state in
-   * ExternalView, if using best-efforts, log a warning and treat it as good state; if not, throw an exception to abort
-   * the rebalance because we are not able to get out of the ERROR state.
+   * NOTE:
+   * Only check the segments in the IdealState and being monitored. Extra segments in ExternalView are ignored because
+   * they are not managed by the rebalancer.
+   * For each segment checked:
+   * - In regular mode, it is okay to have extra instances in ExternalView as long as the instance states in IdealState
+   *   are reached.
+   * - In low disk mode, instance states in ExternalView must match IdealState to ensure the segments are deleted from
+   *   server before moving to the next assignment.
+   * For ERROR state in ExternalView, if using best-efforts, log a warning and treat it as good state; if not, throw an
+   * exception to abort the rebalance because we are not able to get out of the ERROR state.
    */
   @VisibleForTesting
   static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
-      Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts,
+      Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor) {
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
@@ -843,15 +858,22 @@ public class TableRebalancer {
         String externalViewInstanceState = externalViewInstanceStateMap.get(instanceName);
         if (!idealStateInstanceState.equals(externalViewInstanceState)) {
           if (SegmentStateModel.ERROR.equals(externalViewInstanceState)) {
-            if (bestEfforts) {
-              LOGGER.warn(
-                  "Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",
-                  instanceName, segmentName, tableNameWithType);
-            } else {
-              LOGGER.warn("Found ERROR instance: {} for segment: {}, table: {}", instanceName, segmentName,
-                  tableNameWithType);
-              throw new IllegalStateException("Found segments in ERROR state");
-            }
+            handleErrorInstance(tableNameWithType, segmentName, instanceName, bestEfforts);
+          } else {
+            return false;
+          }
+        }
+      }
+
+      // For low disk mode, check if there are extra instances in ExternalView that are not in IdealState
+      if (lowDiskMode && externalViewInstanceStateMap != null) {
+        for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
+          String instanceName = instanceStateEntry.getKey();
+          if (idealStateInstanceStateMap.containsKey(instanceName)) {
+            continue;
+          }
+          if (SegmentStateModel.ERROR.equals(instanceStateEntry.getValue())) {
+            handleErrorInstance(tableNameWithType, segmentName, instanceName, bestEfforts);
           } else {
             return false;
           }
@@ -859,6 +881,17 @@ public class TableRebalancer {
       }
     }
     return true;
+  }
+
+  private static void handleErrorInstance(String tableNameWithType, String segmentName, String instanceName,
+      boolean bestEfforts) {
+    if (bestEfforts) {
+      LOGGER.warn("Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",
+          instanceName, segmentName, tableNameWithType);
+    } else {
+      LOGGER.warn("Found ERROR instance: {} for segment: {}, table: {}", instanceName, segmentName, tableNameWithType);
+      throw new IllegalStateException("Found segments in ERROR state");
+    }
   }
 
   /**

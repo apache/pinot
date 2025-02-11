@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,8 +32,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -52,13 +55,16 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -74,6 +80,9 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -129,6 +138,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseServerStarter.class);
 
+  private static final long CONSUMER_DIRECTORY_EXCEPTION_VALUE = -1L;
   protected String _helixClusterName;
   protected String _zkAddress;
   protected PinotConfiguration _serverConf;
@@ -146,6 +156,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
+  protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
   @Override
@@ -160,6 +172,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+
+    String tarCompressionCodecName =
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
+    if (null != tarCompressionCodecName) {
+      TarCompressionUtils.setDefaultCompressor(tarCompressionCodecName);
+    }
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
@@ -229,6 +247,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
+
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -608,8 +628,32 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+
+    int maxPreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
+    int maxPreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler =
+        new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries,
+            false);
+    int maxStarTreePreprocessConcurrency = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
+    int maxStarTreePreprocessConcurrencyBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+    // Relax throttling until the server is ready to serve queries
+    SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler =
+        new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
+            maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
+    _segmentPreprocessThrottler =
+        new SegmentPreprocessThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler);
+
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -630,6 +674,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
+
+    LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
+    try {
+      _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
+    }
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentPreprocessThrottler);
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
@@ -700,12 +752,39 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker =
         new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
+
+    // Add metrics for consumer directory usage
+    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.REALTIME_CONSUMER_DIR_USAGE, () -> {
+      List<File> instanceConsumerDirs = instanceDataManager.getConsumerDirPaths();
+      long totalSize = 0;
+      try {
+        for (File consumerDir : instanceConsumerDirs) {
+          if (consumerDir.exists()) {
+            totalSize += FileUtils.sizeOfDirectory(consumerDir);
+          }
+        }
+        return totalSize;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to gather size info for consumer directories", e);
+        return CONSUMER_DIRECTORY_EXCEPTION_VALUE;
+      }
+    });
+
+    long startupDurationMs = System.currentTimeMillis() - startTimeMs;
+    if (ServiceStatus.getServiceStatus(_instanceId).equals(Status.GOOD)) {
+      serverMetrics.addTimedValue(
+          ServerTimer.STARTUP_SUCCESS_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+    } else {
+      serverMetrics.addTimedValue(
+          ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+    }
   }
 
   /**
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
+    _segmentPreprocessThrottler.startServingQueries();
   }
 
   @Override

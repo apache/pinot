@@ -22,9 +22,11 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -265,6 +267,12 @@ public interface Dictionary extends IndexReader {
   default void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getBytesValue(dictIds[i]);
+    }
+  }
+
+  default void readMapValues(int[] dictIds, int length, Map[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = MapUtils.deserializeMap(getBytesValue(dictIds[i]));
     }
   }
 

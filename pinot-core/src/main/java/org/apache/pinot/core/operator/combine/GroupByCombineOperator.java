@@ -26,14 +26,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -42,7 +40,9 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,8 +50,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Combine operator for group-by queries.
- * TODO: Use CombineOperatorUtils.getNumThreadsForQuery() to get the parallelism of the query instead of using
- *       all threads
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
@@ -60,8 +58,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
-  private final int _trimSize;
-  private final int _trimThreshold;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
@@ -75,24 +71,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
-    int minTrimSize = queryContext.getMinServerGroupTrimSize();
-    if (minTrimSize > 0) {
-      int limit = queryContext.getLimit();
-      if ((!queryContext.isServerReturnFinalResult() && queryContext.getOrderByExpressions() != null)
-          || queryContext.getHavingFilter() != null) {
-        _trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
-      } else {
-        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
-        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
-        _trimSize = limit;
-      }
-      _trimThreshold = queryContext.getGroupTrimThreshold();
-    } else {
-      // Server trim is disabled
-      _trimSize = Integer.MAX_VALUE;
-      _trimThreshold = Integer.MAX_VALUE;
-    }
-
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
@@ -103,12 +81,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, create one task per operator.
+   * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
+   * as the default number of query worker threads (or the number of operators / segments if that's lower).
    */
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
     if (maxExecutionThreads <= 0) {
-      queryContext.setMaxExecutionThreads(numOperators);
+      queryContext.setMaxExecutionThreads(Math.min(numOperators, ResourceManager.DEFAULT_QUERY_WORKER_THREADS));
     }
     return queryContext;
   }
@@ -134,18 +113,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              DataSchema dataSchema = resultsBlock.getDataSchema();
-              // NOTE: Use trimSize as resultSize on server size.
-              if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-                // special case of trim threshold where it is set to max value.
-                // there won't be any trimming during upsert in this case.
-                // thus we can avoid the overhead of read-lock and write-lock
-                // in the upsert method.
-                _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
-              } else {
-                _indexedTable =
-                    new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
-              }
+              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
+                  _executorService);
             }
           }
         }
@@ -188,6 +157,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             mergedKeys++;
           }
         }
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -235,6 +206,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
     Throwable processingException = _processingException.get();
     if (processingException != null) {
+      if (processingException instanceof BadQueryRequestException) {
+        return new ExceptionResultsBlock(QueryException.QUERY_VALIDATION_ERROR, processingException);
+      }
       return new ExceptionResultsBlock(processingException);
     }
 

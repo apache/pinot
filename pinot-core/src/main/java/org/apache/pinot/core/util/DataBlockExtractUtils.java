@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -81,6 +82,8 @@ public final class DataBlockExtractUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
+      case MAP:
+        return MapUtils.deserializeMap(dataBlock.getBytes(rowId, colId).getBytes());
 
       // Multi-value column
       case INT_ARRAY:
@@ -99,8 +102,8 @@ public final class DataBlockExtractUtils {
         return ObjectSerDeUtils.deserialize(dataBlock.getCustomObject(rowId, colId));
 
       default:
-        throw new IllegalStateException(String.format("Unsupported stored type: %s for column: %s", storedType,
-            dataBlock.getDataSchema().getColumnName(colId)));
+        throw new IllegalStateException("Unsupported stored type: " + storedType + " for column: "
+            + dataBlock.getDataSchema().getColumnName(colId));
     }
   }
 
@@ -232,8 +235,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(String.format("Cannot extract int values for column: %s with stored type: %s",
-              dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract int values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -273,8 +276,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(String.format("Cannot extract int values for column: %s with stored type: %s",
-              dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract int values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -315,9 +318,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract long values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract long values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -357,9 +359,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract long values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract long values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -400,9 +401,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract float values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract float values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -442,9 +442,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract float values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract float values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -485,9 +484,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract double values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract double values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -527,9 +525,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract double values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract double values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -574,9 +571,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract BigDecimal values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract BigDecimal values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -613,9 +609,8 @@ public final class DataBlockExtractUtils {
           }
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract BigDecimal values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract BigDecimal values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -703,8 +698,8 @@ public final class DataBlockExtractUtils {
           values[matchedRowId] = dataBlock.getBigDecimal(rowId, colId).intValue();
           break;
         default:
-          throw new IllegalStateException(String.format("Cannot extract int values for column: %s with stored type: %s",
-              dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract int values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -739,9 +734,8 @@ public final class DataBlockExtractUtils {
           values[matchedRowId] = dataBlock.getBigDecimal(rowId, colId).longValue();
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract long values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract long values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -776,9 +770,8 @@ public final class DataBlockExtractUtils {
           values[matchedRowId] = dataBlock.getBigDecimal(rowId, colId).floatValue();
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract float values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract float values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -813,9 +806,8 @@ public final class DataBlockExtractUtils {
           values[matchedRowId] = dataBlock.getBigDecimal(rowId, colId).doubleValue();
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract double values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract double values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;
@@ -855,9 +847,8 @@ public final class DataBlockExtractUtils {
           values[matchedRowId] = dataBlock.getBigDecimal(rowId, colId);
           break;
         default:
-          throw new IllegalStateException(
-              String.format("Cannot extract BigDecimal values for column: %s with stored type: %s",
-                  dataBlock.getDataSchema().getColumnName(colId), storedType));
+          throw new IllegalStateException("Cannot extract BigDecimal values for column: "
+              + dataBlock.getDataSchema().getColumnName(colId) + " with stored type: " + storedType);
       }
     }
     return values;

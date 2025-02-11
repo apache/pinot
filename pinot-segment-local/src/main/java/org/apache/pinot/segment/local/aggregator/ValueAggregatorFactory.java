@@ -66,10 +66,10 @@ public class ValueAggregatorFactory {
         return new PercentileEstValueAggregator();
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
-        return new PercentileTDigestValueAggregator();
+        return new PercentileTDigestValueAggregator(arguments);
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
-        return new DistinctCountThetaSketchValueAggregator();
+        return new DistinctCountThetaSketchValueAggregator(arguments);
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUS:
         return new DistinctCountHLLPlusValueAggregator(arguments);
@@ -77,7 +77,7 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
       case AVGVALUEINTEGERSUMTUPLESKETCH:
       case SUMVALUESINTEGERSUMTUPLESKETCH:
-        return new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);
+        return new IntegerTupleSketchValueAggregator(arguments, IntegerSummary.Mode.Sum);
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
         return new DistinctCountCPCSketchValueAggregator(arguments);

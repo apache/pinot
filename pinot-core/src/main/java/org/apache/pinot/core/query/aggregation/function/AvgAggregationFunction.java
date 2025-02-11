@@ -133,23 +133,24 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          updateGroupByResult(groupKey, groupByResultHolder, value, 1L);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
+          }
         }
-      }
+      });
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        double sum = avgPair.getSum();
-        long count = avgPair.getCount();
-        for (int groupKey : groupKeysArray[i]) {
-          updateGroupByResult(groupKey, groupByResultHolder, sum, count);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+          }
         }
-      }
+      });
     }
   }
 

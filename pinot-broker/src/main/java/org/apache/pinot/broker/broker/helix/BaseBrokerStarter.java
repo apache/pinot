@@ -20,12 +20,14 @@ package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -47,17 +49,21 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -71,9 +77,13 @@ import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -86,6 +96,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,6 +142,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
+  protected MultiStageQueryThrottler _multiStageQueryThrottler;
+  protected AbstractResponseStore _responseStore;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -255,6 +268,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot broker (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Broker configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
+    long startTimeMs = System.currentTimeMillis();
     _isStarting = true;
     Utils.logVersions();
 
@@ -326,16 +340,44 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+      _multiStageQueryThrottler = new MultiStageQueryThrottler();
+      _multiStageQueryThrottler.init(_spectatorHelixManager);
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
+      queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache);
+              _queryQuotaManager, tableCache, _multiStageQueryThrottler);
     }
+    TimeSeriesRequestHandler timeSeriesRequestHandler = null;
+    if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+      Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
+      timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
+          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
+    }
+
+    LOGGER.info("Initializing PinotFSFactory");
+    PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
+
+    LOGGER.info("Initialize ResponseStore");
+    PinotConfiguration responseStoreConfiguration =
+        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
+
+    String expirationTime = _brokerConf.getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+        CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
+
+    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(
+        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
+    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
+        _brokerMetrics, expirationTime);
+
     _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler);
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
+            timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -364,6 +406,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
     _clusterConfigChangeHandlers.add(_queryQuotaManager);
+    if (_multiStageQueryThrottler != null) {
+      _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -373,6 +418,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _externalViewChangeHandlers.add(_routingManager);
     _externalViewChangeHandlers.add(_queryQuotaManager);
+    if (_multiStageQueryThrottler != null) {
+      _externalViewChangeHandlers.add(_multiStageQueryThrottler);
+    }
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
@@ -422,6 +470,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     registerServiceStatusHandler();
 
     _isStarting = false;
+    _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
+        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
     LOGGER.info("Finish starting Pinot broker");
   }
 
@@ -433,6 +483,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
+  }
+
+  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
+    String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    int port = Integer.parseInt(_brokerConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf));
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
@@ -455,22 +512,21 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean shouldUpdateBrokerResource = false;
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
-      // This is a new broker (first time joining the cluster)
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+      // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
+      // tenant isolation mode since it defaults to true and is relatively obscure.
+      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
+                  instanceTag);
+          instanceConfig.addTag(instanceTag);
+        }
+        shouldUpdateBrokerResource = true;
+      } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
       } else {
-        String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
-        if (StringUtils.isNotEmpty(instanceTagsConfig)) {
-          for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-            Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                instanceTag);
-            instanceConfig.addTag(instanceTag);
-          }
-          shouldUpdateBrokerResource = true;
-        } else {
-          instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
-        }
+        instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
       }
       instanceTags = instanceConfig.getTags();
       updated = true;
@@ -573,6 +629,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
 
+    LOGGER.info("Close PinotFs");
+    try {
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
+    }
+
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
 
@@ -619,7 +682,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager);
+            _queryQuotaManager, _responseStore);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

@@ -24,8 +24,7 @@
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-spark-3-connector</artifactId>
   <name>Pinot Spark 3 Connector</name>
@@ -36,6 +35,43 @@
   </properties>
 
   <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <build>
+        <plugins>
+
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+                <configuration>
+                  <relocations>
+                    <relocation>
+                      <pattern>com</pattern>
+                      <shadedPattern>${shadeBase}.com</shadedPattern>
+                      <includes>
+                        <include>com.google.protobuf.**</include>
+                        <include>com.google.common.**</include>
+                      </includes>
+                    </relocation>
+                  </relocations>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
     <profile>
       <id>scala-2.12</id>
       <activation>
@@ -63,29 +99,6 @@
       <build>
         <plugins>
           <!-- scala build -->
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <relocations>
-                    <relocation>
-                      <pattern>com</pattern>
-                      <shadedPattern>${shadeBase}.com</shadedPattern>
-                      <includes>
-                        <include>com.google.protobuf.**</include>
-                        <include>com.google.common.**</include>
-                      </includes>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
           <plugin>
             <groupId>net.alchim31.maven</groupId>
             <artifactId>scala-maven-plugin</artifactId>
@@ -135,6 +148,15 @@
       <plugin>
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest-maven-plugin</artifactId>
+        <configuration>
+          <argLine>
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            --add-opens=java.base/java.lang=ALL-UNNAMED
+            --add-opens=java.base/java.util=ALL-UNNAMED
+            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+          </argLine>
+        </configuration>
       </plugin>
     </plugins>
   </build>

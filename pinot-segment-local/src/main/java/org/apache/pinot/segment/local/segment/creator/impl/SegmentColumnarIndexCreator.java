@@ -182,6 +182,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           LOGGER.info("Creating dictionary index in column {}.{} even when it is disabled in config",
               segmentCreationSpec.getTableName(), columnName);
         }
+
+        // override dictionary type if configured to do so
+        if (_config.isOptimizeDictionaryType()) {
+          LOGGER.info("Overriding dictionary type for column: {} using var-length dictionary: {}", columnName,
+              columnIndexCreationInfo.isUseVarLengthDictionary());
+          dictConfig = new DictionaryIndexConfig(dictConfig, columnIndexCreationInfo.isUseVarLengthDictionary());
+        }
+
         SegmentDictionaryCreator creator =
             new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 
@@ -284,21 +292,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   private boolean createDictionaryForColumn(ColumnIndexCreationInfo info, SegmentGeneratorConfig config,
       FieldSpec spec) {
-    String column = spec.getName();
-    boolean createDictionary = false;
-    if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
-        .containsKey(column) || spec instanceof ComplexFieldSpec) {
-      return createDictionary;
+    if (spec instanceof ComplexFieldSpec) {
+      return false;
     }
 
+    String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
-    if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
-        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec, fieldIndexConfigs,
-        info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
-      // Ignore overrides and pick from config
-      createDictionary = info.isCreateDictionary();
+    if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      return false;
     }
-    return createDictionary;
+
+    return DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
+        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(),
+        config.getNoDictionaryCardinalityRatioThreshold(), spec, fieldIndexConfigs, info.getDistinctValueCount(),
+        info.getTotalNumberOfEntries());
   }
 
   /**

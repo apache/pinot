@@ -36,11 +36,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -1956,5 +1958,63 @@ public class InstanceSelectorTest {
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+  }
+
+  @Test
+  public void testReplicaGroupAdaptiveServerSelector() {
+    // Arrange
+    String offlineTableName = "testTable_OFFLINE";
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    HybridSelector hybridSelector = mock(HybridSelector.class);
+    ReplicaGroupInstanceSelector instanceSelector = new ReplicaGroupInstanceSelector(
+        offlineTableName, propertyStore, brokerMetrics, hybridSelector, Clock.systemUTC(), false, 300);
+
+    // Define instances and segments
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    String instance3 = "instance3";
+    String instance4 = "instance4";
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String segment2 = "segment2";
+    List<String> segments = Arrays.asList(segment0, segment1, segment2);
+
+    // Define candidates for each segment
+    Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap = new HashMap<>();
+    // segment0 -> instance0, instance1
+    instanceCandidatesMap.put(segment0, Arrays.asList(new SegmentInstanceCandidate(instance0, true),
+        new SegmentInstanceCandidate(instance1, true)));
+    // segment1 -> instance2, instance3
+    instanceCandidatesMap.put(segment1, Arrays.asList(new SegmentInstanceCandidate(instance2, true),
+        new SegmentInstanceCandidate(instance3, true)));
+    // segment2 -> instance3, instance4 // instance4 is not in the hybrid selector's server ranking
+    instanceCandidatesMap.put(segment2, Arrays.asList(new SegmentInstanceCandidate(instance4, true),
+        new SegmentInstanceCandidate(instance3, true)));
+
+    // Define the segment states
+    SegmentStates segmentStates = new SegmentStates(instanceCandidatesMap, new HashSet<>(segments), null);
+
+    // Define server rankings
+    List<Pair<String, Double>> serverRanks = Arrays.asList(
+        new ImmutablePair<>(instance3, 1.0),
+        new ImmutablePair<>(instance2, 2.0),
+        new ImmutablePair<>(instance1, 3.0),
+        new ImmutablePair<>(instance0, 4.0)
+    );
+    when(hybridSelector.fetchServerRankingsWithScores(any())).thenReturn(serverRanks);
+
+    // Act
+    Pair<Map<String, String>, Map<String, String>> selectedResult = instanceSelector.select(segments, 0,
+        segmentStates, null);
+
+    // Assert
+    Map<String, String> expectedSelection = new HashMap<>();
+    expectedSelection.put(segment0, instance1);
+    expectedSelection.put(segment1, instance3);
+    expectedSelection.put(segment2, instance4);
+
+    assertEquals(selectedResult.getLeft(), expectedSelection);
   }
 }

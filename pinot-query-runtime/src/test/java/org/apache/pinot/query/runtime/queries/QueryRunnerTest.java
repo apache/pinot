@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +47,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
+
 
 /**
  * all special tests that doesn't fit into {@link org.apache.pinot.query.runtime.queries.ResourceBasedQueriesTest}
@@ -66,7 +70,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName")
+        .addMetric("col3", FieldSpec.DataType.INT, 0)
+        .setSchemaName("defaultSchemaName")
         .setEnableColumnBasedNullHandling(true);
   }
 
@@ -83,6 +88,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       rows.add(row);
     }
     return rows;
+  }
+
+  protected Map<String, Object> getConfiguration() {
+    return Collections.emptyMap();
   }
 
   @BeforeClass
@@ -128,10 +137,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1, getConfiguration());
     server1.start();
     // Start server1 to ensure the next server will have a different port.
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2, getConfiguration());
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.
@@ -181,29 +190,30 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares against its desired exceptions.
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
+  public void testSqlWithExceptionMsgChecker(String sql, String expectedError) {
     try {
       // query pinot
       ResultTable resultTable = queryRunner(sql, false).getResultTable();
-      Assert.fail("Expected error with message '" + exceptionMsg + "'. But instead rows were returned: "
+      Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
       // NOTE: The actual message is (usually) something like:
       //   Received error query execution result block: {200=QueryExecutionError:
       //   Query execution error on: Server_localhost_12345
       //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
+      //   In some cases there is no prefix.
       String exceptionMessage = e.getMessage();
       Assert.assertTrue(
           exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
-              "Error occurred during stage submission"),
+              "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
           "Exception message didn't start with proper heading: " + exceptionMessage);
-      Assert.assertTrue(exceptionMessage.contains(exceptionMsg),
-          "Exception should contain: " + exceptionMsg + ", but found: " + exceptionMessage);
+      Assert.assertTrue(exceptionMessage.contains(expectedError),
+          "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
     }
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
-  private Object[][] provideTestSqlAndRowCount() {
+  protected Object[][] provideTestSqlAndRowCount() {
     //@formatter:off
     return new Object[][]{
         // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
@@ -237,10 +247,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // ScalarFunction
         // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
-        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
-        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like(a.col2, b.col1)", 9},
-        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
-        new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLikeVar(a.col2, b.col1)", 9},
+        new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like_var(a.col2, b.col1)", 9},
+        new Object[]{"SELECT regexpLikeVar(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexp_like_var(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
 
         // test function with @ScalarFunction annotation and alias works (using round_decimal)
         new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
@@ -277,52 +287,72 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
                 + "GROUP BY a.col2, b.col2",
             1
         },
-        new Object[]{"SELECT * FROM \"default.tbl-escape-naming\"", 5}
+        new Object[]{"SELECT * FROM default.\"tbl-escape-naming\"", 5},
+        new Object[]{"SELECT * FROM \"default\".\"tbl-escape-naming\"", 5}
     };
     //@formatter:on
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
-  private Object[][] provideTestSqlWithExecutionException() {
-    //@formatter:off
-    return new Object[][]{
-        // Missing index
-        new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"},
+  protected Iterator<Object[]> provideTestSqlWithExecutionException() {
+    List<Object[]> testCases = new ArrayList<>();
+    // Missing index
+    testCases.add(new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"});
+    testCases.add(new Object[]{"SELECT col1, textMatch(col1, 'f') FROM a LIMIT 10", "without text index"});
 
-        // Query hint with dynamic broadcast pipeline breaker should return error upstream
-        new Object[]{
-            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a WHERE a.col1 IN "
-                + "(SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
-            "without text index"
-        },
+    // Query hint with dynamic broadcast pipeline breaker should return error upstream
+    testCases.add(new Object[]{
+        "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a WHERE a.col1 IN "
+            + "(SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
+        "without text index"
+    });
 
-        // Timeout exception should occur with this option:
-        new Object[]{"SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-            "Timeout"},
+    // Timeout exception should occur with this option:
+    testCases.add(new Object[]{
+        "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
+        "Timeout"
+    });
 
-        // Function with incorrect argument signature should throw runtime exception when casting string to numeric
-        new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"},
+    // Function with incorrect argument signature should throw runtime exception when casting string to numeric
+    testCases.add(new Object[]{"SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"});
 
-        // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
-        //   - predicate only functions:
-        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"},
-        new Object[]{"SELECT * FROM a WHERE text_contains(col1, 'f')", "supported only on native text index"},
+    // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
+    //   - predicate only functions:
+    testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"});
+    testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"});
+    testCases.add(new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"});
+    testCases.add(new Object[]{
+        "SELECT * FROM a WHERE text_contains(col1, 'f')",
+        "supported only on native text index"}
+    );
 
-        //  - transform only functions
-        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"},
-        new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
+    //  - transform only functions
+    testCases.add(new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"});
+    testCases.add(new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"});
 
-        //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
-        //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
-        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"},
-        //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-        new Object[]{
-            "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
-            "Unsupported function: JSONEXTRACTSCALAR"
-        }
-    };
-    //@formatter:on
+    //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
+    //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
+    testCases.add(
+        new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Cannot resolve JSON path"});
+    //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
+    testCases.add(new Object[]{
+        "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
+        "Unsupported function: JSONEXTRACTSCALAR"
+    });
+
+    // Positive int keys (only included ones that will be parsed for this query)
+    for (String key : new String[]{
+        MAX_EXECUTION_THREADS, NUM_GROUPS_LIMIT, MAX_INITIAL_RESULT_HOLDER_CAPACITY, MAX_STREAMING_PENDING_BLOCKS,
+        MAX_ROWS_IN_JOIN
+    }) {
+      for (String value : new String[]{"-10000000000", "-2147483648", "-1", "0", "2147483648", "10000000000"}) {
+        testCases.add(new Object[]{
+            "set " + key + " = " + value + "; SELECT col1, count(*) FROM a GROUP BY col1",
+            key + " must be a number between 1 and 2^31-1, got: " + value
+        });
+      }
+    }
+
+    return testCases.iterator();
   }
 }

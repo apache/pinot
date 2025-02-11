@@ -71,11 +71,12 @@ public class TransferableBlockUtilsTest {
     int estRowSizeInBytes = dataSchema.size() * TEST_EST_BYTES_PER_COLUMN;
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock), DataBlock.Type.ROW,
-        estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+    validateBlocks(
+        TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock), estRowSizeInBytes * splitRowCount + 1), rows,
+        dataSchema);
     // compare non-serialized split
     validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW),
-        DataBlock.Type.ROW, estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+        estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
   }
 
   @Test
@@ -93,18 +94,15 @@ public class TransferableBlockUtilsTest {
     validateNonSplittableBlock(metadataBlock);
   }
 
-  private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock)
-      throws Exception {
+  private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock) {
     Iterator<TransferableBlock> transferableBlocks =
-        TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), DataBlock.Type.METADATA,
-            4 * 1024 * 1024);
+        TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), 4 * 1024 * 1024);
     Assert.assertTrue(transferableBlocks.hasNext());
     Assert.assertSame(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
     Assert.assertFalse(transferableBlocks.hasNext());
   }
 
-  private void validateBlocks(Iterator<TransferableBlock> blocks, List<Object[]> rows, DataSchema dataSchema)
-      throws Exception {
+  private void validateBlocks(Iterator<TransferableBlock> blocks, List<Object[]> rows, DataSchema dataSchema) {
     int rowId = 0;
     while (blocks.hasNext()) {
       TransferableBlock block = blocks.next();

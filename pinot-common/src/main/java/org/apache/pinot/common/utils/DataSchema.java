@@ -34,9 +34,17 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -160,6 +168,29 @@ public class DataSchema {
     return new DataSchema(columnNames, columnDataTypes);
   }
 
+  public static DataSchema fromBytes(PinotInputStream buffer)
+      throws IOException {
+    // Read the number of columns.
+    int numColumns = buffer.readInt();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    // Read the column names.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.readInt();
+      byte[] bytes = new byte[length];
+      buffer.readFully(bytes);
+      columnNames[i] = new String(bytes, UTF_8);
+    }
+    // Read the column types.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.readInt();
+      byte[] bytes = new byte[length];
+      buffer.readFully(bytes);
+      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+    }
+    return new DataSchema(columnNames, columnDataTypes);
+  }
+
   @SuppressWarnings("MethodDoesntCallSuperMethod")
   @Override
   public DataSchema clone() {
@@ -196,27 +227,141 @@ public class DataSchema {
     return EqualityUtils.hashCodeOf(Arrays.hashCode(_columnNames), Arrays.hashCode(_columnDataTypes));
   }
 
+  public RelDataType toRelDataType(RelDataTypeFactory typeFactory) {
+    List<RelDataType> columnTypes = new ArrayList<>(_columnDataTypes.length);
+    for (ColumnDataType columnDataType : _columnDataTypes) {
+      columnTypes.add(columnDataType.toType(typeFactory));
+    }
+    return typeFactory.createStructType(columnTypes, Arrays.asList(_columnNames));
+  }
+
   public enum ColumnDataType {
-    INT(NullValuePlaceHolder.INT),
-    LONG(NullValuePlaceHolder.LONG),
-    FLOAT(NullValuePlaceHolder.FLOAT),
-    DOUBLE(NullValuePlaceHolder.DOUBLE),
-    BIG_DECIMAL(NullValuePlaceHolder.BIG_DECIMAL),
-    BOOLEAN(INT, NullValuePlaceHolder.INT),
-    TIMESTAMP(LONG, NullValuePlaceHolder.LONG),
-    STRING(NullValuePlaceHolder.STRING),
-    JSON(STRING, NullValuePlaceHolder.STRING),
-    BYTES(NullValuePlaceHolder.INTERNAL_BYTES),
-    OBJECT(null),
-    INT_ARRAY(NullValuePlaceHolder.INT_ARRAY),
-    LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY),
-    FLOAT_ARRAY(NullValuePlaceHolder.FLOAT_ARRAY),
-    DOUBLE_ARRAY(NullValuePlaceHolder.DOUBLE_ARRAY),
-    BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY),
-    TIMESTAMP_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY),
-    STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY),
-    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY),
-    UNKNOWN(null);
+    INT(NullValuePlaceHolder.INT) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      }
+    },
+    LONG(NullValuePlaceHolder.LONG) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      }
+    },
+    FLOAT(NullValuePlaceHolder.FLOAT) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.REAL);
+      }
+    },
+    DOUBLE(NullValuePlaceHolder.DOUBLE) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+      }
+    },
+    BIG_DECIMAL(NullValuePlaceHolder.BIG_DECIMAL) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      }
+    },
+    BOOLEAN(INT, NullValuePlaceHolder.INT) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
+      }
+    },
+    TIMESTAMP(LONG, NullValuePlaceHolder.LONG) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+      }
+    },
+    STRING(NullValuePlaceHolder.STRING) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      }
+    },
+    JSON(STRING, NullValuePlaceHolder.STRING) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      }
+    },
+    MAP(NullValuePlaceHolder.MAP) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.MAP);
+      }
+    },
+    BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
+    OBJECT(null) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.ANY);
+      }
+    },
+    INT_ARRAY(NullValuePlaceHolder.INT_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(INT.toType(typeFactory), -1);
+      }
+    },
+    LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(LONG.toType(typeFactory), -1);
+      }
+    },
+    FLOAT_ARRAY(NullValuePlaceHolder.FLOAT_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(FLOAT.toType(typeFactory), -1);
+      }
+    },
+    DOUBLE_ARRAY(NullValuePlaceHolder.DOUBLE_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(DOUBLE.toType(typeFactory), -1);
+      }
+    },
+    BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(BOOLEAN.toType(typeFactory), -1);
+      }
+    },
+    TIMESTAMP_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(TIMESTAMP.toType(typeFactory), -1);
+      }
+    },
+    STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(STRING.toType(typeFactory), -1);
+      }
+    },
+    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
+      }
+    },
+    UNKNOWN(null) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.ANY);
+      }
+    };
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
@@ -497,6 +642,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case MAP:
+          return toMap(value);
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
@@ -516,6 +663,16 @@ public class DataSchema {
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
+    }
+
+    private Serializable toMap(Object value) {
+      if (value instanceof Serializable) {
+        return (Serializable) value;
+      }
+      if (value instanceof Map) {
+        return new HashMap<>((Map) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to Map", value));
     }
 
     private static int[] toIntArray(Object value) {
@@ -678,6 +835,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case MAP:
+          return MAP;
         case UNKNOWN:
           return UNKNOWN;
         default:
@@ -707,5 +866,7 @@ public class DataSchema {
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
     }
+
+    public abstract RelDataType toType(RelDataTypeFactory typeFactory);
   }
 }

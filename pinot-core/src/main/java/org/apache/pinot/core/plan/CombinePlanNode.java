@@ -45,7 +45,8 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
- * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
+ * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments in
+ * V1/SSQE.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {
@@ -122,7 +123,8 @@ public class CombinePlanNode implements PlanNode {
       }, _executorService, _queryContext.getEndTimeMs());
     }
 
-    if (_streamer != null && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
+    if (_streamer != null
+          && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {

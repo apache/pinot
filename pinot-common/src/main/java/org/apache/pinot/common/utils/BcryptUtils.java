@@ -40,13 +40,10 @@ public class BcryptUtils {
   }
 
   public static boolean checkpw(String password, String encryptedPassword) {
-    boolean isMatch = false;
     try {
-      isMatch = BCrypt.checkpw(password, encryptedPassword);
+      return BCrypt.checkpw(password, encryptedPassword);
     } catch (Exception e) {
-      System.out.println(e.getMessage());
-    } finally {
-      return isMatch;
+      return false;
     }
   }
 

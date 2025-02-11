@@ -112,6 +112,13 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE = "realtime.segment.flush.threshold.segment.size";
 
   /**
+   * The variance fraction allowed for the segment size auto tuning. The valid value is [0.0, 0.5].
+   * By default 0.0 is used.
+   */
+  public static final String FLUSH_THRESHOLD_VARIANCE_FRACTION =
+      "realtime.segment.flush.threshold.variance.fraction";
+
+  /**
    * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
    */
   public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";
@@ -122,6 +129,11 @@ public class StreamConfigProperties {
    * Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
    */
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
+
+  /**
+   * Config used to indicate which segment commit protocol implementation controller should use for this table
+   */
+  public static final String SEGMENT_COMPLETION_FSM_SCHEME = "segment.completion.fsm.scheme";
 
   /**
    * Helper method to create a stream specific property

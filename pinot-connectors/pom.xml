@@ -24,8 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-connectors</artifactId>
   <packaging>pom</packaging>

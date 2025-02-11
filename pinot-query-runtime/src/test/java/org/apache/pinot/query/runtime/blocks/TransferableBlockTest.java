@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStatsTest;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,12 +32,12 @@ public class TransferableBlockTest {
   @Test(dataProviderClass = MultiStageQueryStatsTest.class, dataProvider = "stats")
   public void serializeDeserialize(MultiStageQueryStats queryStats) {
     TransferableBlock transferableBlock = new TransferableBlock(queryStats);
-    List<ByteBuffer> fromStatsBytes = transferableBlock.getSerializedStatsByStage();
+    List<DataBuffer> fromStatsBytes = transferableBlock.getSerializedStatsByStage();
 
     DataBlock dataBlock = transferableBlock.getDataBlock();
 
     TransferableBlock fromBlock = TransferableBlockUtils.wrap(dataBlock);
-    List<ByteBuffer> fromBlockBytes = fromBlock.getSerializedStatsByStage();
+    List<DataBuffer> fromBlockBytes = fromBlock.getSerializedStatsByStage();
 
     Assert.assertEquals(fromStatsBytes, fromBlockBytes, "Serialized bytes from stats and block should be equal");
   }

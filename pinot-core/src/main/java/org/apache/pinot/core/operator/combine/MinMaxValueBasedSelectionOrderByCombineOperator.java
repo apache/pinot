@@ -19,9 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -205,26 +203,19 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (SelectionResultsBlock) operator.nextBlock();
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-      Collection<Object[]> rows = resultsBlock.getRows();
-      if (rows != null && rows.size() >= _numRowsToKeep) {
+      List<Object[]> rows = resultsBlock.getRows();
+      assert rows != null;
+      int numRows = rows.size();
+      if (numRows >= _numRowsToKeep) {
         // Segment result has enough rows, update the boundary value
-
-        Comparable segmentBoundaryValue;
-        if (rows instanceof PriorityQueue) {
-          // Results from SelectionOrderByOperator
-          assert ((PriorityQueue<Object[]>) rows).peek() != null;
-          segmentBoundaryValue = (Comparable) ((PriorityQueue<Object[]>) rows).peek()[0];
-        } else {
-          // Results from LinearSelectionOrderByOperator
-          assert rows instanceof List;
-          segmentBoundaryValue = (Comparable) ((List<Object[]>) rows).get(rows.size() - 1)[0];
-        }
-
+        Comparable segmentBoundaryValue = (Comparable) rows.get(numRows - 1)[0];
         if (boundaryValue == null) {
           boundaryValue = segmentBoundaryValue;
         } else {

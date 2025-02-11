@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -40,8 +41,8 @@ public class StreamConfig {
   public static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
   public static final long DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   public static final long DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
+  public static final double DEFAULT_FLUSH_THRESHOLD_VARIANCE_FRACTION = 0.0;
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
-  public static final String DEFAULT_SERVER_UPLOAD_TO_DEEPSTORE = "false";
 
   public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
       "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
@@ -68,6 +69,7 @@ public class StreamConfig {
   private final int _flushThresholdSegmentRows;
   private final long _flushThresholdTimeMillis;
   private final long _flushThresholdSegmentSizeBytes;
+  private final double _flushThresholdVarianceFraction;
   private final int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
 
   private final String _groupId;
@@ -79,10 +81,11 @@ public class StreamConfig {
   // Allow overriding it to use different offset criteria
   private OffsetCriteria _offsetCriteria;
 
-  // Indicates if the segment should be uploaded to the deep store's file system or to the controller during the
-  // segment commit protocol. By default, segment is uploaded to the controller during commit.
-  // If this flag is set to true, the segment is uploaded to deep store.
-  private final boolean _serverUploadToDeepStore;
+  // Indicate StreamConfig flag for table if segment should be uploaded to the deep store's file system or to the
+  // controller during the segment commit protocol. if config is not present in Table StreamConfig
+  // _serverUploadToDeepStore is null and method isServerUploadToDeepStore() overrides the default value with Server
+  // level config
+  private final Boolean _serverUploadToDeepStore;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -175,9 +178,10 @@ public class StreamConfig {
     _flushThresholdSegmentRows = extractFlushThresholdSegmentRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
-    _serverUploadToDeepStore = Boolean.parseBoolean(
-        streamConfigMap.getOrDefault(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE,
-            DEFAULT_SERVER_UPLOAD_TO_DEEPSTORE));
+    _flushThresholdVarianceFraction = extractFlushThresholdVarianceFraction(streamConfigMap);
+    _serverUploadToDeepStore = streamConfigMap.containsKey(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE)
+        ? Boolean.valueOf(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
+        : null;
 
     int autotuneInitialRows = 0;
     String initialRowsValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS);
@@ -214,11 +218,34 @@ public class StreamConfig {
     }
   }
 
-  public boolean isServerUploadToDeepStore() {
+  @Nullable
+  public Boolean isServerUploadToDeepStore() {
     return _serverUploadToDeepStore;
   }
 
-  private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
+  public static double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.FLUSH_THRESHOLD_VARIANCE_FRACTION;
+    String flushThresholdVarianceFractionStr = streamConfigMap.get(key);
+    if (flushThresholdVarianceFractionStr != null) {
+      try {
+        double segmentSizeVariationFraction = Double.parseDouble(flushThresholdVarianceFractionStr);
+        // Valid value of Segment size variation should be between 0 and 0.5
+        if (segmentSizeVariationFraction < 0.0 || segmentSizeVariationFraction >= 0.5) {
+          LOGGER.warn(
+              "Segment size variation fraction: {} should be in the range of [0, 0.5]. Using default {}",
+              segmentSizeVariationFraction, StreamConfig.DEFAULT_FLUSH_THRESHOLD_VARIANCE_FRACTION);
+          return StreamConfig.DEFAULT_FLUSH_THRESHOLD_VARIANCE_FRACTION;
+        }
+        return segmentSizeVariationFraction;
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + flushThresholdVarianceFractionStr);
+      }
+    } else {
+      return DEFAULT_FLUSH_THRESHOLD_VARIANCE_FRACTION;
+    }
+  }
+
+  public static long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE;
     String flushThresholdSegmentSizeStr = streamConfigMap.get(key);
     if (flushThresholdSegmentSizeStr == null) {
@@ -237,7 +264,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
     String flushThresholdRowsStr = streamConfigMap.get(key);
     if (flushThresholdRowsStr == null) {
@@ -261,7 +288,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS;
     String flushThresholdSegmentRowsStr = streamConfigMap.get(key);
     if (flushThresholdSegmentRowsStr != null) {
@@ -275,7 +302,7 @@ public class StreamConfig {
     }
   }
 
-  protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
+  public static long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     String flushThresholdTimeStr = streamConfigMap.get(key);
     if (flushThresholdTimeStr == null) {
@@ -365,6 +392,10 @@ public class StreamConfig {
     return _flushThresholdSegmentSizeBytes;
   }
 
+  public double getFlushThresholdVarianceFraction() {
+    return _flushThresholdVarianceFraction;
+  }
+
   public int getFlushAutotuneInitialRows() {
     return _flushAutotuneInitialRows;
   }
@@ -395,6 +426,7 @@ public class StreamConfig {
         + ", _idleTimeoutMillis=" + _idleTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows
         + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
+        + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
         + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap=" + _streamConfigMap
         + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
@@ -416,12 +448,12 @@ public class StreamConfig {
         && _flushThresholdSegmentSizeBytes == that._flushThresholdSegmentSizeBytes
         && _flushAutotuneInitialRows == that._flushAutotuneInitialRows
         && Double.compare(_topicConsumptionRateLimit, that._topicConsumptionRateLimit) == 0
-        && _serverUploadToDeepStore == that._serverUploadToDeepStore && Objects.equals(_type, that._type)
+        && Objects.equals(_serverUploadToDeepStore, that._serverUploadToDeepStore) && Objects.equals(_type, that._type)
         && Objects.equals(_topicName, that._topicName) && Objects.equals(_tableNameWithType, that._tableNameWithType)
         && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
         that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
-        that._offsetCriteria);
+        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction);
   }
 
   @Override
@@ -430,6 +462,6 @@ public class StreamConfig {
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
-        _serverUploadToDeepStore);
+        _serverUploadToDeepStore, _flushThresholdVarianceFraction);
   }
 }

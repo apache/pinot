@@ -39,6 +39,7 @@ message PlanNode {
     TableScanNode tableScanNode = 13;
     ValueNode valueNode = 14;
     WindowNode windowNode = 15;
+    ExplainNode explainNode = 16;
   }
 }
 
@@ -67,6 +68,9 @@ message AggregateNode {
   repeated int32 filterArgs = 2;
   repeated int32 groupKeys = 3;
   AggType aggType = 4;
+  bool leafReturnFinalResult = 5;
+  repeated Collation collations = 6;
+  int32 limit = 7;
 }
 
 message FilterNode {
@@ -82,11 +86,17 @@ enum JoinType {
   ANTI = 5;
 }
 
+enum JoinStrategy {
+  HASH = 0;
+  LOOKUP = 1;
+}
+
 message JoinNode {
   JoinType joinType = 1;
   repeated int32 leftKeys = 2;
   repeated int32 rightKeys = 3;
   repeated Expression nonEquiConditions = 4;
+  JoinStrategy joinStrategy = 5;
 }
 
 enum ExchangeType {
@@ -136,13 +146,15 @@ message MailboxReceiveNode {
 }
 
 message MailboxSendNode {
-  int32 receiverStageId = 1;
+  // kept for backward compatibility. Brokers populate it, but servers should prioritize receiverStageIds
+  int32 receiverStageId = 1  [deprecated = true];
   ExchangeType exchangeType = 2;
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   bool prePartitioned = 5;
   repeated Collation collations = 6;
   bool sort = 7;
+  repeated int32 receiverStageIds = 8;
 }
 
 message ProjectNode {
@@ -192,4 +204,50 @@ message WindowNode {
   int32 lowerBound = 5;
   int32 upperBound = 6;
   repeated Literal constants = 7;
+}
+
+// A node that doesn't carry semantic information.
+// Instead it is only used to be a catch-all in a explain plan shown to the user.
+// The main reason for this node is to open the ability to represent single-stage operators in the multi-stage plan.
+// For example the single-stage operator RangeIndexBasedFilterOperator can be represented as a ExplainNode
+// with the title "FilterRangeIndex" and the attributes that are specific to this operator (like the predicate).
+//
+// Remember that this class was designed to be generated from operators and not the other way around.
+// Specifically, some important semantic information may be lost when converting an operator to a ExplainNode that
+// makes it impossible to convert it back to the original operator.
+message ExplainNode {
+  // The title (and description) of the plan node. For example, "SelectStreaming" or "FilterMatchEntireSegment".
+  // This basically will be used in the explain plan as the title of the node.
+  string title = 1;
+  // The attributes of the plan node, which are specific for each original operator.
+  map<string, AttributeValue> attributes = 2;
+
+  message AttributeValue {
+    MergeType mergeType = 1;
+
+    oneof value {
+      string string = 2;
+      int64 long = 3;
+      bool bool = 4;
+      StringList stringList = 5;
+    };
+
+    enum MergeType {
+      // Longs will be added, other types will behave like IDEMPOTENT.
+      DEFAULT = 0;
+      // When being merge, values must be the same. Otherwise cannot be merged.
+      IDEMPOTENT = 1;
+      // When being merge, if values are different, the value can be excluded from the merged result.
+      // This may be used for example to support verbose explain mode
+      // For example, a node may indicate the segment that is used. Different segments will use different values.
+      // In verbose mode, the segment information can be included in the explain plan.
+      // But in non-verbose mode, the segment information can be excluded to simplify similar plans generated from
+      // different segments.
+      IGNORABLE = 2;
+    }
+  }
+
+  message StringList {
+    repeated string values = 1;
+  }
 }

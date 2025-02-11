@@ -6,7 +6,8 @@ cscope.*
 .externalToolBuilders/
 maven-eclipse.xml
 target/
-examples/
+/examples/
+/logs/
 bin/
 */bin/
 .idea
@@ -45,7 +46,8 @@ yarn-error.log*
 quickstart*
 
 #build symlink directory
-build*
+build
+build/*
 
 #helm related files
 kubernetes/helm/**/charts/
@@ -54,3 +56,4 @@ kubernetes/helm/**/Chart.lock
 
 #Develocity
 .mvn/.gradle-enterprise/
+.mvn/.develocity/

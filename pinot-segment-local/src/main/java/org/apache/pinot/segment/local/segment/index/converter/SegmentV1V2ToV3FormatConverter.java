@@ -27,9 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -110,10 +108,10 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
     }
@@ -155,7 +153,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
-          for (IndexType<?, ?, ?> indexType : sortedIndexTypes()) {
+          for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
             // NOTE: Text index is copied separately
             if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
               copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
@@ -168,12 +166,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyLuceneTextIndexIfExists(v2Directory, v3Directory);
     copyVectorIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
-  }
-
-  private List<IndexType<?, ?, ?>> sortedIndexTypes() {
-    return IndexService.getInstance().getAllIndexes().stream()
-        .sorted((i1, i2) -> i1.getId().compareTo(i2.getId()))
-        .collect(Collectors.toList());
+    copyNativeTextIndexIfExists(v2Directory, v3Directory);
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
@@ -226,7 +219,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
@@ -263,7 +256,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyVectorIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
     File[] vectorIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
@@ -278,6 +271,15 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         File v3VectorIndexFile = new File(v3VectorIndexDir, indexFile.getName());
         Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
       }
+    }
+  }
+
+  private void copyNativeTextIndexIfExists(File segmentDirectory, File v3Dir) throws IOException {
+    String suffix = V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(suffix));
+    for (File textIndexFile : textIndexFiles) {
+      File v3TextIndexFile = new File(v3Dir, textIndexFile.getName());
+      Files.copy(textIndexFile.toPath(), v3TextIndexFile.toPath());
     }
   }
 

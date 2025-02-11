@@ -24,8 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kafka-2.0</artifactId>
@@ -54,25 +53,22 @@
       <groupId>com.fasterxml.jackson.module</groupId>
       <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.101tec</groupId>
-      <artifactId>zkclient</artifactId>
-    </dependency>
 
+    <!-- Test -->
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk18on</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk18on</artifactId>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kafka-base</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -59,7 +60,23 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
   }
 
   @Override
-  public GenericRow get(PrimaryKey pk) {
+  public FieldSpec getFieldSpecFor(String columnName) {
+    return _tableSchema.getFieldSpecFor(columnName);
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return _lookupTable.isEmpty();
+  }
+
+  @Override
+  public boolean containsKey(PrimaryKey pk) {
+    return _lookupTable.containsKey(pk);
+  }
+
+  @Nullable
+  @Override
+  public GenericRow getRow(PrimaryKey pk) {
     LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
     if (lookupRecordLocation == null) {
       return null;
@@ -69,14 +86,26 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
     return lookupRecordLocation.getRecord(reuse);
   }
 
+  @Nullable
   @Override
-  public boolean isEmpty() {
-    return _lookupTable.isEmpty();
+  public Object getValue(PrimaryKey pk, String columnName) {
+    LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
+    return lookupRecordLocation != null ? lookupRecordLocation.getValue(columnName) : null;
   }
 
+  @Nullable
   @Override
-  public FieldSpec getFieldSpecFor(String columnName) {
-    return _tableSchema.getFieldSpecFor(columnName);
+  public Object[] getValues(PrimaryKey pk, String[] columnNames) {
+    LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
+    if (lookupRecordLocation == null) {
+      return null;
+    }
+    int numColumns = columnNames.length;
+    Object[] values = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      values[i] = lookupRecordLocation.getValue(columnNames[i]);
+    }
+    return values;
   }
 
   @Override

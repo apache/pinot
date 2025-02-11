@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
@@ -93,5 +96,23 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
       stringBuilder.append(", ").append(expressions.get(i).toString());
     }
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    List<ExpressionContext> selectExpressions = _queryContext.getSelectExpressions();
+    if (selectExpressions.isEmpty()) {
+      return;
+    }
+    List<String> expressions = selectExpressions.stream()
+        .map(ExpressionContext::toString)
+        .collect(Collectors.toList());
+    attributeBuilder.putStringList("keyColumns", expressions);
   }
 }

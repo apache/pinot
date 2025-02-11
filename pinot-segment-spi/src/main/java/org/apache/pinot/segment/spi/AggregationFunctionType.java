@@ -51,28 +51,29 @@ public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
   COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", SqlTypeName.DOUBLE),
-  MAX("max", SqlTypeName.DOUBLE),
-  SUM("sum", SqlTypeName.DOUBLE),
-  SUM0("$sum0", SqlTypeName.DOUBLE),
+  MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  SUM("sum", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  SUM0("$sum0", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  AVG("avg", SqlTypeName.OTHER),
-  MODE("mode", SqlTypeName.OTHER),
+  AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
   LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
       OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
-  MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
+  MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   /**
    * for all distinct count family functions:
    * (1) distinct_count only supports single argument;
    * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
    */
-  DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER),
-  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
+  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
-  DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER),
+  DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", ReturnTypes.BIGINT, OperandTypes.ANY,
       SqlTypeName.OTHER),
   DISTINCTCOUNTHLL("distinctCountHLL", ReturnTypes.BIGINT,
@@ -90,10 +91,9 @@ public enum AggregationFunctionType {
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTRAWULL("distinctCountRawULL", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
-  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
-  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR,
-      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT, OperandTypes.ONE_OR_MORE, SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR, OperandTypes.ONE_OR_MORE,
+      SqlTypeName.OTHER),
   DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY, SqlTypeName.OTHER),
   DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
       OperandTypes.BINARY, SqlTypeName.OTHER),
@@ -106,7 +106,7 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
 
-  PERCENTILE("percentile", ReturnTypes.ARG0, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
+  PERCENTILE("percentile", ReturnTypes.ARG0, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   PERCENTILEEST("percentileEst", ReturnTypes.BIGINT, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
   PERCENTILERAWEST("percentileRawEst", ReturnTypes.VARCHAR, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
   PERCENTILETDIGEST("percentileTDigest", ReturnTypes.DOUBLE,
@@ -130,20 +130,22 @@ public enum AggregationFunctionType {
 
   HISTOGRAM("histogram", new ArrayReturnTypeInference(SqlTypeName.DOUBLE), OperandTypes.VARIADIC, SqlTypeName.OTHER),
 
-  COVARPOP("covarPop", SqlTypeName.OTHER),
-  COVARSAMP("covarSamp", SqlTypeName.OTHER),
-  VARPOP("varPop", SqlTypeName.OTHER),
-  VARSAMP("varSamp", SqlTypeName.OTHER),
-  STDDEVPOP("stdDevPop", SqlTypeName.OTHER),
-  STDDEVSAMP("stdDevSamp", SqlTypeName.OTHER),
+  COVARPOP("covarPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  COVARSAMP("covarSamp", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  VARPOP("varPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  VARSAMP("varSamp", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  STDDEVPOP("stdDevPop", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
+  STDDEVSAMP("stdDevSamp", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
 
   SKEWNESS("skewness", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
   KURTOSIS("kurtosis", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
   FOURTHMOMENT("fourthMoment", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
 
   // Datasketches Frequent Items support
-  FREQUENTSTRINGSSKETCH("frequentStringsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
-  FREQUENTLONGSSKETCH("frequentLongsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
+  FREQUENTSTRINGSSKETCH("frequentStringsSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  FREQUENTLONGSSKETCH("frequentLongsSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
 
   // Geo aggregation functions
   STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
@@ -161,15 +163,15 @@ public enum AggregationFunctionType {
   PINOTPARENTAGGEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
       ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER),
   PINOTCHILDAGGEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
-      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
   PINOTCHILDAGGEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
-      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER, SqlTypeName.BIGINT),
 
   // Array aggregate functions
   ARRAYAGG("arrayAgg", ReturnTypes.TO_ARRAY,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.BOOLEAN), i -> i == 2),
       SqlTypeName.OTHER),
-  LISTAGG("listAgg", SqlTypeName.OTHER),
+  LISTAGG("listAgg", SqlTypeName.OTHER, SqlTypeName.VARCHAR),
 
   SUMARRAYLONG("sumArrayLong", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.ARRAY, SqlTypeName.OTHER),
   SUMARRAYDOUBLE("sumArrayDouble", new ArrayReturnTypeInference(SqlTypeName.DOUBLE), OperandTypes.ARRAY,
@@ -184,16 +186,17 @@ public enum AggregationFunctionType {
       SqlTypeName.OTHER),
 
   // Aggregation functions for multi-valued columns
-  COUNTMV("countMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.BIGINT),
-  MINMV("minMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
-  MAXMV("maxMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
-  SUMMV("sumMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
+  COUNTMV("countMV", ReturnTypes.BIGINT, OperandTypes.ARRAY),
+  MINMV("minMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
+  MAXMV("maxMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
+  SUMMV("sumMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY),
   AVGMV("avgMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
   MINMAXRANGEMV("minMaxRangeMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
-  DISTINCTCOUNTMV("distinctCountMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTCOUNTMV("distinctCountMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
   DISTINCTSUMMV("distinctSumMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
   DISTINCTAVGMV("distinctAvgMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
-  DISTINCTCOUNTBITMAPMV("distinctCountBitmapMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTCOUNTBITMAPMV("distinctCountBitmapMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV", ReturnTypes.VARCHAR,
@@ -204,7 +207,7 @@ public enum AggregationFunctionType {
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
   PERCENTILEMV("percentileMV", ReturnTypes.DOUBLE,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
-  PERCENTILEESTMV("percentileEstMV", ReturnTypes.DOUBLE,
+  PERCENTILEESTMV("percentileEstMV", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
   PERCENTILERAWESTMV("percentileRawEstMV", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
@@ -219,11 +222,12 @@ public enum AggregationFunctionType {
       SqlTypeName.OTHER),
   PERCENTILERAWKLLMV("percentileRawKLLMV", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
-      SqlTypeName.OTHER);
+      SqlTypeName.OTHER),
+  TIMESERIESAGGREGATE("timeSeriesAggregate", SqlTypeName.OTHER, SqlTypeName.OTHER);
 
-  private static final Set<String> NAMES =
-      Arrays.stream(values()).flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
-          .collect(Collectors.toSet());
+  private static final Set<String> NAMES = Arrays.stream(values())
+      .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
+      .collect(Collectors.toSet());
 
   private final String _name;
 
@@ -231,29 +235,48 @@ public enum AggregationFunctionType {
   // When returnTypeInference is provided, the function will be registered as a USER_DEFINED_FUNCTION
   private final SqlReturnTypeInference _returnTypeInference;
   private final SqlOperandTypeChecker _operandTypeChecker;
-  // override options for Pinot aggregate rules to insert intermediate results that are non-standard than return type.
+  // Override intermediate result type if it is not the same as standard return type of the function.
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
+  // Override final result type if it is not the same as standard return type of the function.
+  private final SqlReturnTypeInference _finalReturnTypeInference;
 
   AggregationFunctionType(String name) {
-    this(name, null, null, (SqlReturnTypeInference) null);
+    this(name, null, null, (SqlReturnTypeInference) null, null);
   }
 
   AggregationFunctionType(String name, SqlTypeName intermediateReturnType) {
-    this(name, null, null, ReturnTypes.explicit(intermediateReturnType));
+    this(name, null, null, ReturnTypes.explicit(intermediateReturnType), null);
+  }
+
+  AggregationFunctionType(String name, SqlTypeName intermediateReturnType, SqlTypeName finalReturnType) {
+    this(name, null, null, ReturnTypes.explicit(intermediateReturnType), ReturnTypes.explicit(finalReturnType));
+  }
+
+  AggregationFunctionType(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker) {
+    this(name, returnTypeInference, operandTypeChecker, (SqlReturnTypeInference) null, null);
   }
 
   AggregationFunctionType(String name, SqlReturnTypeInference returnTypeInference,
       SqlOperandTypeChecker operandTypeChecker, SqlTypeName intermediateReturnType) {
-    this(name, returnTypeInference, operandTypeChecker, ReturnTypes.explicit(intermediateReturnType));
+    this(name, returnTypeInference, operandTypeChecker, ReturnTypes.explicit(intermediateReturnType), null);
+  }
+
+  AggregationFunctionType(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, SqlTypeName intermediateReturnType, SqlTypeName finalReturnType) {
+    this(name, returnTypeInference, operandTypeChecker, ReturnTypes.explicit(intermediateReturnType),
+        ReturnTypes.explicit(finalReturnType));
   }
 
   AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
       @Nullable SqlOperandTypeChecker operandTypeChecker,
-      @Nullable SqlReturnTypeInference intermediateReturnTypeInference) {
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference,
+      @Nullable SqlReturnTypeInference finalReturnTypeInference) {
     _name = name;
     _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
     _intermediateReturnTypeInference = intermediateReturnTypeInference;
+    _finalReturnTypeInference = finalReturnTypeInference;
   }
 
   public String getName() {
@@ -273,6 +296,11 @@ public enum AggregationFunctionType {
   @Nullable
   public SqlReturnTypeInference getIntermediateReturnTypeInference() {
     return _intermediateReturnTypeInference;
+  }
+
+  @Nullable
+  public SqlReturnTypeInference getFinalReturnTypeInference() {
+    return _finalReturnTypeInference;
   }
 
   public static boolean isAggregationFunction(String functionName) {

@@ -788,7 +788,6 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         String.format("SELECT %s, %s, %s, %s FROM %s LIMIT %d", INT_COLUMN, BOOLEAN_COLUMN, BOOLEAN_FROM_INT_COLUMN,
             BOOLEAN_FROM_STRING_COLUMN, getTableName(), getCountStarResult());
     JsonNode result = postQuery(query).get("resultTable");
-    System.out.println("result = " + result);
     JsonNode columnDataTypesNode = result.get("dataSchema").get("columnDataTypes");
     assertEquals(columnDataTypesNode.get(0).textValue(), "INT");
     assertEquals(columnDataTypesNode.get(1).textValue(), "BOOLEAN");
@@ -813,7 +812,6 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         String.format("SELECT %s, %s, %s FROM %s LIMIT %d", BOOLEAN_ARRAY_COLUMN, BOOLEAN_FROM_INT_ARRAY_COLUMN,
             BOOLEAN_FROM_STRING_ARRAY_COLUMN, getTableName(), getCountStarResult());
     JsonNode result = postQuery(query).get("resultTable");
-    System.out.println("result = " + result);
     JsonNode columnDataTypesNode = result.get("dataSchema").get("columnDataTypes");
     assertEquals(columnDataTypesNode.get(0).textValue(), "BOOLEAN_ARRAY");
     assertEquals(columnDataTypesNode.get(1).textValue(), "BOOLEAN_ARRAY");
@@ -875,7 +873,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -955,6 +953,6 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         ));
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 }

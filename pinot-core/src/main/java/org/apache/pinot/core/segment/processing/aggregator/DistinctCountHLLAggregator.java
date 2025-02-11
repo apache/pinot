@@ -20,12 +20,13 @@ package org.apache.pinot.core.segment.processing.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
 public class DistinctCountHLLAggregator implements ValueAggregator {
   @Override
-  public Object aggregate(Object value1, Object value2) {
+  public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     try {
       HyperLogLog first = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value1);
       HyperLogLog second = ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize((byte[]) value2);

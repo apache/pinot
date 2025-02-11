@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -283,10 +284,26 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     return !_dimensionTable.get().isEmpty();
   }
 
-  public GenericRow lookupRowByPrimaryKey(PrimaryKey pk) {
-    return _dimensionTable.get().get(pk);
+  public boolean containsKey(PrimaryKey pk) {
+    return _dimensionTable.get().containsKey(pk);
   }
 
+  @Nullable
+  public GenericRow lookupRow(PrimaryKey pk) {
+    return _dimensionTable.get().getRow(pk);
+  }
+
+  @Nullable
+  public Object lookupValue(PrimaryKey pk, String columnName) {
+    return _dimensionTable.get().getValue(pk, columnName);
+  }
+
+  @Nullable
+  public Object[] lookupValues(PrimaryKey pk, String[] columnNames) {
+    return _dimensionTable.get().getValues(pk, columnNames);
+  }
+
+  @Nullable
   public FieldSpec getColumnFieldSpec(String columnName) {
     return _dimensionTable.get().getFieldSpecFor(columnName);
   }

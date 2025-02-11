@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
@@ -114,5 +115,16 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    if (_aggregationFunctions.length > 0) {
+      List<String> aggregations = Arrays.stream(_aggregationFunctions)
+          .map(AggregationFunction::toExplainString)
+          .collect(Collectors.toList());
+      attributeBuilder.putStringList("aggregations", aggregations);
+    }
   }
 }

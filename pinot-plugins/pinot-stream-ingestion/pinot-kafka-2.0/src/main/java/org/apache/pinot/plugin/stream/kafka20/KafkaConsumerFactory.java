@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
+import org.apache.pinot.plugin.stream.kafka.KafkaConfigBackwardCompatibleUtils;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;

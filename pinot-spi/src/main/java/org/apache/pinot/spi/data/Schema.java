@@ -38,6 +38,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -73,6 +74,7 @@ public final class Schema implements Serializable {
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
   // TODO(yupeng): add validation checks like duplicate columns and use of time column
+  @Nullable
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
@@ -176,6 +178,7 @@ public final class Schema implements Serializable {
     _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
+  @Nullable
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
@@ -374,6 +377,34 @@ public final class Schema implements Serializable {
       }
     }
     return physicalColumnNames;
+  }
+
+  /**
+   * Returns a new schema containing only physical columns.
+   *
+   * All properties but the fields are the same.
+   * All field attributes are a shallow copy without the virtual column.
+   */
+  public Schema withoutVirtualColumns() {
+    Schema newSchema = new Schema();
+    newSchema.setSchemaName(getSchemaName());
+    newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    List<String> primaryKeyColumns = getPrimaryKeyColumns();
+    if (primaryKeyColumns != null) {
+      newSchema.setPrimaryKeyColumns(primaryKeyColumns.stream()
+          .filter(primaryKey -> {
+            FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
+            return fieldSpec != null && !fieldSpec.isVirtualColumn();
+          })
+          .collect(Collectors.toList())
+      );
+    }
+    for (FieldSpec fieldSpec : getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
   }
 
   /**
@@ -840,10 +871,17 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  /**
+   * @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
+   * of the fieldSpecs.
+   */
+  @Deprecated
+  @Override
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
@@ -924,30 +962,30 @@ public final class Schema implements Serializable {
         break;
       case SECONDS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochSecondsBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochSecondsBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochSeconds(%s)", incomingName);
+          innerFunction = "fromEpochSeconds(" + incomingName + ")";
         }
         break;
       case MINUTES:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochMinutesBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochMinutesBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochMinutes(%s)", incomingName);
+          innerFunction = "fromEpochMinutes(" + incomingName + ")";
         }
         break;
       case HOURS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochHoursBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochHoursBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochHours(%s)", incomingName);
+          innerFunction = "fromEpochHours(" + incomingName + ")";
         }
         break;
       case DAYS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochDaysBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochDaysBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochDays(%s)", incomingName);
+          innerFunction = "fromEpochDays(" + incomingName + ")";
         }
         break;
       default:
@@ -960,30 +998,30 @@ public final class Schema implements Serializable {
         break;
       case SECONDS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochSecondsBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochSecondsBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochSeconds(%s)", innerFunction);
+          outerFunction = "toEpochSeconds(" + innerFunction + ")";
         }
         break;
       case MINUTES:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochMinutesBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochMinutesBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochMinutes(%s)", innerFunction);
+          outerFunction = "toEpochMinutes(" + innerFunction + ")";
         }
         break;
       case HOURS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochHoursBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochHoursBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochHours(%s)", innerFunction);
+          outerFunction = "toEpochHours(" + innerFunction + ")";
         }
         break;
       case DAYS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochDaysBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochDaysBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochDays(%s)", innerFunction);
+          outerFunction = "toEpochDays(" + innerFunction + ")";
         }
         break;
       default:

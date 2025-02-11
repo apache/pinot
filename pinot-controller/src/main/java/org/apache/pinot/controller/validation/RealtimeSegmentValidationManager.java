@@ -23,15 +23,18 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -51,24 +54,27 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
+  private final StorageQuotaChecker _storageQuotaChecker;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  private final boolean _segmentAutoResetOnErrorAtValidation;
 
-  public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
   public static final String OFFSET_CRITERIA = "offsetCriteria";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
+    _storageQuotaChecker = quotaChecker;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
   }
 
@@ -83,8 +89,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
-    context._recreateDeletedConsumingSegment =
-        Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
     String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
     if (offsetCriteriaStr != null) {
       context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
@@ -103,28 +107,70 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
       return;
     }
-    StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    if (context._runSegmentLevelValidation) {
-      runSegmentLevelValidation(tableConfig, streamConfig);
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
+        streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
+    ).collect(Collectors.toList());
+
+    if (shouldEnsureConsuming(tableNameWithType)) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
     }
-    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-        context._recreateDeletedConsumingSegment, context._offsetCriteria);
+
+    if (context._runSegmentLevelValidation) {
+      runSegmentLevelValidation(tableConfig);
+    } else {
+      LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
+    }
   }
 
-  private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
+  /**
+   *
+   * Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+   * Skips updating the pause state if table is paused by admin.
+   * Returns true if table is not paused
+   */
+  private boolean shouldEnsureConsuming(String tableNameWithType) {
+    PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
+    boolean isTablePaused = pauseStatus.getPauseFlag();
+    // if table is paused by admin then don't compute
+    if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
+      return false;
+    }
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+    if (isQuotaExceeded == isTablePaused) {
+      return !isTablePaused;
+    }
+    // if quota breach and pause flag is not in sync, update the IS
+    if (isQuotaExceeded) {
+      String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
+      // as quota is breached pause the consumption right away
+      _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
+          "Storage quota of " + storageQuota + " exceeded.");
+    } else {
+      // as quota limit is being honored, unset the pause state and allow consuming segment recreation.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
+          PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
+    }
+    return !isQuotaExceeded;
+  }
+
+  private void runSegmentLevelValidation(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
 
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // Delete tmp segments
-    try {
-      long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
-      LOGGER.info("Deleted {} tmp segments for table: {}", numDeleteTmpSegments, realtimeTableName);
-      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.DELETED_TMP_SEGMENT_COUNT,
-          numDeleteTmpSegments);
-    } catch (Exception e) {
-      LOGGER.error("Failed to delete tmp segments for table: {}", realtimeTableName, e);
+    if (_llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
+      try {
+        long startTimeMs = System.currentTimeMillis();
+        int numDeletedTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
+        LOGGER.info("Deleted {} tmp segments for table: {} in {}ms", numDeletedTmpSegments, realtimeTableName,
+            System.currentTimeMillis() - startTimeMs);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.DELETED_TMP_SEGMENT_COUNT,
+            numDeletedTmpSegments);
+      } catch (Exception e) {
+        LOGGER.error("Failed to delete tmp segments for table: {}", realtimeTableName, e);
+      }
     }
 
     // Update the total document count gauge
@@ -133,6 +179,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
+    }
+
+    if (_segmentAutoResetOnErrorAtValidation) {
+      _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
     }
   }
 
@@ -163,7 +213,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public static final class Context {
     private boolean _runSegmentLevelValidation;
-    private boolean _recreateDeletedConsumingSegment;
     private OffsetCriteria _offsetCriteria;
   }
 

@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
 import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -31,13 +34,19 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private final SetOperationBuilder _setOperationBuilder;
+  private final int _nominalEntries;
 
   // This changes a lot similar to the Bitmap aggregator
   private int _maxByteSize;
 
-  public DistinctCountThetaSketchValueAggregator() {
-    _setOperationBuilder =
-        Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
+  public DistinctCountThetaSketchValueAggregator(List<ExpressionContext> arguments) {
+    // No argument means we use the Helix default
+    if (arguments.isEmpty()) {
+      _nominalEntries = CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES;
+    } else {
+      _nominalEntries = arguments.get(0).getLiteral().getIntValue();
+    }
+    _setOperationBuilder = Union.builder().setNominalEntries(_nominalEntries);
   }
 
   @Override
@@ -48,6 +57,11 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   @Override
   public DataType getAggregatedValueType() {
     return AGGREGATED_VALUE_TYPE;
+  }
+
+  @VisibleForTesting
+  public int getNominalEntries() {
+    return _nominalEntries;
   }
 
   private void singleItemUpdate(Union thetaUnion, Object rawValue) {

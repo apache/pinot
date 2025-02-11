@@ -60,6 +60,14 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * Number of single-stage queries executed that would not have successfully run on the multi-stage query engine as is.
    */
   SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE("queries", true),
+  /**
+   * Number of time-series queries. This metric is not grouped on the table name.
+   */
+  TIME_SERIES_GLOBAL_QUERIES("queries", true),
+  /**
+   * Number of time-series queries that failed. This metric is not grouped on the table name.
+   */
+  TIME_SERIES_GLOBAL_QUERIES_FAILED("queries", true),
   // These metrics track the exceptions caught during query execution in broker side.
   // Query rejected by Jersey thread pool executor
   QUERY_REJECTED_EXCEPTIONS("exceptions", true),
@@ -97,7 +105,11 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
 
+  SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+
   BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
+
+  SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
 
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
@@ -157,7 +169,27 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * For each query with at least one window function, this meter is increased as many times as window functions in the
    * query.
    */
-  WINDOW_COUNT("queries", true),;
+  WINDOW_COUNT("queries", true),
+
+  /**
+   * Number of queries executed with cursors. This count includes queries that use SSE and MSE
+   */
+  CURSOR_QUERIES_GLOBAL("queries", true),
+
+  /**
+   * Number of exceptions when writing a response to the response store
+   */
+  CURSOR_WRITE_EXCEPTION("exceptions", true),
+
+  /**
+   * Number of exceptions when reading a response and result table from the response store
+   */
+  CURSOR_READ_EXCEPTION("exceptions", true),
+
+  /**
+   * The number of bytes stored in the response store. Only the size of the result table is tracked.
+   */
+  CURSOR_RESPONSE_STORE_SIZE("bytes", true);
 
   private final String _brokerMeterName;
   private final String _unit;

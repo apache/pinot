@@ -20,7 +20,9 @@ package org.apache.pinot.core.common.datablock;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -127,6 +129,19 @@ public class DataBlockTestUtils {
           }
           row[colId] = timestampArray;
           break;
+        case MAP:
+          length = RANDOM.nextInt(ARRAY_SIZE);
+          Map<String, Object> map = new HashMap<>();
+          for (int i = 0; i < length; i++) {
+            int mapSize = RANDOM.nextInt(20);
+            for (int j = 0; j < mapSize; j++) {
+              map.put("k0", RandomStringUtils.random(RANDOM.nextInt(5)));
+              map.put("k1", RandomStringUtils.random(RANDOM.nextInt(10)));
+              map.put("k2", RandomStringUtils.random(RANDOM.nextInt(20)));
+            }
+          }
+          row[colId] = map;
+          break;
         case UNKNOWN:
           row[colId] = null;
           break;
@@ -173,6 +188,8 @@ public class DataBlockTestUtils {
         return dataBlock.getDoubleArray(rowId, colId);
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
+      case MAP:
+        return dataBlock.getMap(rowId, colId);
       case UNKNOWN:
         return null;
       default:

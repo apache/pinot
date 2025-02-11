@@ -107,6 +107,28 @@ public class ServerQueryRequest {
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
+  /**
+   * To be used by Time Series Query Engine.
+   */
+  public ServerQueryRequest(QueryContext queryContext, List<String> segmentsToQuery, Map<String, String> metadata,
+      ServerMetrics serverMetrics) {
+    long queryArrivalTimeMs = System.currentTimeMillis();
+    _queryContext = queryContext;
+
+    // Initialize metadata
+    _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
+    _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
+    _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
+    _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
+    _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
+        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
+
+    _segmentsToQuery = segmentsToQuery;
+    _optionalSegments = null;
+
+    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+  }
+
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
     return QueryContextConverterUtils.getQueryContext(pinotQuery);
   }

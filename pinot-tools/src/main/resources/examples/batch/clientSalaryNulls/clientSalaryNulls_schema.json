@@ -1,0 +1,38 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "clientId",
+      "notNull": "true"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "city",
+      "notNull": "true"
+    },
+    {
+      "dataType": "STRING",
+      "singleValueField": true,
+      "name": "description",
+      "notNull": "false"
+    },
+    {
+      "dataType": "INT",
+      "singleValueField": true,
+      "name": "salary",
+      "notNull": "false"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "DaysSinceEpoch",
+      "dataType": "INT",
+      "format": "1:DAYS:EPOCH",
+      "granularity": "1:DAYS"
+    }
+  ],
+  "schemaName": "clientSalaryNulls",
+  "enableColumnBasedNullHandling": true
+}

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -32,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -143,11 +143,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     int index = 0;
     for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
       AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+      AggregationSpec aggregationSpec = entry.getValue();
       _metrics[index] = functionColumnPair.toColumnName();
-      // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
+      List<ExpressionContext> arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+          functionColumnPair.getFunctionType(), aggregationSpec.getFunctionParameters());
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
-      _aggregationSpecs[index] = entry.getValue();
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), arguments);
+      _aggregationSpecs[index] = aggregationSpec;
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();

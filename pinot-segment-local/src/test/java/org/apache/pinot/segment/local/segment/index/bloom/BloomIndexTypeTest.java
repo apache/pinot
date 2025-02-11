@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.bloom;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -33,7 +31,10 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class BloomIndexTypeTest {
@@ -60,16 +61,7 @@ public class BloomIndexTypeTest {
     }
 
     @Test
-    public void oldIndexingConfigNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(BloomFilterConfig.DISABLED);
-    }
-
-    @Test
-    public void oldConfNull()
-        throws JsonProcessingException {
+    public void oldConfNull() {
       _tableConfig.getIndexingConfig().setBloomFilterColumns(null);
       _tableConfig.getIndexingConfig().setBloomFilterConfigs(null);
 
@@ -79,10 +71,8 @@ public class BloomIndexTypeTest {
     @Test
     public void oldMapConfNotFound()
         throws IOException {
-      _tableConfig.getIndexingConfig().setBloomFilterConfigs(
-          JsonUtils.stringToObject("{}", new TypeReference<Map<String, BloomFilterConfig>>() {
-          })
-      );
+      _tableConfig.getIndexingConfig().setBloomFilterConfigs(JsonUtils.stringToObject("{}", new TypeReference<>() {
+      }));
 
       assertEquals(BloomFilterConfig.DISABLED);
     }

@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,7 @@ import org.slf4j.LoggerFactory;
  * The {@code ExpressionTransformer} class will evaluate the function expressions.
  * <p>NOTE: should put this before the {@link DataTypeTransformer}. After this, transformed column can be treated as
  * regular column for other record transformers.
+ * TODO: Merge this and CustomFunctionEnricher
  */
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
@@ -110,6 +112,20 @@ public class ExpressionTransformer implements RecordTransformer {
   @Override
   public boolean isNoOp() {
     return _expressionEvaluators.isEmpty();
+  }
+
+  @Override
+  public Set<String> getInputColumns() {
+    if (_expressionEvaluators.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> inputColumns = new HashSet<>();
+    for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
+      inputColumns.addAll(entry.getValue().getArguments());
+      // NOTE: Add the column itself too, so that if it is already transformed, we won't transform again
+      inputColumns.add(entry.getKey());
+    }
+    return inputColumns;
   }
 
   @Override

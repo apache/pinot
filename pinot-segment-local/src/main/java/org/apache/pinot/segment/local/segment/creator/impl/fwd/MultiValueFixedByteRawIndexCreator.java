@@ -20,9 +20,9 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -66,27 +66,36 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion)
       throws IOException {
     this(indexFile, compressionType, totalDocs, valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk,
-        writerVersion, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+        writerVersion, ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(),
+        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
-
 
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
-    // Store the length followed by the values
-    int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
+      // Store the length followed by the values
+      int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
       int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(targetMaxChunkSizeBytes / (totalMaxLength
           + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : targetDocsPerChunk;
       _indexWriter =
           new VarByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
               writerVersion);
     } else {
-      int chunkSize =
-          ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
-      _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
+      if (writerVersion == VarByteChunkForwardIndexWriterV5.VERSION) {
+        // Store only the values
+        int totalMaxLength = maxNumberOfMultiValueElements * valueType.getStoredType().size();
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV5(indexFile, compressionType, chunkSize);
+      } else {
+        // Store the length followed by the values
+        int totalMaxLength = Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
+        int chunkSize =
+            ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
+        _indexWriter = new VarByteChunkForwardIndexWriterV4(indexFile, compressionType, chunkSize);
+      }
     }
     _valueType = valueType;
   }
@@ -108,54 +117,22 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putIntMV(int[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Integer.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (int value : values) {
-      byteBuffer.putInt(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putIntMV(values);
   }
 
   @Override
   public void putLongMV(long[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Long.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (long value : values) {
-      byteBuffer.putLong(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putLongMV(values);
   }
 
   @Override
   public void putFloatMV(float[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Float.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (float value : values) {
-      byteBuffer.putFloat(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putFloatMV(values);
   }
 
   @Override
   public void putDoubleMV(double[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Double.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (double value : values) {
-      byteBuffer.putDouble(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putDoubleMV(values);
   }
 
   @Override

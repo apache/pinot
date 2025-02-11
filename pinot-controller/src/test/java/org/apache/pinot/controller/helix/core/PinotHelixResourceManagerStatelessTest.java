@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -58,10 +59,12 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -96,6 +99,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int NUM_SERVER_INSTANCES = NUM_OFFLINE_SERVER_INSTANCES + NUM_REALTIME_SERVER_INSTANCES;
   private static final String BROKER_TENANT_NAME = "brokerTenant";
   private static final String SERVER_TENANT_NAME = "serverTenant";
+  private static final String SERVER_NAME_TAGGED = "Server_localhost_0";
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -662,6 +666,73 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testValidateTableTaskMinionInstanceTagConfig() {
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
+
+    Map<String, String> segmentGenerationAndPushTaskConfig =
+        Map.of("invalidRecordsThresholdCount", "1", "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1",
+            "validDocIdsType", "SNAPSHOT");
+
+    Map<String, String> upsertCompactionTask =
+        Map.of("invalidRecordsThresholdCount", "1", "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1",
+            "validDocIdsType", "SNAPSHOT", "minionInstanceTag", "minionTenant");
+
+    Map<String, String> segmentGenerationAndPushTaskConfig2 =
+        Map.of("schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
+            "minionInstanceTag", "anotherMinionTenant");
+
+    // Minion instance tag set but no minion present
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
+
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
+
+    // Valid minion instance tag with instances
+    addMinionInstance();
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+
+    //Untag minion instance
+    untagMinions();
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
+    _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+
+    realtimeTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
+  }
+
+  private void untagMinions() {
+    for (InstanceConfig minionInstance : _helixResourceManager.getAllMinionInstanceConfigs()) {
+      _helixResourceManager.updateInstanceTags(minionInstance.getId(), Helix.UNTAGGED_MINION_INSTANCE, false);
+    }
+  }
+
+  private void addMinionInstance() {
+    untagMinions();
+    Instance minionTenant =
+        new Instance("2.3.4.5", 2345, InstanceType.MINION, Collections.singletonList("minionTenant"), null, 0, 0, 0, 0,
+            false);
+    _helixResourceManager.addInstance(minionTenant, false);
+  }
+
+  @Test
   public void testCreateColocatedTenant() {
     untagServers();
     Tenant serverTenant = new Tenant(TenantRole.SERVER, SERVER_TENANT_NAME, NUM_SERVER_INSTANCES, NUM_SERVER_INSTANCES,
@@ -700,6 +771,37 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 1);
 
     resetServerTags();
+  }
+
+  @Test
+  public void testHandleEmptyServerTags()
+      throws Exception {
+    // Create an instance with no tags
+    String serverName = "Server_localhost_" + NUM_SERVER_INSTANCES;
+    Instance instance =
+        new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER, Collections.emptyList(), null, 0, 12345, 0,
+            0, false);
+    _helixResourceManager.addInstance(instance, false);
+    addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(serverName, false);
+
+    List<String> allInstances = _helixResourceManager.getAllInstances();
+    assertTrue(allInstances.contains(serverName));
+    List<String> allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertTrue(allLiveInstances.contains(serverName));
+
+    // Verify that the server is considered untagged
+    List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
+    assertTrue(untaggedServers.contains(serverName), "Server with empty tags should be considered untagged");
+
+    // Takes care of the negative case
+    assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
+
+    stopAndDropFakeInstance(serverName);
+
+    allInstances = _helixResourceManager.getAllInstances();
+    assertFalse(allInstances.contains(serverName));
+    allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertFalse(allLiveInstances.contains(serverName));
   }
 
   @Test
@@ -818,21 +920,42 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertNull(segmentZKMetadata.getTier());
 
     // Move on to new tier
-    _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
+    Map<String, Set<String>> tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
     List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
         _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j11", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
 
     // Move back to default tier
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.updateTableConfig(tableConfig);
-    _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
+    tierToSegmentsMap = _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
     retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j22", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
   }
 
   /**

@@ -105,10 +105,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public int getLengthOfLargestElement() {
-    if (_sealed) {
-      return _maxLength;
-    }
-    throw new IllegalStateException("you must seal the collector first before asking for longest value");
+    return _maxLength;
   }
 
   @Override
@@ -118,10 +115,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public int getCardinality() {
-    if (_sealed) {
-      return _sortedValues.length;
-    }
-    throw new IllegalStateException("you must seal the collector first before asking for cardinality");
+    return _sealed ? _sortedValues.length : _values.size();
   }
 
   @Override

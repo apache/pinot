@@ -58,7 +58,7 @@ jobs:
           cache: 'maven'
       - name: Linter Test
         env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -112,7 +112,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -123,13 +123,18 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            --add-opens=java.base/java.lang=ALL-UNNAMED
+            --add-opens=java.base/java.util=ALL-UNNAMED
+            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Unit Test
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
           PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -140,9 +145,14 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            --add-opens=java.base/java.lang=ALL-UNNAMED
+            --add-opens=java.base/java.util=ALL-UNNAMED
+            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -192,7 +202,7 @@ jobs:
       - name: Build Project
         env:
           RUN_INTEGRATION_TESTS: true
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -209,7 +219,7 @@ jobs:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
           PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -222,7 +232,7 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -235,7 +245,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -249,7 +259,7 @@ jobs:
         run: .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
       - name: Upload coverage to Codecov
         if : ${{ matrix.testset == 1 }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -397,7 +407,7 @@ jobs:
       - uses: actions/cache@v4
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}

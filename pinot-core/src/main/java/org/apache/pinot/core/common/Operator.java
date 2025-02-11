@@ -21,6 +21,8 @@ package org.apache.pinot.core.common;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.plan.ExplainInfo;
+import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -37,23 +39,55 @@ public interface Operator<T extends Block> {
    * times, and will return non-empty block or null if no more documents available
    *
    * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
-   *         block of data. Operator can early terminated when the query times out, or is already satisfied.
+   *         block of data. Operator can be early terminated when the query times out, or is already satisfied.
    */
   T nextBlock();
 
   /** @return List of {@link Operator}s that this operator depends upon. */
   List<? extends Operator> getChildOperators();
 
-  /** @return Explain Plan description if available; otherwise, null. */
+  /**
+   * Explains the operator and its children into a tree structure.
+   *
+   * This is the method that ends up being called when using {@link ExplainMode#NODE}.
+   */
+  ExplainInfo getExplainInfo();
+
+  /**
+   * Returns the string representation of the operator in a string format.
+   *
+   * This string may include some additional information about the operator, such as the number of documents matched
+   * or the aggregation functions applied.
+   *
+   * By default, this method is called when using {@link ExplainMode#DESCRIPTION description} mode after
+   * {@link #prepareForExplainPlan(ExplainPlanRows)} has been called.
+   */
   @Nullable
   String toExplainString();
 
+  /**
+   * This method is called before {@link #toExplainString()} when explaining the plan in
+   * {@link ExplainMode#DESCRIPTION description} mode.
+   *
+   * Most operators don't need to do anything here, but some operators may need to prepare some data.
+   */
   default void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
   }
 
+  /**
+   * This method is called after {@link #toExplainString()} when explaining the plan in
+   * {@link ExplainMode#DESCRIPTION description} mode.
+   *
+   * Most operators don't need to do anything here, but some operators may need to post-process some data.
+   */
   default void postExplainPlan(ExplainPlanRows explainPlanRows) {
   }
 
+  /**
+   * Explains the operator and its children in a string format.
+   *
+   * This is the method that ends up being called when using {@link ExplainMode#DESCRIPTION}.
+   */
   default void explainPlan(ExplainPlanRows explainPlanRows, int[] globalId, int parentId) {
     prepareForExplainPlan(explainPlanRows);
     String explainPlanString = toExplainString();

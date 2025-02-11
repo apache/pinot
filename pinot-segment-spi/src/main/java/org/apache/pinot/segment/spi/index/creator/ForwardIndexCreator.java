@@ -20,10 +20,12 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -64,10 +66,16 @@ public interface ForwardIndexCreator extends IndexCreator {
           putBytes((byte[]) cellValue);
           break;
         case JSON:
+        case MAP:
           if (cellValue instanceof String) {
             putString((String) cellValue);
           } else if (cellValue instanceof byte[]) {
             putBytes((byte[]) cellValue);
+          } else if (cellValue instanceof Map) {
+            putBytes(MapUtils.serializeMap((Map<String, Object>) cellValue));
+          } else {
+            throw new IllegalStateException(
+                "Unsupported value type: " + getValueType() + ", cellValue type is: " + cellValue.getClass());
           }
           break;
         default:

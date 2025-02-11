@@ -20,11 +20,14 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,20 +39,24 @@ public interface DataBlock {
 
   int getNumberOfRows();
 
+  int getNumberOfColumns();
+
   void addException(ProcessingException processingException);
 
   void addException(int errCode, String errMsg);
 
   Map<Integer, String> getExceptions();
 
-  byte[] toBytes()
+  /**
+   * This is a wrapper on top of {@link DataBlockUtils#serialize(DataBlock)} but implementations can cache
+   * the result so messages that are sent to more than one receiving mailbox don't need to be serialized as many times.
+   */
+  List<ByteBuffer> serialize()
       throws IOException;
 
   // --------------------------------------------------------------------------
   // The following APIs are copied from {@link DataTable} and will be deprecated soon.
   // --------------------------------------------------------------------------
-
-  int getVersion();
 
   int getInt(int rowId, int colId);
 
@@ -75,10 +82,14 @@ public interface DataBlock {
 
   String[] getStringArray(int rowId, int colId);
 
+  Map<String, Object> getMap(int rowId, int colId);
+
   CustomObject getCustomObject(int rowId, int colId);
 
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
+
+  Type getDataBlockType();
 
   enum Type {
     ROW(0),
@@ -104,4 +115,39 @@ public interface DataBlock {
       }
     }
   }
+
+  /**
+   * Returns the dictionary for the given column.
+   *
+   * This is a break in the interface abstraction that assumes all implementations will use a dictionary only for
+   * string columns. This may change in the future.
+   */
+  @Nullable
+  String[] getStringDictionary();
+
+  /**
+   * The actual content is different depending on whether this is a row-based or columnar data block.
+   *
+   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
+   */
+  @Nullable
+  DataBuffer getFixedData();
+
+  /**
+   * The actual content is different depending on whether this is a row-based or columnar data block.
+   *
+   * This is an abstraction leak that assumes all implementations derive from {@link BaseDataBlock}.
+   */
+  @Nullable
+  DataBuffer getVarSizeData();
+
+  /**
+   * Returns the list of serialized stats.
+   * <p>
+   * The returned list may contain nulls, which would mean that no stats were available for that stage.
+   * <p>
+   * The list itself may also be null.
+   */
+  @Nullable
+  List<DataBuffer> getStatsByStage();
 }

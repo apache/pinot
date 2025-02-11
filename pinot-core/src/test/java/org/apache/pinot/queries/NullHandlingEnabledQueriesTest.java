@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -382,8 +383,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
-    String query =
-        String.format("SELECT DISTINCT %s,%s FROM testTable ORDER BY %s,%s", COLUMN1, COLUMN2, COLUMN1, COLUMN2);
+    String query = String.format("SELECT DISTINCT %s,%s FROM testTable", COLUMN1, COLUMN2);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
@@ -415,6 +415,33 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(resultTable.getRows().get(1), new Object[]{null, 1});
     assertEquals(resultTable.getRows().get(2), new Object[]{null, 2});
     assertEquals(resultTable.getRows().get(3), new Object[]{null, null});
+  }
+
+  @Test
+  public void testSelectDistinctOrderByMultiColumnCustomNullOrdering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT DISTINCT %s,%s FROM testTable ORDER BY %s NULLS FIRST, %s DESC NULLS LAST", COLUMN1,
+            COLUMN2, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 4);
+    assertEquals(resultTable.getRows().get(0), new Object[]{null, 2});
+    assertEquals(resultTable.getRows().get(1), new Object[]{null, 1});
+    assertEquals(resultTable.getRows().get(2), new Object[]{null, null});
+    assertEquals(resultTable.getRows().get(3), new Object[]{1, 1});
   }
 
   @DataProvider(name = "NumberTypes")
@@ -1651,5 +1678,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
     assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @AfterMethod
+  public void destroySegments() {
+    _indexSegment.destroy();
   }
 }

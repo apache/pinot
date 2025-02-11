@@ -21,13 +21,12 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -57,7 +56,7 @@ import org.testng.annotations.Test;
 /**
  * Unit tests for On-Heap dictionary implementations.
  */
-public class OnHeapDictionariesTest {
+public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapDictionariesTest.class);
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "onHeapDict";
@@ -79,23 +78,22 @@ public class OnHeapDictionariesTest {
       throws Exception {
     Schema schema = buildSchema();
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setOnHeapDictionaryColumns(
+        List.of(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN)).setTableName("test").build();
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
-    IndexLoadingConfig loadingConfig = new IndexLoadingConfig();
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
     loadingConfig.setReadMode(ReadMode.mmap);
     loadingConfig.setSegmentVersion(SegmentVersion.v3);
     _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
-
-    loadingConfig.setOnHeapDictionaryColumns(new HashSet<>(
-        Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN})));
-
     _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
+    _onHeapSegment.destroy();
+    _offHeapSegment.destroy();
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 

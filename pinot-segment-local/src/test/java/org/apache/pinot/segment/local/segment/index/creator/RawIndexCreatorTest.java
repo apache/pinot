@@ -22,36 +22,31 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -64,12 +59,14 @@ import org.testng.annotations.Test;
 /**
  * Class for testing Raw index creators.
  */
-public class RawIndexCreatorTest {
+public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), RawIndexCreatorTest.class.getSimpleName());
+
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
-
-  private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "fwdIndexTest";
-  private static final String SEGMENT_NAME = "testSegment";
 
   private static final String INT_COLUMN = "intColumn";
   private static final String LONG_COLUMN = "longColumn";
@@ -83,42 +80,45 @@ public class RawIndexCreatorTest {
   private static final String STRING_MV_COLUMN = "stringMVColumn";
   private static final String BYTES_MV_COLUMN = "bytesMVColumn";
 
-  Random _random;
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addMultiValueDimension(INT_MV_COLUMN, DataType.INT)
+      .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
+      .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
+      .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(BYTES_MV_COLUMN, DataType.BYTES)
+      .build();
+  //@formatter:on
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+      .setNoDictionaryColumns(SCHEMA.getDimensionNames()).build();
+  private static final Random RANDOM = new Random();
+
   private RecordReader _recordReader;
-  SegmentDirectory _segmentDirectory;
+  private SegmentDirectory _segmentDirectory;
   private SegmentDirectory.Reader _segmentReader;
 
-  /**
-   * Setup to build a segment with raw indexes (no-dictionary) of various data types.
-   */
   @BeforeClass
-  public void setup()
+  public void setUp()
       throws Exception {
-    Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(INT_COLUMN, DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(LONG_COLUMN, DataType.LONG, true));
-    schema.addField(new DimensionFieldSpec(FLOAT_COLUMN, DataType.FLOAT, true));
-    schema.addField(new DimensionFieldSpec(DOUBLE_COLUMN, DataType.DOUBLE, true));
-    schema.addField(new DimensionFieldSpec(STRING_COLUMN, DataType.STRING, true));
-    schema.addField(new DimensionFieldSpec(INT_MV_COLUMN, DataType.INT, false));
-    schema.addField(new DimensionFieldSpec(LONG_MV_COLUMN, DataType.LONG, false));
-    schema.addField(new DimensionFieldSpec(FLOAT_MV_COLUMN, DataType.FLOAT, false));
-    schema.addField(new DimensionFieldSpec(DOUBLE_MV_COLUMN, DataType.DOUBLE, false));
-    schema.addField(new DimensionFieldSpec(STRING_MV_COLUMN, DataType.STRING, false));
-    schema.addField(new DimensionFieldSpec(BYTES_MV_COLUMN, DataType.BYTES, false));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
-
-    _random = new Random(System.nanoTime());
-    _recordReader = buildIndex(tableConfig, schema);
+    FileUtils.deleteQuietly(TEMP_DIR);
+    _recordReader = buildIndex();
+    _segmentDirectory = new SegmentLocalFSDirectory(new File(TEMP_DIR, SEGMENT_NAME), ReadMode.mmap);
+    _segmentReader = _segmentDirectory.createReader();
   }
 
-  /**
-   * Clean up after test
-   */
   @AfterClass
-  public void cleanup() {
-    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+  public void tearDown()
+      throws IOException {
+    _segmentReader.close();
+    _segmentDirectory.close();
+    _recordReader.close();
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   /**
@@ -240,7 +240,8 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
     try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+        DataType.BYTES);
+        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
@@ -279,49 +280,39 @@ public class RawIndexCreatorTest {
    *
    * @return Array of string values for the rows in the generated index.
    */
-  private RecordReader buildIndex(TableConfig tableConfig, Schema schema)
+  private RecordReader buildIndex()
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setRawIndexCreationColumns(schema.getDimensionNames());
-
-    config.setOutDir(SEGMENT_DIR_NAME);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME);
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> map = new HashMap<>();
+      GenericRow row = new GenericRow();
 
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      for (FieldSpec fieldSpec : SCHEMA.getAllFieldSpecs()) {
         Object value;
         if (fieldSpec.isSingleValueField()) {
-          value = getRandomValue(_random, fieldSpec.getDataType());
-          map.put(fieldSpec.getName(), value);
+          value = getRandomValue(RANDOM, fieldSpec.getDataType());
+          row.putValue(fieldSpec.getName(), value);
         } else {
-          int length = _random.nextInt(50);
+          int length = RANDOM.nextInt(50);
           Object[] values = new Object[length];
           for (int j = 0; j < length; j++) {
-            values[j] = getRandomValue(_random, fieldSpec.getDataType());
+            values[j] = getRandomValue(RANDOM, fieldSpec.getDataType());
           }
-          map.put(fieldSpec.getName(), values);
+          row.putValue(fieldSpec.getName(), values);
         }
       }
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     RecordReader recordReader = new GenericRowRecordReader(rows);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();
-    Map<String, Object> props = new HashMap<>();
-    props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap.toString());
-    _segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-        .load(driver.getOutputDirectory().toURI(),
-            new SegmentDirectoryLoaderContext.Builder().setTableConfig(tableConfig)
-                .setSegmentDirectoryConfigs(new PinotConfiguration(props)).build());
-    _segmentReader = _segmentDirectory.createReader();
+
     recordReader.rewind();
     return recordReader;
   }

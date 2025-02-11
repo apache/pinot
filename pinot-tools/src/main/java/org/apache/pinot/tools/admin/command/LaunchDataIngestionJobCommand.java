@@ -39,12 +39,9 @@ import picocli.CommandLine;
  * Class to implement LaunchDataIngestionJob command.
  *
  */
-@CommandLine.Command(name = "LaunchDataIngestionJob")
+@CommandLine.Command(name = "LaunchDataIngestionJob", mixinStandardHelpOptions = true)
 public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchDataIngestionJobCommand.class);
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true,
       description = "Ingestion job spec file")
   private String _jobSpecFile;
@@ -91,15 +88,6 @@ public class LaunchDataIngestionJobCommand extends AbstractBaseAdminCommand impl
 
   public void setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  public void setHelp(boolean help) {
-    _help = help;
   }
 
   @Override

@@ -28,6 +28,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -48,12 +49,13 @@ public class OpChainExecutionContext {
   @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+  private final ThreadExecutionContext _parentContext;
 
   private ServerPlanRequestContext _leafStageContext;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult) {
+      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _deadlineMs = deadlineMs;
@@ -65,6 +67,7 @@ public class OpChainExecutionContext {
     _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _pipelineBreakerResult = pipelineBreakerResult;
     _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
+    _parentContext = parentContext;
   }
 
   public MailboxService getMailboxService() {
@@ -122,5 +125,10 @@ public class OpChainExecutionContext {
 
   public void setLeafStageContext(ServerPlanRequestContext leafStageContext) {
     _leafStageContext = leafStageContext;
+  }
+
+  @Nullable
+  public ThreadExecutionContext getParentContext() {
+    return _parentContext;
   }
 }

@@ -62,12 +62,6 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);

@@ -20,8 +20,8 @@ package org.apache.pinot.query.catalog;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -49,16 +49,14 @@ public class PinotCatalog implements Schema {
   private final TableCache _tableCache;
   private final String _databaseName;
 
+  // list of tables resolved via this catalog instance
+  private Set<String> _resolvedTables;
+
   /**
    * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
    * table available for query and processes table/segment metadata updates when cluster status changes.
    */
-  public PinotCatalog(TableCache tableCache) {
-    _tableCache = tableCache;
-    _databaseName = null;
-  }
-
-  public PinotCatalog(String databaseName, TableCache tableCache) {
+  public PinotCatalog(TableCache tableCache, String databaseName) {
     _tableCache = tableCache;
     _databaseName = databaseName;
   }
@@ -73,6 +71,14 @@ public class PinotCatalog implements Schema {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
+
+    if (tableName != null) {
+      if (_resolvedTables == null) {
+        _resolvedTables = new HashSet<>();
+      }
+      _resolvedTables.add(tableName);
+    }
+
     Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
@@ -85,8 +91,15 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
-        .collect(Collectors.toSet());
+    Set<String> result = new HashSet<>();
+    for (String tableName: _tableCache.getTableNameMap().keySet()) {
+      if (DatabaseUtils.isPartOfDatabase(tableName, _databaseName)) {
+        result.add(tableName);
+        // if table has no prefix the next add(n) will have no effect
+        result.add(DatabaseUtils.removeDatabasePrefix(tableName, _databaseName));
+      }
+    }
+    return result;
   }
 
   @Override
@@ -133,5 +146,9 @@ public class PinotCatalog implements Schema {
   @Override
   public Schema snapshot(SchemaVersion version) {
     return this;
+  }
+
+  public Set<String> getResolvedTables() {
+    return _resolvedTables;
   }
 }

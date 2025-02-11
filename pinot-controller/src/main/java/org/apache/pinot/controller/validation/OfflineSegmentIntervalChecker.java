@@ -51,6 +51,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
 
   private final ValidationMetrics _validationMetrics;
+  private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
@@ -59,6 +60,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
+    _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
   }
 
   @Override
@@ -134,6 +136,10 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         .updateTotalDocumentCountGauge(offlineTableName, computeOfflineTotalDocumentInSegments(segmentsZKMetadata));
     // Update the gauge to contain the total number of segments for this table
     _validationMetrics.updateSegmentCountGauge(offlineTableName, numSegments);
+
+    if (_segmentAutoResetOnErrorAtValidation) {
+      _pinotHelixResourceManager.resetSegments(offlineTableName, null, true);
+    }
   }
 
   @Override

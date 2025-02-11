@@ -43,4 +43,8 @@ public class LookupRecordLocation {
     _pinotSegmentRecordReader.getRecord(_docId, reuse);
     return reuse;
   }
+
+  public Object getValue(String column) {
+    return _pinotSegmentRecordReader.getValue(_docId, column);
+  }
 }

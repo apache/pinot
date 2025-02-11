@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
@@ -414,6 +415,9 @@ public class SelectionOperatorUtils {
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
+          case MAP:
+            dataTableBuilder.setColumn(i, (Map) columnValue);
+            break;
           case UNKNOWN:
             dataTableBuilder.setColumn(i, (Object) null);
             break;
@@ -436,9 +440,8 @@ public class SelectionOperatorUtils {
             break;
 
           default:
-            throw new IllegalStateException(
-                String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
-                    dataSchema.getColumnName(i)));
+            throw new IllegalStateException("Unsupported data type: " + storedColumnDataTypes + " for column: "
+                + dataSchema.getColumnName(i));
         }
       }
       dataTableBuilder.finishRow();
@@ -490,6 +493,9 @@ public class SelectionOperatorUtils {
         case BYTES:
           row[i] = dataTable.getBytes(rowId, i);
           break;
+        case MAP:
+          row[i] = dataTable.getMap(rowId, i);
+          break;
         case UNKNOWN:
           row[i] = null;
           break;
@@ -512,9 +518,8 @@ public class SelectionOperatorUtils {
           break;
 
         default:
-          throw new IllegalStateException(
-              String.format("Unsupported data type: %s for column: %s", storedColumnDataTypes[i],
-                  dataSchema.getColumnName(i)));
+          throw new IllegalStateException("Unsupported data type: " + storedColumnDataTypes[i] + " for column: "
+              + dataSchema.getColumnName(i));
       }
     }
 

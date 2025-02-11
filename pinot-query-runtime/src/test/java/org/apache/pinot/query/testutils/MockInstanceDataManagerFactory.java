@@ -99,11 +99,18 @@ public class MockInstanceDataManagerFactory {
     _serverTableDataDirMap.put(tableNameWithType, tableDataDir);
   }
 
-  public String addSegment(String tableNameWithType, List<GenericRow> rows) {
-    String segmentName = String.format("%s_%s", tableNameWithType, UUID.randomUUID());
+  public ImmutableSegment addSegment(String tableNameWithType, List<GenericRow> rows) {
     File tableDataDir = _serverTableDataDirMap.get(tableNameWithType);
-    ImmutableSegment segment = buildSegment(tableNameWithType, tableDataDir, segmentName, rows);
+    ImmutableSegment segment = buildSegment(tableNameWithType, tableDataDir, rows);
+    addSegment(tableNameWithType, segment);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    List<GenericRow> tableRows = _tableRowsMap.getOrDefault(rawTableName, new ArrayList<>());
+    tableRows.addAll(rows);
+    _tableRowsMap.put(rawTableName, tableRows);
+    return segment;
+  }
 
+  public void addSegment(String tableNameWithType, ImmutableSegment segment) {
     List<ImmutableSegment> segmentList = _tableSegmentMap.getOrDefault(tableNameWithType, new ArrayList<>());
     segmentList.add(segment);
     _tableSegmentMap.put(tableNameWithType, segmentList);
@@ -111,13 +118,6 @@ public class MockInstanceDataManagerFactory {
     List<String> segmentNameList = _tableSegmentNameMap.getOrDefault(tableNameWithType, new ArrayList<>());
     segmentNameList.add(segment.getSegmentName());
     _tableSegmentNameMap.put(tableNameWithType, segmentNameList);
-
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    List<GenericRow> tableRows = _tableRowsMap.getOrDefault(rawTableName, new ArrayList<>());
-    tableRows.addAll(rows);
-    _tableRowsMap.put(rawTableName, tableRows);
-
-    return segmentName;
   }
 
   public InstanceDataManager buildInstanceDataManager() {
@@ -165,8 +165,8 @@ public class MockInstanceDataManagerFactory {
     return tableDataManager;
   }
 
-  private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, String segmentName,
-      List<GenericRow> rows) {
+  private ImmutableSegment buildSegment(String tableNameWithType, File indexDir, List<GenericRow> rows) {
+    String segmentName = String.format("%s_%s", tableNameWithType, UUID.randomUUID());
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     // TODO: plugin table config constructor

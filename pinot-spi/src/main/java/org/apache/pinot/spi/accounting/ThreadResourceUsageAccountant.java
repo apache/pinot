@@ -42,7 +42,8 @@ public interface ThreadResourceUsageAccountant {
    * @param taskId a unique task id
    * @param parentContext the parent execution context, null for root(runner) thread
    */
-  void createExecutionContext(String queryId, int taskId, @Nullable ThreadExecutionContext parentContext);
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
@@ -58,6 +59,11 @@ public interface ThreadResourceUsageAccountant {
    * call to sample usage
    */
   void sampleUsage();
+
+  /**
+   * Sample Usage for Multi-stage engine queries
+   */
+  void sampleUsageMSE();
 
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response

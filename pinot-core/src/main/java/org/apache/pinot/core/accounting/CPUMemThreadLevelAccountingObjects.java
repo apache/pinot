@@ -103,8 +103,15 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? -1 : taskEntry.getTaskId();
     }
 
-    public void setThreadTaskStatus(@Nonnull String queryId, int taskId, @Nonnull Thread anchorThread) {
-      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, anchorThread));
+    @Override
+    public ThreadExecutionContext.TaskType getTaskType() {
+      TaskEntry taskEntry = _currentThreadTaskStatus.get();
+      return taskEntry == null ? ThreadExecutionContext.TaskType.UNKNOWN : taskEntry.getTaskType();
+    }
+
+    public void setThreadTaskStatus(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nonnull Thread anchorThread) {
+      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread));
     }
   }
 
@@ -117,15 +124,17 @@ public class CPUMemThreadLevelAccountingObjects {
     private final String _queryId;
     private final int _taskId;
     private final Thread _anchorThread;
+    private final TaskType _taskType;
 
     public boolean isAnchorThread() {
       return _taskId == CommonConstants.Accounting.ANCHOR_TASK_ID;
     }
 
-    public TaskEntry(String queryId, int taskId, Thread anchorThread) {
+    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread) {
       _queryId = queryId;
       _taskId = taskId;
       _anchorThread = anchorThread;
+      _taskType = taskType;
     }
 
     public String getQueryId() {
@@ -138,6 +147,11 @@ public class CPUMemThreadLevelAccountingObjects {
 
     public Thread getAnchorThread() {
       return _anchorThread;
+    }
+
+    @Override
+    public TaskType getTaskType() {
+      return _taskType;
     }
 
     @Override

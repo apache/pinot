@@ -30,6 +30,7 @@ import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,8 +98,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final boolean _continueOnError;
 
   public ComplexTypeTransformer(TableConfig tableConfig) {
-    this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig),
-        parseCollectionNotUnnestedToJson(tableConfig), parsePrefixesToRename(tableConfig), tableConfig);
+    this(parseFieldsToUnnest(tableConfig), parseDelimiter(tableConfig), parseCollectionNotUnnestedToJson(tableConfig),
+        parsePrefixesToRename(tableConfig), tableConfig);
   }
 
   @VisibleForTesting
@@ -168,6 +169,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
     } else {
       return Collections.emptyMap();
     }
+  }
+
+  @Override
+  public List<String> getInputColumns() {
+    return _fieldsToUnnest;
   }
 
   @Override

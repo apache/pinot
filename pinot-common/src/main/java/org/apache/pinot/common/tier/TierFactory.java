@@ -20,16 +20,20 @@ package org.apache.pinot.common.tier;
 
 import com.google.common.collect.Sets;
 import java.util.Collections;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Factory class to create and sort {@link Tier}
  */
 public final class TierFactory {
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(TierFactory.class);
   public static final String TIME_SEGMENT_SELECTOR_TYPE = "time";
   public static final String FIXED_SEGMENT_SELECTOR_TYPE = "fixed";
   public static final String PINOT_SERVER_STORAGE_TYPE = "pinot_server";
@@ -41,11 +45,18 @@ public final class TierFactory {
    * Constructs a {@link Tier} from the {@link TierConfig} in the table config
    */
   public static Tier getTier(TierConfig tierConfig, HelixManager helixManager) {
+    return getTier(tierConfig, helixManager, null);
+  }
+
+  public static Tier getTier(TierConfig tierConfig, HelixManager helixManager,
+      @Nullable Set<String> providedSegmentsForTier) {
     TierSegmentSelector segmentSelector;
     TierStorage storageSelector;
-
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
-    if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
+    if (providedSegmentsForTier != null) {
+      LOGGER.debug("Provided segments: {} for tier: {}", providedSegmentsForTier, tierConfig.getName());
+      segmentSelector = new FixedTierSegmentSelector(helixManager, providedSegmentsForTier);
+    } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
       segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
       segmentSelector = new FixedTierSegmentSelector(helixManager,

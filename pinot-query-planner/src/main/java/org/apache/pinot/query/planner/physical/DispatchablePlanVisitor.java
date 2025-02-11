@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -36,10 +40,7 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
-  public static final DispatchablePlanVisitor INSTANCE = new DispatchablePlanVisitor();
-
-  private DispatchablePlanVisitor() {
-  }
+  private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
 
   private static DispatchablePlanMetadata getOrCreateDispatchablePlanMetadata(PlanNode node,
       DispatchablePlanContext context) {
@@ -103,10 +104,12 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
 
   @Override
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
-    node.getInputs().get(0).visit(this, context);
-    DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setPrePartitioned(node.isPrePartitioned());
-    context.getDispatchablePlanStageRootMap().put(node.getStageId(), node);
+    if (_visited.add(node)) {
+      node.getInputs().get(0).visit(this, context);
+      DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
+      dispatchablePlanMetadata.setPrePartitioned(node.isPrePartitioned());
+      context.getDispatchablePlanStageRootMap().put(node.getStageId(), node);
+    }
     return null;
   }
 
@@ -138,5 +141,10 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitValue(ValueNode node, DispatchablePlanContext context) {
     getOrCreateDispatchablePlanMetadata(node, context);
     return null;
+  }
+
+  @Override
+  public Void visitExplained(ExplainedNode node, DispatchablePlanContext context) {
+    throw new UnsupportedOperationException("ExplainedNode should not be visited by DispatchablePlanVisitor");
   }
 }

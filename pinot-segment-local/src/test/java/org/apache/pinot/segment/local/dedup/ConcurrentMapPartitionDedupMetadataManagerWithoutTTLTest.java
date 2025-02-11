@@ -23,8 +23,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -45,14 +46,23 @@ import static org.testng.Assert.assertSame;
 
 
 public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(),
+      ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest.class.getSimpleName());
   private DedupContext.Builder _dedupContextBuilder;
 
   @BeforeMethod
-  public void setUpContextBuilder() {
+  public void setUpContextBuilder()
+      throws IOException {
+    FileUtils.forceMkdir(TEMP_DIR);
     _dedupContextBuilder = new DedupContext.Builder();
     _dedupContextBuilder.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setTableIndexDir(mock(File.class))
-        .setTableDataManager(mock(TableDataManager.class)).setServerMetrics(mock(ServerMetrics.class));
+        .setTableDataManager(mock(TableDataManager.class)).setTableIndexDir(TEMP_DIR);
+  }
+
+  @AfterMethod
+  public void cleanup() {
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   @Test

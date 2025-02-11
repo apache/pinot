@@ -94,6 +94,7 @@ public enum TransformFunctionType {
 
   // CASE WHEN function parsed as 'CASE_WHEN'
   CASE("case"),
+  TEXT_MATCH("textMatch", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
 
   // date type conversion functions
   CAST("cast"),
@@ -116,7 +117,8 @@ public enum TransformFunctionType {
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
   DATE_TIME_CONVERT("dateTimeConvert", TransformFunctionType::dateTimeConverterReturnTypeInference, OperandTypes.family(
-      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), i -> i == 4)),
   DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop",
       ReturnTypes.cascade(TransformFunctionType::dateTimeConverterReturnTypeInference, SqlTypeTransforms.TO_ARRAY),
       OperandTypes.family(
@@ -125,18 +127,30 @@ public enum TransformFunctionType {
   DATE_TRUNC("dateTrunc", ReturnTypes.BIGINT, OperandTypes.family(
       List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER), i -> i > 1)),
-  YEAR("year"),
-  YEAR_OF_WEEK("yearOfWeek", "yow"),
-  QUARTER("quarter"),
-  MONTH_OF_YEAR("monthOfYear", "month"),
-  WEEK_OF_YEAR("weekOfYear", "week"),
-  DAY_OF_YEAR("dayOfYear", "doy"),
-  DAY_OF_MONTH("dayOfMonth", "day"),
-  DAY_OF_WEEK("dayOfWeek", "dow"),
-  HOUR("hour"),
-  MINUTE("minute"),
-  SECOND("second"),
-  MILLISECOND("millisecond"),
+  YEAR("year", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  YEAR_OF_WEEK("yearOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "yow"),
+  QUARTER("quarter", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MONTH_OF_YEAR("monthOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "month"),
+  WEEK_OF_YEAR("weekOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "week"),
+  DAY_OF_YEAR("dayOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "doy"),
+  DAY_OF_MONTH("dayOfMonth", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "day"),
+  DAY_OF_WEEK("dayOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "dow"),
+  HOUR("hour", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MINUTE("minute", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  SECOND("second", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MILLISECOND("millisecond", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
   EXTRACT("extract"),
 
   // Array functions
@@ -175,8 +189,13 @@ public enum TransformFunctionType {
   // Geo constructors
   ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
   ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
+  ST_GEOG_FROM_GEO_JSON("ST_GeogFromGeoJSON", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+  ST_GEOM_FROM_GEO_JSON("ST_GeomFromGeoJSON", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
   ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+
   ST_POINT("ST_Point", ReturnTypes.VARBINARY,
       OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY), i -> i == 2)),
   ST_POLYGON("ST_Polygon", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
@@ -189,6 +208,7 @@ public enum TransformFunctionType {
   // Geo outputs
   ST_AS_BINARY("ST_AsBinary", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR, OperandTypes.BINARY),
+  ST_AS_GEO_JSON("ST_AsGeoJSON", ReturnTypes.VARCHAR, OperandTypes.BINARY),
 
   // Geo relationship
   // TODO: Revisit whether we should return BOOLEAN instead
@@ -224,7 +244,11 @@ public enum TransformFunctionType {
   COSH("cosh"),
   TANH("tanh"),
   DEGREES("degrees"),
-  RADIANS("radians");
+  RADIANS("radians"),
+  // Complex type handling
+  ITEM("item"),
+  // Time series functions
+  TIME_SERIES_BUCKET("timeSeriesBucket");
 
   private final String _name;
   private final List<String> _names;
@@ -311,12 +335,26 @@ public enum TransformFunctionType {
     switch (operandTypeStr) {
       case "INT":
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case "INT_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1);
       case "LONG":
         return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case "LONG_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BIGINT), -1);
+      case "FLOAT":
+        return typeFactory.createSqlType(SqlTypeName.REAL);
+      case "FLOAT_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.REAL), -1);
+      case "DOUBLE_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
       case "STRING":
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case "STRING_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARCHAR), -1);
       case "BYTES":
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      case "BIG_DECIMAL":
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL);
       default:
         SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {

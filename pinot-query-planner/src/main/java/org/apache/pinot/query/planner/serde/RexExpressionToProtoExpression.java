@@ -64,9 +64,13 @@ public class RexExpressionToProtoExpression {
     for (RexExpression operand : operands) {
       protoOperands.add(convertExpression(operand));
     }
-    return Expressions.FunctionCall.newBuilder().setDataType(convertColumnDataType(functionCall.getDataType()))
-        .setFunctionName(functionCall.getFunctionName()).addAllFunctionOperands(protoOperands)
-        .setIsDistinct(functionCall.isDistinct()).build();
+    return Expressions.FunctionCall.newBuilder()
+        .setDataType(convertColumnDataType(functionCall.getDataType()))
+        .setFunctionName(functionCall.getFunctionName())
+        .addAllFunctionOperands(protoOperands)
+        .setIsDistinct(functionCall.isDistinct())
+        .setIgnoreNulls(functionCall.isIgnoreNulls())
+        .build();
   }
 
   public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {
@@ -148,6 +152,8 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.JSON;
       case BYTES:
         return Expressions.ColumnDataType.BYTES;
+      case MAP:
+        return Expressions.ColumnDataType.MAP;
       case INT_ARRAY:
         return Expressions.ColumnDataType.INT_ARRAY;
       case LONG_ARRAY:

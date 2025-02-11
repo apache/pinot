@@ -21,9 +21,7 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -42,10 +40,9 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -62,12 +59,16 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   private static final String INT_COLUMN = "intColumn";
   private static final String JSON_COLUMN = "jsonColumn";
   private static final String STRING_COLUMN = "stringColumn";
-  private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING).build();
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .build();
+  //@formatter:on
   private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setJsonIndexColumns(List.of(JSON_COLUMN))
+          .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -140,27 +141,17 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
             + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
 
-    List<String> jsonIndexColumns = new ArrayList<>();
-    jsonIndexColumns.add("jsonColumn");
-    TABLE_CONFIG.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
-
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(TABLE_CONFIG);
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<String>(jsonIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
   }
 
   /** Verify result column type of a simple select query against JSON column */

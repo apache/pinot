@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -32,7 +31,9 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * The <code>InstanceDataManager</code> class is the instance level data manager, which manages all tables and segments
  * served by the instance.
  */
+@InterfaceAudience.Private
 @ThreadSafe
 public interface InstanceDataManager {
 
@@ -48,8 +50,9 @@ public interface InstanceDataManager {
    * <p>Should be called only once and before calling any other method.
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
-  void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
-      throws ConfigurationException;
+  void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      throws Exception;
 
   /**
    * Returns the instance id.
@@ -71,7 +74,7 @@ public interface InstanceDataManager {
   /**
    * Delete a table.
    */
-  void deleteTable(String tableNameWithType)
+  void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception;
 
   /**
@@ -194,4 +197,9 @@ public interface InstanceDataManager {
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
   void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
+
+  /**
+   * Returns consumer directory paths on the instance
+   */
+  List<File> getConsumerDirPaths();
 }

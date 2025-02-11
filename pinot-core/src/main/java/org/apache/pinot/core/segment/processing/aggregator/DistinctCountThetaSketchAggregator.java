@@ -18,26 +18,45 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.Map;
+import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class DistinctCountThetaSketchAggregator implements ValueAggregator {
 
-  private final Union _union;
-
   public DistinctCountThetaSketchAggregator() {
-    // TODO: Handle configurable nominal entries
-    _union = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
   }
 
   @Override
-  public Object aggregate(Object value1, Object value2) {
+  public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
+    SetOperationBuilder unionBuilder = Union.builder();
+
+    String samplingProbabilityParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY);
+    String nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
+
+    // Check if nominal entries is set
+    if (nominalEntriesParam != null) {
+      unionBuilder.setNominalEntries(Integer.parseInt(nominalEntriesParam));
+    } else {
+      // If the functionParameters don't have an explicit nominal entries value set,
+      // use the default value for nominal entries
+      unionBuilder.setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES);
+    }
+
+    // Check if sampling probability is set
+    if (samplingProbabilityParam != null) {
+      unionBuilder.setP(Float.parseFloat(samplingProbabilityParam));
+    }
+
+    Union union = unionBuilder.buildUnion();
     Sketch first = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value1);
     Sketch second = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value2);
-    Sketch result = _union.union(first, second);
+    Sketch result = union.union(first, second);
     return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(result);
   }
 }

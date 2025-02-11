@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -29,6 +32,7 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -42,7 +46,7 @@ import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
- * The <code>GroupByOperator</code> class provides the operator for group-by query on a single segment.
+ * The <code>GroupByOperator</code> class implements keyed aggregation on a single segment in V1/SSQE.
  */
 @SuppressWarnings("rawtypes")
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
@@ -167,5 +171,24 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    List<String> groupKeys = Arrays.stream(_groupByExpressions)
+        .map(ExpressionContext::toString)
+        .collect(Collectors.toList());
+    attributeBuilder.putStringList("groupKeys", groupKeys);
+
+    List<String> aggregations = Arrays.stream(_aggregationFunctions)
+        .map(AggregationFunction::toExplainString)
+        .collect(Collectors.toList());
+    attributeBuilder.putStringList("aggregations", aggregations);
   }
 }

@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Cache;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +33,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -53,7 +54,8 @@ public interface TableDataManager {
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache);
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
 
   /**
    * Returns the instance id of the server.
@@ -323,4 +325,12 @@ public interface TableDataManager {
    */
   default void onConsumingToOnline(String segmentNameStr) {
   }
+
+  /**
+   * Return list of segment names that are stale along with reason.
+   * @param tableConfig Table Config of the table
+   * @param schema Schema of the table
+   * @return List of {@link StaleSegment} with segment names and reason why it is stale
+   */
+  List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema);
 }

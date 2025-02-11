@@ -61,6 +61,7 @@ import static org.testng.Assert.assertTrue;
  * </ul>
  */
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
+  public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
@@ -158,7 +159,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       }
       for (String metric : metrics) {
         aggregationConfigs.add(
-            new StarTreeAggregationConfig(metric, functionType.name(), CompressionCodec.LZ4, false, 4, null, null));
+            new StarTreeAggregationConfig(metric, functionType.name(), null, CompressionCodec.LZ4, false, 4, null,
+                null));
       }
     }
     return new StarTreeIndexConfig(dimensions, null, null, aggregationConfigs, maxLeafRecords);
@@ -209,25 +211,37 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private void testStarQuery(String starQuery, boolean verifyPlan)
       throws Exception {
-    String filterStartreeIndex = "FILTER_STARTREE_INDEX";
     String explain = "EXPLAIN PLAN FOR ";
     String disableStarTree = "SET useStarTree = false; ";
+    // The star-tree index doesn't currently support null values, but we should still be able to use the star-tree index
+    // here since there aren't actually any null values in the dataset.
+    String nullHandlingEnabled = "SET enableNullHandling = true; ";
 
     if (verifyPlan) {
       JsonNode starPlan = postQuery(explain + starQuery);
       JsonNode referencePlan = postQuery(disableStarTree + explain + starQuery);
-      assertTrue(starPlan.toString().contains(filterStartreeIndex) || starPlan.toString().contains("FILTER_EMPTY")
+      JsonNode nullHandlingEnabledPlan = postQuery(nullHandlingEnabled + explain + starQuery);
+      assertTrue(starPlan.toString().contains(FILTER_STARTREE_INDEX) || starPlan.toString().contains("FILTER_EMPTY")
               || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
           "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
-      assertFalse(referencePlan.toString().contains(filterStartreeIndex),
+      assertFalse(referencePlan.toString().contains(FILTER_STARTREE_INDEX),
           "Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan);
+      assertTrue(
+          nullHandlingEnabledPlan.toString().contains(FILTER_STARTREE_INDEX) || nullHandlingEnabledPlan.toString()
+              .contains("FILTER_EMPTY") || nullHandlingEnabledPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
+          "StarTree query with null handling enabled did not indicate use of StarTree index in query plan. Plan: "
+              + nullHandlingEnabledPlan);
     }
 
     JsonNode starResponse = postQuery(starQuery);
     String referenceQuery = disableStarTree + starQuery;
     JsonNode referenceResponse = postQuery(referenceQuery);
+    // Don't compare the actual response values since they could differ (e.g. "null" vs "Infinity" for MIN
+    // aggregation function with no values aggregated)
+    JsonNode nullHandlingEnabledResponse = postQuery(nullHandlingEnabled + starQuery);
     assertEquals(starResponse.get("exceptions").size(), 0);
     assertEquals(referenceResponse.get("exceptions").size(), 0);
+    assertEquals(nullHandlingEnabledResponse.get("exceptions").size(), 0);
     assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"), String.format(
         "Query comparison failed for: \n"
             + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",

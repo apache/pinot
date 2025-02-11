@@ -54,8 +54,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
 
   @VisibleForTesting
   public RangeIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentDirectory, indexLoadingConfig);
-    _columnsToAddIdx = indexLoadingConfig.getRangeIndexColumns();
+    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig());
   }
 
   public RangeIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,

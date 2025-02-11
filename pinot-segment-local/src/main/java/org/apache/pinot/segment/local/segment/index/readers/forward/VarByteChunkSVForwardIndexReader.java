@@ -21,11 +21,13 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -125,6 +127,12 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     } else {
       return getBytesUncompressed(docId);
     }
+  }
+
+
+  @Override
+  public Map getMap(int docId, ChunkReaderContext context) {
+    return MapUtils.deserializeMap(getBytes(docId, context));
   }
 
   /**

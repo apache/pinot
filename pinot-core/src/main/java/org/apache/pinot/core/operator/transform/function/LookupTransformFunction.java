@@ -29,7 +29,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -219,8 +218,7 @@ public class LookupTransformFunction extends BaseTransformFunction {
         }
       }
       // lookup
-      GenericRow row = _dataManager.lookupRowByPrimaryKey(primaryKey);
-      Object value = row == null ? null : row.getValue(_dimColumnName);
+      Object value = _dataManager.lookupValue(primaryKey, _dimColumnName);
       valueAcceptor.accept(i, value);
     }
   }

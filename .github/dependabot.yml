@@ -25,6 +25,19 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 20
+    ignore:
+    - dependency-name: "org.apache.pinot:pinot-dropwizard"
+      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
+      versions: ["0.10.0"]
+    - dependency-name: "org.apache.pinot:pinot-yammer"
+      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
+      versions: ["0.10.0"]
+    - dependency-name: "commons-io:commons-io"
+      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
+      versions: ["2.11.0"]
+    - dependency-name: "com.yammer.metrics:metrics-core"
+      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
+      versions: ["2.1.5"]
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"

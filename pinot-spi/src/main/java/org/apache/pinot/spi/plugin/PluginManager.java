@@ -20,9 +20,14 @@ package org.apache.pinot.spi.plugin;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,8 +36,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.plexus.classworlds.ClassWorld;
+import org.codehaus.plexus.classworlds.realm.ClassRealm;
+import org.codehaus.plexus.classworlds.realm.DuplicateRealmException;
+import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +57,8 @@ public class PluginManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PluginManager.class);
   private static final String JAR_FILE_EXTENSION = "jar";
   private static final PluginManager PLUGIN_MANAGER = new PluginManager();
+  private static final String PINOT_REALMID = "pinot";
+  private static final String PINOUT_PLUGIN_PROPERTIES_FILE_NAME = "pinot-plugin.properties";
 
   // For backward compatibility, this map holds a mapping from old plugins class name to its new class name.
   private static final Map<String, String> PLUGINS_BACKWARD_COMPATIBLE_CLASS_NAME_MAP = new HashMap<String, String>() {
@@ -83,6 +97,8 @@ public class PluginManager {
       // StreamConsumerFactory
       put("org.apache.pinot.core.realtime.impl.kafka2.KafkaConsumerFactory",
           "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory");
+      put("org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory",
+          "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     }
   };
 
@@ -109,13 +125,28 @@ public class PluginManager {
         }
       };
 
-  private Map<Plugin, PluginClassLoader> _registry = new HashMap<>();
+  private final ClassWorld _classWorld;
+  private final Map<Plugin, PluginClassLoader> _registry;
+
   private String _pluginsDirectories;
   private String _pluginsInclude;
   private boolean _initialized = false;
 
-  private PluginManager() {
+  PluginManager() {
+    // For the shaded plugins
+    _registry = new HashMap<>();
     _registry.put(new Plugin(DEFAULT_PLUGIN_NAME), createClassLoader(Collections.emptyList()));
+
+    // for the new pinot plugins
+    try {
+      _classWorld = new ClassWorld();
+      // to simulate behavior of legacy code, however every plugin should have a dedicated realm
+      _classWorld.newRealm(DEFAULT_PLUGIN_NAME);
+      _classWorld.newRealm(PINOT_REALMID, ClassLoader.getSystemClassLoader());
+    } catch (DuplicateRealmException e) {
+      throw new RuntimeException(e);
+    }
+
     init();
   }
 
@@ -126,13 +157,13 @@ public class PluginManager {
     try {
       _pluginsDirectories = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_PROPERTY_NAME, e);
+      LOGGER.error("Failed to load system property {}", PLUGINS_DIR_PROPERTY_NAME, e);
       _pluginsDirectories = null;
     }
     try {
       _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
+      LOGGER.error("Failed to load system property {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
       _pluginsInclude = null;
     }
     init(_pluginsDirectories, _pluginsInclude);
@@ -141,9 +172,8 @@ public class PluginManager {
 
   private void init(String pluginsDirectories, String pluginsInclude) {
     if (StringUtils.isEmpty(pluginsDirectories)) {
-      LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
-          PLUGINS_DIR_PROPERTY_NAME);
-      return;
+      LOGGER.info("System property '{}' is not specified. Set this system property via the JVM arguments to load "
+          + "additional plugins.", PLUGINS_DIR_PROPERTY_NAME);
     } else {
       try {
         HashMap<String, File> plugins = getPluginsToLoad(pluginsDirectories, pluginsInclude);
@@ -177,28 +207,26 @@ public class PluginManager {
    * @return A hash map with key = plugin name, value = file object
    */
   @VisibleForTesting
-  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude) throws
-      IllegalArgumentException {
+  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
+      throws IllegalArgumentException {
     String[] directories = pluginsDirectories.split(";");
-    LOGGER.info("Plugin directories env: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
+    LOGGER.info("Plugin directories: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
 
     HashMap<String, File> finalPluginsToLoad = new HashMap<>();
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
-        throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
+        throw new IllegalArgumentException("Plugins dir [" + pluginsDirectory + "] doesn't exist.");
       }
 
-      Collection<File> jarFiles = FileUtils.listFiles(
-          new File(pluginsDirectory),
-          new String[]{JAR_FILE_EXTENSION},
-          true);
+      Collection<File> jarFiles =
+          FileUtils.listFiles(new File(pluginsDirectory), new String[]{JAR_FILE_EXTENSION}, true);
       List<String> pluginsToLoad = null;
       if (!StringUtils.isEmpty(pluginsInclude)) {
         pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
         LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
       } else {
-        LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
+        LOGGER.info("Please use system property '{}' to customize plugins to load. Loading all plugins: {}",
             PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
       }
 
@@ -229,22 +257,82 @@ public class PluginManager {
   /**
    * Loads jars recursively
    * @param pluginName
-   * @param directory
+   * @param directory the directory of one plugin
    */
   public void load(String pluginName, File directory) {
-    LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
-    Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{"jar"}, true);
-    Collection<URL> urlList = new ArrayList<>();
-    for (File jarFile : jarFiles) {
-      try {
-        urlList.add(jarFile.toURI().toURL());
-      } catch (MalformedURLException e) {
-        LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
+    Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
+    if (Files.isRegularFile(pluginPropertiesPath)) {
+      Properties pluginProperties = new Properties();
+      PinotPluginConfiguration config;
+      try (Reader reader = Files.newBufferedReader(pluginPropertiesPath)) {
+        pluginProperties.load(reader);
+        config = new PinotPluginConfiguration(pluginProperties);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
+        throw new UncheckedIOException(e);
       }
+
+      final ClassLoader baseClassLoader = ClassLoader.getPlatformClassLoader();
+
+      Collection<URL> urlList;
+      try (Stream<Path> pluginClasspathEntries = Files.list(directory.toPath())) {
+        urlList = pluginClasspathEntries.map(p -> {
+          try {
+            return p.toUri().toURL();
+          } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+          }
+        }).collect(Collectors.toList());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+
+      try {
+        ClassRealm pluginRealm = _classWorld.newRealm(pluginName, baseClassLoader);
+        urlList.forEach(pluginRealm::addURL);
+
+        ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
+
+        // All packages to look up in pinot realm BEFORE itself
+        Stream<String> importedPinotPackages =
+            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
+        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+
+        // Additional importForm as specified by the plugin configuration
+        config.getImportsFromPerRealm().forEach((r, ifs) -> {
+          try {
+            ClassRealm cr = _classWorld.getRealm(r);
+            ifs.forEach(i -> pluginRealm.importFrom(cr, i));
+          } catch (NoSuchRealmException e) {
+            LOGGER.warn("{} realm does not exist", r);
+          }
+        });
+
+        // Important: parent is not the same as baseclassloader (see pluginRealm above)
+        // baseClassLoader is BEFORE self classloader (should be Platform class loader)
+        // parentClassLoader is AFTER self classloader
+        config.getParentRealmId().map(_classWorld::getClassRealm).ifPresent(pluginRealm::setParentRealm);
+      } catch (DuplicateRealmException e) {
+        throw new RuntimeException(e);
+      }
+      LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
+    } else {
+      LOGGER.info("Trying to load plugin [{}] from location [{}]", pluginName, directory);
+      Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{"jar"}, true);
+      Collection<URL> urlList = new ArrayList<>();
+      for (File jarFile : jarFiles) {
+        try {
+          urlList.add(jarFile.toURI().toURL());
+        } catch (MalformedURLException e) {
+          LOGGER.error("Unable to load plugin [{}] jar file [{}]", pluginName, jarFile, e);
+        }
+      }
+
+      PluginClassLoader classLoader = createClassLoader(urlList);
+      _registry.put(new Plugin(pluginName), classLoader);
+
+      LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
     }
-    PluginClassLoader classLoader = createClassLoader(urlList);
-    LOGGER.info("Successfully loaded plugin [{}] from jar files: {}", pluginName, Arrays.toString(urlList.toArray()));
-    _registry.put(new Plugin(pluginName), classLoader);
   }
 
   private PluginClassLoader createClassLoader(Collection<URL> urlList) {
@@ -285,7 +373,18 @@ public class PluginManager {
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
     // Backward compatible check.
-    return _registry.get(new Plugin(pluginName)).loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    String name = loadClassWithBackwardCompatibleCheck(className);
+
+    Plugin plugin = new Plugin(pluginName);
+    if (_registry.containsKey(plugin)) {
+      return _registry.get(plugin).loadClass(name, true);
+    } else {
+      try {
+        return _classWorld.getRealm(pluginName).loadClass(className);
+      } catch (NoSuchRealmException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
@@ -347,9 +446,16 @@ public class PluginManager {
    */
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
-    PluginClassLoader pluginClassLoader = PLUGIN_MANAGER._registry.get(new Plugin(pluginName));
-    Class<T> loadedClass =
-        (Class<T>) pluginClassLoader.loadClass(loadClassWithBackwardCompatibleCheck(className), true);
+    Class<T> loadedClass;
+    String name = loadClassWithBackwardCompatibleCheck(className);
+
+    Plugin plugin = new Plugin(pluginName);
+    if (_registry.containsKey(plugin)) {
+      PluginClassLoader pluginClassLoader = _registry.get(plugin);
+      loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
+    } else {
+      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));
+    }
     Constructor<?> constructor;
     constructor = loadedClass.getConstructor(argTypes);
     Object instance = constructor.newInstance(argValues);

@@ -21,9 +21,7 @@ package org.apache.pinot.perf;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
@@ -81,6 +79,9 @@ public class BenchmarkNativeAndLuceneBasedLike {
   private static final String URL_COL = "URL_COL";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_STRING_COL_NAME = "NO_INDEX_COL";
+  private TableConfig _tableConfig;
+  private List<FieldConfig> _fieldConfigs = new ArrayList<>();
+  private Schema _schema;
 
   @Param({"LUCENE", "NATIVE"})
   private FSTType _fstType;
@@ -105,11 +106,8 @@ public class BenchmarkNativeAndLuceneBasedLike {
     _queryContext = QueryContextConverterUtils.getQueryContext(_query);
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment(_fstType);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-    indexLoadingConfig.setFSTIndexType(_fstType);
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
   }
 
@@ -145,23 +143,22 @@ public class BenchmarkNativeAndLuceneBasedLike {
   private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
+    _fieldConfigs.add(
         new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-    fieldConfigs
+    _fieldConfigs
         .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(_fieldConfigs).build();
+    _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
+    _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
         .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setFSTIndexType(fstType);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);

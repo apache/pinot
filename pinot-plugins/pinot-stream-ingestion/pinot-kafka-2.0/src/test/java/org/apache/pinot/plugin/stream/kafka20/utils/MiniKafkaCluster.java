@@ -37,6 +37,7 @@ import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Time;
+import org.apache.pinot.plugin.stream.kafka.utils.EmbeddedZooKeeper;
 import scala.Option;
 
 
@@ -48,10 +49,9 @@ public final class MiniKafkaCluster implements Closeable {
   private final String _kafkaServerAddress;
   private final AdminClient _adminClient;
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public MiniKafkaCluster(String brokerId)
       throws IOException, InterruptedException {
-    _zkServer = new EmbeddedZooKeeper();
+    _zkServer = new EmbeddedZooKeeper(new File(TEMP_DIR, "zk"));
     int kafkaServerPort = getAvailablePort();
     KafkaConfig kafkaBrokerConfig = new KafkaConfig(createBrokerConfig(brokerId, kafkaServerPort));
     _kafkaServer = new KafkaServer(kafkaBrokerConfig, Time.SYSTEM, Option.empty(), false);

@@ -37,7 +37,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -P github-actions,no-integration-tests || exit 1
+      -P github-actions,codecoverage,no-integration-tests || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test -T 16 \
@@ -48,5 +48,7 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
-    -P github-actions,no-integration-tests || exit 1
+    -P github-actions,codecoverage,no-integration-tests || exit 1
 fi
+
+mvn jacoco:report-aggregate@report -P codecoverage || exit 1

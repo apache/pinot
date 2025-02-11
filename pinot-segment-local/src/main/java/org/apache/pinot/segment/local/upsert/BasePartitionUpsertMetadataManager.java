@@ -21,13 +21,9 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -36,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -44,20 +39,13 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.model.IdealState;
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -65,19 +53,19 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -87,6 +75,8 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BasePartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
   protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
+  // The special value to indicate the largest comparison value is not set yet, and allow negative comparison values.
+  protected static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
 
   protected final String _tableNameWithType;
   protected final int _partitionId;
@@ -112,7 +102,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Helix threads. Otherwise, segments might be missed by the consuming thread when taking snapshots, which takes
   // snapshotLock WLock and clear the tracking set to avoid keeping segment object references around.
   // Skip mutableSegments as only immutable segments are for taking snapshots.
-  protected final Set<ImmutableSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
+  protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
@@ -138,6 +128,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // By default, the upsert consistency mode is NONE and upsertViewManager is disabled.
   private final UpsertViewManager _upsertViewManager;
 
+  // We track newly added segments to get them included in the list of selected segments for queries to get a more
+  // complete upsert data view, e.g. the newly created consuming segment or newly uploaded immutable segments. Such
+  // segments can be processed by the server even before they get included in the broker's routing table. Server can
+  // remove a segment from this map if it knows the segment has been included in the broker's routing table. But
+  // there is no easy or efficient way for server to know if this happens on all brokers, so we track the segments
+  // for a configurable period, to wait for brokers to add the segment in routing tables.
+  private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
+  private final long _newSegmentTrackingTimeMs;
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
@@ -153,19 +152,30 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
+    long trackingTimeMs = context.getNewSegmentTrackingTimeMs();
     UpsertConfig.ConsistencyMode cmode = context.getConsistencyMode();
     if (cmode == UpsertConfig.ConsistencyMode.SYNC || cmode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewManager = new UpsertViewManager(cmode, context);
+      // For consistency mode, we have to track newly added segments, so use default tracking time to enable the
+      // tracking of newly added segments if it's not enabled explicitly. This is for existing tables to work.
+      // New tables are required to set a positive newSegmentTrackingTimeMs when to enable consistency mode.
+      _newSegmentTrackingTimeMs =
+          trackingTimeMs > 0 ? trackingTimeMs : UpsertViewManager.DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS;
     } else {
       _upsertViewManager = null;
+      _newSegmentTrackingTimeMs = trackingTimeMs;
     }
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
-    if (_metadataTTL > 0) {
-      _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
+    if (isTTLEnabled()) {
+      Preconditions.checkState(_comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
+      Preconditions.checkState(_metadataTTL <= 0 || _enableSnapshot, "Upsert metadata TTL must have snapshot enabled");
+      _largestSeenComparisonValue =
+          new AtomicDouble(WatermarkUtils.loadWatermark(getWatermarkFile(), TTL_WATERMARK_NOT_SET));
     } else {
-      _largestSeenComparisonValue = new AtomicDouble(Double.MIN_VALUE);
-      deleteWatermark();
+      _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
+      WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
   }
 
@@ -228,10 +238,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_PRELOAD_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
-      // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
-      // loading logic would be used. The segments not being preloaded successfully here would be loaded via the
-      // normal segment loading logic, the one doing more costly checks on the upsert metadata.
+      // We should continue even if preloading fails, so that segments not being preloaded successfully can get
+      // loaded via the normal segment loading logic as done on the Helix task threads although with more costly
+      // checks on the upsert metadata.
       _logger.warn("Failed to preload segments from partition: {} of table: {}, skipping", _partitionId,
           _tableNameWithType, e);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_PRELOAD_FAILURE, 1);
@@ -245,115 +254,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  // Keep this hook method for subclasses to extend the preloading logic as needed.
   protected void doPreloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
       HelixManager helixManager, ExecutorService segmentPreloadExecutor)
       throws Exception {
-    _logger.info("Preload segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
-        _tableNameWithType);
-    String instanceId = getInstanceId(tableDataManager);
-    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment(helixManager);
-    Map<String, SegmentZKMetadata> segmentMetadataMap = getSegmentsZKMetadata(helixManager);
-    List<Future<?>> futures = new ArrayList<>();
-    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      String state = instanceStateMap.get(instanceId);
-      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
-        if (state == null) {
-          _logger.debug("Skip segment: {} as it's not assigned to instance: {}", segmentName, instanceId);
-        } else {
-          _logger.info("Skip segment: {} as its ideal state: {} is not ONLINE for instance: {}", segmentName, state,
-              instanceId);
-        }
-        continue;
-      }
-      SegmentZKMetadata segmentZKMetadata = segmentMetadataMap.get(segmentName);
-      Preconditions.checkState(segmentZKMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s",
-          segmentName, _tableNameWithType);
-      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
-      Preconditions.checkNotNull(partitionId,
-          String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
-              _tableNameWithType));
-      if (partitionId != _partitionId) {
-        _logger.debug("Skip segment: {} as its partition: {} is different from the requested partition: {}",
-            segmentName, partitionId, _partitionId);
-        continue;
-      }
-      if (!hasValidDocIdsSnapshot(tableDataManager, indexLoadingConfig.getTableConfig(), segmentName,
-          segmentZKMetadata.getTier())) {
-        _logger.info("Skip segment: {} from partition: {} as no validDocIds snapshot exists", segmentName,
-            _partitionId);
-        continue;
-      }
-      futures.add(segmentPreloadExecutor.submit(
-          () -> doPreloadSegmentWithSnapshot(tableDataManager, segmentName, indexLoadingConfig, segmentZKMetadata)));
-    }
-    try {
-      for (Future<?> f : futures) {
-        f.get();
-      }
-    } finally {
-      for (Future<?> f : futures) {
-        if (!f.isDone()) {
-          f.cancel(true);
-        }
-      }
-    }
-    _logger.info("Preloaded {} segments from partition: {} of table: {} for fast upsert metadata recovery",
-        futures.size(), _partitionId, _tableNameWithType);
-  }
-
-  private String getInstanceId(TableDataManager tableDataManager) {
-    return tableDataManager.getInstanceDataManagerConfig().getInstanceId();
-  }
-
-  private static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
-      String segmentName, String segmentTier) {
-    try {
-      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
-      File snapshotFile =
-          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-      return snapshotFile.exists();
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  @VisibleForTesting
-  Map<String, Map<String, String>> getSegmentAssignment(HelixManager helixManager) {
-    IdealState idealState = HelixHelper.getTableIdealState(helixManager, _tableNameWithType);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", _tableNameWithType);
-    return idealState.getRecord().getMapFields();
-  }
-
-  @VisibleForTesting
-  Map<String, SegmentZKMetadata> getSegmentsZKMetadata(HelixManager helixManager) {
-    Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
-    ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), _tableNameWithType)
-        .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
-    return segmentMetadataMap;
-  }
-
-  @VisibleForTesting
-  void doPreloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
-      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata) {
-    try {
-      _logger.info("Preload segment: {} from partition: {} of table: {}", segmentName, _partitionId,
-          _tableNameWithType);
-      // This method checks segment crc and if it has changed, the segment is not loaded. It might modify the
-      // file on disk, but we don't need to take the segmentLock, because every segment from the current table is
-      // processed by at most one thread from the preloading thread pool. HelixTaskExecutor task threads about to
-      // process segments from the same table are blocked on _preloadLock.
-      // In fact, taking segmentLock during segment preloading phase could cause deadlock when HelixTaskExecutor
-      // threads processing other tables have taken the same segmentLock as decided by the hash of table name and
-      // segment name, i.e. due to hash collision.
-      tableDataManager.tryLoadExistingSegment(segmentZKMetadata, indexLoadingConfig);
-      _logger.info("Preloaded segment: {} from partition: {} of table: {}", segmentName, _partitionId,
-          _tableNameWithType);
-    } catch (Exception e) {
-      _logger.warn("Failed to preload segment: {} from partition: {} of table: {}, skipping", segmentName, _partitionId,
-          _tableNameWithType, e);
-    }
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    SegmentPreloadUtils.preloadSegments(tableDataManager, _partitionId, indexLoadingConfig, helixManager,
+        segmentPreloadExecutor, (segmentName, segmentZKMetadata) -> {
+          String tier = segmentZKMetadata.getTier();
+          if (SegmentPreloadUtils.hasValidDocIdsSnapshot(tableDataManager, tableConfig, segmentName, tier)) {
+            return true;
+          }
+          _logger.info("Skip segment: {} on tier: {} as it has no validDocIds snapshot", segmentName, tier);
+          return false;
+        });
   }
 
   @Override
@@ -366,37 +280,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
-    ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-
-    if (_deletedKeysTTL > 0) {
-      double maxComparisonValue =
-          ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
-              .getMaxValue()).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
-    }
-
-    // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
-      Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
-      Preconditions.checkState(_comparisonColumns.size() == 1,
-          "Upsert TTL does not work with multiple comparison columns");
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
-        _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
-        MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
-        if (validDocIdsSnapshot != null) {
-          MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
-          immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
-              queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
-        } else {
-          _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
-              segmentName);
-        }
-        return;
-      }
-    }
-
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
@@ -405,7 +288,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      doAddSegment(immutableSegment);
+      doAddSegment((ImmutableSegmentImpl) segment);
       _trackedSegments.add(segment);
       if (_enableSnapshot) {
         _updatedSegmentsSinceLastSnapshot.add(segment);
@@ -418,9 +301,64 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  protected boolean isTTLEnabled() {
+    return _metadataTTL > 0 || _deletedKeysTTL > 0;
+  }
+
+  protected double getMaxComparisonValue(IndexSegment segment) {
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+        .getMaxValue()).doubleValue();
+  }
+
+  protected boolean isOutOfMetadataTTL(double maxComparisonValue) {
+    return _metadataTTL > 0 && _largestSeenComparisonValue.get() != TTL_WATERMARK_NOT_SET
+        && maxComparisonValue < _largestSeenComparisonValue.get() - _metadataTTL;
+  }
+
+  protected boolean isOutOfMetadataTTL(IndexSegment segment) {
+    if (_metadataTTL > 0) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      return isOutOfMetadataTTL(maxComparisonValue);
+    }
+    return false;
+  }
+
+  protected boolean skipAddSegmentOutOfTTL(ImmutableSegmentImpl segment) {
+    String segmentName = segment.getSegmentName();
+    _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
+    MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
+    if (validDocIdsSnapshot != null) {
+      MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+          queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
+    } else {
+      _logger.warn("Failed to find validDocIds snapshot to add segment: {} out of TTL, treating all docs as valid",
+          segmentName);
+    }
+    // Return true if segment is skipped. This boolean value allows subclass to decide whether to skip.
+    return true;
+  }
+
+  protected boolean skipPreloadSegmentOutOfTTL(ImmutableSegmentImpl segment, MutableRoaringBitmap validDocIdsSnapshot) {
+    String segmentName = segment.getSegmentName();
+    _logger.info("Skip preloading segment: {} because it's out of TTL", segmentName);
+    MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+    segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+        queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
+    // Return true if segment is skipped. This boolean value allows subclass to decide whether to skip.
+    return true;
+  }
+
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      if (isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
+        return;
+      }
+    }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
       segment.deleteValidDocIdsSnapshot();
@@ -491,7 +429,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
       return;
     }
-
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      if (isOutOfMetadataTTL(maxComparisonValue) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+        return;
+      }
+    }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
@@ -663,7 +607,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, null, oldSegment);
       return;
     }
-
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      // Segment might be uploaded directly to the table to replace an old segment. So update the TTL watermark but
+      // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
+    }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> recordInfoIterator =
@@ -763,18 +712,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing untracked (replaced or empty) segment: {}", segmentName);
       return;
     }
-    // Skip removing the upsert metadata of segment that has max comparison value smaller than
-    // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
-    // new consuming segment in batches.
-    boolean skipRemoveMetadata = false;
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
-        _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-        skipRemoveMetadata = true;
-      }
-    }
     if (!startOperation()) {
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
@@ -783,7 +720,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      if (!skipRemoveMetadata) {
+      // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
+      // while creating new consuming segment in batches.
+      if (isOutOfMetadataTTL(segment)) {
+        _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
+      } else {
         doRemoveSegment(segment);
       }
       _trackedSegments.remove(segment);
@@ -937,6 +878,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
+    TableDataManager tableDataManager = _context.getTableDataManager();
+    boolean isSegmentSkipped = false;
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
         numConsumingSegments++;
@@ -947,6 +890,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numUnchangedSegments++;
         continue;
       }
+      // Try to acquire the segmentLock when taking snapshot for the segment because the segment directory can be
+      // modified, e.g. a new snapshot file can be added to the directory. If not taking the lock, the Helix task
+      // thread replacing the segment could fail. For example, we found FileUtils.cleanDirectory() failed due to
+      // DirectoryNotEmptyException because a new snapshot file got added into the segment directory just between two
+      // major cleanup steps in the cleanDirectory() method.
+      String segmentName = segment.getSegmentName();
+      Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+      boolean locked = segmentLock.tryLock();
+      if (!locked) {
+        // Try to get the segmentLock in a non-blocking manner to avoid deadlock. The Helix task thread takes
+        // segmentLock first and then the snapshot RLock when replacing a segment. However, the consuming thread has
+        // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
+        // enter deadlock with the Helix task threads waiting for snapshot RLock.
+        // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
+        // validDocIds might become stale or wrong when the segment is being processed by another thread right now.
+        _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
+        isSegmentSkipped = true;
+        continue;
+      }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
         if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
@@ -954,24 +916,48 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         immutableSegment.persistValidDocIdsSnapshot();
+        _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
-        Utils.rethrowException(e);
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
+        isSegmentSkipped = true;
+      } finally {
+        segmentLock.unlock();
       }
     }
-    for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
-      try {
-        segment.persistValidDocIdsSnapshot();
-        numImmutableSegments++;
-        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
-      } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
-        Utils.rethrowException(e);
+    // If we have skipped any segments in the previous for-loop, we should skip the next for-loop, basically to not
+    // add new snapshot files on disk. This ensures all the validDocIds snapshots kept on disk are still disjoint
+    // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
+    if (!isSegmentSkipped) {
+      for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+        String segmentName = segment.getSegmentName();
+        Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+        boolean locked = segmentLock.tryLock();
+        if (!locked) {
+          _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
+              segmentName);
+          continue;
+        }
+        try {
+          segment.persistValidDocIdsSnapshot();
+          _updatedSegmentsSinceLastSnapshot.remove(segment);
+          numImmutableSegments++;
+          numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+        } catch (Exception e) {
+          _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
+        } finally {
+          segmentLock.unlock();
+        }
       }
     }
-    _updatedSegmentsSinceLastSnapshot.clear();
+    _updatedSegmentsSinceLastSnapshot.retainAll(_trackedSegments);
+    // Persist TTL watermark after taking snapshots if TTL is enabled, so that segments out of TTL can be loaded with
+    // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
+    // stale bitmaps or even no bitmap snapshots to use.
+    if (isTTLEnabled()) {
+      WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
+    }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
@@ -987,66 +973,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
-  /**
-   * Loads watermark from the file if exists.
-   */
-  protected double loadWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      try {
-        byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
-        double watermark = ByteBuffer.wrap(bytes).getDouble();
-        _logger.info("Loaded watermark: {} from file for table: {} partition_id: {}", watermark, _tableNameWithType,
-            _partitionId);
-        return watermark;
-      } catch (Exception e) {
-        _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
-      }
-    }
-    return Double.MIN_VALUE;
-  }
-
-  /**
-   * Persists watermark to the file.
-   */
-  protected void persistWatermark(double watermark) {
-    File watermarkFile = getWatermarkFile();
-    try {
-      if (watermarkFile.exists()) {
-        if (!FileUtils.deleteQuietly(watermarkFile)) {
-          _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-          return;
-        }
-      }
-      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false);
-          DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
-        dataOutputStream.writeDouble(watermark);
-      }
-      _logger.info("Persisted watermark: {} to file: {}", watermark, watermarkFile);
-    } catch (Exception e) {
-      _logger.warn("Caught exception while persisting watermark file: {}, skipping", watermarkFile);
-    }
-  }
-
-  /**
-   * Deletes the watermark file.
-   */
-  protected void deleteWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      if (!FileUtils.deleteQuietly(watermarkFile)) {
-        _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-      }
-    }
-  }
-
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
 
+  @VisibleForTesting
+  double getWatermark() {
+    return _largestSeenComparisonValue.get();
+  }
+
+  @VisibleForTesting
+  void setWatermark(double watermark) {
+    _largestSeenComparisonValue.set(watermark);
+  }
+
   @Override
   public void removeExpiredPrimaryKeys() {
-    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
+    if (!isTTLEnabled()) {
       return;
     }
     if (!startOperation()) {
@@ -1180,7 +1123,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _snapshotLock.readLock().lock();
       try {
-        _updatedSegmentsSinceLastSnapshot.add((ImmutableSegment) segment);
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       } finally {
         _snapshotLock.readLock().unlock();
       }
@@ -1207,5 +1150,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_upsertViewManager != null) {
       _upsertViewManager.untrackSegment(segment);
     }
+  }
+
+  @Override
+  public void trackNewlyAddedSegment(String segmentName) {
+    if (_newSegmentTrackingTimeMs > 0) {
+      _newlyAddedSegments.put(segmentName, System.currentTimeMillis() + _newSegmentTrackingTimeMs);
+      if (_logger.isDebugEnabled()) {
+        _logger.debug("Tracked newly added segments: {}", _newlyAddedSegments);
+      }
+    }
+  }
+
+  public Set<String> getNewlyAddedSegments() {
+    if (_newSegmentTrackingTimeMs > 0) {
+      // Untrack stale segments at query time. The overhead should be limited as the tracking map should be very small.
+      long nowMs = System.currentTimeMillis();
+      _newlyAddedSegments.values().removeIf(v -> v < nowMs);
+      return _newlyAddedSegments.keySet();
+    }
+    return Collections.emptySet();
   }
 }

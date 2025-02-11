@@ -36,6 +36,7 @@ import org.apache.pinot.core.operator.combine.CombineOperatorUtils;
 import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -142,6 +143,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
             }
           }
         }
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
@@ -169,7 +172,11 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     _processingException.compareAndSet(null, t);
     // Clear the blocking queue and add the exception results block to terminate the main thread
     _blockingQueue.clear();
-    _blockingQueue.offer(new ExceptionResultsBlock(t));
+    if (t instanceof BadQueryRequestException) {
+      _blockingQueue.offer(new ExceptionResultsBlock(QueryException.QUERY_VALIDATION_ERROR, t));
+    } else {
+      _blockingQueue.offer(new ExceptionResultsBlock(t));
+    }
   }
 
   @Override

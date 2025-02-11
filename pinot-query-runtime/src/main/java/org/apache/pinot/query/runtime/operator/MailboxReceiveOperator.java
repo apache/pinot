@@ -60,6 +60,8 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     }
     if (block.isSuccessfulEndOfStreamBlock()) {
       updateEosBlock(block, _statMap);
+    } else if (block.isDataBlock()) {
+      sampleAndCheckInterruption();
     }
     return block;
   }

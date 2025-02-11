@@ -88,7 +88,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
-    Preconditions.checkArgument(version == 2 || version == 3 || (fixed && version == 4),
+    Preconditions.checkArgument(version == 2 || version == 3 || (fixed && (version == 4 || version == 5)),
         "Illegal version: %s for %s bytes values", version, fixed ? "fixed" : "variable");
     Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "Chunk size limited to 2GB");
     _chunkSize = (int) chunkSize;

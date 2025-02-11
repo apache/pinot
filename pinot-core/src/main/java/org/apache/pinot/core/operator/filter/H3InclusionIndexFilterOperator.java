@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -142,7 +144,19 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(inclusionIndex:h3_index");
     stringBuilder.append(",operator:").append(_predicate.getType());
-    stringBuilder.append(",predicate:").append(_predicate.toString());
+    stringBuilder.append(",predicate:").append(_predicate);
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("predicate", _predicate.toString());
   }
 }

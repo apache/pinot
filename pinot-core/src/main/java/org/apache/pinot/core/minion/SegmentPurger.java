@@ -18,14 +18,17 @@
  */
 package org.apache.pinot.core.minion;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorCustomConfigs;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -50,12 +53,14 @@ public class SegmentPurger {
   private final Schema _schema;
   private final RecordPurger _recordPurger;
   private final RecordModifier _recordModifier;
-
+  private final SegmentGeneratorCustomConfigs _segmentGeneratorCustomConfigs;
+  private SegmentGeneratorConfig _segmentGeneratorConfig;
   private int _numRecordsPurged;
   private int _numRecordsModified;
 
   public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
-      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
+      @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier,
+      @Nullable SegmentGeneratorCustomConfigs segmentGeneratorCustomConfigs) {
     Preconditions.checkArgument(recordPurger != null || recordModifier != null,
         "At least one of record purger and modifier should be non-null");
     _indexDir = indexDir;
@@ -64,6 +69,7 @@ public class SegmentPurger {
     _schema = schema;
     _recordPurger = recordPurger;
     _recordModifier = recordModifier;
+    _segmentGeneratorCustomConfigs = segmentGeneratorCustomConfigs;
   }
 
   public File purgeSegment()
@@ -84,34 +90,45 @@ public class SegmentPurger {
         return null;
       }
 
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
-      config.setOutDir(_workingDir.getPath());
-      config.setSegmentName(segmentName);
+      initSegmentGeneratorConfig(segmentName);
 
       // Keep index creation time the same as original segment because both segments use the same raw data.
       // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
       // identify if the new pushed segment has newer data than the existing one.
-      config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
+      _segmentGeneratorConfig.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
 
       // The time column type info is not stored in the segment metadata.
       // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
       if (segmentMetadata.getTimeInterval() != null) {
-        config.setTimeColumnName(_tableConfig.getValidationConfig().getTimeColumnName());
-        config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
-        config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
-        config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+        _segmentGeneratorConfig.setTimeColumnName(_tableConfig.getValidationConfig().getTimeColumnName());
+        _segmentGeneratorConfig.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+        _segmentGeneratorConfig.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+        _segmentGeneratorConfig.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
       }
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
-      driver.init(config, purgeRecordReader);
+      driver.init(_segmentGeneratorConfig, purgeRecordReader);
       driver.build();
     }
 
     LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableNameWithType,
         segmentName, _numRecordsPurged, _numRecordsModified);
 
-    return new File(_workingDir, segmentName);
+    return new File(_workingDir, _segmentGeneratorConfig.getSegmentName());
+  }
+
+  @VisibleForTesting
+  void initSegmentGeneratorConfig(String segmentName) {
+    _segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
+    _segmentGeneratorConfig.setOutDir(_workingDir.getPath());
+
+    if (_segmentGeneratorCustomConfigs != null && StringUtils.isNotEmpty(
+        _segmentGeneratorCustomConfigs.getSegmentName())) {
+      _segmentGeneratorConfig.setSegmentName(_segmentGeneratorCustomConfigs.getSegmentName());
+    } else {
+      _segmentGeneratorConfig.setSegmentName(segmentName);
+    }
   }
 
   public RecordPurger getRecordPurger() {
@@ -128,6 +145,10 @@ public class SegmentPurger {
 
   public int getNumRecordsModified() {
     return _numRecordsModified;
+  }
+
+  public SegmentGeneratorConfig getSegmentGeneratorConfig() {
+    return _segmentGeneratorConfig;
   }
 
   private class PurgeRecordReader implements RecordReader {
@@ -181,11 +202,6 @@ public class SegmentPurger {
         _finished = true;
         return false;
       }
-    }
-
-    @Override
-    public GenericRow next() {
-      return next(new GenericRow());
     }
 
     @Override

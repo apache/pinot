@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -34,6 +35,8 @@ import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
+import software.amazon.awssdk.services.kinesis.model.ListStreamsRequest;
+import software.amazon.awssdk.services.kinesis.model.ListStreamsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
@@ -113,6 +116,39 @@ public class KinesisConnectionHandler implements Closeable {
     ListShardsResponse listShardsResponse =
         _kinesisClient.listShards(ListShardsRequest.builder().streamName(_config.getStreamTopicName()).build());
     return listShardsResponse.shards();
+  }
+
+  public List<String> getStreamNames() {
+    final int limit = 1000; // default value for the API is 100
+    try {
+      List<String> allStreamNames = new ArrayList<>();
+      ListStreamsResponse response = _kinesisClient.listStreams(ListStreamsRequest.builder().limit(limit).build());
+
+      while (response != null && response.streamNames() != null) {
+        allStreamNames.addAll(response.streamNames());
+
+        if (!response.hasMoreStreams()) {
+          break;
+        }
+
+        // Fetch the next page
+        response = _kinesisClient.listStreams(ListStreamsRequest.builder()
+            .exclusiveStartStreamName(allStreamNames.get(allStreamNames.size() - 1))
+            .limit(limit)
+            .build());
+      }
+
+      return allStreamNames;
+    } catch (Exception e) {
+      // Log the exception (if a logger is available) for better observability
+      throw new RuntimeException("Failed to list Kinesis streams: " + e.getMessage(), e);
+    }
+  }
+
+
+  @VisibleForTesting
+  public KinesisClient getClient() {
+    return _kinesisClient;
   }
 
   @Override

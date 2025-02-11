@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -39,13 +40,13 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   private int _maxByteSize;
 
   public DistinctCountHLLPlusValueAggregator(List<ExpressionContext> arguments) {
-    // length 1 means we use the default _p and _sp
-    if (arguments.size() == 2) {
-      _p = arguments.get(1).getLiteral().getIntValue();
+    // length 0 means we use the default _p and _sp
+    if (arguments.size() == 1) {
+      _p = arguments.get(0).getLiteral().getIntValue();
       _sp = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP;
-    } else if (arguments.size() == 3) {
-      _p = arguments.get(1).getLiteral().getIntValue();
-      _sp = arguments.get(2).getLiteral().getIntValue();
+    } else if (arguments.size() == 2) {
+      _p = arguments.get(0).getLiteral().getIntValue();
+      _sp = arguments.get(1).getLiteral().getIntValue();
     } else {
       _p = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
       _sp = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_SP;
@@ -121,5 +122,15 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
   @Override
   public HyperLogLogPlus deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytes);
+  }
+
+  @VisibleForTesting
+  public int getP() {
+    return _p;
+  }
+
+  @VisibleForTesting
+  public int getSp() {
+    return _sp;
   }
 }

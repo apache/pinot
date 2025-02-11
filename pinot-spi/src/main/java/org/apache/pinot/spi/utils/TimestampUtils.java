@@ -95,7 +95,7 @@ public class TimestampUtils {
       LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
       return Timestamp.valueOf(dateTime);
     } catch (Exception e) {
-      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+      throw new IllegalArgumentException("Invalid timestamp: '" + timestampString + "'");
     }
   }
 
@@ -129,7 +129,7 @@ public class TimestampUtils {
       LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
       return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     } catch (Exception e) {
-      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+      throw new IllegalArgumentException("Invalid timestamp: '" + timestampString + "'");
     }
   }
 }

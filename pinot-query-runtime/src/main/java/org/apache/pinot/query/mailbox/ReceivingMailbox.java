@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.common.base.Preconditions;
+import com.google.errorprone.annotations.ThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -43,7 +44,13 @@ import org.slf4j.LoggerFactory;
  * the {@link SendingMailbox} whose ownership lies with the send operator. This is because the ReceivingMailbox can be
  * initialized even before the corresponding OpChain is registered on the receiver, whereas the SendingMailbox is
  * initialized when the send operator is running.
+ *
+ * There is a single ReceivingMailbox for each {@link org.apache.pinot.query.runtime.operator.MailboxReceiveOperator}.
+ * The offer methods will be called when new blocks are received from different sources. For example local workers will
+ * directly call {@link #offer(TransferableBlock, long)} while each remote worker opens a GPRC channel where messages
+ * are sent in raw format and {@link #offerRaw(ByteBuffer, long)} is called from them.
  */
+@ThreadSafe
 public class ReceivingMailbox {
   public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
 
@@ -98,7 +105,7 @@ public class ReceivingMailbox {
     _stats.merge(StatKey.DESERIALIZED_MESSAGES, 1);
 
     now = System.currentTimeMillis();
-    DataBlock dataBlock = DataBlockUtils.getDataBlock(byteBuffer);
+    DataBlock dataBlock = DataBlockUtils.readFrom(byteBuffer);
     _stats.merge(StatKey.DESERIALIZATION_TIME_MS, System.currentTimeMillis() - now);
 
     if (dataBlock instanceof MetadataBlock) {

@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -56,7 +57,12 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   }
 
   public void materializeChildOperator() {
-    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    // V2 query engine can call getNextBlock() methods repetitively to stream result blocks between query stages, but
+    // the query plan should be created just once, so cache the child operator. And no need to synchronize here as the
+    // operator object is used by a single thread.
+    if (_childOperator == null) {
+      _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    }
   }
 
   /**
@@ -95,6 +101,17 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   @Override
   public void postExplainPlan(ExplainPlanRows explainPlanRows) {
     release();
+  }
+
+  @Override
+  public ExplainInfo getExplainInfo() {
+    acquire();
+    try {
+      materializeChildOperator();
+      return super.getExplainInfo();
+    } finally {
+      release();
+    }
   }
 
   @Override

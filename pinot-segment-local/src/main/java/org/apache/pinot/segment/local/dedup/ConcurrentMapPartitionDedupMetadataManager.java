@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -39,13 +40,22 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
+  protected void doPreloadSegment(ImmutableSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      double dedupTime = dedupRecordInfo.getDedupTime();
+      _primaryKeyToSegmentAndTimeMap.put(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          Pair.of(segment, dedupTime));
+    }
+  }
+
+  @Override
   protected void doAddOrReplaceSegment(IndexSegment oldSegment, IndexSegment newSegment,
       Iterator<DedupRecordInfo> dedupRecordInfoIteratorOfNewSegment) {
     String segmentName = newSegment.getSegmentName();
     while (dedupRecordInfoIteratorOfNewSegment.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIteratorOfNewSegment.next();
       double dedupTime = dedupRecordInfo.getDedupTime();
-      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, segmentAndTime) -> {
             // Stale metadata is treated as not existing when checking for deduplicates.
@@ -94,10 +104,8 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
 
   @Override
   protected void doRemoveExpiredPrimaryKeys() {
-    if (_metadataTTL > 0) {
-      double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
-      _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
-    }
+    double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
+    _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
   }
 
   @Override
@@ -108,7 +116,9 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
       return true;
     }
     try {
-      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+      if (_metadataTTL > 0) {
+        _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+      }
       AtomicBoolean present = new AtomicBoolean(false);
       _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
           (primaryKey, segmentAndTime) -> {

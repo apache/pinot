@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.io.Closeable;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
@@ -36,6 +38,22 @@ public interface PartitionDedupMetadataManager extends Closeable {
     // since this is a newly added method, by default, add the new segment to keep backward compatibility
     addSegment(newSegment);
   }
+
+  /**
+   * Preload segments for the table partition. Segments can be added differently during preloading.
+   * TODO: As commented in PartitionUpsertMetadataManager, revisit this method and see if we can use the same
+   *       IndexLoadingConfig for all segments. Tier info might be different for different segments.
+   */
+  void preloadSegments(IndexLoadingConfig indexLoadingConfig);
+
+  boolean isPreloading();
+
+  /**
+   * Different from adding a segment, when preloading a segment, the dedup metadata may be updated more efficiently.
+   * Basically the dedup metadata can be directly updated for each primary key, without doing the more costly
+   * read-compare-update.
+   */
+  void preloadSegment(ImmutableSegment immutableSegment);
 
   /**
    * Removes the dedup metadata for the given segment.

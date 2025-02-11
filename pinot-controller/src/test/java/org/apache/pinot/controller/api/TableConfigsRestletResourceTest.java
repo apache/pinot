@@ -23,7 +23,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -36,8 +38,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -241,6 +245,52 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     } catch (Exception e) {
       // expected
     }
+
+    // table name check fails when database context is not passed in header but one of the configs has database prefix
+    Schema dummySchema = createDummySchema(tableName);
+    TableConfig offlineTableConfig1 = createOfflineTableConfig("db1." + tableName);
+    TableConfig realtimeTableConfig1 = createRealtimeTableConfig(tableName);
+    tableConfigs = new TableConfigs(tableName, dummySchema, offlineTableConfig1, realtimeTableConfig1);
+    try {
+      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      fail("Creation of an TableConfigs without database context in header but provided in one of the configs should "
+          + "fail");
+    } catch (Exception e) {
+      // expected
+    }
+    // fails with schema as well
+    offlineTableConfig1.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    dummySchema.setSchemaName("db1." + tableName);
+    try {
+      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      fail("Creation of an TableConfigs without database context in header but provided in one of the configs should "
+          + "fail");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // fails even though both configs and schema have the database prefix in the table names but
+    // database context is not passed in header
+    tableConfigs.setTableName("db1." + tableName);
+    try {
+      sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+      fail("Creation of an TableConfigs without database context in header but provided in all of the configs should "
+          + "fail");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // successfully created with all 3 configs when database context is passed in header and configs may or may not
+    // have the database prefix in the table names
+    Map<String, String> headers = new HashMap<>();
+    tableConfigs.setTableName(tableName);
+    headers.put(CommonConstants.DATABASE, "db1");
+    // only schema has the database prefix
+    dummySchema.setSchemaName("db1." + tableName);
+    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString(), headers);
+    // one of the table config has database prefix
+    offlineTableConfig1.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString(), headers);
 
     // successfully created with all 3 configs
     String tableName1 = "testValidate1";

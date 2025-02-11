@@ -22,7 +22,6 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +41,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
@@ -59,7 +59,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -68,7 +68,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -131,15 +130,22 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(MV_COL1_NO_INDEX, DataType.INT)
       .build();
 
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+      .setNoDictionaryColumns(List.of(COL1_RAW, MV_COL1_RAW))
+      .setSortedColumn(COL1_SORTED_INDEX)
+      .setInvertedIndexColumns(List.of(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX))
+      .setRangeIndexColumns(List.of(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX))
+      .setJsonIndexColumns(List.of(COL1_JSON_INDEX))
+      .setFieldConfigList(List.of(
+          new FieldConfig(COL1_TEXT_INDEX, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
+              null, null)))
+      .build();
+
   private static final DataSchema DATA_SCHEMA = new DataSchema(
       new String[]{"Operator", "Operator_Id", "Parent_Id"},
       new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT}
   );
   //@formatter:on
-
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(List.of(COL1_RAW, MV_COL1_RAW))
-          .setTableName(RAW_TABLE_NAME).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -198,22 +204,6 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
   ImmutableSegment createImmutableSegment(List<GenericRow> records, String segmentName)
       throws Exception {
-    IndexingConfig indexingConfig = TABLE_CONFIG.getIndexingConfig();
-
-    List<String> invertedIndexColumns = List.of(COL1_INVERTED_INDEX, COL2_INVERTED_INDEX, COL3_INVERTED_INDEX);
-    indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
-
-    List<String> rangeIndexColumns = List.of(COL1_RANGE_INDEX, COL2_RANGE_INDEX, COL3_RANGE_INDEX);
-    indexingConfig.setRangeIndexColumns(rangeIndexColumns);
-
-    List<String> sortedIndexColumns = List.of(COL1_SORTED_INDEX);
-    indexingConfig.setSortedColumn(sortedIndexColumns);
-
-    List<String> jsonIndexColumns = List.of(COL1_JSON_INDEX);
-    indexingConfig.setJsonIndexColumns(jsonIndexColumns);
-
-    List<String> textIndexColumns = List.of(COL1_TEXT_INDEX);
-
     File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setSegmentName(segmentName);
@@ -223,16 +213,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(TABLE_CONFIG);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(invertedIndexColumns));
-    indexLoadingConfig.setRangeIndexColumns(new HashSet<>(rangeIndexColumns));
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
-    indexLoadingConfig.setTextIndexColumns(new HashSet<>(textIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     _segmentNames.add(segmentName);
-
     return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig);
   }
 
@@ -295,9 +277,9 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Mock the instance data manager
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
-            new SegmentLocks()).getTableDataManager(TABLE_CONFIG);
+    TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(TABLE_CONFIG);
     tableDataManager.start();
     for (IndexSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment((ImmutableSegment) indexSegment);

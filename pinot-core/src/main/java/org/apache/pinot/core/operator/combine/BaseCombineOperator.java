@@ -35,8 +35,10 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -180,4 +182,24 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected abstract void onProcessSegmentsFinish();
+
+  protected static RuntimeException wrapOperatorException(Operator operator, RuntimeException e) {
+    // Skip early termination as that's not quite related to the segments.
+    if (e instanceof EarlyTerminationException) {
+      return e;
+    }
+    // Otherwise, try to get the segment name to help locate the segment when debugging query errors.
+    // Not all operators have associated segment, so do this at best effort.
+    IndexSegment segment = operator.getIndexSegment();
+    String errorMessage = null;
+    if (segment != null) {
+      errorMessage = "Caught exception while doing operator: " + operator.getClass()
+          + " on segment: " + segment.getSegmentName();
+    }
+
+    if (e instanceof IllegalArgumentException || e instanceof BadQueryRequestException) {
+      throw new BadQueryRequestException(errorMessage, e);
+    }
+    throw new RuntimeException(errorMessage, e);
+  }
 }

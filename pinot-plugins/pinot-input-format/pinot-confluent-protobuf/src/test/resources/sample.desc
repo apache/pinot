@@ -1,0 +1,8 @@
+
+¨
+sample.proto,org.apache.pinot.plugin.inputformat.protobuf"b
+SampleRecord
+name (	Rname
+id (Rid
+email (	Remail
+friends (	Rfriendsbproto3

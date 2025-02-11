@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
+import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,13 +45,10 @@ public class SegmentAssignmentUtilsTest {
     int numInstances = 10;
     List<String> instances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, numInstances);
 
-    // Uniformly spray segments to the instances:
-    // [instance_0,   instance_1,   instance_2,   instance_3,   instance_4,   instance_5,   instance_6,   instance_7,
-    // instance_8,   instance_9]
-    //  segment_0(r0) segment_0(r1) segment_0(r2) segment_1(r0) segment_1(r1) segment_1(r2) segment_2(r0) segment_2
-    //  (r1) segment_2(r2) segment_3(r0)
-    //  segment_3(r1) segment_3(r2) segment_4(r0) segment_4(r1) segment_4(r2) segment_5(r0) segment_5(r1) segment_5
-    //  (r2) segment_6(r0) segment_6(r1)
+    // Uniformly spray segments to the instances (i0 represents instance_0, s0 represents segment_0)
+    // [    i0,    i1,    i2,    i3,    i4,    i5,    i6,    i7,    i8,    i9]
+    //  s0(r0) s0(r1) s0(r2) s1(r0) s1(r1) s1(r2) s2(r0) s2(r1) s2(r2) s3(r0)
+    //  s3(r1) s3(r2) s4(r0) s4(r1) s4(r2) s5(r0) s5(r1) s5(r2) s6(r0) s6(r1)
     //  ...
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     int assignedInstanceId = 0;
@@ -60,8 +58,8 @@ public class SegmentAssignmentUtilsTest {
         instancesAssigned.add(instances.get(assignedInstanceId));
         assignedInstanceId = (assignedInstanceId + 1) % numInstances;
       }
-      currentAssignment
-          .put(segmentName, SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE));
     }
 
     // There should be 100 segments assigned
@@ -83,15 +81,12 @@ public class SegmentAssignmentUtilsTest {
         currentAssignment);
 
     // Replace instance_0 with instance_10
-    // {
-    //   0_0=[instance_10, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
-    //   instance_8, instance_9]
-    // }
     List<String> newInstances = new ArrayList<>(instances);
     String newInstanceName = INSTANCE_NAME_PREFIX + 10;
     newInstances.set(0, newInstanceName);
-    Map<String, Map<String, String>> newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    Map<String, Map<String, String>> newAssignment =
+        SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+            NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(currentAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -103,11 +98,12 @@ public class SegmentAssignmentUtilsTest {
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, newInstances);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // All segments on instance_0 should be moved to instance_10
-    Map<String, Integer> numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), 1);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstanceName), numSegmentsPerInstance);
+    Map<String, IntIntPair> numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), 2);
+    assertEquals(numSegmentsToMovePerInstance.get(newInstanceName), IntIntPair.of(30, 0));
     String oldInstanceName = INSTANCE_NAME_PREFIX + 0;
+    assertEquals(numSegmentsToMovePerInstance.get(oldInstanceName), IntIntPair.of(0, 30));
     for (String segmentName : segments) {
       if (currentAssignment.get(segmentName).containsKey(oldInstanceName)) {
         assertTrue(newAssignment.get(segmentName).containsKey(newInstanceName));
@@ -120,8 +116,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     int newNumInstances = numInstances - 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -136,26 +132,26 @@ public class SegmentAssignmentUtilsTest {
     assertEquals(numSegmentsAssignedPerInstance[2], 60);
     assertEquals(numSegmentsAssignedPerInstance[3], 60);
     assertEquals(numSegmentsAssignedPerInstance[4], 64);
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), newNumInstances);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(0)), 26);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(1)), 30);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(2)), 30);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(3)), 30);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(4)), 34);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), numInstances);
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 0), IntIntPair.of(26, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 1), IntIntPair.of(30, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 2), IntIntPair.of(30, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 3), IntIntPair.of(30, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + 4), IntIntPair.of(34, 0));
+    for (int i = 5; i < 10; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
+    }
 
-    // Add 5 instances
+    // Add 5 instances (i0 represents instance_0)
     // {
-    //   0_0=[
-    //       instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,
-    //       instance_8, instance_9,
-    //       instance_10, instance_11, instance_12, instance_13, instance_14]
+    //   0_0=[i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14]
     // }
     newNumInstances = numInstances + 5;
     newInstances = SegmentAssignmentTestUtils.getNameList(INSTANCE_NAME_PREFIX, newNumInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -170,11 +166,14 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, newNumSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Each new added instance should have 20 segments to be moved to it
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), 5);
-    for (int instanceId = numInstances; instanceId < newNumInstances; instanceId++) {
-      assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(instanceId)), newNumSegmentsPerInstance);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), newNumInstances);
+    for (int i = 0; i < numInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 10));
+    }
+    for (int i = numInstances; i < newNumInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(20, 0));
     }
 
     // Change all instances
@@ -183,8 +182,8 @@ public class SegmentAssignmentUtilsTest {
     // }
     String newInstanceNamePrefix = "i_";
     newInstances = SegmentAssignmentTestUtils.getNameList(newInstanceNamePrefix, numInstances);
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances, NUM_REPLICAS);
+    newAssignment = SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, newInstances,
+        NUM_REPLICAS);
     // There should be 100 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -198,11 +197,12 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Each instance should have 30 segments to be moved to it
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), numInstances);
-    for (String instanceName : newInstances) {
-      assertEquals((int) numSegmentsToBeMovedPerInstance.get(instanceName), numSegmentsPerInstance);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), 2 * numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(newInstanceNamePrefix + i), IntIntPair.of(30, 0));
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
     }
   }
 
@@ -264,9 +264,8 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(SegmentAssignmentUtils
-            .rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions, partitionIdToSegmentsMap),
-        currentAssignment);
+    assertEquals(SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, instancePartitions,
+        partitionIdToSegmentsMap), currentAssignment);
 
     // Replace instance_0 with instance_9, instance_4 with instance_10
     // {
@@ -289,8 +288,9 @@ public class SegmentAssignmentUtilsTest {
     newInstancePartitions.setInstances(0, 0, newReplicaGroup0Instances);
     newInstancePartitions.setInstances(0, 1, newReplicaGroup1Instances);
     newInstancePartitions.setInstances(0, 2, newReplicaGroup2Instances);
-    Map<String, Map<String, String>> newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    Map<String, Map<String, String>> newAssignment =
+        SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+            partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -303,13 +303,15 @@ public class SegmentAssignmentUtilsTest {
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // All segments on instance_0 should be moved to instance_9, all segments on instance_4 should be moved to
     // instance_10
-    Map<String, Integer> numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), 2);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplicaGroup0Instance), numSegmentsPerInstance);
-    assertEquals((int) numSegmentsToBeMovedPerInstance.get(newReplicaGroup1Instance), numSegmentsPerInstance);
+    Map<String, IntIntPair> numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), 4);
+    assertEquals(numSegmentsToMovePerInstance.get(newReplicaGroup0Instance), IntIntPair.of(30, 0));
+    assertEquals(numSegmentsToMovePerInstance.get(newReplicaGroup1Instance), IntIntPair.of(30, 0));
     String oldReplicaGroup0Instance = INSTANCE_NAME_PREFIX + 0;
     String oldReplicaGroup1Instance = INSTANCE_NAME_PREFIX + 4;
+    assertEquals(numSegmentsToMovePerInstance.get(oldReplicaGroup0Instance), IntIntPair.of(0, 30));
+    assertEquals(numSegmentsToMovePerInstance.get(oldReplicaGroup0Instance), IntIntPair.of(0, 30));
     for (String segmentName : segments) {
       Map<String, String> oldInstanceStateMap = currentAssignment.get(segmentName);
       if (oldInstanceStateMap.containsKey(oldReplicaGroup0Instance)) {
@@ -335,8 +337,8 @@ public class SegmentAssignmentUtilsTest {
       newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
       newInstances.addAll(newInstancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -351,12 +353,15 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, newNumSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Each instance should have 15 segments to be moved to it
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), newNumInstances);
-    for (String instanceName : newInstances) {
-      assertEquals((int) numSegmentsToBeMovedPerInstance.get(instanceName),
-          newNumSegmentsPerInstance - numSegmentsPerInstance);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), numInstances);
+    for (String instanceName : instances) {
+      if (newInstances.contains(instanceName)) {
+        assertEquals(numSegmentsToMovePerInstance.get(instanceName), IntIntPair.of(15, 0));
+      } else {
+        assertEquals(numSegmentsToMovePerInstance.get(instanceName), IntIntPair.of(0, 30));
+      }
     }
 
     // Add 6 instances (2 to each replica-group)
@@ -376,8 +381,8 @@ public class SegmentAssignmentUtilsTest {
       }
       newInstancePartitions.setInstances(0, replicaGroupId, newInstancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -392,11 +397,14 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, newNumSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Each new added instance should have 18 segments to be moved to it
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), 6);
-    for (int instanceId = numInstances; instanceId < newNumInstances; instanceId++) {
-      assertEquals((int) numSegmentsToBeMovedPerInstance.get(newInstances.get(instanceId)), newNumSegmentsPerInstance);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), newNumInstances);
+    for (int i = 0; i < numInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 12));
+    }
+    for (int i = numInstances; i < newNumInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(18, 0));
     }
 
     // Change all instances
@@ -405,7 +413,8 @@ public class SegmentAssignmentUtilsTest {
     //   0_1=[i_3, i_4, i_5],
     //   0_2=[i_6, i_7, i_8]
     // }
-    newInstances = SegmentAssignmentTestUtils.getNameList("i_", numInstances);
+    String newInstanceNamePrefix = "i_";
+    newInstances = SegmentAssignmentTestUtils.getNameList(newInstanceNamePrefix, numInstances);
     instanceIdToAdd = 0;
     for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
       List<String> instancesForReplicaGroup = new ArrayList<>(numInstancesPerReplicaGroup);
@@ -414,8 +423,8 @@ public class SegmentAssignmentUtilsTest {
       }
       newInstancePartitions.setInstances(0, replicaGroupId, instancesForReplicaGroup);
     }
-    newAssignment = SegmentAssignmentUtils
-        .rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions, partitionIdToSegmentsMap);
+    newAssignment = SegmentAssignmentUtils.rebalanceReplicaGroupBasedTable(currentAssignment, newInstancePartitions,
+        partitionIdToSegmentsMap);
     // There should be 90 segments assigned
     assertEquals(newAssignment.size(), numSegments);
     // Each segment should have 3 replicas
@@ -429,11 +438,12 @@ public class SegmentAssignmentUtilsTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Each instance should have 30 segments to be moved to it
-    numSegmentsToBeMovedPerInstance =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment);
-    assertEquals(numSegmentsToBeMovedPerInstance.size(), numInstances);
-    for (String instanceName : newInstances) {
-      assertEquals((int) numSegmentsToBeMovedPerInstance.get(instanceName), numSegmentsPerInstance);
+    numSegmentsToMovePerInstance =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment);
+    assertEquals(numSegmentsToMovePerInstance.size(), 2 * numInstances);
+    for (int i = 0; i < numInstances; i++) {
+      assertEquals(numSegmentsToMovePerInstance.get(newInstanceNamePrefix + i), IntIntPair.of(30, 0));
+      assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
     }
   }
 }

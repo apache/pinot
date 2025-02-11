@@ -38,14 +38,15 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
+import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.RANGE;
+import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.ROWS;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -323,7 +324,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls =
         List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.ROW_NUMBER.name(), List.of()));
     WindowAggregateOperator operator =
-        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.ROWS,
+        getOperator(inputSchema, resultSchema, keys, collations, aggCalls, ROWS,
             Integer.MIN_VALUE, 0);
 
     // When:
@@ -351,9 +352,10 @@ public class WindowAggregateOperatorTest {
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(0)));
+    // RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (default window frame for ORDER BY)
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, 0);
 
     // When:
     List<Object[]> resultRows = operator.nextBlock().getContainer();
@@ -418,59 +420,6 @@ public class WindowAggregateOperatorTest {
     verifyResultRows(resultRows, keys, Map.of("bar", List.<Object[]>of(new Object[]{2, "bar", 2.0}), "foo",
         List.of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only RANGE type frames "
-      + "are supported at present.*")
-  public void testShouldThrowOnInvalidRowsFunction() {
-    // Given:
-    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
-    List<Integer> keys = List.of(0);
-    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
-
-    // Then:
-    getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.ROWS,
-        Integer.MIN_VALUE, Integer.MAX_VALUE);
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
-      + "supported, lowerBound must be UNBOUNDED PRECEDING")
-  public void testShouldThrowOnCustomFramesCustomPreceding() {
-    // TODO: Remove this test once custom frame support is added
-    // Given:
-    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
-    List<Integer> keys = List.of(0);
-    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
-
-    // Then:
-    getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE, 5,
-        Integer.MAX_VALUE);
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Only default frame is "
-      + "supported, upperBound must be UNBOUNDED FOLLOWING or CURRENT ROW")
-  public void testShouldThrowOnCustomFramesCustomFollowing() {
-    // TODO: Remove this test once custom frame support is added
-    // Given:
-    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
-    List<Integer> keys = List.of(0);
-    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
-
-    // Then:
-    getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-        Integer.MIN_VALUE, 5);
   }
 
   @Test
@@ -567,16 +516,16 @@ public class WindowAggregateOperatorTest {
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
                 new Object[]{2, "the"}, new Object[]{3, "true"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "lead", "lag"},
-        new ColumnDataType[]{INT, STRING, INT, INT});
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
-    List<RexExpression.FunctionCall> aggCalls =
-        List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
-                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))),
-            new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
-                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))),
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
             Integer.MIN_VALUE, 0);
@@ -611,18 +560,18 @@ public class WindowAggregateOperatorTest {
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
                 new Object[]{2, "the"}, new Object[]{3, "true"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "lead", "lag"},
-        new ColumnDataType[]{INT, STRING, INT, INT});
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(1, RelFieldCollation.Direction.ASCENDING, RelFieldCollation.NullDirection.LAST));
-    List<RexExpression.FunctionCall> aggCalls =
-        List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
-                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 2),
-                    new RexExpression.Literal(ColumnDataType.INT, 100))),
-            new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
-                List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1),
-                    new RexExpression.Literal(ColumnDataType.INT, 200))));
+    List<RexExpression.FunctionCall> aggCalls = List.of(
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LEAD.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 2),
+                new RexExpression.Literal(ColumnDataType.INT, 100))),
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAG.name(),
+            List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1),
+                new RexExpression.Literal(ColumnDataType.INT, 200))));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
             Integer.MIN_VALUE, 0);
@@ -647,6 +596,2296 @@ public class WindowAggregateOperatorTest {
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
+  @Test(dataProvider = "windowFrameTypes")
+  public void testSumWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, frameType, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then (result should be the same for both window frame types):
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 59.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 59.0},
+            new Object[]{"A", 15, 2008, 59.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testSumWithUnboundedPrecedingLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, frameType, Integer.MIN_VALUE, 0,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14.0},
+            new Object[]{"A", 10, 2002, 24.0},
+            new Object[]{"A", 20, 2008, frameType == ROWS ? 44.0 : 59.0},
+            new Object[]{"A", 15, 2008, 59.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithUnboundedPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, Integer.MIN_VALUE, 2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 44.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 59.0},
+            new Object[]{"A", 15, 2008, 59.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithUnboundedPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, Integer.MIN_VALUE, -2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 14.0},
+            new Object[]{"A", 15, 2008, 24.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testSumWithCurrentRowLowerAndUnboundedFollowingUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, frameType, 0, Integer.MAX_VALUE,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 59.0},
+            new Object[]{"A", 10, 2002, 45.0},
+            new Object[]{"A", 20, 2008, 35.0},
+            new Object[]{"A", 15, 2008, frameType == ROWS ? 15.0 : 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 20.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testSumWithCurrentRowLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, frameType, 0, 0,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14.0},
+            new Object[]{"A", 10, 2002, 10.0},
+            new Object[]{"A", 20, 2008, frameType == ROWS ? 20.0 : 35.0},
+            new Object[]{"A", 15, 2008, frameType == ROWS ? 15.0 : 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10.0},
+            new Object[]{"B", 20, 2005, 20.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithCurrentRowLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, 0, 2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 44.0},
+            new Object[]{"A", 10, 2002, 45.0},
+            new Object[]{"A", 20, 2008, 35.0},
+            new Object[]{"A", 15, 2008, 15.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 20.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetPrecedingLowerAndUnboundedFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, -1, Integer.MAX_VALUE,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 59.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 45.0},
+            new Object[]{"A", 15, 2008, 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetFollowingLowerAndUnboundedFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, 1, Integer.MAX_VALUE,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 45.0},
+            new Object[]{"A", 10, 2002, 35.0},
+            new Object[]{"A", 20, 2008, 15.0},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20.0},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetPrecedingLowerAndCurrentRowUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, -2, 0,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14.0},
+            new Object[]{"A", 10, 2002, 24.0},
+            new Object[]{"A", 20, 2008, 44.0},
+            new Object[]{"A", 15, 2008, 45.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, -1, 2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 44.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 45.0},
+            new Object[]{"A", 15, 2008, 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithVeryLargeOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        // Verify if overflows are handled correctly
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, -1, 2147483646,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 59.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 45.0},
+            new Object[]{"A", 15, 2008, 35.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithVeryLargeOffsetFollowingLower() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        // Verify if overflows are handled correctly
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, 2147483646, 2147483647,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, null},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, -3, -2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 14.0},
+            new Object[]{"A", 15, 2008, 24.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 2, ROWS, 1, 2,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 30.0},
+            new Object[]{"A", 10, 2002, 35.0},
+            new Object[]{"A", 20, 2008, 15.0},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20.0},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testSumWithSamePartitionAndCollationKey() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, DOUBLE, List.of(0), 0, RANGE, Integer.MIN_VALUE, 0,
+        getSum(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 59.0},
+            new Object[]{"A", 10, 2002, 59.0},
+            new Object[]{"A", 20, 2008, 59.0},
+            new Object[]{"A", 15, 2008, 59.0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 30.0},
+            new Object[]{"B", 20, 2005, 30.0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testMinWithRowsWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -1, 1,
+        getMin(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 10, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 10, 2008, 10},
+            new Object[]{"A", 15, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testMinWithRangeWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, RANGE, 0, Integer.MAX_VALUE,
+        getMin(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 12, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 12},
+            new Object[]{"A", 12, 2008, 12},
+            new Object[]{"A", 15, 2008, 12}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testMaxWithRowsWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 0, 2,
+        getMax(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 20, 2000},
+            new Object[]{"A", 15, 2002},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"A", 10, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 20, 2000, 20},
+            new Object[]{"A", 15, 2002, 15},
+            new Object[]{"A", 15, 2008, 15},
+            new Object[]{"A", 10, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testMaxWithRangeWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, RANGE, 0, 0,
+        getMax(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", 15, 2008, 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2000, 20},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testBoolAndWithRowsWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, BOOLEAN, INT}, BOOLEAN, List.of(0), 2, ROWS, -2, -1,
+        getBoolAnd(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 0, 2000},
+            new Object[]{"A", 1, 2002},
+            new Object[]{"A", 1, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", null, 2010},
+            new Object[]{"B", 1, 2000},
+            new Object[]{"B", 0, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 0, 2000, null},
+            new Object[]{"A", 1, 2002, 0},
+            new Object[]{"A", 1, 2008, 0},
+            new Object[]{"A", null, 2008, 1},
+            new Object[]{"A", null, 2010, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 2000, null},
+            new Object[]{"B", 0, 2005, 1}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testBoolAndWithRangeWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, BOOLEAN, INT}, BOOLEAN, List.of(0), 2, RANGE, Integer.MIN_VALUE, 0,
+        getBoolAnd(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 0, 2000},
+            new Object[]{"A", 1, 2002},
+            new Object[]{"A", 1, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", null, 2010},
+            new Object[]{"B", 1, 2000},
+            new Object[]{"B", 0, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 0, 2000, 0},
+            new Object[]{"A", 1, 2002, 0},
+            new Object[]{"A", 1, 2008, 0},
+            new Object[]{"A", null, 2008, 0},
+            new Object[]{"A", null, 2010, 0}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 2000, 1},
+            new Object[]{"B", 0, 2005, 0}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testBoolOrWithRowsWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, BOOLEAN, INT}, BOOLEAN, List.of(0), 2, ROWS, 1, 2,
+        getBoolOr(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 0, 2000},
+            new Object[]{"A", 1, 2002},
+            new Object[]{"A", 1, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", null, 2010},
+            new Object[]{"B", 1, 2000},
+            new Object[]{"B", 0, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 0, 2000, 1},
+            new Object[]{"A", 1, 2002, 1},
+            new Object[]{"A", 1, 2008, null},
+            new Object[]{"A", null, 2008, null},
+            new Object[]{"A", null, 2010, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 2000, 0},
+            new Object[]{"B", 0, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testBoolOrWithRangeWindow() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, BOOLEAN, INT}, BOOLEAN, List.of(0), 2, RANGE, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getBoolOr(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 0, 2000},
+            new Object[]{"A", 1, 2002},
+            new Object[]{"A", 1, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", null, 2010},
+            new Object[]{"B", 1, 2000},
+            new Object[]{"B", 0, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 0, 2000, 1},
+            new Object[]{"A", 1, 2002, 1},
+            new Object[]{"A", 1, 2008, 1},
+            new Object[]{"A", null, 2008, 1},
+            new Object[]{"A", null, 2010, 1}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 2000, 1},
+            new Object[]{"B", 0, 2005, 1}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueWithUnboundedPrecedingLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, 0,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 14}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 14}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithUnboundedPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, -2,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 14}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithUnboundedPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, 2,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 14}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueWithCurrentRowLowerAndUnboundedFollowingUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, Integer.MAX_VALUE,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", null, 2008, null},
+            new Object[]{"A", 15, 2008, frameType == ROWS ? 15 : null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueWithCurrentRowLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, 0,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", 15, 2008, frameType == ROWS ? 15 : 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithCurrentRowLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 0, 2,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithOffsetPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -1, 2,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", 15, 2008, 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithOffsetPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -2, -1,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 2, 3,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 20},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, null},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueWithUnboundedPrecedingLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, 0,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, frameType == ROWS ? 20 : 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithUnboundedPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, -2,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 14},
+            new Object[]{"A", 15, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithUnboundedPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, 2,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 20},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueWithCurrentRowLowerAndUnboundedFollowingUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, Integer.MAX_VALUE,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueWithCurrentRowLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, 0,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, frameType == ROWS ? 20 : null},
+            new Object[]{"A", null, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithCurrentRowLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 0, 2,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 20},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithOffsetPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -1, 2,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 20},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, 20}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithOffsetPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -2, -1,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", 15, 2008, 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 1, 3,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueIgnoreNullsWithUnboundedPrecedingLowerAndCurrentRowUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, 0,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, frameType == ROWS ? null : 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueIgnoreNullsWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, 10},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 20, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithUnboundedPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, -1,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithUnboundedPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, 1,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueIgnoreNullsWithCurrentRowLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, Integer.MAX_VALUE,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, 10},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", null, 2008, frameType == ROWS ? null : 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testFirstValueIgnoreNullsWithCurrentRowLowerAndCurrentRowUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, 0,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, frameType == ROWS ? null : 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", null, 2008, frameType == ROWS ? null : 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithCurrentRowLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 0, 1,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 20},
+            new Object[]{"A", null, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithOffsetPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -1, 1,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 20}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithOffsetPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -2, -1,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, null},
+            new Object[]{"A", null, 2002, null},
+            new Object[]{"A", 10, 2002, null},
+            new Object[]{"A", 20, 2008, 10},
+            new Object[]{"A", null, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testFirstValueIgnoreNullsWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 1, 3,
+        getFirstValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", null, 2000},
+            new Object[]{"A", null, 2002},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", null, 2000, 10},
+            new Object[]{"A", null, 2002, 10},
+            new Object[]{"A", 10, 2002, 20},
+            new Object[]{"A", 20, 2008, null},
+            new Object[]{"A", null, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2005, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueIgnoreNullsWithUnboundedPrecedingLowerAndCurrentRowUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, 0,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", null, 2008, frameType == ROWS ? 10 : 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueIgnoreNullsWithUnboundedPrecedingLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, Integer.MIN_VALUE, Integer.MAX_VALUE,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 15, 2008, 15},
+            new Object[]{"A", null, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithUnboundedPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, -1,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", null, 2008, 10},
+            new Object[]{"A", 15, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithUnboundedPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, Integer.MIN_VALUE, 2,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", null, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueIgnoreNullsWithCurrentRowLowerAndUnboundedFollowingUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, Integer.MAX_VALUE,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", null, 2010},
+            new Object[]{"B", null, 2000},
+            new Object[]{"B", 10, 2005}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 15, 2008, 15},
+            new Object[]{"A", null, 2008, frameType == ROWS ? null : 15},
+            new Object[]{"A", null, 2010, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", null, 2000, 10},
+            new Object[]{"B", 10, 2005, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test(dataProvider = "windowFrameTypes")
+  public void testLastValueIgnoreNullsWithCurrentRowLowerAndCurrentRowUpper(
+      WindowNode.WindowFrameType frameType) {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, frameType, 0, 0,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2000},
+            new Object[]{"B", null, 2008}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 14},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", null, 2008, frameType == ROWS ? null : 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2000, frameType == ROWS ? null : 10},
+            new Object[]{"B", null, 2008, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithCurrentRowLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 0, 1,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2008}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", null, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2008, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithOffsetPrecedingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -1, 1,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2008}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 10},
+            new Object[]{"A", null, 2008, 15},
+            new Object[]{"A", 15, 2008, 15}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", null, 2008, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithOffsetPrecedingLowerAndOffsetPrecedingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, -2, -1,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2008}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, null},
+            new Object[]{"A", 10, 2002, 14},
+            new Object[]{"A", null, 2008, 10},
+            new Object[]{"A", 15, 2008, 10}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2008, 10}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueIgnoreNullsWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 1, 2,
+        getLastValue(new RexExpression.InputRef(1), true),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", null, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", null, 2008}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 10},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", null, 2008, 15},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", null, 2008, null}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testNtile() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value"},
+        new ColumnDataType[]{STRING, INT}, INT, List.of(0), 1, ROWS, 0, 0,
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.NTILE.name(),
+            List.of(new RexExpression.Literal(INT, 3)), false, false),
+        new Object[][]{
+            new Object[]{"A", 1},
+            new Object[]{"A", 2},
+            new Object[]{"A", 3},
+            new Object[]{"A", 4},
+            new Object[]{"A", 5},
+            new Object[]{"A", 6},
+            new Object[]{"A", 7},
+            new Object[]{"A", 8},
+            new Object[]{"A", 9},
+            new Object[]{"A", 10},
+            new Object[]{"A", 11},
+            new Object[]{"B", 1},
+            new Object[]{"B", 2},
+            new Object[]{"B", 3},
+            new Object[]{"B", 4},
+            new Object[]{"B", 5},
+            new Object[]{"B", 6},
+            new Object[]{"C", 1},
+            new Object[]{"C", 2}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 1, 1},
+            new Object[]{"A", 2, 1},
+            new Object[]{"A", 3, 1},
+            new Object[]{"A", 4, 1},
+            new Object[]{"A", 5, 2},
+            new Object[]{"A", 6, 2},
+            new Object[]{"A", 7, 2},
+            new Object[]{"A", 8, 2},
+            new Object[]{"A", 9, 3},
+            new Object[]{"A", 10, 3},
+            new Object[]{"A", 11, 3}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 1},
+            new Object[]{"B", 2, 1},
+            new Object[]{"B", 3, 2},
+            new Object[]{"B", 4, 2},
+            new Object[]{"B", 5, 3},
+            new Object[]{"B", 6, 3}
+        ),
+        "C", List.of(
+            new Object[]{"C", 1, 1},
+            new Object[]{"C", 2, 2}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  private WindowAggregateOperator prepareDataForWindowFunction(String[] inputSchemaCols,
+      ColumnDataType[] inputSchemaColTypes, ColumnDataType outputType, List<Integer> partitionKeys,
+      int collationFieldIndex, WindowNode.WindowFrameType frameType, int windowFrameLowerBound,
+      int windowFrameUpperBound, RexExpression.FunctionCall functionCall, Object[][] rows) {
+    DataSchema inputSchema = new DataSchema(inputSchemaCols, inputSchemaColTypes);
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, rows))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+
+    String[] outputSchemaCols = new String[inputSchemaCols.length + 1];
+    System.arraycopy(inputSchemaCols, 0, outputSchemaCols, 0, inputSchemaCols.length);
+    outputSchemaCols[inputSchemaCols.length] = functionCall.getFunctionName().toLowerCase();
+
+    ColumnDataType[] outputSchemaColTypes = new ColumnDataType[inputSchemaColTypes.length + 1];
+    System.arraycopy(inputSchemaColTypes, 0, outputSchemaColTypes, 0, inputSchemaColTypes.length);
+    outputSchemaColTypes[inputSchemaCols.length] = outputType;
+
+    DataSchema resultSchema = new DataSchema(outputSchemaCols, outputSchemaColTypes);
+    List<RexExpression.FunctionCall> aggCalls = List.of(functionCall);
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(collationFieldIndex));
+    return getOperator(inputSchema, resultSchema, partitionKeys, collations, aggCalls, frameType, windowFrameLowerBound,
+        windowFrameUpperBound);
+  }
+
+  @Test
+  public void testShouldThrowOnWindowFrameWithInvalidOffsetBounds() {
+    // Given:
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+
+    // Then:
+    IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, 5, 2));
+    assertEquals(e.getMessage(), "Window frame lower bound can't be greater than upper bound");
+
+    e = Assert.expectThrows(IllegalStateException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, -2, -3));
+    assertEquals(e.getMessage(), "Window frame lower bound can't be greater than upper bound");
+  }
+
+  @Test
+  public void testShouldThrowOnWindowFrameWithOffsetBoundsForRange() {
+    // TODO: Remove this test when support for RANGE window frames with offset PRECEDING / FOLLOWING is added
+    // Given:
+    DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
+    List<Integer> keys = List.of(0);
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+
+    // Then:
+    IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE, 5,
+            Integer.MAX_VALUE));
+    assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+
+    e = Assert.expectThrows(IllegalStateException.class,
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
+            Integer.MAX_VALUE, 5));
+    assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls,
       WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint) {
@@ -664,6 +2903,40 @@ public class WindowAggregateOperatorTest {
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
     return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.SUM.name(), List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getMin(RexExpression arg) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.MIN.name(), List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getMax(RexExpression arg) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.MAX.name(), List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getBoolAnd(RexExpression arg) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, "BOOLAND", List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getBoolOr(RexExpression arg) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, "BOOLOR", List.of(arg));
+  }
+
+  private static RexExpression.FunctionCall getFirstValue(RexExpression arg) {
+    return getFirstValue(arg, false);
+  }
+
+  private static RexExpression.FunctionCall getFirstValue(RexExpression arg, boolean ignoreNulls) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.FIRST_VALUE.name(), List.of(arg), false,
+        ignoreNulls);
+  }
+
+  private static RexExpression.FunctionCall getLastValue(RexExpression arg) {
+    return getLastValue(arg, false);
+  }
+
+  private static RexExpression.FunctionCall getLastValue(RexExpression arg, boolean ignoreNulls) {
+    return new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.LAST_VALUE.name(), List.of(arg), false,
+        ignoreNulls);
   }
 
   private static void verifyResultRows(List<Object[]> resultRows, List<Integer> keys,
@@ -697,5 +2970,13 @@ public class WindowAggregateOperatorTest {
     for (int i = 0; i < numRows; i++) {
       assertEquals(resultRows.get(i), expectedRows.get(i));
     }
+  }
+
+  @DataProvider(name = "windowFrameTypes")
+  public Object[][] getWindowFrameTypes() {
+    return new Object[][]{
+        {ROWS},
+        {WindowNode.WindowFrameType.RANGE}
+    };
   }
 }

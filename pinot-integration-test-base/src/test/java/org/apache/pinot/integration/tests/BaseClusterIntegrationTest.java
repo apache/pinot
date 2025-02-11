@@ -59,8 +59,6 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.stream.StreamDataProducer;
-import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -188,22 +186,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected List<String> getInvertedIndexColumns() {
-    return DEFAULT_INVERTED_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_INVERTED_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getNoDictionaryColumns() {
-    return DEFAULT_NO_DICTIONARY_COLUMNS;
+    return new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
   }
 
   @Nullable
   protected List<String> getRangeIndexColumns() {
-    return DEFAULT_RANGE_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_RANGE_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getBloomFilterColumns() {
-    return DEFAULT_BLOOM_FILTER_COLUMNS;
+    return new ArrayList<>(DEFAULT_BLOOM_FILTER_COLUMNS);
   }
 
   @Nullable
@@ -292,15 +290,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new OFFLINE table config.
    */
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
-        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
-        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
-        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
-        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
-        .setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
-        .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
+    // @formatter:off
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
+    // @formatter:on
   }
 
   /**
@@ -346,14 +357,26 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setStreamConfigs(getStreamConfigs())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .build();
   }
 
   /**
@@ -555,61 +578,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return TarCompressionUtils.untar(inputStream, outputDir);
   }
 
-  /**
-   * Pushes the data in the given Avro files into a Kafka stream.
-   *
-   * @param avroFiles List of Avro files
-   */
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
   }
 
-  /**
-   * Pushes the data in the given Avro files into a Kafka stream.
-   *
-   * @param csvFile List of CSV strings
-   */
   protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex)
       throws Exception {
-    String kafkaBroker = "localhost:" + getKafkaPort();
-    StreamDataProducer producer = null;
-    try {
-      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-          getDefaultKafkaProducerProperties(kafkaBroker));
-      ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
-          producer);
-    } catch (Exception e) {
-      if (producer != null) {
-        producer.close();
-      }
-      throw e;
-    }
+    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, "localhost:" + getKafkaPort(), kafkaTopic,
+        partitionColumnIndex, injectTombstones());
   }
 
-  protected void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic, @Nullable Integer partitionColumnIndex) {
-    String kafkaBroker = "localhost:" + getKafkaPort();
-    StreamDataProducer producer = null;
-    try {
-      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-          getDefaultKafkaProducerProperties(kafkaBroker));
-      ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
-          producer);
-    } catch (Exception e) {
-      if (producer != null) {
-        producer.close();
-      }
-    }
-  }
-
-  private Properties getDefaultKafkaProducerProperties(String kafkaBroker) {
-    Properties properties = new Properties();
-    properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
-    properties.put("request.required.acks", "1");
-    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
-    return properties;
+  protected void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic, @Nullable Integer partitionColumnIndex)
+      throws Exception {
+    ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, "localhost:" + getKafkaPort(), kafkaTopic,
+        partitionColumnIndex, injectTombstones());
   }
 
   protected boolean injectTombstones() {
@@ -648,14 +632,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
-    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+    startKafkaWithoutTopic();
+    createKafkaTopic(getKafkaTopic());
   }
 
-  protected void startKafka(int port) {
-    Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
-    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(), kafkaConfig);
-    _kafkaStarters.get(0)
-        .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+  protected void startKafkaWithoutTopic() {
+    startKafkaWithoutTopic(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+  }
+
+  protected void startKafkaWithoutTopic(int port) {
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
+        KafkaStarterUtils.getDefaultKafkaConfiguration());
+  }
+
+  protected void createKafkaTopic(String topic) {
+    _kafkaStarters.get(0).createTopic(topic, KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
 
   protected void stopKafka() {
@@ -693,7 +684,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
-    final long countStarResult = getCountStarResult();
+    long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
@@ -732,7 +723,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQuery(@Language("sql") String pinotQuery, String h2Query)
+  protected void testQuery(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
@@ -758,5 +749,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getLongCellValue(JsonNode jsonNode, int colIndex, int rowIndex) {
     return getCellValue(jsonNode, colIndex, rowIndex, JsonNode::asLong).longValue();
+  }
+
+  protected JsonNode getColumnIndexSize(String column)
+      throws Exception {
+    return JsonUtils.stringToJsonNode(
+            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
+        .get("columnIndexSizeMap").get(column);
   }
 }

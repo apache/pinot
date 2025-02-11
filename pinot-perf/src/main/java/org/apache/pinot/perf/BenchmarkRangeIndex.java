@@ -21,7 +21,6 @@ package org.apache.pinot.perf;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
@@ -88,7 +87,7 @@ public class BenchmarkRangeIndex {
       FileUtils.forceMkdir(_indexDir);
       switch (_dataType) {
         case INT: {
-          LongSupplier supplier = Distribution.createLongSupplier(_seed, _scenario);
+          LongSupplier supplier = Distribution.createSupplier(_seed, _scenario);
           int[] values = new int[_numDocs];
           for (int i = 0; i < values.length; i++) {
             values[i] = (int) supplier.getAsLong();
@@ -97,7 +96,7 @@ public class BenchmarkRangeIndex {
           break;
         }
         case LONG: {
-          LongSupplier supplier = Distribution.createLongSupplier(_seed, _scenario);
+          LongSupplier supplier = Distribution.createSupplier(_seed, _scenario);
           long[] values = new long[_numDocs];
           for (int i = 0; i < values.length; i++) {
             values[i] = supplier.getAsLong();
@@ -106,7 +105,7 @@ public class BenchmarkRangeIndex {
           break;
         }
         case FLOAT: {
-          DoubleSupplier supplier = Distribution.createDoubleSupplier(_seed, _scenario);
+          Distribution.DataSupplier supplier = Distribution.createSupplier(_seed, _scenario);
           float[] values = new float[_numDocs];
           for (int i = 0; i < values.length; i++) {
             values[i] = (float) supplier.getAsDouble();
@@ -115,7 +114,7 @@ public class BenchmarkRangeIndex {
           break;
         }
         case DOUBLE: {
-          DoubleSupplier supplier = Distribution.createDoubleSupplier(_seed, _scenario);
+          Distribution.DataSupplier supplier = Distribution.createSupplier(_seed, _scenario);
           double[] values = new double[_numDocs];
           for (int i = 0; i < values.length; i++) {
             values[i] = supplier.getAsDouble();

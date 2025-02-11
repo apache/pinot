@@ -23,6 +23,7 @@ import io.netty.channel.ChannelHandler;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.NettyConfig;
@@ -43,6 +44,7 @@ import org.apache.pinot.core.transport.ChannelHandlerFactory;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
+import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
@@ -74,6 +76,7 @@ public class ServerInstance {
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
   private final HelixManager _helixManager;
+  private final SegmentPreprocessThrottler _segmentPreprocessThrottler;
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
@@ -81,7 +84,8 @@ public class ServerInstance {
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory)
+  public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
       throws Exception {
     LOGGER.info("Initializing server instance");
     _helixManager = helixManager;
@@ -95,10 +99,13 @@ public class ServerInstance {
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
 
+    _segmentPreprocessThrottler = segmentPreprocessThrottler;
+
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
     _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
-    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics);
+    _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
+        _segmentPreprocessThrottler);
 
     // Initialize ServerQueryLogger and FunctionRegistry before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),
@@ -119,15 +126,15 @@ public class ServerInstance {
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
     NettyConfig nettyConfig =
         NettyConfig.extractNettyConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_NETTY_PREFIX);
-    accessControlFactory
-        .init(serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL),
-            helixManager);
+    accessControlFactory.init(
+        serverConf.getPinotConfig().subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_ACCESS_CONTROL), helixManager);
     _accessControl = accessControlFactory.create();
 
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
-      _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, helixManager,
-          _serverMetrics);
+      _workerQueryServer =
+          new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager, helixManager, _serverMetrics,
+              serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null);
     } else {
       _workerQueryServer = null;
     }
@@ -135,9 +142,9 @@ public class ServerInstance {
     if (serverConf.isNettyServerEnabled()) {
       int nettyPort = serverConf.getNettyPort();
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
-      _instanceRequestHandler = ChannelHandlerFactory
-          .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
-              _serverMetrics, new AllowAllAccessFactory().create());
+      _instanceRequestHandler =
+          ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
+              _queryScheduler, _serverMetrics, new AllowAllAccessFactory().create());
       _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, _instanceRequestHandler);
     } else {
       _nettyQueryServer = null;
@@ -146,9 +153,9 @@ public class ServerInstance {
     if (serverConf.isNettyTlsServerEnabled()) {
       int nettySecPort = serverConf.getNettyTlsPort();
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
-      _instanceRequestHandler = ChannelHandlerFactory
-          .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
-              _serverMetrics, _accessControl);
+      _instanceRequestHandler =
+          ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
+              _queryScheduler, _serverMetrics, _accessControl);
       _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, _instanceRequestHandler);
     } else {
       _nettyTlsQueryServer = null;
@@ -157,9 +164,8 @@ public class ServerInstance {
       int grpcPort = serverConf.getGrpcPort();
       LOGGER.info("Initializing gRPC query server on port: {}", grpcPort);
       _grpcQueryServer = new GrpcQueryServer(grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-          serverConf.isGrpcTlsServerEnabled() ? TlsUtils
-              .extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null,
-          _queryExecutor, _serverMetrics, _accessControl);
+          serverConf.isGrpcTlsServerEnabled() ? TlsUtils.extractTlsConfig(serverConf.getPinotConfig(),
+              CommonConstants.Server.SERVER_GRPCTLS_PREFIX) : null, _queryExecutor, _serverMetrics, _accessControl);
     } else {
       _grpcQueryServer = null;
     }
@@ -291,5 +297,9 @@ public class ServerInstance {
 
   public HelixManager getHelixManager() {
     return _helixManager;
+  }
+
+  public QueryScheduler getQueryScheduler() {
+    return _queryScheduler;
   }
 }

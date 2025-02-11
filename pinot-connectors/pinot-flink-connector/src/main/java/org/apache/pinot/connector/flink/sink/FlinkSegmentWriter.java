@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -41,7 +42,6 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -53,7 +53,7 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +69,8 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(FlinkSegmentWriter.class);
   private static final FileFormat BUFFER_FILE_FORMAT = FileFormat.AVRO;
 
+  public static final String DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX = "flink";
+
   private final int _indexOfSubtask;
 
   private TableConfig _tableConfig;
@@ -78,7 +80,6 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
-  private RecordEnricherPipeline _recordEnricherPipeline;
   private RecordTransformer _recordTransformer;
 
   private File _stagingDir;
@@ -86,6 +87,9 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private int _rowCount;
   /** A sequence ID that increments each time a segment is flushed */
   private int _seqId;
+
+  private final String _segmentNamePrefix;
+  private final long _segmentUploadTimeMs;
 
   private org.apache.avro.Schema _avroSchema;
   private DataFileWriter<GenericData.Record> _recordWriter;
@@ -96,7 +100,15 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private transient volatile long _lastRecordProcessingTimeMs = 0;
 
   public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup) {
+    this(indexOfSubtask, metricGroup, null, null);
+  }
+
+  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup, @Nullable String segmentNamePrefix,
+      @Nullable Long segmentUploadTimeMs) {
     _indexOfSubtask = indexOfSubtask;
+    _segmentNamePrefix = segmentNamePrefix;
+    _segmentUploadTimeMs =
+        segmentUploadTimeMs == null ? System.currentTimeMillis() : segmentUploadTimeMs;
     registerMetrics(metricGroup);
   }
 
@@ -124,11 +136,25 @@ public class FlinkSegmentWriter implements SegmentWriter {
         "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
 
     Map<String, String> batchConfigMap = _batchIngestionConfig.getBatchConfigMaps().get(0);
+    batchConfigMap.put(BatchConfigProperties.SEGMENT_PARTITION_ID, Integer.toString(_indexOfSubtask));
+    batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, Long.toString(_segmentUploadTimeMs));
+    batchConfigMap.computeIfAbsent(
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "." + BatchConfigProperties.SEGMENT_NAME_PREFIX,
+        key -> StringUtils.isNotBlank(_segmentNamePrefix) ? _segmentNamePrefix
+            : DEFAULT_UPLOADED_REALTIME_SEGMENT_PREFIX);
+
+    // generate segment name for simple segment name generator type(non upsert tables)
     String segmentNamePostfixProp = String.format("%s.%s", BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX,
         BatchConfigProperties.SEGMENT_NAME_POSTFIX);
     String segmentSuffix = batchConfigMap.get(segmentNamePostfixProp);
     segmentSuffix = segmentSuffix == null ? String.valueOf(_indexOfSubtask) : segmentSuffix + "_" + _indexOfSubtask;
     batchConfigMap.put(segmentNamePostfixProp, segmentSuffix);
+
+    // For upsert tables must use the UploadedRealtimeSegmentName for right assignment of segments
+    if (_tableConfig.isUpsertEnabled()) {
+      batchConfigMap.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
+          BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME);
+    }
 
     _batchConfig = new BatchConfig(_tableNameWithType, batchConfigMap);
 
@@ -139,7 +165,6 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(_tableConfig);
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
@@ -175,7 +200,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   public void collect(GenericRow row)
       throws IOException {
     long startTime = System.currentTimeMillis();
-    _recordEnricherPipeline.run(row);
+    // TODO: Revisit whether we should transform the row
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _rowCount++;
@@ -222,6 +247,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_DIR_URI, _bufferFile.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
+      batchConfigMapOverride.put(BatchConfigProperties.SEQUENCE_ID, Integer.toString(_seqId));
       BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
           _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency(),
           _batchIngestionConfig.getConsistentDataPush());
@@ -229,7 +255,6 @@ public class FlinkSegmentWriter implements SegmentWriter {
       // Build segment
       SegmentGeneratorConfig segmentGeneratorConfig =
           IngestionUtils.generateSegmentGeneratorConfig(_tableConfig, _schema, batchIngestionConfig);
-      segmentGeneratorConfig.setSequenceId(_seqId);
       String segmentName = IngestionUtils.buildSegment(segmentGeneratorConfig);
       LOGGER.info("Successfully built segment: {} of sequence {} for Pinot table: {}", segmentName, _seqId,
           _tableNameWithType);

@@ -85,7 +85,7 @@ public class QueryContext {
   private final int _offset;
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-  private final boolean _explain;
+  private final ExplainMode _explain;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -112,6 +112,8 @@ public class QueryContext {
   // The following properties apply to group-by queries
   // Maximum initial capacity of the group-by result holder
   private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  // Initial capacity of the indexed table
+  private int _minInitialIndexedTableCapacity = InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
@@ -120,6 +122,11 @@ public class QueryContext {
   private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
+  // Number of threads to use for final reduce
+  private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
+  // Parallel chunk size for final reduce
+  private int _chunkSizeExtractFinalResult =
+      InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -134,7 +141,7 @@ public class QueryContext {
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
@@ -197,7 +204,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns a list of expressions in the GROUP-BY clause, or {@code null} if there is no GROUP-BY clause.
+   * Returns a list of expressions in the GROUP-BY clause (aggregation keys), or {@code null} if there is no GROUP-BY
+   * clause.
    */
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
@@ -250,8 +258,18 @@ public class QueryContext {
 
   /**
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
+   * <p>
+   * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
+   *
    */
   public boolean isExplain() {
+    return _explain != ExplainMode.NONE;
+  }
+
+  /**
+   * Returns the explain mode of the query.
+   */
+  public ExplainMode getExplain() {
     return _explain;
   }
 
@@ -350,6 +368,14 @@ public class QueryContext {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
   }
 
+  public int getMinInitialIndexedTableCapacity() {
+    return _minInitialIndexedTableCapacity;
+  }
+
+  public void setMinInitialIndexedTableCapacity(int minInitialIndexedTableCapacity) {
+    _minInitialIndexedTableCapacity = minInitialIndexedTableCapacity;
+  }
+
   public int getNumGroupsLimit() {
     return _numGroupsLimit;
   }
@@ -380,6 +406,22 @@ public class QueryContext {
 
   public void setGroupTrimThreshold(int groupTrimThreshold) {
     _groupTrimThreshold = groupTrimThreshold;
+  }
+
+  public int getNumThreadsExtractFinalResult() {
+    return _numThreadsExtractFinalResult;
+  }
+
+  public void setNumThreadsExtractFinalResult(int numThreadsExtractFinalResult) {
+    _numThreadsExtractFinalResult = numThreadsExtractFinalResult;
+  }
+
+  public int getChunkSizeExtractFinalResult() {
+    return _chunkSizeExtractFinalResult;
+  }
+
+  public void setChunkSizeExtractFinalResult(int chunkSizeExtractFinalResult) {
+    _chunkSizeExtractFinalResult = chunkSizeExtractFinalResult;
   }
 
   public boolean isNullHandlingEnabled() {
@@ -461,7 +503,7 @@ public class QueryContext {
     private int _offset;
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-    private boolean _explain;
+    private ExplainMode _explain = ExplainMode.NONE;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -528,7 +570,16 @@ public class QueryContext {
       return this;
     }
 
+    /**
+     * @deprecated Use {@link #setExplain(ExplainMode)} instead.
+     */
+    @Deprecated
     public Builder setExplain(boolean explain) {
+      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
+      return this;
+    }
+
+    public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
     }
@@ -540,8 +591,8 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList, _filter,
-              _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
+          new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
+              _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
               _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));

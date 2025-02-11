@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
@@ -95,6 +96,11 @@ public class DistinctCountULLValueAggregator implements ValueAggregator<Object, 
   @Override
   public UltraLogLog deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytes).downsize(_p); // downsize when we load
+  }
+
+  @VisibleForTesting
+  public int getP() {
+    return _p;
   }
 
   private void addObjectToSketch(Object rawValue, UltraLogLog sketch) {

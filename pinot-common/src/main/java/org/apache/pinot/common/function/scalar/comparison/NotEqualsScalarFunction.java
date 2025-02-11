@@ -20,7 +20,7 @@ package org.apache.pinot.common.function.scalar.comparison;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -33,7 +33,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class NotEqualsScalarFunction extends PolymorphicComparisonScalarFunction {
 
-  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
   private static final FunctionInfo DOUBLE_NOT_EQUALS_WITH_TOLERANCE;
 
   static {

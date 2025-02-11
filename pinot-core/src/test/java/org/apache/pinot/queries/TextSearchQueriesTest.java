@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,13 +27,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -62,14 +58,10 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -109,15 +101,38 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final String SKILLS_TEXT_MV_COL_NAME = "SKILLS_TEXT_MV_COL";
   private static final String SKILLS_TEXT_MV_COL_DICT_NAME = "SKILLS_TEXT_MV_COL_DICT";
   private static final String INT_COL_NAME = "INT_COL";
+
   private static final List<String> RAW_TEXT_INDEX_COLUMNS =
       Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME,
           SKILLS_TEXT_NO_RAW_NAME, SKILLS_TEXT_MV_COL_NAME);
+
   private static final List<String> DICT_TEXT_INDEX_COLUMNS =
       Arrays.asList(SKILLS_TEXT_COL_DICT_NAME, SKILLS_TEXT_MV_COL_DICT_NAME);
+
   private static final int INT_BASE_VALUE = 1000;
+
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(SKILLS_TEXT_COL_DICT_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(SKILLS_TEXT_COL_MULTI_TERM_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(SKILLS_TEXT_NO_RAW_NAME, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(SKILLS_TEXT_MV_COL_NAME, FieldSpec.DataType.STRING)
+      .addMultiValueDimension(SKILLS_TEXT_MV_COL_DICT_NAME, FieldSpec.DataType.STRING)
+      .addMetric(INT_COL_NAME, FieldSpec.DataType.INT)
+      .build();
+
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
+      .setTableName(TABLE_NAME)
+      .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS)
+      .setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
+      .setFieldConfigList(createFieldConfigs())
+      .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+  private TableConfig _tableConfig;
 
   @Override
   protected String getFilter() {
@@ -138,31 +153,36 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
-
     buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> textIndexColumns = new HashSet<>();
-    textIndexColumns.addAll(RAW_TEXT_INDEX_COLUMNS);
-    textIndexColumns.addAll(DICT_TEXT_INDEX_COLUMNS);
-    indexLoadingConfig.setTextIndexColumns(textIndexColumns);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(DICT_TEXT_INDEX_COLUMNS));
-    Map<String, Map<String, String>> columnProperties = new HashMap<>();
-    Map<String, String> props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
-    columnProperties.put(SKILLS_TEXT_COL_MULTI_TERM_NAME, props);
-    props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator");
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those");
-    props.put(FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, "true");
-    columnProperties.put(SKILLS_TEXT_COL_NAME, props);
-    props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "");
-    columnProperties.put(SKILLS_TEXT_COL_DICT_NAME, props);
-    indexLoadingConfig.setColumnProperties(columnProperties);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+  }
+
+  private static List<FieldConfig> createFieldConfigs() {
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
+    fieldConfigs.add(new FieldConfig(QUERY_LOG_TEXT_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, null));
+    fieldConfigs.add(
+        new FieldConfig(SKILLS_TEXT_COL_NAME, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
+            null, Map.of(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator",
+            FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those",
+            FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, "true")));
+    fieldConfigs.add(new FieldConfig(SKILLS_TEXT_COL_DICT_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, Map.of(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "")));
+    fieldConfigs.add(new FieldConfig(SKILLS_TEXT_COL_MULTI_TERM_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null,
+        Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true")));
+    fieldConfigs.add(new FieldConfig(SKILLS_TEXT_NO_RAW_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null,
+        Map.of(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true", FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")));
+    fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, null));
+    fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_DICT_NAME, FieldConfig.EncodingType.DICTIONARY,
+        List.of(FieldConfig.IndexType.TEXT), null, null));
+    return fieldConfigs;
   }
 
   @AfterClass
@@ -174,61 +194,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private void buildSegment()
       throws Exception {
     List<GenericRow> rows = createTestData();
-
-    List<FieldConfig> fieldConfigs = new ArrayList<>(RAW_TEXT_INDEX_COLUMNS.size() + DICT_TEXT_INDEX_COLUMNS.size());
-    for (String textIndexColumn : RAW_TEXT_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(textIndexColumn, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null));
-    }
-    for (String textIndexColumn : DICT_TEXT_INDEX_COLUMNS) {
-      fieldConfigs.add(
-          new FieldConfig(textIndexColumn, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-              null));
-    }
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS).setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
-        .setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(QUERY_LOG_TEXT_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_TEXT_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_TEXT_COL_DICT_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_TEXT_COL_MULTI_TERM_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(SKILLS_TEXT_NO_RAW_NAME, FieldSpec.DataType.STRING)
-        .addMultiValueDimension(SKILLS_TEXT_MV_COL_NAME, FieldSpec.DataType.STRING)
-        .addMultiValueDimension(SKILLS_TEXT_MV_COL_DICT_NAME, FieldSpec.DataType.STRING)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
-    config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    addTextIndexProp(config, SKILLS_TEXT_NO_RAW_NAME, ImmutableMap.<String, String>builder()
-        .put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true")
-        .put(FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")
-        .build());
-    addTextIndexProp(config, SKILLS_TEXT_COL_NAME, ImmutableMap.<String, String>builder()
-        .put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator")
-        .put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those")
-        .put(FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, "true")
-        .build());
-    addTextIndexProp(config, SKILLS_TEXT_COL_DICT_NAME,
-        Collections.singletonMap(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, ""));
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
-  }
-
-
-  private void addTextIndexProp(SegmentGeneratorConfig config, String colName, Map<String, String> propMap) {
-    FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(colName);
-    TextIndexConfig textConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
-
-    TextIndexConfig newTextConfig = new TextIndexConfigBuilder(textConfig)
-        .withProperties(propMap)
-        .build();
-
-    config.setIndexOn(StandardIndexes.text(), newTextConfig, colName);
   }
 
   private List<GenericRow> createTestData()

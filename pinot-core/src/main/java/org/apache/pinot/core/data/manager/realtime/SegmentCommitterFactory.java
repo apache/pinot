@@ -21,8 +21,10 @@ package org.apache.pinot.core.data.manager.realtime;
 import java.net.URISyntaxException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -46,7 +48,7 @@ public class SegmentCommitterFactory {
     _protocolHandler = protocolHandler;
     _tableConfig = tableConfig;
     _streamConfig = new StreamConfig(_tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+        IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0));
     _indexLoadingConfig = indexLoadingConfig;
     _serverMetrics = serverMetrics;
   }
@@ -54,7 +56,14 @@ public class SegmentCommitterFactory {
   public SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
       String controllerVipUrl)
       throws URISyntaxException {
-    boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
+    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+
+    boolean uploadToFs = instanceDataManagerConfig.isUploadSegmentToDeepStore();
+    Boolean streamConfigServerUploadToDeepStore = _streamConfig.isServerUploadToDeepStore();
+    if (streamConfigServerUploadToDeepStore != null) {
+      uploadToFs = streamConfigServerUploadToDeepStore;
+    }
+
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
@@ -71,6 +80,10 @@ public class SegmentCommitterFactory {
           _protocolHandler.getAuthProvider(), _tableConfig.getTableName());
     }
 
+    if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+      return new PauselessSegmentCommitter(_logger, _protocolHandler, params, segmentUploader,
+          peerSegmentDownloadScheme);
+    }
     return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);
   }
 }

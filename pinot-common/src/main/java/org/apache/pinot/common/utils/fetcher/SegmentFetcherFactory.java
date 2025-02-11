@@ -106,6 +106,9 @@ public class SegmentFetcherFactory {
       return segmentFetcher;
     } else {
       LOGGER.info("Segment fetcher is not configured for protocol: {}, using default", protocol);
+      if (protocol == null) {
+        return PINOT_FS_SEGMENT_FETCHER;
+      }
       switch (protocol) {
         case CommonConstants.HTTP_PROTOCOL:
         case CommonConstants.HTTPS_PROTOCOL:

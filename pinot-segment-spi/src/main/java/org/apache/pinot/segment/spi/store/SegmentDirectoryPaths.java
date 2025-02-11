@@ -79,8 +79,13 @@ public class SegmentDirectoryPaths {
    */
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION;
     File indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    // check for V99 version, if null
+    if (indexFormatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION;
+      indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
     // check for V9 version, if null
     if (indexFormatFile == null) {
       luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
@@ -107,14 +112,19 @@ public class SegmentDirectoryPaths {
   }
 
   public static File findFSTIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
     File formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    // check for V99 version, if null
+    if (formatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
     // check for V9 version, if null
     if (formatFile == null) {
       luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(indexDir, luceneIndexDirectory);
     }
-   // check for old version, if null
+    // check for old version, if null
     if (formatFile == null) {
       luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(indexDir, luceneIndexDirectory);
@@ -132,9 +142,16 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
-    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
     File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
 
+    // check for V99 version, if null
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+
+    // check for V90 version, if null
     if (formatFile == null) {
       vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
       formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);

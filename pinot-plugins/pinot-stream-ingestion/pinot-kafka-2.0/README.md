@@ -20,9 +20,9 @@
 -->
 # Pinot connector for kafka 2.x
 
-This is an implementation of the kafka stream for kafka versions 2.x The version used in this implementation is kafka 2.0.0.
+This is an implementation of the kafka stream for kafka versions 2.x.
 
-A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on (Pluggable Streams)[https://docs.pinot.apache.org/developers-and-contributors/extending-pinot/pluggable-streams] for the specfic interfaces to implement.
+A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on [Stream Ingestion Plugin](https://docs.pinot.apache.org/developers/plugin-architecture/write-custom-plugins/write-your-stream) for the specific interfaces to implement.
 
 * How to build and release Pinot package with Kafka 2.x connector
 ```$xslt
@@ -43,15 +43,3 @@ Below is a sample `streamConfigs` used to create a realtime table with Kafka Str
   "stream.kafka.hlc.bootstrap.server": "localhost:19092"
 }
 ```
-
-* Upgrade from Kafka 0.9 connector to Kafka 2.x connector:
-
-  1. Update  table config:
- `stream.kafka.consumer.factory.class.name` from `org.apache.pinot.plugin.stream.kafka09.KafkaConsumerFactory` to `org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory`.
-
-  1. If using Stream(High) level consumer, please also add config `stream.kafka.hlc.bootstrap.server` into `tableIndexConfig.streamConfigs`.
-This config should be the URI of Kafka broker lists, e.g. `localhost:9092`.
-
-* How to upgrade to Kafka version > `2.0.0`
-This connector is also suitable for Kafka lib version higher than `2.0.0`.
-In `pinot-connector-kafka-2.0/pom.xml` change the `kafka.lib.version` from `2.0.0` to `2.1.1` will make this Connector working with Kafka `2.1.1`.

@@ -28,7 +28,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /**
  * StreamDataProducer is the interface for stream data sources. E.g. KafkaDataProducer.
  */
-public interface StreamDataProducer {
+public interface StreamDataProducer extends AutoCloseable {
   void init(Properties props);
 
   void produce(String topic, byte[] payload);

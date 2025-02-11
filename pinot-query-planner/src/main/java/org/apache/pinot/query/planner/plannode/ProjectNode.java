@@ -48,6 +48,11 @@ public class ProjectNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new ProjectNode(_stageId, _dataSchema, _nodeHint, inputs, _projects);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

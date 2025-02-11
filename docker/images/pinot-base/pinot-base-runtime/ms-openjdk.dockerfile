@@ -20,12 +20,19 @@
 ARG JAVA_VERSION=11
 ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
 
-FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu
+FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu AS builder
+
+FROM ubuntu:24.10
+ARG JAVA_VERSION
+ENV LANG=en_US.UTF-8
+ENV JAVA_HOME="/usr/lib/jvm/msopenjdk-${JAVA_VERSION}"
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+COPY --from=builder $JAVA_HOME $JAVA_HOME
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends vim less wget curl git python sysstat procps linux-tools-generic libtasn1-6 zstd && \
+  apt-get install -y --no-install-recommends vim less wget curl git python-is-python3 sysstat procps linux-tools-generic libtasn1-6 zstd ca-certificates && \
   rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \

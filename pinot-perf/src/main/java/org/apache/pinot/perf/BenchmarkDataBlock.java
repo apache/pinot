@@ -30,9 +30,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockSerde;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.ZeroCopyDataBlockSerde;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Fork;
@@ -74,22 +77,26 @@ public class BenchmarkDataBlock {
         .addProfiler(GCProfiler.class));
   }
 
-  @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
+//  @Param(value = {"INT", "LONG", "STRING", "BYTES", "BIG_DECIMAL", "LONG_ARRAY", "STRING_ARRAY"})
+  @Param(value = {"INT", "LONG", "STRING", "BYTES", "LONG_ARRAY"})
   DataSchema.ColumnDataType _dataType;
   @Param(value = {"COLUMNAR", "ROW"})
   DataBlock.Type _blockType = DataBlock.Type.COLUMNAR;
   //    @Param(value = {"0", "10", "90"})
   int _nullPerCent = 10;
 
-  @Param(value = {"10000", "1000000"})
-  int _rows;
+  @Param(value = {"direct_small", "heap_small", "direct_large"})
+  String _version = "heap_small";
+
+//  @Param(value = {"10000", "1000000"})
+  int _rows = 10000;
 
   BenchmarkState _state;
 
   @Setup(Level.Trial)
   public void setup()
       throws IOException {
-    _state = new BenchmarkState(_rows, _dataType, _nullPerCent, _blockType);
+    _state = new BenchmarkState(_rows, _dataType, _version, _nullPerCent, _blockType);
   }
 
   public static void start(Class<? extends BenchmarkDataBlock> benchmarkClass,
@@ -119,22 +126,21 @@ public class BenchmarkDataBlock {
   @Benchmark
   public Object serialize()
       throws IOException {
-    return _state._dataBlock.toBytes();
+    return DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, _state._dataBlock);
   }
 
   @Benchmark
   public DataBlock deserialize()
       throws IOException {
-    _state._bytes.clear();
-    return DataBlockUtils.getDataBlock(_state._bytes);
+    return DataBlockUtils.deserialize(_state._bytes);
   }
 
   @Benchmark
   public DataBlock all()
       throws IOException {
     DataBlock dataBlock = _state.createDataBlock();
-    ByteBuffer buffers = ByteBuffer.wrap(dataBlock.toBytes());
-    return DataBlockUtils.getDataBlock(buffers);
+    List<ByteBuffer> buffers = DataBlockUtils.serialize(dataBlock);
+    return DataBlockUtils.deserialize(buffers);
   }
 
   public static class BenchmarkState {
@@ -146,11 +152,11 @@ public class BenchmarkDataBlock {
     private final DataSchema _schema;
     private final List<Object[]> _data;
     private final DataBlock _dataBlock;
-    private final ByteBuffer _bytes;
+    private final List<ByteBuffer> _bytes;
 
     private final CheckedFunction<List<Object[]>, DataBlock> _generateBlock;
 
-    public BenchmarkState(int rows, DataSchema.ColumnDataType columnDataType, int nullPerCent,
+    public BenchmarkState(int rows, DataSchema.ColumnDataType columnDataType, String version, int nullPerCent,
         DataBlock.Type blockType)
         throws IOException {
       _nullPerCent = nullPerCent;
@@ -165,13 +171,33 @@ public class BenchmarkDataBlock {
       } else {
         _dataBlock = DataBlockBuilder.buildFromRows(_data, _schema);
       }
-      _bytes = ByteBuffer.wrap(_dataBlock.toBytes());
+      _bytes = DataBlockUtils.serialize(_dataBlock);
+
+      PagedPinotOutputStream.PageAllocator alloc;
+
+      switch (version) {
+        case "direct_small":
+          alloc = PagedPinotOutputStream.DirectPageAllocator.createSmall(false);
+          break;
+        case "direct_large":
+          alloc = PagedPinotOutputStream.DirectPageAllocator.createLarge(false);
+          break;
+        case "heap_small":
+          alloc = PagedPinotOutputStream.HeapPageAllocator.createSmall();
+          break;
+        case "heap_large":
+          alloc = PagedPinotOutputStream.HeapPageAllocator.createLarge();
+          break;
+        default:
+          throw new IllegalArgumentException("Cannot get allocator from version: " + version);
+      }
 
       if (blockType == DataBlock.Type.COLUMNAR) {
-        _generateBlock = (data) -> DataBlockBuilder.buildFromColumns(data, _schema);
+        _generateBlock = (data) -> DataBlockBuilder.buildFromColumns(data, _schema, alloc);
       } else {
-        _generateBlock = (data) -> DataBlockBuilder.buildFromRows(data, _schema);
+        _generateBlock = (data) -> DataBlockBuilder.buildFromRows(data, _schema, alloc);
       }
+      DataBlockUtils.setSerde(DataBlockSerde.Version.V1_V2, new ZeroCopyDataBlockSerde(alloc));
     }
 
     private List<Object[]> createData(int numRows) {
@@ -201,9 +227,9 @@ public class BenchmarkDataBlock {
       int distinctStrings = 100;
       switch (_columnDataType) {
         case INT:
-          return r.nextInt();
+          return (Object) r.nextInt();
         case LONG:
-          return r.nextLong();
+          return (Object) r.nextLong();
         case STRING:
           return "string" + r.nextInt(distinctStrings);
         case BYTES:
@@ -213,7 +239,7 @@ public class BenchmarkDataBlock {
         case BIG_DECIMAL:
           return new BigDecimal(r.nextDouble());
         case BOOLEAN:
-          return r.nextBoolean() ? 1 : 0;
+          return (Object) (r.nextBoolean() ? 1 : 0);
         case LONG_ARRAY:
           long[] longArray = new long[10];
           for (int i = 0; i < longArray.length; i++) {

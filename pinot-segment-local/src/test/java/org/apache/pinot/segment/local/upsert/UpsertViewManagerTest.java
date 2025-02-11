@@ -30,7 +30,10 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 public class UpsertViewManagerTest {
@@ -46,12 +49,12 @@ public class UpsertViewManagerTest {
 
     SegmentContext segCtx1 = new SegmentContext(seg1);
     mgr.trackSegment(seg1);
-    assertEquals(mgr.getOptionalSegments(), Collections.singleton(seg1.getSegmentName()));
+    assertEquals(mgr.getTrackedSegments(), Collections.singleton(seg1));
     mgr.setSegmentContexts(Collections.singletonList(segCtx1), new HashMap<>());
     assertSame(segCtx1.getQueryableDocIdsSnapshot(), mutableRoaringBitmap);
 
     mgr.untrackSegment(seg1);
-    assertTrue(mgr.getOptionalSegments().isEmpty());
+    assertTrue(mgr.getTrackedSegments().isEmpty());
     segCtx1 = new SegmentContext(seg1);
     mgr.setSegmentContexts(Collections.singletonList(segCtx1), new HashMap<>());
     assertNull(segCtx1.getQueryableDocIdsSnapshot());
