@@ -97,6 +97,13 @@ public class PinotOperatorTable implements SqlOperatorTable {
           InferTypes.FIRST_KNOWN,
           OperandTypes.MINUS_OPERATOR.or(OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP)));
 
+  // These 2 operators are not directly registered in the operator table, but are used in the custom optimization rules
+  // (see PinotSemiJoinToInClauseRule and PinotLeftJoinToNotInClauseRule) to work around the Calcite limitation of not
+  // supporting IN and NOT IN as the function call.
+  public static final PinotSqlFunction PINOT_IN = new PinotSqlFunction("IN", ReturnTypes.BOOLEAN_NULLABLE, null);
+  public static final PinotSqlFunction PINOT_NOT_IN =
+      new PinotSqlFunction("NOT_IN", ReturnTypes.BOOLEAN_NULLABLE, null);
+
   /**
    * This list includes the supported standard {@link SqlOperator}s defined in {@link SqlStdOperatorTable}.
    * NOTE: The operator order follows the same order as defined in {@link SqlStdOperatorTable} for easier search.

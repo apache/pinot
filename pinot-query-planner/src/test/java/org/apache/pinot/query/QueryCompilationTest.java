@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -342,8 +343,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(1), "b");
 
     // query with UNION clause and table alias using WITH clause
-    query = "WITH tmp1 AS (SELECT * FROM a), \n" + "tmp2 AS (SELECT * FROM b) \n"
-        + "SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
+    query = "WITH tmp1 AS (SELECT * FROM a), tmp2 AS (SELECT * FROM b) SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
     tableNames = _queryEnvironment.getTableNamesForQuery(query);
     assertEquals(tableNames.size(), 2);
     Collections.sort(tableNames);
@@ -483,6 +483,38 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQueryWithNoArg));
     assertTrue(e.getCause().getMessage().contains("expecting 1 argument"));
+  }
+
+  // This is a performance test
+  @Test
+  public void testLargeIn() {
+    String query = "SELECT * FROM a WHERE col1 IN " + getValuesClause(1000);
+    long startTimeNs = System.nanoTime();
+    _queryEnvironment.planQuery(query);
+    long planTimeNs = System.nanoTime() - startTimeNs;
+    assertTrue(planTimeNs < TimeUnit.SECONDS.toNanos(5));
+  }
+
+  // This is a performance test
+  @Test
+  public void testLargeNotIn() {
+    String query = "SELECT * FROM a WHERE col1 NOT IN " + getValuesClause(1000);
+    long startTimeNs = System.nanoTime();
+    _queryEnvironment.planQuery(query);
+    long planTimeNs = System.nanoTime() - startTimeNs;
+    assertTrue(planTimeNs < TimeUnit.SECONDS.toNanos(5));
+  }
+
+  private String getValuesClause(int numValues) {
+    StringBuilder builder = new StringBuilder("(");
+    for (int i = 0; i < numValues; i++) {
+      builder.append("'a").append(i).append("'");
+      if (i < numValues - 1) {
+        builder.append(", ");
+      }
+    }
+    builder.append(")");
+    return builder.toString();
   }
 
   // --------------------------------------------------------------------------
