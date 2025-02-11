@@ -122,6 +122,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -1317,7 +1318,7 @@ public class PinotTableRestletResource {
       instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
 
       // Calculate instance partitions for tiers if configured
-      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
+      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig, null);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
           tableRebalancer.getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
               dryRun);
