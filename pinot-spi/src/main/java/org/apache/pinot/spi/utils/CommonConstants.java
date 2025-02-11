@@ -349,6 +349,11 @@ public class CommonConstants {
         "pinot.broker.min.init.indexed.table.capacity";
     public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
 
+    // this config allows enabling is_enable_group_trim hint for all queries and thus enabling V1-style trimming in
+    // leaf nodes and v2-style trimming in intermediate nodes
+    public static final String CONFIG_OF_ENABLE_GROUP_TRIM = "pinot.broker.enable.group.trim";
+    public static final boolean DEFAULT_BROKER_ENABLE_GROUP_TRIM = false;
+
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
     public static final String BROKER_REQUEST_HANDLER_TYPE = "pinot.broker.request.handler.type";
