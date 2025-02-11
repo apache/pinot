@@ -36,6 +36,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
@@ -448,6 +449,10 @@ public class PinotLLCRealtimeSegmentManager {
     Stat stat = new Stat();
     ZNRecord znRecord = _propertyStore.get(committingSegmentsListPath, stat, AccessOption.PERSISTENT);
     int expectedVersion = stat.getVersion();
+    LOGGER.info("Committing segments list size: {} before adding the segment: {}", Optional.ofNullable(znRecord)
+        .map(record -> record.getListField(COMMITTING_SEGMENTS))
+        .map(List::size)
+        .orElse(0), segmentName);
 
     // empty ZN record for the table
     if (znRecord == null) {
@@ -480,6 +485,12 @@ public class PinotLLCRealtimeSegmentManager {
         ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
     Stat stat = new Stat();
     ZNRecord znRecord = _propertyStore.get(committingSegmentsListPath, stat, AccessOption.PERSISTENT);
+
+    LOGGER.info("Committing segments list size: {} before removing the segment: {}", Optional.ofNullable(znRecord)
+        .map(record -> record.getListField(COMMITTING_SEGMENTS))
+        .map(List::size)
+        .orElse(0), segmentName);
+
     if (znRecord == null || znRecord.getListField(COMMITTING_SEGMENTS) == null || !znRecord.getListField(
         COMMITTING_SEGMENTS).contains(segmentName)) {
       return true;
