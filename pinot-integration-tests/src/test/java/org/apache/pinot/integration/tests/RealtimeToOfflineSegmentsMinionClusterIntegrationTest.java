@@ -288,13 +288,13 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     for (int i = 0; i < 3; i++) {
       // Schedule task
       assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-              .setTablesToSchedule(Collections.singleton(_realtimeTableName)))
+              .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName)))
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
       MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
-              .setTablesToSchedule(Collections.singleton(_realtimeTableName))
+              .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName))
               .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
           _taskManager);
 
