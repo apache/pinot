@@ -126,6 +126,7 @@ import org.apache.pinot.spi.utils.retry.AttemptFailureException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
+import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2313,50 +2314,23 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Cleans up the committing segments list for a given real-time table by removing segments that:
-   * - Have already been committed (status is DONE).
-   * - No longer exist in Zookeeper metadata (possibly deleted).
+   * Synchronizes the list of committing segments for a realtime table in ZooKeeper by both adding new segments
+   * and removing segments that are no longer in COMMITTING state. This function is designed to be called periodically
+   * to maintain an up-to-date list of actively committing segments.
    *
-   * @param realtimeTableName The name of the real-time table.
-   */
-  public boolean cleanUpCommittedSegments(String realtimeTableName) {
-    return updateCommittingSegmentsList(realtimeTableName, () -> {
-      String committingSegmentsListPath =
-          ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
-
-      // Fetch the committing segments record from the property store.
-      Stat stat = new Stat();
-      ZNRecord znRecord = _propertyStore.get(committingSegmentsListPath, stat, AccessOption.PERSISTENT);
-
-      // If there is no record or the committing segments list is empty, return early.
-      if (znRecord == null || znRecord.getListField(COMMITTING_SEGMENTS) == null) {
-        return true;
-      }
-
-      znRecord.setListField(COMMITTING_SEGMENTS,
-          getCommittingSegments(realtimeTableName, znRecord.getListField(COMMITTING_SEGMENTS)));
-      try {
-        return _propertyStore.set(committingSegmentsListPath, znRecord, stat.getVersion(), AccessOption.PERSISTENT);
-      } catch (ZkBadVersionException e) {
-        return false;
-      }
-    });
-  }
-
-  /**
-   * Adds segments to the list of committing segments for a realtime table in ZooKeeper.
-   * If the segments list already exists, merges the new segments with existing ones while maintaining uniqueness.
-   * If the segments list doesn't exist, creates a new list with the provided segments.
+   * The synchronization process works as follows:
+   * 1. For a new table (no existing ZooKeeper record), creates a fresh list with the provided segments
+   * 2. For an existing table, merges the new segments with currently committing segments while removing any
+   *    segments that are no longer in COMMITTING state
+   * 3. Maintains uniqueness of segments using a Set-based deduplication
    *
-   * @param realtimeTableName Name of the realtime table
-   * @param committingSegments List of segment names to be added to the committing segments list.
-   *                          If null, returns true without making any changes.
-   * @return true if the operation succeeds, false if there's a failure in updating ZooKeeper
+   * @param realtimeTableName Name of the realtime table whose committing segments list needs to be synchronized
+   * @param committingSegments List of new segment names that are currently in COMMITTING state.
+   *                          If null, returns true without making any changes to the existing list
+   * @return true if the synchronization succeeds, false if there's a failure in updating ZooKeeper
+   * @see #getCommittingSegments for the logic that filters out segments no longer in COMMITTING state
    */
-  public boolean addCommittingSegments(String realtimeTableName, @Nullable List<String> committingSegments) {
-    if (committingSegments == null) {
-      return true;
-    }
+  public boolean syncCommittingSegments(String realtimeTableName, @NotNull List<String> committingSegments) {
     return updateCommittingSegmentsList(realtimeTableName, () -> {
       String committingSegmentsListPath =
           ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
@@ -2373,7 +2347,9 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       Set<String> mergedSegments = new HashSet<>(committingSegments);
-      List<String> existingSegments = znRecord.getListField(COMMITTING_SEGMENTS);
+      // Get segments that are present in the list and are still in COMMITTING status
+      List<String> existingSegments =
+          getCommittingSegments(realtimeTableName, znRecord.getListField(COMMITTING_SEGMENTS));
       if (existingSegments != null) {
         mergedSegments.addAll(existingSegments);
       }

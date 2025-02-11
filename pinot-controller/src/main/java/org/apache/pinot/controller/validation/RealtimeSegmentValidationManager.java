@@ -118,12 +118,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
     }
 
-    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
-      if (!_llcRealtimeSegmentManager.cleanUpCommittedSegments(tableNameWithType)) {
-        LOGGER.error("Failed to cleanup committed segments for table: {}", tableNameWithType);
-      }
-    }
-
     if (context._runSegmentLevelValidation) {
       runSegmentLevelValidation(tableConfig);
     } else {
@@ -187,7 +181,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
     // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
-    addSegmentsInCommittingStatus(realtimeTableName, segmentsZKMetadata);
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
+    }
 
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
@@ -199,7 +195,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
-  private void addSegmentsInCommittingStatus(String realtimeTableName,
+  private void syncCommittingSegmentsFromMetadata(String realtimeTableName,
       List<SegmentZKMetadata> segmentsZKMetadata) {
     List<String> committingSegments = new ArrayList<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
@@ -207,7 +203,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         committingSegments.add(segmentZKMetadata.getSegmentName());
       }
     }
-    if (!_llcRealtimeSegmentManager.addCommittingSegments(realtimeTableName, committingSegments)) {
+    LOGGER.info("Adding committing segments to ZK: {}", committingSegments);
+    if (!_llcRealtimeSegmentManager.syncCommittingSegments(realtimeTableName, committingSegments)) {
       LOGGER.error("Failed to add committing segments for table: {}", realtimeTableName);
     }
   }
