@@ -1311,11 +1311,11 @@ public class PinotTableRestletResource {
     boolean bootstrap = rebalanceConfig.isBootstrap();
 
     try {
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
 
       Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
           tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
-      instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          instancePartitionsMapAndUnchanged.getLeft();
 
       // Calculate instance partitions for tiers if configured
       List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig, null);
