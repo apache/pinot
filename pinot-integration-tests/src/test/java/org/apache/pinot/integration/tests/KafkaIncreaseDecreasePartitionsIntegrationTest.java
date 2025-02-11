@@ -75,12 +75,12 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
 
   String createTable()
       throws IOException {
-    Schema schema =  createSchema("simpleMeetup_schema.json");
+    Schema schema = createSchema("simpleMeetup_schema.json");
     addSchema(schema);
-    TableConfig tableConfig = JsonUtils.inputStreamToObject(getClass().getClassLoader().getResourceAsStream("simpleMeetup_realtime_table_config.json"), TableConfig.class);
+    TableConfig tableConfig = JsonUtils.inputStreamToObject(
+        getClass().getClassLoader().getResourceAsStream("simpleMeetup_realtime_table_config.json"), TableConfig.class);
     addTableConfig(tableConfig);
-    String tableName = tableConfig.getTableName();
-    return tableName;
+    return tableConfig.getTableName();
   }
 
   void waitForNumConsumingSegmentsInEV(String tableName, int desiredNumConsumingSegments) {
@@ -97,7 +97,8 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
         LOGGER.error("Exception in waitForNumConsumingSegments: {}", e.getMessage());
         return false;
       }
-    }, 5000, 600_000L, "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName);
+        }, 5000, 600_000L,
+        "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName);
   }
 
   @Test
