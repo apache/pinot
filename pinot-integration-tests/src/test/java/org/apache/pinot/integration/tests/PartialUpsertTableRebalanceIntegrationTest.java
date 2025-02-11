@@ -59,7 +59,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-
 public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_SERVERS = 1;
   private static final String PRIMARY_KEY_COL = "clientId";
@@ -92,7 +91,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, _helixResourceManager);
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
 
     createSchemaAndTable();
   }
