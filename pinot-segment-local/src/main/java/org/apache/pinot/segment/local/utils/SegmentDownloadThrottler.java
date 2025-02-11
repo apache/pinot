@@ -52,7 +52,7 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
   }
 
   @Override
-  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     if (CollectionUtils.isEmpty(changedConfigs)) {
       LOGGER.info("Skip updating SegmentDownloadThrottler configs with unchanged clusterConfigs");
       return;
