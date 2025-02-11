@@ -240,7 +240,6 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        validateCanHostTable(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -514,7 +513,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
-        validateCanHostTable(tableConfig);
+        validateUpdatedTargetAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -1279,30 +1278,31 @@ public class PinotTableRestletResource {
     }
   }
 
-  private void validateCanHostTable(TableConfig tableConfig) {
+  /*
+  For the given table config, calculates a target assignment if possible (which means the cluster can host the table)
+   */
+  private void validateUpdatedTargetAssignment(TableConfig tableConfig) {
 
     String tableNameWithType = tableConfig.getTableName();
 
     TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
 
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setDowntime(true);
     rebalanceConfig.setIncludeConsuming(true);
-    rebalanceConfig.setReassignInstances(false);
+    rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setBootstrap(true);
-    rebalanceConfig.setDowntime(false);
+
     boolean dryRun = rebalanceConfig.isDryRun();
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
     boolean bootstrap = rebalanceConfig.isBootstrap();
 
-    // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
     try {
       Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
           tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
       instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
     } catch (Exception e) {
-      LOGGER.error("Cannot host table with the provided configs", e);
+      LOGGER.error("Could not calculate instance partitions for table: {}", tableNameWithType, e);
       throw e;
     }
 
@@ -1316,10 +1316,11 @@ public class PinotTableRestletResource {
               dryRun);
       tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
     } catch (Exception e) {
-      LOGGER.error("Cannot host table with the provided configs", e);
+      LOGGER.error("Could not calculate instance partitions for tiers for table: {}", tableNameWithType, e);
       throw e;
     }
 
+    // this will be null for new tables
     IdealState currentIdealState;
     try {
       PropertyKey idealStatePropertyKey =
@@ -1341,7 +1342,7 @@ public class PinotTableRestletResource {
       segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
           tierToInstancePartitionsMap, rebalanceConfig);
     } catch (Exception e) {
-      LOGGER.error("Cannot host table with the provided configs", e);
+      LOGGER.error("Could not calculate target assignment for table: {}", tableNameWithType, e);
       throw e;
     }
   }
