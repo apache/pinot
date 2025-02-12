@@ -26,6 +26,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
+import org.apache.pinot.spi.tasks.StatusEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,27 +38,20 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class MinionProgressObserver extends DefaultMinionEventObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
-  // TODO: make this configurable
-  private static final int DEFAULT_MAX_NUM_STATUS_TO_TRACK = 128;
 
-  private final int _maxNumStatusToTrack;
-  private final Deque<StatusEntry> _lastStatus = new LinkedList<>();
-  private MinionTaskState _taskState;
-  private long _startTs;
-
-  public MinionProgressObserver() {
-    this(DEFAULT_MAX_NUM_STATUS_TO_TRACK);
-  }
-
-  public MinionProgressObserver(int maxNumStatusToTrack) {
-    _maxNumStatusToTrack = maxNumStatusToTrack;
-    _taskState = MinionTaskState.UNKNOWN;
-  }
+  protected MinionTaskProgressStats _taskProgressStats = new MinionTaskProgressStats();
+  protected String _taskId;
 
   @Override
   public synchronized void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
-    _startTs = System.currentTimeMillis();
-    addStatus(_startTs, "Task started", MinionTaskState.IN_PROGRESS);
+    _taskProgressStats.setStartTimestamp(System.currentTimeMillis());
+    _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
+    _taskId = pinotTaskConfig.getTaskId();
+    _taskProgressStats.setTaskId(_taskId);
+    addStatus(new StatusEntry.Builder()
+        .timestamp(_taskProgressStats.getStartTimestamp())
+        .status("Task started")
+        .build());
     super.notifyTaskStart(pinotTaskConfig);
   }
 
@@ -71,76 +66,88 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
     }
-    addStatus(System.currentTimeMillis(), (progress == null) ? "" : progress.toString(), MinionTaskState.IN_PROGRESS);
+    _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
+    addStatus(new StatusEntry.Builder()
+        .timestamp(System.currentTimeMillis())
+        .status((progress == null) ? "" : progress.toString())
+        .build());
     super.notifyProgress(pinotTaskConfig, progress);
   }
 
   @Override
   @Nullable
   public synchronized List<StatusEntry> getProgress() {
-    return new ArrayList<>(_lastStatus);
+    return new ArrayList<>(_taskProgressStats.getProgressLogs());
+  }
+
+  @Nullable
+  @Override
+  public MinionTaskProgressStats getProgressStats() {
+    return _taskProgressStats;
   }
 
   @Override
   public synchronized void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task succeeded in " + (endTs - _startTs) + "ms", MinionTaskState.SUCCEEDED);
+    _taskProgressStats.setCurrentState(MinionTaskState.SUCCEEDED.name());
+    addStatus(new StatusEntry.Builder()
+        .timestamp(endTs)
+        .status("Task succeeded in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .build());
     super.notifyTaskSuccess(pinotTaskConfig, executionResult);
   }
 
   @Override
   public synchronized void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task got cancelled after " + (endTs - _startTs) + "ms", MinionTaskState.CANCELLED);
+    _taskProgressStats.setCurrentState(MinionTaskState.CANCELLED.name());
+    addStatus(new StatusEntry.Builder()
+        .timestamp(endTs)
+        .status("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .build());
     super.notifyTaskCancelled(pinotTaskConfig);
   }
 
   @Override
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + ExceptionUtils.getStackTrace(e),
-        MinionTaskState.ERROR);
+    _taskProgressStats.setCurrentState(MinionTaskState.ERROR.name());
+    addStatus(new StatusEntry.Builder()
+        .timestamp(endTs)
+        .status("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
+            + ExceptionUtils.getStackTrace(e))
+        .build());
     super.notifyTaskError(pinotTaskConfig, e);
   }
 
   @Override
   public MinionTaskState getTaskState() {
-    return _taskState;
+    return MinionTaskState.valueOf(_taskProgressStats.getCurrentState());
   }
 
   @Override
   public long getStartTs() {
-    return _startTs;
+    return _taskProgressStats.getStartTimestamp();
   }
 
-  private void addStatus(long ts, String progress, MinionTaskState taskState) {
-    _taskState = taskState;
-    _lastStatus.addLast(new StatusEntry(ts, progress));
-    if (_lastStatus.size() > _maxNumStatusToTrack) {
-      _lastStatus.pollFirst();
+  private synchronized void addStatus(StatusEntry statusEntry) {
+    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
+    Deque<StatusEntry> progressLogs;
+    if (minionTaskProgressStats != null) {
+      progressLogs = minionTaskProgressStats.getProgressLogs();
+    } else {
+      progressLogs = new LinkedList<>();
     }
+    progressLogs.add(statusEntry);
+
+    _progressManager.setTaskProgress(_taskId, new MinionTaskProgressStats(_taskProgressStats)
+        .setProgressLogs(progressLogs));
   }
 
-  public static class StatusEntry {
-    private final long _ts;
-    private final String _status;
-
-    public StatusEntry(long ts, String status) {
-      _ts = ts;
-      _status = status;
-    }
-
-    public long getTs() {
-      return _ts;
-    }
-
-    public String getStatus() {
-      return _status;
-    }
-
-    @Override
-    public String toString() {
-      return "StatusEntry{" + "_ts=" + _ts + ", _status=" + _status + '}';
+  @Override
+  public void cleanup() {
+    if (_taskId != null) {
+      _progressManager.deleteTaskProgress(_taskId);
     }
   }
 }
