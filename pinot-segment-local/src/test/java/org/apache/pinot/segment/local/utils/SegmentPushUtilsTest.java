@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -185,8 +187,13 @@ public class SegmentPushUtilsTest {
     when(mockFs.exists(any(URI.class))).thenReturn(true);
     mockFs.copyToLocalFile(any(URI.class), any(File.class));
 
-    SegmentPushUtils.generateSegmentMetadataFiles(
-        jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap,
+          segmentURIs, executor);
+    } finally {
+      executor.shutdown();
+    }
 
     assertEquals(segmentMetadataFileMap.size(), 2);
     assertEquals(segmentURIs.size(), 4);
@@ -197,7 +204,6 @@ public class SegmentPushUtilsTest {
       throws Exception {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setSegmentMetadataGenerationParallelism(2);
     jobSpec.setPushJobSpec(pushJobSpec);
     PinotFS mockFs = Mockito.mock(PinotFS.class);
     Map<String, String> segmentUriToTarPathMap = Map.of(
@@ -212,11 +218,14 @@ public class SegmentPushUtilsTest {
         .when(mockFs)
         .copyToLocalFile(any(URI.class), any(File.class));
 
+    ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
-      SegmentPushUtils.generateSegmentMetadataFiles(
-          jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs);
+      SegmentPushUtils.generateSegmentMetadataFiles(jobSpec, mockFs, segmentUriToTarPathMap, segmentMetadataFileMap,
+          segmentURIs, executor);
     } catch (Exception e) {
       assertEquals(e.getMessage(), "1 out of 2 segment metadata generation failed");
+    } finally {
+      executor.shutdown();
     }
 
     assertEquals(segmentMetadataFileMap.size(), 1);

@@ -383,12 +383,15 @@ public class SegmentPushUtils implements Serializable {
     ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
     Map<String, File> allSegmentsMetadataMap = new HashMap<>();
     File allSegmentsMetadataTarFile = null;
+    int nThreads = spec.getPushJobSpec().getSegmentMetadataGenerationParallelism();
+    ExecutorService executor = Executors.newFixedThreadPool(nThreads);
     LOGGER.info("Start pushing segment metadata: {} to locations: {} for table: {} with parallelism: {}",
         segmentUriToTarPathMap, Arrays.toString(spec.getPinotClusterSpecs()), tableName,
         spec.getPushJobSpec().getPushParallelism());
 
     try {
-      generateSegmentMetadataFiles(spec, fileSystem, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs);
+      generateSegmentMetadataFiles(spec, fileSystem, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs,
+          executor);
       allSegmentsMetadataTarFile = createSegmentsMetadataTarFile(segmentURIs, segmentMetadataFileMap);
       // the key is unused in batch upload mode and hence 'noopKey'
       allSegmentsMetadataMap.put("noopKey", allSegmentsMetadataTarFile);
@@ -444,17 +447,17 @@ public class SegmentPushUtils implements Serializable {
       if (allSegmentsMetadataTarFile != null) {
         FileUtils.deleteQuietly(allSegmentsMetadataTarFile);
       }
+      executor.shutdown();
     }
   }
 
   @VisibleForTesting
-  public static void generateSegmentMetadataFiles(SegmentGenerationJobSpec spec, PinotFS fileSystem,
+  static void generateSegmentMetadataFiles(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, ConcurrentHashMap<String, File> segmentMetadataFileMap,
-      ConcurrentLinkedQueue<String> segmentURIs) {
-    int nThreads = spec.getPushJobSpec().getSegmentMetadataGenerationParallelism();
-    ExecutorService executor = Executors.newFixedThreadPool(nThreads);
-    List<Future<Void>> futures = new ArrayList<>();
+      ConcurrentLinkedQueue<String> segmentURIs, ExecutorService executor) {
 
+    List<Future<Void>> futures = new ArrayList<>();
+    // Generate segment metadata files in parallel
     for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
       futures.add(
           executor.submit(() -> {
@@ -498,7 +501,6 @@ public class SegmentPushUtils implements Serializable {
         exception = e;
       }
     }
-    executor.shutdown();
     if (errorCount > 0) {
       throw new RuntimeException(
           String.format("%d out of %d segment metadata generation failed", errorCount, segmentUriToTarPathMap.size()),
