@@ -113,10 +113,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
-    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tlsConfig);
+    _queryDispatcher = new QueryDispatcher(
+        new MailboxService(hostname, port, config, tlsConfig), tlsConfig, this.isQueryCancellationEnabled());
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
-            + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
-        _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
+            + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
+        _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
+        this.isQueryCancellationEnabled());
     _explainAskingServerDefault = _config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
@@ -156,10 +158,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       queryTimer = new Timer(queryTimeoutMs);
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+
       boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
           CommonConstants.Broker.DEFAULT_OF_SPOOLS);
+      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GROUP_TRIM,
+          CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM);
 
       queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
@@ -167,6 +172,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           .workerManager(_workerManager)
           .defaultInferPartitionHint(inferPartitionHint)
           .defaultUseSpools(defaultUseSpool)
+          .defaultEnableGroupTrim(defaultEnableGroupTrim)
           .build());
 
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
@@ -294,6 +300,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     }
 
+    String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
+    onQueryStart(requestId, clientRequestId, query);
+
     try {
       Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
@@ -326,12 +335,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             QueryException.getException(queryException, consolidatedMessage));
       } finally {
         Tracing.getThreadAccountant().clear();
+        onQueryFinish(requestId);
       }
       long executionEndTimeNs = System.nanoTime();
       updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
           executionEndTimeNs - executionStartTimeNs);
 
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+      brokerResponse.setClientRequestId(clientRequestId);
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setTablesQueried(tableNames);
       brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
@@ -512,16 +523,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public Map<Long, String> getRunningQueries() {
-    // TODO: Support running query tracking for multi-stage engine
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+  protected boolean handleCancel(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses) {
-    // TODO: Support query cancellation for multi-stage engine
-    throw new UnsupportedOperationException();
+    return _queryDispatcher.cancel(queryId);
   }
 
   /**

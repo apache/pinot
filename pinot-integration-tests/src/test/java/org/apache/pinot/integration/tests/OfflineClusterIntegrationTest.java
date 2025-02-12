@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
@@ -79,6 +80,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -177,6 +179,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     return Collections.singletonList(
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
             CompressionCodec.MV_ENTRY_DICT, null));
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true");
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, "true");
   }
 
   @BeforeClass
@@ -3867,5 +3881,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(
         "SELECT COUNT(*) FROM mytable WHERE Origin BETWEEN 'ALB' AND 'LMT' OR DayofMonth <> 2"
     );
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testResponseWithClientRequestId(boolean useMultiStageQueryEngine)
+    throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String clientRequestId = UUID.randomUUID().toString();
+    String sqlQuery =
+        "SET " + CommonConstants.Broker.Request.QueryOptionKey.CLIENT_QUERY_ID + "='" + clientRequestId + "'; "
+            + "SELECT AirlineID FROM mytable LIMIT 1";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    assertEquals(result.get("clientRequestId").asText(), clientRequestId);
   }
 }
