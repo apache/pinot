@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.transport.server.routing.stats;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
@@ -58,10 +60,12 @@ public class ServerRoutingStatsEntry {
     _hybridScoreExponent = scoreExponent;
   }
 
+  @JsonIgnore
   public ReentrantReadWriteLock.ReadLock getServerReadLock() {
     return _serverLock.readLock();
   }
 
+  @JsonIgnore
   public ReentrantReadWriteLock.WriteLock getServerWriteLock() {
     return _serverLock.writeLock();
   }
@@ -78,6 +82,7 @@ public class ServerRoutingStatsEntry {
     return _latencyMsEMA.getAverage();
   }
 
+  @JsonProperty("hybridScore")
   public double computeHybridScore() {
     double estimatedQSize = _numInFlightRequests + _inFlighRequestsEMA.getAverage();
     return Math.pow(estimatedQSize, _hybridScoreExponent) * _latencyMsEMA.getAverage();
