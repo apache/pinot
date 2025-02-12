@@ -20,12 +20,16 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 
 
 /**
  * The <code>MinionEventObserver</code> interface provides call backs for Minion events.
  */
 public interface MinionEventObserver {
+
+  void init(MinionTaskProgressManager progressManager);
 
   /**
    * Invoked when a minion task starts.
@@ -45,6 +49,11 @@ public interface MinionEventObserver {
 
   @Nullable
   default Object getProgress() {
+    return null;
+  }
+
+  @Nullable
+  default MinionTaskProgressStats getProgressStats() {
     return null;
   }
 
@@ -86,4 +95,6 @@ public interface MinionEventObserver {
   default long getStartTs() {
     return -1;
   }
+
+  void cleanup();
 }
