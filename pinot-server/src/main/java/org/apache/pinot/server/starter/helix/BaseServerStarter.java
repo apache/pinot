@@ -696,7 +696,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_groovyConfigChangeListener);
     GroovyFunctionEvaluator.configureGroovySecurity(
         _serverConf.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
-    GroovyFunctionEvaluator.setMetrics(serverMetrics, ServerMeter.GROOVY_SECURITY_VIOLATIONS);
 
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");

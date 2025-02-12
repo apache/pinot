@@ -196,7 +196,6 @@ public class PinotClusterConfigs {
     }
   }
 
-
   @POST
   @Path("/cluster/configs/groovy/staticAnalyzerConfig")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_GROOVY_STATIC_ANALYZER_CONFIG)

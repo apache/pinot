@@ -38,8 +38,7 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   SEGMENT_BYTES_UPLOADED("bytes", false),
   RECORDS_PROCESSED_COUNT("rows", false),
   RECORDS_PURGED_COUNT("rows", false),
-  COMPACTED_RECORDS_COUNT("rows", false),
-  GROOVY_SECURITY_VIOLATIONS("exceptions", true);
+  COMPACTED_RECORDS_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

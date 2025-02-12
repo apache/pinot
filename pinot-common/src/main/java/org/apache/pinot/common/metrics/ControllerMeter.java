@@ -68,10 +68,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false),
   IDEAL_STATE_UPDATE_FAILURE("IdealStateUpdateFailure", false),
   IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false),
-  IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false),
-  GROOVY_SECURITY_VIOLATIONS("exceptions", true);
-
-
+  IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false);
 
   private final String _brokerMeterName;
   private final String _unit;

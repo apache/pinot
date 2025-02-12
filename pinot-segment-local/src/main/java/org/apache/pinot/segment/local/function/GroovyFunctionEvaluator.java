@@ -63,7 +63,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
   private static GroovyStaticAnalyzerConfig _config;
-  private static AbstractMetrics _metrics;
   private static AbstractMetrics.Meter _securityViolationCounter;
 
   private final List<String> _arguments;
@@ -160,10 +159,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
     try {
       return _script.run();
-    } catch (SecurityException ex) {
-      LOGGER.error("An insecure Groovy script execution caught: {}", _expression);
-      incrementSecurityViolationCounter();
-      throw ex;
     } catch (Exception e) {
       if (hasNullArgument) {
         return null;
@@ -178,13 +173,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
     }
-    try {
-      return _script.run();
-    } catch (SecurityException ex) {
-      LOGGER.error("An insecure Groovy script execution caught: {}", _expression);
-      incrementSecurityViolationCounter();
-      throw ex;
-    }
+    return _script.run();
   }
 
   @Override
@@ -198,21 +187,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-  private static void incrementSecurityViolationCounter() {
-    synchronized (GroovyFunctionEvaluator.class) {
-      if (_metrics != null) {
-        _metrics.addMeteredGlobalValue(_securityViolationCounter, 1);
-      }
-    }
-  }
-
-  public static void setMetrics(AbstractMetrics metrics, AbstractMetrics.Meter securityViolationCounter) {
-    synchronized (GroovyFunctionEvaluator.class) {
-      _metrics = metrics;
-      _securityViolationCounter = securityViolationCounter;
-    }
-  }
-
   public static void configureGroovySecurity(String groovyASTConfig)
       throws Exception {
     try {
@@ -222,9 +196,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         LOGGER.info("No Groovy Security Configuration found, Groovy static analysis is disabled");
       }
     } catch (Exception ex) {
-      // If there was an issue reading the security configuration then send an exception to the startup routine.
-      LOGGER.error("Failed to read config from ZK");
-      throw ex;
+      throw new Exception("Failed to configure Groovy Security", ex);
     }
   }
 
@@ -235,6 +207,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   public static void setConfig(GroovyStaticAnalyzerConfig config)
       throws JsonProcessingException {
     synchronized (GroovyFunctionEvaluator.class) {
+      if (config != null) {
+        LOGGER.info("Setting Groovy Static Analyzer Config: {}", config.toJson());
+      } else {
+        LOGGER.info("Disabling Groovy Static Analysis");
+      }
       _config = config;
     }
   }
