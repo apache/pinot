@@ -488,7 +488,6 @@ public class SegmentPushUtils implements Serializable {
             return null;
           }));
     }
-    executor.shutdown();
     int errorCount = 0;
     Exception exception = null;
     for (Future<Void> future : futures) {
@@ -499,6 +498,7 @@ public class SegmentPushUtils implements Serializable {
         exception = e;
       }
     }
+    executor.shutdown();
     if (errorCount > 0) {
       throw new RuntimeException(
           String.format("%d out of %d segment metadata generation failed", errorCount, segmentUriToTarPathMap.size()),
