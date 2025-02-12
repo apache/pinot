@@ -661,7 +661,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION.getId());
   }
 
   @Test
@@ -672,7 +672,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION.getId());
   }
 
   @Test
@@ -1166,7 +1166,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId());
+      String errorMsg = exceptionNode.get("message").toString();
+      assertTrue(errorMsg.contains("tobase64 with 0 arguments"), errorMsg);
     }
 
     // invalid argument
@@ -1175,7 +1178,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId());
+      String errorMsg = exceptionNode.get("message").asText();
+      assertEquals(errorMsg, "Unsupported function: frombase64 with 0 arguments");
     }
 
     // invalid argument
@@ -1184,7 +1190,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.SQL_PARSING.getId());
     }
 
     // invalid argument
@@ -1193,7 +1200,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.SQL_PARSING.getId());
     }
 
     // string literal used in a filter
@@ -1563,7 +1571,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode queryResponse = postQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
     // NOTE: Broker timeout is 60s
     assertTrue(System.currentTimeMillis() - startTimeMs < 60_000L);
-    assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    JsonNode exceptionNode = queryResponse.get("exceptions").get(0);
+    assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_EXECUTION.getId());
   }
 
   @Test
