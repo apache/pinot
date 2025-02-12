@@ -41,17 +41,17 @@ public class QueryException extends PinotRuntimeException {
     _errorCode = errorCode;
   }
 
-  QueryException(QueryErrorCode errorCode, String message) {
+  public QueryException(QueryErrorCode errorCode, String message) {
     super(message);
     _errorCode = errorCode;
   }
 
-  QueryException(QueryErrorCode errorCode, String message, Throwable cause) {
+  public QueryException(QueryErrorCode errorCode, String message, Throwable cause) {
     super(message, cause);
     _errorCode = errorCode;
   }
 
-  QueryException(QueryErrorCode errorCode, Throwable cause) {
+  public QueryException(QueryErrorCode errorCode, Throwable cause) {
     super(cause.getMessage(), cause);
     _errorCode = errorCode;
   }
