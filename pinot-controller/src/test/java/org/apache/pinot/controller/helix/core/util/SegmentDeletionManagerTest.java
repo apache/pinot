@@ -33,11 +33,13 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -54,6 +56,7 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForSegment;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -352,6 +355,76 @@ public class SegmentDeletionManagerTest {
     }, 2000L, 10_000L, "Unable to verify table deletion with retention");
   }
 
+
+  @Test
+  public void testSegmentDeletionLogicWithFileWithGZExtension()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    File tempDir = Files.createTempDir();
+    tempDir.deleteOnExit();
+    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+
+    // create table segment files.
+    Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
+    createTableAndSegmentFilesWithGZExtension(tempDir, segmentsThatShouldBeDeleted());
+    final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+        + File.separator + TABLE_NAME);
+
+    // mock returning ZK Metadata for segment url
+    ZNRecord znRecord1 = mock(org.apache.helix.ZNRecord.class);
+    ZNRecord znRecord2 = mock(org.apache.helix.ZNRecord.class);
+    ZNRecord znRecord3 = mock(org.apache.helix.ZNRecord.class);
+    List<ZNRecord> znRecordList = List.of(znRecord1, znRecord2, znRecord3);
+    for (int i = 0; i < 3; i++) {
+      when(znRecordList.get(i).getSimpleFields()).thenReturn(Map.of(CommonConstants.Segment.DOWNLOAD_URL,
+          tableDir.getAbsolutePath() + File.separator + segmentsThatShouldBeDeleted().get(i)
+              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+      when(propertyStore.get(constructPropertyStorePathForSegment(TABLE_NAME, segmentsThatShouldBeDeleted().get(i)),
+          null, AccessOption.PERSISTENT)).thenReturn(znRecordList.get(i));
+    }
+
+    // delete the segments instantly.
+    SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(mockValidationConfig.getDeletedSegmentsRetentionPeriod()).thenReturn("0d");
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    deletionManager.deleteSegments(TABLE_NAME, segments, mockTableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+
+    // create table segment files again to test default retention.
+    createTableAndSegmentFilesWithGZExtension(tempDir, segmentsThatShouldBeDeleted());
+    // delete the segments with default retention
+    deletionManager.deleteSegments(TABLE_NAME, segments);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+  }
+
+
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
       throws Exception {
     File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
@@ -363,6 +436,20 @@ public class SegmentDeletionManagerTest {
           tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
     }
   }
+
+  public void createTableAndSegmentFilesWithGZExtension(File tempDir, List<String> segmentIds)
+      throws Exception {
+    File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    tableDir.mkdir();
+    for (String segmentId : segmentIds) {
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, 0);
+      // Create segment metadata file
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
+    }
+  }
+
 
   public String genDeletedSegmentName(String fileName, int age, int retentionInDays) {
     // adding one more hours to the deletion time just to make sure the test goes pass the retention period because

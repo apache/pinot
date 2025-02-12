@@ -28,6 +28,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
@@ -43,6 +44,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -235,7 +237,7 @@ public class SegmentDeletionManager {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI fileToDeleteURI = getFileToDeleteURI(tableNameWithType, segmentId);
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
       // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
       // This is catch all clean up to ensure that metadata is removed from deep store.
@@ -280,6 +282,23 @@ public class SegmentDeletionManager {
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
     }
+  }
+
+  /**
+   * Gets URI for segment deletion by:
+   * 1. Fetching download URL from ZK metadata if available
+   * 2. Otherwise, constructing URI from data dir, table name and segment ID
+   */
+  private URI getFileToDeleteURI(String tableNameWithType, String segmentId) {
+    String segmentDownloadUrl =
+        Optional.ofNullable(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentId))
+            .map(SegmentZKMetadata::getDownloadUrl)
+            .orElse(null);
+    if (segmentDownloadUrl != null) {
+      return URIUtils.getUri(segmentDownloadUrl);
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    return URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
   }
 
   /**
