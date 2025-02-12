@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -38,14 +39,20 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
-    this(sendingMailboxes, RANDOM::nextInt, splitter);
+  RandomExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    this(sendingMailboxes, RANDOM::nextInt, splitter, statsIndexChooser);
+  }
+
+  RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    super(sendingMailboxes, splitter, statsIndexChooser);
+    _rand = rand;
   }
 
   @VisibleForTesting
   RandomExchange(List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand, BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
-    _rand = rand;
+    this(sendingMailboxes, rand, splitter, RANDOM_INDEX_CHOOSER);
   }
 
   @Override
