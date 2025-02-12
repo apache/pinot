@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -33,7 +34,10 @@ public class BrokerQueryErrorMessage {
   private int _errorCode;
   private String _message;
 
-  public BrokerQueryErrorMessage(int errorCode, String message) {
+  @JsonCreator
+  public BrokerQueryErrorMessage(
+      @JsonProperty("errorCode") int errorCode,
+      @JsonProperty("message") String message) {
     _errorCode = errorCode;
     _message = message;
   }
