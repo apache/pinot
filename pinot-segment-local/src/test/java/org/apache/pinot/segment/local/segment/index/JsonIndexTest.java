@@ -48,9 +48,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.*;
 
 
 /**
@@ -60,6 +58,26 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIndexTest");
   private static final String ON_HEAP_COLUMN_NAME = "onHeap";
   private static final String OFF_HEAP_COLUMN_NAME = "offHeap";
+  public static final String TEST_RECORD = "{"
+      + "\"name\": \"adam\","
+      + "\"age\": 20,"
+      + "\"addresses\": ["
+      + "  {"
+      + "    \"country\": \"us\","
+      + "    \"street\": \"main st\","
+      + "    \"number\": 1"
+      + "  },"
+      + "  {"
+      + "    \"country\": \"ca\","
+      + "    \"street\": \"second st\","
+      + "    \"number\": 2"
+      + "  }"
+      + "],"
+      + "\"skills\": ["
+      + "  \"english\","
+      + "  \"programming\""
+      + "]"
+      + "}";
 
   @BeforeMethod
   public void setUp()
@@ -571,6 +589,199 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
+  public void testWhenDisableCrossArrayUnnestIsOffThenJsonArraysAreSeparated()
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setDisableCrossArrayUnnest(true);
+
+    List<Map<String, String>> result = JsonUtils.flatten(TEST_RECORD, jsonIndexConfig);
+
+    Assert.assertEquals(result.toString(),
+        "["
+            + "{.addresses.$index=0, .addresses..country=us, .addresses..number=1, .addresses..street=main st, "
+            + ".age=20, .name=adam}, "
+            + "{.addresses.$index=1, .addresses..country=ca, .addresses..number=2, .addresses..street=second st, "
+            + ".age=20, .name=adam}, "
+            + "{.age=20, .name=adam, .skills.=english, .skills.$index=0}, "
+            + "{.age=20, .name=adam, .skills.=programming, .skills.$index=1}]");
+  }
+
+  @Test
+  public void testWhenDisableCrossArrayUnnestIsOnThenJsonArraysAreCombined()
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setDisableCrossArrayUnnest(false);
+
+    List<Map<String, String>> result = JsonUtils.flatten(TEST_RECORD, jsonIndexConfig);
+
+    Assert.assertEquals(result.toString(),
+        "["
+            + "{.addresses.$index=0, .addresses..country=us, .addresses..number=1, .addresses..street=main st, "
+            + ".age=20, .name=adam, "
+            + ".skills.=english, .skills.$index=0}, "
+            + "{.addresses.$index=0, .addresses..country=us, .addresses..number=1, .addresses..street=main st, "
+            + ".age=20, .name=adam, "
+            + ".skills.=programming, .skills.$index=1}, "
+            + "{.addresses.$index=1, .addresses..country=ca, .addresses..number=2, .addresses..street=second st, "
+            + ".age=20, .name=adam, "
+            + ".skills.=english, .skills.$index=0}, "
+            + "{.addresses.$index=1, .addresses..country=ca, .addresses..number=2, .addresses..street=second st, "
+            + ".age=20, .name=adam, "
+            + ".skills.=programming, .skills.$index=1}]");
+  }
+
+  @Test
+  public void testWhenDisableCrossArrayUnnestIsOnThenQueriesOnMultipleArraysReturnEmptyResult()
+      throws IOException {
+    RoaringBitmap expectedBitmap = RoaringBitmap.bitmapOf();
+    boolean disableCrossArrayUnnest = true;
+
+    assertWhenCrossArrayUnnestIs(disableCrossArrayUnnest, expectedBitmap);
+  }
+
+  @Test
+  public void testWhenDisableCrossArrayUnnestIsOffThenQueriesOnMultipleArraysReturnGoodResult()
+      throws IOException {
+    RoaringBitmap expectedBitmap = RoaringBitmap.bitmapOf(0);
+    boolean disableCrossArrayUnnest = false;
+
+    assertWhenCrossArrayUnnestIs(disableCrossArrayUnnest, expectedBitmap);
+  }
+
+  private void assertWhenCrossArrayUnnestIs(boolean disableCrossArrayUnnest, RoaringBitmap expectedBitmap)
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setDisableCrossArrayUnnest(disableCrossArrayUnnest);
+
+    String[] records = {TEST_RECORD};
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapIndex = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapIndex = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableIndex.add(record);
+      }
+
+      String filter = "\"$.addresses[*].country\" = 'us' and \"$.skills[*]\" = 'english'";
+
+      assertEquals(onHeapIndex.getMatchingDocIds(filter), expectedBitmap);
+      assertEquals(offHeapIndex.getMatchingDocIds(filter), expectedBitmap);
+      assertEquals(mutableIndex.getMatchingDocIds(filter), expectedBitmap);
+    }
+  }
+
+  @Test
+  public void testWhenDisableCrossArrayUnnestIsOnThenJsonFlatteningBreaksWhen100kCombinationLimitIsExceeded()
+      throws IOException {
+    // flattening record with arrays whose combinations reach 100k returns exception
+    StringBuilder record = generateRecordWith100kArrayElementCombinations();
+
+    try {
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      jsonIndexConfig.setDisableCrossArrayUnnest(false);
+      createIndex(true, jsonIndexConfig, new String[]{record.toString()});
+      Assert.fail("expected exception");
+    } catch (IllegalArgumentException e) {
+      assertEquals(e.getCause().getMessage(), "Got too many combinations");
+    }
+  }
+
+  private static StringBuilder generateRecordWith100kArrayElementCombinations() {
+    StringBuilder record = new StringBuilder();
+    record.append('{');
+
+    //address
+    record.append("\n \"addresses\": [");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        record.append(',');
+      }
+      record.append("{ ")
+          .append(" \"street\": \"").append("st").append(i).append("\"")
+          .append(" }");
+    }
+    record.append("],");
+
+    //skill
+    record.append("\n \"skills\": [");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        record.append(',');
+      }
+      record.append("\"skill").append(i).append("\"");
+    }
+    record.append("],");
+
+    //hobby
+    record.append("\n \"hobbies\": [");
+    for (int i = 0; i < 10; i++) {
+      if (i > 0) {
+        record.append(',');
+      }
+      record.append("\"hobby").append(i).append("\"");
+    }
+    record.append(']');
+    record.append("\n}");
+    return record;
+  }
+
+  @Test
+  public void testSettingMaxValueLengthCausesLongValuesToBeReplacedWithSKIPPED()
+      throws IOException {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setMaxValueLength(10);
+    // value is longer than max length
+    String[] records = {"{\"key1\":\"value_is_longer_than_10_characters\"}"};
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapIndex = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapIndex = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableIndex.add(record);
+      }
+
+      Map<String, RoaringBitmap> expectedMap = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
+          RoaringBitmap.bitmapOf(0));
+
+      assertEquals(expectedMap, getMatchingDocsMap(onHeapIndex, "$.key1"));
+      assertEquals(expectedMap, getMatchingDocsMap(offHeapIndex, "$.key1"));
+      assertEquals(expectedMap, getMatchingDocsMap(mutableIndex, "$.key1"));
+
+      // skipped values can be found for the key
+      String filter = "\"$.key1\"='" + JsonUtils.SKIPPED_VALUE_REPLACEMENT + "'";
+
+      RoaringBitmap expectedBitmap = RoaringBitmap.bitmapOf(0);
+      assertEquals(expectedBitmap, onHeapIndex.getMatchingDocIds(filter));
+      assertEquals(expectedBitmap, offHeapIndex.getMatchingDocIds(filter));
+      assertEquals(expectedBitmap, mutableIndex.getMatchingDocIds(filter));
+    }
+  }
+
+  private static Map<String, RoaringBitmap> getMatchingDocsMap(JsonIndexReader onHeapIndex, String key) {
+    return onHeapIndex.getMatchingFlattenedDocsMap(key, null);
+  }
+
+  @Test
   public void testSkipInvalidJsonEnable() throws Exception {
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
     jsonIndexConfig.setSkipInvalidJson(true);
@@ -593,8 +804,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
-      Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingFlattenedDocsMap("$", null);
-      Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingFlattenedDocsMap("$", null);
+      Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapIndexReader, "$");
+      Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapIndexReader, "$");
       Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("$", null);
       Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
           RoaringBitmap.bitmapOf(0));
