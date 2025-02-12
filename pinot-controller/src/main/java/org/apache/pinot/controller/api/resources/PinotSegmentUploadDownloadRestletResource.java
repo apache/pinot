@@ -277,7 +277,8 @@ public class PinotSegmentUploadDownloadRestletResource {
           if (!copySegmentToFinalLocation && StringUtils.isEmpty(sourceDownloadURIStr)) {
             throw new ControllerApplicationException(LOGGER,
                 "Source download URI is required in header field 'DOWNLOAD_URI' if segment should not be copied to "
-                    + "the deep store", Response.Status.BAD_REQUEST);
+                    + "the deep store",
+                Response.Status.BAD_REQUEST);
           }
           createSegmentFileFromMultipart(multiPart, destFile);
           segmentSizeInBytes = destFile.length();
@@ -347,9 +348,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
             segmentName, rawTableName);
       }
-      String tableNameWithType =
-          tableType == TableType.OFFLINE ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
-              : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      String tableNameWithType = tableType == TableType.OFFLINE
+          ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
+          : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
       if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) && tableType != TableType.REALTIME) {
         throw new ControllerApplicationException(LOGGER, "Cannot upload segment: " + segmentName
@@ -1073,7 +1074,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 500, message = "Internal error")
   })
   @TrackInflightRequestMetrics
-  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS)
+  @TrackedByGauge(gauge = ControllerGauge.REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS)
   public void uploadReingestedSegment(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table", required = true)
       @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName, @Context HttpHeaders headers,

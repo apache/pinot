@@ -183,7 +183,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
 
   // Number of reingested segments getting uploaded
-  SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS("segmentReingestionUploadInProgress", true);
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true);
 
   private final String _gaugeName;
   private final String _unit;

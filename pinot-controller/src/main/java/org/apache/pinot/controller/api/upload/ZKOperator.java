@@ -101,7 +101,6 @@ public class ZKOperator {
           headers);
     } else {
       // Refresh an existing segment
-
       if (!allowRefresh) {
         // We cannot perform this check up-front in UploadSegment API call. If a segment doesn't exist during the check
         // done up-front but ends up getting created before the check here, we could incorrectly refresh an existing
@@ -110,7 +109,6 @@ public class ZKOperator {
             String.format("Segment: %s already exists in table: %s. Refresh not permitted.", segmentName,
                 tableNameWithType), Response.Status.CONFLICT);
       }
-
       LOGGER.info("Segment: {} already exists in table: {}, refreshing it", segmentName, tableNameWithType);
       processExistingSegment(tableNameWithType, segmentMetadata, uploadType, existingSegmentMetadataZNRecord,
           finalSegmentLocationURI, segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName,
