@@ -27,17 +27,17 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
 /**
  * The {@code BaseResultsBlock} class is the holder of the server side results.
  */
 public abstract class BaseResultsBlock implements Block {
-  private List<ProcessingException> _processingExceptions;
+  private List<QueryErrorMessage> _processingExceptions;
   private long _numTotalDocs;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -50,19 +50,19 @@ public abstract class BaseResultsBlock implements Block {
   private int _numServerThreads;
 
   @Nullable
-  public List<ProcessingException> getProcessingExceptions() {
+  public List<QueryErrorMessage> getErrorMessages() {
     return _processingExceptions;
   }
 
-  public void setProcessingExceptions(List<ProcessingException> processingExceptions) {
+  public void setErrorMessages(List<QueryErrorMessage> processingExceptions) {
     _processingExceptions = processingExceptions;
   }
 
-  public void addToProcessingExceptions(ProcessingException processingException) {
+  public void addErrorMessage(QueryErrorMessage errorMsg) {
     if (_processingExceptions == null) {
       _processingExceptions = new ArrayList<>();
     }
-    _processingExceptions.add(processingException);
+    _processingExceptions.add(errorMsg);
   }
 
   @VisibleForTesting

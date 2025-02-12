@@ -19,7 +19,7 @@
 package org.apache.pinot.common.response.broker;
 
 import java.io.IOException;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -44,9 +44,8 @@ public class BrokerResponseNativeTest {
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(actual.getExceptions().get(0).getErrorCode(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(actual.getExceptions().get(0).getMessage(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
+        QueryErrorCode.BROKER_RESOURCE_MISSING.getId());
+    Assert.assertEquals(actual.getExceptions().get(0).getMessage(), "BrokerResourceMissingError");
   }
 
   @Test
@@ -54,13 +53,12 @@ public class BrokerResponseNativeTest {
       throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
-    expected.addException(new QueryProcessingException(400, errorMsgStr));
+    expected.addException(new BrokerQueryErrorMessage(400, errorMsgStr));
     String brokerString = expected.toJsonString();
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(),
-        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
+        QueryErrorCode.BROKER_RESOURCE_MISSING.getId());
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "BrokerResourceMissingError");
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
   }

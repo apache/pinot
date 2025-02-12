@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -28,6 +27,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -126,7 +126,7 @@ public class TransformOperatorTest {
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
+    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("NumberFormatException"));
   }
 
   @Test
@@ -143,7 +143,7 @@ public class TransformOperatorTest {
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
+    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("transformError"));
   }
 
   @Test

@@ -23,7 +23,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -31,8 +30,10 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +66,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       throw new EarlyTerminationException("Interrupted while merging results blocks", e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new ExceptionResultsBlock(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      mergedBlock = new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, e.getMessage()));
     } finally {
       stopProcess();
     }
@@ -112,11 +113,17 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected void onProcessSegmentsException(Throwable t) {
     _processingException.compareAndSet(null, t);
-    if (t instanceof BadQueryRequestException) {
-      _blockingQueue.offer(new ExceptionResultsBlock(QueryException.QUERY_VALIDATION_ERROR, t));
+    ExceptionResultsBlock errBlock;
+    if (t instanceof QueryException) {
+      QueryException queryException = (QueryException) t;
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(queryException.getErrorCode(), queryException.getMessage());
+      errBlock = new ExceptionResultsBlock(errMsg);
     } else {
-      _blockingQueue.offer(new ExceptionResultsBlock(t));
+      LOGGER.warn("Caught exception while processing query: {}", _queryContext, t);
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_EXECUTION, t.getMessage());
+      errBlock = new ExceptionResultsBlock(errMsg);
     }
+    _blockingQueue.offer(errBlock);
   }
 
   @Override
@@ -142,7 +149,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       if (blockToMerge == null) {
         return getTimeoutResultsBlock(numBlocksMerged);
       }
-      if (blockToMerge.getProcessingExceptions() != null) {
+      if (blockToMerge.getErrorMessages() != null) {
         // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
         // exception
         return blockToMerge;

@@ -45,7 +45,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -143,7 +142,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       // wrap and throw the exception here is for assert purpose on dispatch-time error
-      throw new RuntimeException("Error occurred during stage submission: " + QueryException.getTruncatedStackTrace(e));
+      throw new RuntimeException("Error occurred during stage submission:", e);
     } finally {
       // Cancel all ongoing submission
       for (CompletableFuture<?> future : submissionStubs) {

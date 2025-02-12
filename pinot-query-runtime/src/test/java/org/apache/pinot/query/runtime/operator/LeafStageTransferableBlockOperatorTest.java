@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -37,6 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -221,7 +221,7 @@ public class LeafStageTransferableBlockOperatorTest {
     List<BaseResultsBlock> dataBlocks = Collections.singletonList(
         new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
-    errorBlock.addException(QueryException.QUERY_EXECUTION_ERROR.getErrorCode(), "foobar");
+    errorBlock.addException(QueryErrorCode.QUERY_EXECUTION, "foobar");
     QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, errorBlock);
     LeafStageTransferableBlockOperator operator =
         new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,

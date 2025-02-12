@@ -404,6 +404,7 @@ public class DataTableImplV4 implements DataTable {
   }
 
   @Override
+  @Deprecated
   public void addException(ProcessingException processingException) {
     _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
   }

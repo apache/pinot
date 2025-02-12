@@ -36,7 +36,6 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -45,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -221,7 +221,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
-        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
+        + QueryErrorCode.QUERY_CANCELLATION));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
@@ -234,7 +234,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
 
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
-        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
+        + QueryErrorCode.QUERY_CANCELLATION.getId()));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }

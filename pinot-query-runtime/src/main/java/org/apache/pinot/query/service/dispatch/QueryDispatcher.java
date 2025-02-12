@@ -46,8 +46,6 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -78,6 +76,7 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -492,20 +491,37 @@ public class QueryDispatcher {
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
-      String errorMessage = "Received error query execution result block: " + queryExceptions;
-      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
-        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
-        throw queryInfoException;
-      }
 
-      throw new RuntimeException(errorMessage);
+      if (queryExceptions.size() == 1) {
+        Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
+        throw QueryErrorCode.fromErrorCode(error.getKey()).asException("Error on servers: " + error.getValue());
+      } else {
+        Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
+            .max(QueryDispatcher::compareErrors)
+            .orElseThrow();
+        throw QueryErrorCode.fromErrorCode(highestPriorityError.getKey())
+            .asException("Received " + queryExceptions.size() + " errors from server. "
+                + "The one with highest priority is: " + highestPriorityError.getValue());
+      }
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
     assert queryStats != null;
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<Integer, String> entry1, Map.Entry<Integer, String> entry2) {
+    int errorCode1 = entry1.getKey();
+    int errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode1;
+    }
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode2;
+    }
+    return Integer.compare(errorCode1, errorCode2);
   }
 
   public void shutdown() {

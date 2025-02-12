@@ -33,13 +33,14 @@ import java.util.Map;
 import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 
 
 public final class DataBlockUtils {
@@ -97,18 +98,22 @@ public final class DataBlockUtils {
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
     if (e instanceof ProcessingException) {
-      return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
+      int errorCodeId = ((ProcessingException) e).getErrorCode();
+      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
+    } else if (e instanceof QueryException) {
+      int errorCodeId = ((QueryException) e).getErrorCode().getId();
+      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
     } else {
       // TODO: Pass in meaningful error code.
-      return getErrorDataBlock(Collections.singletonMap(QueryException.UNKNOWN_ERROR_CODE, extractErrorMsg(e)));
+      return getErrorDataBlock(Map.of(QueryErrorCode.UNKNOWN.getId(), extractErrorMsg(e)));
     }
   }
 
   private static String extractErrorMsg(Throwable t) {
-    while (t.getCause() != null && t.getMessage() == null) {
-      t = t.getCause();
+    if (t.getMessage() != null) {
+      return t.getMessage();
     }
-    return t.getMessage() + "\n" + QueryException.getTruncatedStackTrace(t);
+    return "empty error message";
   }
 
   public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {

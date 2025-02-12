@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.BeforeClass;
@@ -296,7 +297,7 @@ public class LiteralOnlyBrokerRequestTest {
     assertEquals(brokerResponse.getTotalDocs(), 0);
 
     brokerResponse = requestHandler.handleRequest("SELECT fromBase64(0) AS decoded");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') "
@@ -314,31 +315,31 @@ public class LiteralOnlyBrokerRequestTest {
     // first argument must be in prefix format
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // first argument must be in prefix format
     brokerResponse =
         requestHandler.handleRequest("SELECT isSubnetOf('105.25.245.115', '105.25.245.115') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // second argument should not be a prefix
     brokerResponse = requestHandler.handleRequest("SELECT isSubnetOf('1.2.3.128/26', '3.175.47.239/26') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // second argument should not be a prefix
     brokerResponse = requestHandler.handleRequest("SELECT isSubnetOf('5f3f:bfdb:1bbe:a824:6bf9:0fbb:d358:1889/64', "
         + "'4275:386f:b2b5:0664:04aa:d7bd:0589:6909/64') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // invalid prefix length
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:4801:7825:103:be76:4eff::/129', '2001:4801:7825:103:be76:4eff::') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
 
     // invalid prefix length
     brokerResponse =
         requestHandler.handleRequest("SELECT isSubnetOf('170.189.0.175/33', '170.189.0.175') AS booleanCol");
-    assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains("IllegalArgumentException"));
+    assertEquals(brokerResponse.getExceptions().get(0).getErrorCode(), QueryErrorCode.SQL_PARSING.getId());
   }
 
   /** Tests for EXPLAIN PLAN for literal only queries. */

@@ -36,7 +36,6 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -131,9 +130,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing request metadata", e);
+      String errorMsg = "Caught exception while deserializing request metadata: " + e.getMessage();
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(e)).build());
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+          .build());
       responseObserver.onCompleted();
       return;
     }
@@ -153,9 +153,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           });
     } catch (ExecutionException | InterruptedException | TimeoutException | RuntimeException e) {
       LOGGER.error("Caught exception while submitting request: {}", requestId, e);
+      String errorMsg = "Caught exception while submitting request: " + e.getMessage();
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(e)).build());
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+          .build());
       responseObserver.onCompleted();
       return;
     } finally {
@@ -174,9 +175,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing request metadata", e);
+      String errorMsg = "Caught exception while deserializing request metadata: " + e.getMessage();
       responseObserver.onNext(Worker.ExplainResponse.newBuilder()
-          .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(e)).build());
+          .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+          .build());
       responseObserver.onCompleted();
       return;
     }
@@ -206,9 +208,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           });
     } catch (ExecutionException | InterruptedException | TimeoutException | RuntimeException e) {
       LOGGER.error("Caught exception while submitting request: {}", requestId, e);
+      String errorMsg = "Caught exception while submitting request: " + e.getMessage();
       responseObserver.onNext(Worker.ExplainResponse.newBuilder()
-          .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(e)).build());
+          .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+          .build());
       responseObserver.onCompleted();
       return;
     }

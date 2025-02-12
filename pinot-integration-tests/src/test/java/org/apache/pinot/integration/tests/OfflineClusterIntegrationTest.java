@@ -54,7 +54,6 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -81,6 +80,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -322,13 +322,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private void testQueryError(String query, int errorCode)
+  private void testQueryError(String query, QueryErrorCode errorCode)
       throws Exception {
     JsonNode response = postQuery(query);
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty(), "At least one exception was expected");
     JsonNode firstException = exceptions.get(0);
-    assertEquals(firstException.get("errorCode").asInt(), errorCode);
+    assertEquals(firstException.get("errorCode").asInt(), errorCode.getId());
   }
 
   @Test
@@ -371,11 +371,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           return false;
         }
         int errorCode = exceptions.get(0).get("errorCode").asInt();
-        if (errorCode == QueryException.BROKER_TIMEOUT_ERROR_CODE) {
+        if (errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()) {
           // Timed out on broker side
           return true;
         }
-        if (errorCode == QueryException.SERVER_NOT_RESPONDING_ERROR_CODE) {
+        if (errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()) {
           // Timed out on server side
           int numServersQueried = queryResponse.get("numServersQueried").asInt();
           int numServersResponded = queryResponse.get("numServersResponded").asInt();
@@ -661,7 +661,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION);
   }
 
   @Test
@@ -672,7 +672,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION);
   }
 
   @Test
@@ -688,7 +688,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -721,7 +721,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -754,7 +754,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -1163,7 +1163,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT toBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
@@ -1172,7 +1172,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT fromBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
@@ -1181,7 +1181,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
@@ -1190,7 +1190,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
@@ -2828,7 +2828,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     //test repeated columns in selection query with order by
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
+    testQueryError(query, QueryErrorCode.QUERY_PLANNING);
 
     //test repeated columns in agg query
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
@@ -2837,7 +2837,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     //test repeated columns in agg group by query
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
+    testQueryError(query, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

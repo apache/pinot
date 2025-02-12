@@ -19,21 +19,32 @@
 package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
 /**
  * This class represents an exception using a message and an error code.
+ *
+ * This is only used to serialize the error message and error code when a broker sends an error message to the client.
+ * In other cases use {@link QueryErrorMessage} instead.
  */
-public class QueryProcessingException {
+public class BrokerQueryErrorMessage {
   private int _errorCode;
   private String _message;
 
-  public QueryProcessingException() {
-  }
-
-  public QueryProcessingException(int errorCode, String message) {
+  public BrokerQueryErrorMessage(int errorCode, String message) {
     _errorCode = errorCode;
     _message = message;
+  }
+
+  public BrokerQueryErrorMessage(QueryErrorCode errorCode, String message) {
+    _errorCode = errorCode.getId();
+    _message = message == null ? errorCode.getDefaultMessage() : message;
+  }
+
+  public static BrokerQueryErrorMessage fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
+    return new BrokerQueryErrorMessage(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
   }
 
   @JsonProperty("errorCode")
@@ -54,5 +65,10 @@ public class QueryProcessingException {
   @JsonProperty("message")
   public void setMessage(String message) {
     _message = message;
+  }
+
+  @Override
+  public String toString() {
+    return "{" + _errorCode + "=" + _message + '}';
   }
 }

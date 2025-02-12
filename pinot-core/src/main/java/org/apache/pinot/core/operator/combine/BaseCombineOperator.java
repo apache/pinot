@@ -22,11 +22,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -40,6 +38,8 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -157,10 +157,12 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
   }
 
   protected ExceptionResultsBlock getTimeoutResultsBlock(int numBlocksMerged) {
-    LOGGER.error("Timed out while polling results block, numBlocksMerged: {} (query: {})", numBlocksMerged,
-        _queryContext);
-    return new ExceptionResultsBlock(QueryException.EXECUTION_TIMEOUT_ERROR,
-        new TimeoutException("Timed out while polling results block"));
+    String logMsg = "Timed out while polling results block, numBlocksMerged: " + numBlocksMerged + " (query: "
+        + _queryContext + ")";
+    LOGGER.error(logMsg);
+    QueryErrorCode errCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    QueryErrorMessage errMSg = new QueryErrorMessage(errCode, "Timed out while polling results block", logMsg);
+    return new ExceptionResultsBlock(errMSg);
   }
 
   @Override

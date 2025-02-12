@@ -22,7 +22,7 @@ package org.apache.pinot.spi.exception;
  * The {@code EarlyTerminationException} can be thrown from {Operator#nextBlock()} when the operator is early
  * terminated (interrupted).
  */
-public class EarlyTerminationException extends RuntimeException {
+public class EarlyTerminationException extends PinotRuntimeException {
 
   public EarlyTerminationException() {
     super();

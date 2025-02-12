@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,9 +37,14 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public interface DataTable {
 
+  @Deprecated
   void addException(ProcessingException processingException);
 
   void addException(int exceptionCode, String exceptionMsg);
+
+  default void addException(QueryErrorCode exceptionCode, String exceptionMsg) {
+    addException(exceptionCode.getId(), exceptionMsg);
+  }
 
   Map<Integer, String> getExceptions();
 

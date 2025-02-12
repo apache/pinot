@@ -28,6 +28,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -41,9 +42,14 @@ public interface DataBlock {
 
   int getNumberOfColumns();
 
+  @Deprecated
   void addException(ProcessingException processingException);
 
   void addException(int errCode, String errMsg);
+
+  default void addException(QueryErrorCode errCode, String errMsg) {
+    addException(errCode.getId(), errMsg);
+  }
 
   Map<Integer, String> getExceptions();
 
