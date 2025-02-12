@@ -389,10 +389,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
-    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-    // For pauseless tables, we should replace the segment if download url is missing even if crc is same
-    // Without this the reingestion of ERROR segments in pauseless tables fails
-    // as the segment data manager is still an instance of RealtimeSegmentDataManager
     Preconditions.checkState(segmentDataManager instanceof ImmutableSegmentDataManager,
         "Cannot replace CONSUMING segment: %s in table: %s", segmentName, _tableNameWithType);
     SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();

@@ -233,13 +233,6 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
-    return uploadSegment(tableName, tableType, multiPart, copySegmentToFinalLocation, enableParallelPushProtection,
-        allowRefresh, false, headers, request);
-  }
-
-  private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
-      @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
-      boolean allowRefresh, boolean isReingested, HttpHeaders headers, Request request) {
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -284,8 +277,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           if (!copySegmentToFinalLocation && StringUtils.isEmpty(sourceDownloadURIStr)) {
             throw new ControllerApplicationException(LOGGER,
                 "Source download URI is required in header field 'DOWNLOAD_URI' if segment should not be copied to "
-                    + "the deep store",
-                Response.Status.BAD_REQUEST);
+                    + "the deep store", Response.Status.BAD_REQUEST);
           }
           createSegmentFileFromMultipart(multiPart, destFile);
           segmentSizeInBytes = destFile.length();
@@ -355,9 +347,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
             segmentName, rawTableName);
       }
-      String tableNameWithType = tableType == TableType.OFFLINE
-          ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
-          : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      String tableNameWithType =
+          tableType == TableType.OFFLINE ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
+              : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
       if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) && tableType != TableType.REALTIME) {
         throw new ControllerApplicationException(LOGGER, "Cannot upload segment: " + segmentName
@@ -416,16 +408,9 @@ public class PinotSegmentUploadDownloadRestletResource {
           segmentDownloadURIStr, segmentFile, tableNameWithType, copySegmentToFinalLocation);
 
       ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-
-      if (!isReingested) {
-        zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
-            segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
-            enableParallelPushProtection, allowRefresh, headers);
-      } else {
-        zkOperator.completeReingestedSegmentOperations(tableNameWithType, segmentMetadata, finalSegmentLocationURI,
-            sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes, enableParallelPushProtection,
-            headers);
-      }
+      zkOperator.completeSegmentOperations(tableNameWithType, segmentMetadata, uploadType, finalSegmentLocationURI,
+          segmentFile, sourceDownloadURIStr, segmentDownloadURIStr, crypterName, segmentSizeInBytes,
+          enableParallelPushProtection, allowRefresh, headers);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
@@ -438,6 +423,98 @@ public class PinotSegmentUploadDownloadRestletResource {
     } finally {
       FileUtils.deleteQuietly(tempEncryptedFile);
       FileUtils.deleteQuietly(tempDecryptedFile);
+      FileUtils.deleteQuietly(tempSegmentDir);
+    }
+  }
+
+  private SuccessResponse uploadReingestedSegment(String tableName, FormDataMultiPart multiPart, HttpHeaders headers,
+      Request request) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+
+    // TODO: Consider validating the segment name and table name from the header against the actual segment
+    extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
+    extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+
+    String uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+    if (!FileUploadType.METADATA.name().equals(uploadTypeStr)) {
+      throw new ControllerApplicationException(LOGGER, "Reingestion upload type must be METADATA",
+          Response.Status.BAD_REQUEST);
+    }
+    String sourceDownloadURIStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+    if (StringUtils.isEmpty(sourceDownloadURIStr)) {
+      throw new ControllerApplicationException(LOGGER, "Source download URI is required", Response.Status.BAD_REQUEST);
+    }
+    String copySegmentToDeepStore =
+        extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
+    if (!Boolean.parseBoolean(copySegmentToDeepStore)) {
+      throw new ControllerApplicationException(LOGGER, "COPY_SEGMENT_TO_DEEP_STORE must be true for reingestion upload",
+          Response.Status.BAD_REQUEST);
+    }
+
+    File tempTarFile = null;
+    File tempSegmentDir = null;
+    try {
+      ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
+      String tempFileName = TMP_DIR_PREFIX + UUID.randomUUID();
+      tempTarFile = new File(provider.getFileUploadTempDir(), tempFileName);
+      tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
+
+      long segmentSizeInBytes;
+      createSegmentFileFromMultipart(multiPart, tempTarFile);
+      PinotFS pinotFS = null;
+      try {
+        URI segmentURI = new URI(sourceDownloadURIStr);
+        pinotFS = PinotFSFactory.create(segmentURI.getScheme());
+        segmentSizeInBytes = pinotFS.length(segmentURI);
+      } catch (Exception e) {
+        segmentSizeInBytes = -1;
+        LOGGER.warn("Could not fetch segment size for metadata push", e);
+      } finally {
+        if (pinotFS != null) {
+          pinotFS.close();
+        }
+      }
+
+      String metadataProviderClass = DefaultMetadataExtractor.class.getName();
+      SegmentMetadata segmentMetadata = getSegmentMetadata(tempTarFile, tempSegmentDir, metadataProviderClass);
+      String segmentName = segmentMetadata.getName();
+
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
+      LOGGER.info("Processing upload request for reingested segment: {} of table: {} from client: {}", segmentName,
+          realtimeTableName, clientAddress);
+
+      // Update download URI if controller is responsible for moving the segment to the deep store
+      URI dataDirURI = provider.getDataDirURI();
+      String dataDirPath = dataDirURI.toString();
+      String encodedSegmentName = URIUtils.encode(segmentName);
+      String finalSegmentLocationPath = URIUtils.getPath(dataDirPath, rawTableName, encodedSegmentName);
+      String segmentDownloadURIStr;
+      if (dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+        segmentDownloadURIStr = URIUtils.getPath(provider.getVip(), "segments", rawTableName, encodedSegmentName);
+      } else {
+        segmentDownloadURIStr = finalSegmentLocationPath;
+      }
+      URI finalSegmentLocationURI = URIUtils.getUri(finalSegmentLocationPath);
+      LOGGER.info("Using segment download URI: {} for reingested segment: {} of table: {}", segmentDownloadURIStr,
+          segmentName, realtimeTableName);
+
+      ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
+      zkOperator.completeReingestedSegmentOperations(realtimeTableName, segmentMetadata, finalSegmentLocationURI,
+          sourceDownloadURIStr, segmentDownloadURIStr, segmentSizeInBytes);
+
+      return new SuccessResponse(
+          "Successfully uploaded reingested segment: " + segmentName + " of table: " + realtimeTableName);
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          "Exception while uploading reingested segment: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    } finally {
+      FileUtils.deleteQuietly(tempTarFile);
       FileUtils.deleteQuietly(tempSegmentDir);
     }
   }
@@ -997,18 +1074,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_REINGESTION_UPLOAD_IN_PROGRESS)
-  public void completeSegmentReingestion(FormDataMultiPart multiPart,
-      @ApiParam(value = "Name of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
-      String tableName,
-      @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
-      @DefaultValue("REALTIME") String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
-      @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
-      boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+  public void uploadReingestedSegment(FormDataMultiPart multiPart,
+      @ApiParam(value = "Name of the table", required = true)
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName, @Context HttpHeaders headers,
+      @Context Request request, @Suspended AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart,
-          true, enableParallelPushProtection, false, true, headers, request));
+      asyncResponse.resume(uploadReingestedSegment(tableName, multiPart, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }

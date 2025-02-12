@@ -124,10 +124,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     if (isPauselessConsumptionEnabled) {
-      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig.getTableName());
+      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig.getTableName());
     } else if (_segmentAutoResetOnErrorAtValidation) {
-      // reset for pauseless tables is already handled in repairSegmentsInErrorState method
-      // with additional checks for pauseless consumption
+      // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
+      // additional checks for pauseless consumption
       _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
     }
   }

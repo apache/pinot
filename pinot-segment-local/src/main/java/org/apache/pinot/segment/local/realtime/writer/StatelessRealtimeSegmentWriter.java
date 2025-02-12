@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.writer;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,10 +44,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -82,9 +76,13 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Simplified Segment Data Manager for ingesting data from a start offset to an end offset.
+ * Segment writer to ingest streaming data from a start offset to an end offset.
+ *
+ * TODO:
+ *   1. Clean up this class and only keep the necessary parts.
+ *   2. Use a different segment impl for better performance because it doesn't need to serve queries.
  */
-public class StatelessRealtimeSegmentWriter {
+public class StatelessRealtimeSegmentWriter implements Closeable {
 
   private static final int DEFAULT_CAPACITY = 100_000;
   private static final int DEFAULT_FETCH_TIMEOUT_MS = 5000;
@@ -100,7 +98,6 @@ public class StatelessRealtimeSegmentWriter {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final StreamConfig _streamConfig;
-  private final StreamPartitionMsgOffsetFactory _offsetFactory;
   private final StreamConsumerFactory _consumerFactory;
   private StreamMetadataProvider _partitionMetadataProvider;
   private final PartitionGroupConsumer _consumer;
@@ -140,22 +137,22 @@ public class StatelessRealtimeSegmentWriter {
         new File(reingestionDir, RESOURCE_TMP_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
     _resourceDataDir =
         new File(reingestionDir, RESOURCE_DATA_DIR_PREFIX + _segmentName + "_" + System.currentTimeMillis());
+    FileUtils.deleteQuietly(_resourceTmpDir);
+    FileUtils.deleteQuietly(_resourceDataDir);
+    FileUtils.forceMkdir(_resourceTmpDir);
+    FileUtils.forceMkdir(_resourceDataDir);
 
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
     Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0);
     _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMap);
 
-    _offsetFactory = StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
-    _startOffset = _offsetFactory.create(segmentZKMetadata.getStartOffset());
-    _endOffset = _offsetFactory.create(segmentZKMetadata.getEndOffset());
+    StreamPartitionMsgOffsetFactory offsetFactory =
+        StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();
+    _startOffset = offsetFactory.create(segmentZKMetadata.getStartOffset());
+    _endOffset = offsetFactory.create(segmentZKMetadata.getEndOffset());
 
     String clientId = getClientId();
-
-    // Temp dirs
-    _resourceTmpDir.mkdirs();
-    _resourceDataDir.mkdirs();
-
     _consumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _partitionMetadataProvider = _consumerFactory.createPartitionMetadataProvider(clientId, _partitionGroupId);
 
@@ -319,13 +316,6 @@ public class StatelessRealtimeSegmentWriter {
     }
   }
 
-  public void close() {
-    stopConsumption();
-    _realtimeSegment.destroy();
-    FileUtils.deleteQuietly(_resourceTmpDir);
-    FileUtils.deleteQuietly(_resourceDataDir);
-  }
-
   public boolean isDoneConsuming() {
     return _isDoneConsuming.get();
   }
@@ -338,11 +328,9 @@ public class StatelessRealtimeSegmentWriter {
     return _consumptionException;
   }
 
-  @VisibleForTesting
-  public File buildSegmentInternal()
-      throws Exception {
-    _logger.info("Building segment from {} to {}", _startOffset, _currentOffset);
-    final long startTimeMillis = now();
+  public File buildSegment() {
+    _logger.info("Building segment from {} to {}", _startOffset, _endOffset);
+    long startTimeMs = now();
     try {
       if (_segBuildSemaphore != null) {
         _logger.info("Trying to acquire semaphore for building segment");
@@ -355,88 +343,37 @@ public class StatelessRealtimeSegmentWriter {
         }
       }
     } catch (InterruptedException e) {
-      String errorMessage = "Interrupted while waiting for semaphore";
-      _logger.error(errorMessage, e);
-      return null;
+      throw new RuntimeException("Interrupted while waiting for segment build semaphore", e);
     }
+    long lockAcquireTimeMs = now();
+    _logger.info("Acquired lock for building segment in {} ms", lockAcquireTimeMs - startTimeMs);
 
-    final long lockAcquireTimeMillis = now();
-    final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
-    _logger.info("Acquired lock for building segment in {} ms", waitTimeMillis);
     // Build a segment from in-memory rows.
-    // Use a temporary directory
-    Path tempSegmentFolder = null;
-    try {
-      tempSegmentFolder =
-          java.nio.file.Files.createTempDirectory(_resourceTmpDir.toPath(), "tmp-" + _segmentName + "-");
-    } catch (IOException e) {
-      _logger.error("Failed to create temporary directory for segment build", e);
-      return null;
-    }
-
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset(_startOffset.toString());
     segmentZKPropsConfig.setEndOffset(_endOffset.toString());
 
     // Build the segment
     RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.toString(), _schema,
+        new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, _resourceTmpDir.getAbsolutePath(), _schema,
             _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
             _tableConfig.getIndexingConfig().isNullHandlingEnabled());
     try {
       converter.build(null, null);
     } catch (Exception e) {
-      _logger.error("Failed to build segment", e);
-      FileUtils.deleteQuietly(tempSegmentFolder.toFile());
-      return null;
+      throw new RuntimeException("Failed to build segment", e);
     }
-    final long buildTimeMillis = now() - lockAcquireTimeMillis;
-    _logger.info("Successfully built segment (Column Mode: {}) in {} ms, after lockWaitTime {} ms",
-        converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
+    _logger.info("Successfully built segment (Column Mode: {}) in {} ms", converter.isColumnMajorEnabled(),
+        now() - lockAcquireTimeMs);
 
-    File dataDir = _resourceDataDir;
-    File indexDir = new File(dataDir, _segmentName);
-    FileUtils.deleteQuietly(indexDir);
-
-    File tempIndexDir = new File(tempSegmentFolder.toFile(), _segmentName);
-    if (!tempIndexDir.exists()) {
-      _logger.error("Temp index directory {} does not exist", tempIndexDir);
-      FileUtils.deleteQuietly(tempSegmentFolder.toFile());
-      return null;
-    }
+    File indexDir = new File(_resourceTmpDir, _segmentName);
+    File segmentTarFile = new File(_resourceTmpDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
-      FileUtils.moveDirectory(tempIndexDir, indexDir);
-    } catch (IOException e) {
-      _logger.error("Caught exception while moving index directory from: {} to: {}", tempIndexDir, indexDir, e);
-      return null;
-    } finally {
-      FileUtils.deleteQuietly(tempSegmentFolder.toFile());
+      TarCompressionUtils.createCompressedTarFile(new File(_resourceTmpDir, _segmentName), segmentTarFile);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while tarring index directory from: " + indexDir + " to: " + segmentTarFile, e);
     }
-
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-
-    long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
-    File segmentTarFile = new File(dataDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    try {
-      TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
-    } catch (IOException e) {
-      _logger.error("Caught exception while tarring index directory from: {} to: {}", indexDir, segmentTarFile, e);
-      return null;
-    }
-
-    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-    if (metadataFile == null) {
-      _logger.error("Failed to find metadata file under index directory: {}", indexDir);
-      return null;
-    }
-    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
-    if (creationMetaFile == null) {
-      _logger.error("Failed to find creation meta file under index directory: {}", indexDir);
-      return null;
-    }
-    Map<String, File> metadataFiles = new HashMap<>();
-    metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFile);
-    metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
     return segmentTarFile;
   }
 
@@ -515,5 +452,13 @@ public class StatelessRealtimeSegmentWriter {
         _logger.warn("Could not close stream metadata provider", e);
       }
     }
+  }
+
+  @Override
+  public void close() {
+    stopConsumption();
+    _realtimeSegment.destroy();
+    FileUtils.deleteQuietly(_resourceTmpDir);
+    FileUtils.deleteQuietly(_resourceDataDir);
   }
 }
