@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,11 +85,46 @@ public class TableMetadataReader {
 
   /**
    * This api takes in list of segments for which we need the metadata.
+   * This calls the server to get the metadata for all segments instead of making a call per segment.
    */
   public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segmentsToInclude,
       int timeoutMs)
       throws InvalidConfigException, IOException {
-    return getSegmentsMetadataInternal(tableNameWithType, columns, segmentsToInclude, timeoutMs);
+    return getSegmentsMetadataInternalV2(tableNameWithType, columns, segmentsToInclude, timeoutMs);
+  }
+
+  private JsonNode getSegmentsMetadataInternalV2(String tableNameWithType, List<String> columns,
+      Set<String> segmentsToInclude, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    final Map<String, List<String>> serverToSegmentsMap =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+
+    List<String> serverURL = new java.util.ArrayList<>(List.of());
+    for (Map.Entry<String, List<String>> serverToSegment : serverToSegmentsMap.entrySet()) {
+      String serverInstance = serverToSegment.getKey();
+      serverURL.add(serverSegmentMetadataReader.generateTableMetadataServerURL(tableNameWithType,
+              columns, segmentsToInclude, endpoints.get(serverInstance)));
+    }
+
+    CompletionServiceHelper completionServiceHelper =
+            new CompletionServiceHelper(_executor, _connectionManager, endpoints);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+            completionServiceHelper.doMultiGetRequest(serverURL, tableNameWithType, false, timeoutMs);
+
+    Map<String, JsonNode> response = new HashMap<>();
+    for (Map.Entry<String, String> serverToSegmentsMetadata : serviceResponse._httpResponses.entrySet()) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(serverToSegmentsMetadata.getValue());
+      Iterator<Map.Entry<String, JsonNode>> fields = responseJson.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> field = fields.next();
+        response.put(field.getKey(), field.getValue());
+      }
+    }
+    return JsonUtils.objectToJsonNode(response);
   }
 
   private JsonNode getSegmentsMetadataInternal(String tableNameWithType, List<String> columns,
