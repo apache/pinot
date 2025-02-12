@@ -55,7 +55,6 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -120,10 +119,10 @@ public class TableRebalancer {
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
   private final ControllerMetrics _controllerMetrics;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final RebalancePreChecker _rebalancePreChecker;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
-      @Nullable ControllerMetrics controllerMetrics, @Nullable PinotHelixResourceManager pinotHelixResourceManager) {
+      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker) {
     _helixManager = helixManager;
     if (tableRebalanceObserver != null) {
       _tableRebalanceObserver = tableRebalanceObserver;
@@ -132,7 +131,7 @@ public class TableRebalancer {
     }
     _helixDataAccessor = helixManager.getHelixDataAccessor();
     _controllerMetrics = controllerMetrics;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _rebalancePreChecker = rebalancePreChecker;
   }
 
   public TableRebalancer(HelixManager helixManager) {
@@ -200,9 +199,17 @@ public class TableRebalancer {
 
     // Perform pre-checks if enabled
     Map<String, String> preChecksResult = null;
-    if (preChecks && _pinotHelixResourceManager != null) {
-      preChecksResult = _pinotHelixResourceManager.getRebalancePreChecker().doRebalancePreChecks(rebalanceJobId,
-          tableNameWithType, tableConfig, _pinotHelixResourceManager);
+    if (preChecks) {
+      if (!dryRun) {
+        // Dry-run must be enabled to run pre-checks
+        String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
+            + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
+        LOGGER.error(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null);
+      }
+      if (_rebalancePreChecker != null) {
+        preChecksResult = _rebalancePreChecker.check(rebalanceJobId, tableNameWithType, tableConfig);
+      }
     }
 
     // Fetch ideal state
@@ -320,14 +327,6 @@ public class TableRebalancer {
       LOGGER.info("For rebalanceId: {}, rebalancing table: {} in dry-run mode, returning the target assignment",
           rebalanceJobId, tableNameWithType);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE, "Dry-run mode", instancePartitionsMap,
-          tierToInstancePartitionsMap, targetAssignment, preChecksResult);
-    }
-
-    if (preChecks) {
-      String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
-          + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
-      LOGGER.error(errorMsg);
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
           tierToInstancePartitionsMap, targetAssignment, preChecksResult);
     }
 

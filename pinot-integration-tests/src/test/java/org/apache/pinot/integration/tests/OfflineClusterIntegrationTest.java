@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
@@ -282,7 +283,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _tableSize = getTableSize(getTableName());
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, _helixResourceManager);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, Executors.newFixedThreadPool(10));
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker);
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -850,7 +853,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Disable dry-run
     rebalanceConfig.setDryRun(false);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.FAILED, false, true);
+    assertNull(rebalanceResult.getPreChecksResult());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Stop the added server
     serverStarter1.stop();

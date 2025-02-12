@@ -19,11 +19,12 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public interface RebalancePreChecker {
-  Map<String, String> doRebalancePreChecks(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig, PinotHelixResourceManager pinotHelixResourceManager);
+  void init(PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService);
+  Map<String, String> check(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig);
 }

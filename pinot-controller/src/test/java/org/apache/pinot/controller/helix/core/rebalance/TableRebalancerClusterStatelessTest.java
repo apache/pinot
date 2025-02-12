@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -90,7 +91,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, _helixResourceManager);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, Executors.newFixedThreadPool(10));
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 

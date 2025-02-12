@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -43,14 +42,23 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
 
+  private PinotHelixResourceManager _pinotHelixResourceManager;
+  private ExecutorService _executorService;
+
   @Override
-  public Map<String, String> doRebalancePreChecks(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig, PinotHelixResourceManager pinotHelixResourceManager) {
+  public void init(PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService) {
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _executorService = executorService;
+  }
+
+  @Override
+  public Map<String, String> check(String rebalanceJobId, String tableNameWithType,
+      TableConfig tableConfig) {
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
     Map<String, String> preCheckResult = new HashMap<>();
     // Check for reload status
-    Boolean needsReload = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType, pinotHelixResourceManager);
+    Boolean needsReload = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType);
     preCheckResult.put(NEEDS_RELOAD_STATUS,
         needsReload == null ? "error" : needsReload ? String.valueOf(true) : String.valueOf(false));
     // Check whether minimizeDataMovement is set in TableConfig
@@ -61,19 +69,20 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return preCheckResult;
   }
 
-  private static Boolean checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType,
-      PinotHelixResourceManager pinotHelixResourceManager) {
+  /**
+   * Checks if the current segments on any servers needs a reload (table config or schema change that hasn't been
+   * applied yet). This check does not guarantee that the segments in deep store are up to date.
+   * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
+   *       and add a pre-check here to call that API.
+   */
+  private Boolean checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType) {
     // Use at most 10 threads to get whether reload is needed from servers
     LOGGER.info("Fetching whether reload is needed for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
     Boolean needsReload = null;
-    if (pinotHelixResourceManager == null) {
-      return needsReload;
-    }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
-      TableMetadataReader metadataReader = new TableMetadataReader(executorService, connectionManager,
-          pinotHelixResourceManager);
+      TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
+          _pinotHelixResourceManager);
       TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
           metadataReader.getServerCheckSegmentsReloadMetadata(tableNameWithType, 30_000);
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
@@ -89,14 +98,15 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
     } catch (InvalidConfigException | IOException e) {
       LOGGER.warn("Caught exception while trying to fetch reload status from servers", e);
-    } finally {
-      executorService.shutdown();
     }
 
     return needsReload;
   }
 
-  private static boolean checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
+  /**
+   * Checks if minimize data movement is set for the given table in the TableConfig
+   */
+  private boolean checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
       TableConfig tableConfig) {
     LOGGER.info("Checking whether minimizeDataMovement is set for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);

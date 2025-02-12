@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import org.apache.pinot.controller.ControllerConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +28,7 @@ public class RebalancePreCheckerFactory {
   private RebalancePreCheckerFactory() {
   }
 
-  public static RebalancePreChecker create(ControllerConf controllerConf) {
-    String rebalancePreCheckerClassName = controllerConf.getRebalancePreCheckerClass();
+  public static RebalancePreChecker create(String rebalancePreCheckerClassName) {
     try {
       LOGGER.info("Trying to create rebalance pre-checker object for class: {}", rebalancePreCheckerClassName);
       return (RebalancePreChecker) Class.forName(rebalancePreCheckerClassName).newInstance();

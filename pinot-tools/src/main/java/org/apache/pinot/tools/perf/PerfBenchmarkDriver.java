@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
@@ -291,7 +292,7 @@ public class PerfBenchmarkDriver {
       // participant with the same host and port.
       ControllerConf controllerConf = getControllerConf();
       controllerConf.setControllerPort(Integer.toString(_conf.getControllerPort() + 1));
-      _helixResourceManager = new PinotHelixResourceManager(controllerConf);
+      _helixResourceManager = new PinotHelixResourceManager(controllerConf, Executors.newFixedThreadPool(10));
       String instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
       HelixManager helixManager = registerAndConnectAsHelixSpectator(instanceId);
       _helixResourceManager.start(helixManager, null);

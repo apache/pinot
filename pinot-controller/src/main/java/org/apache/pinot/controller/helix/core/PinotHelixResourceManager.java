@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -243,7 +244,8 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
+      ExecutorService executorService) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -267,13 +269,15 @@ public class PinotHelixResourceManager {
     }
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
+    _rebalancePreChecker.init(this, executorService);
   }
 
-  public PinotHelixResourceManager(ControllerConf controllerConf) {
+  public PinotHelixResourceManager(ControllerConf controllerConf, ExecutorService executorService) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf), RebalancePreCheckerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf),
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService);
   }
 
   /**
@@ -3600,7 +3604,7 @@ public class PinotHelixResourceManager {
       tierToSegmentsMap = updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, this);
+        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
