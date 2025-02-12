@@ -571,6 +571,9 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+
+        // Custom Query ID provided by the client
+        public static final String CLIENT_QUERY_ID = "clientQueryId";
       }
 
       public static class QueryOptionValue {
