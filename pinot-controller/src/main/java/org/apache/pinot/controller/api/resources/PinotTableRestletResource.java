@@ -604,6 +604,9 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
       boolean dryRun,
+      @ApiParam(value = "Whether to return dry-run summary instead of full, dry-run must be enabled to use this")
+      @DefaultValue("false") @QueryParam("summary")
+      boolean summary,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
@@ -646,6 +649,7 @@ public class PinotTableRestletResource {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
+    rebalanceConfig.setSummary(summary);
     rebalanceConfig.setPreChecks(preChecks);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
@@ -666,7 +670,7 @@ public class PinotTableRestletResource {
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
-      if (dryRun || preChecks || downtime) {
+      if (dryRun || summary || preChecks || downtime) {
         // For dry-run, preChecks or rebalance with downtime, directly return the rebalance result as it should return
         // immediately
         return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
@@ -687,7 +691,7 @@ public class PinotTableRestletResource {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
               LOGGER.error(errorMsg, t);
               return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null,
-                  null);
+                  null, null);
             }
           });
           boolean isJobIdPersisted = waitForRebalanceToPersist(
@@ -708,7 +712,7 @@ public class PinotTableRestletResource {
           return new RebalanceResult(dryRunResult.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
               dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment(),
-              dryRunResult.getPreChecksResult());
+              dryRunResult.getPreChecksResult(), dryRunResult.getRebalanceSummaryResult());
         } else {
           // If dry-run failed or is no-op, return the dry-run result
           return dryRunResult;
