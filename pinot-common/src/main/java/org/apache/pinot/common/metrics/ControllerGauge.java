@@ -184,7 +184,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Added to preserve backwards compatibility of the above metric
   COMMITTING_SEGMENT_SIZE_WITH_TOPIC("committingSegmentSizeWithTopic", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+
+  // Number of reingested segments getting uploaded
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true);
 
   private final String _gaugeName;
   private final String _unit;

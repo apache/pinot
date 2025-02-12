@@ -1056,7 +1056,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
-  SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
     // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
     // complete.
