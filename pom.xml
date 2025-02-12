@@ -271,7 +271,7 @@
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.10.2</c3p0.version>
-    <mchange-commons-java.version>0.3.1</mchange-commons-java.version>
+    <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
 
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>
