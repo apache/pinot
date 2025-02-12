@@ -451,7 +451,8 @@ public class SegmentPushUtils implements Serializable {
   public static void generateSegmentMetadataFiles(SegmentGenerationJobSpec spec, PinotFS fileSystem,
       Map<String, String> segmentUriToTarPathMap, ConcurrentHashMap<String, File> segmentMetadataFileMap,
       ConcurrentLinkedQueue<String> segmentURIs) {
-    ExecutorService executor = Executors.newFixedThreadPool(spec.getPushJobSpec().getPushParallelism());
+    int nThreads = spec.getPushJobSpec().getSegmentMetadataGenerationParallelism();
+    ExecutorService executor = Executors.newFixedThreadPool(nThreads);
     List<Future<Void>> futures = new ArrayList<>();
 
     for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {

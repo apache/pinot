@@ -172,7 +172,7 @@ public class SegmentPushUtilsTest {
       throws Exception {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushParallelism(2);
+    pushJobSpec.setSegmentMetadataGenerationParallelism(2);
     jobSpec.setPushJobSpec(pushJobSpec);
     PinotFS mockFs = Mockito.mock(PinotFS.class);
     Map<String, String> segmentUriToTarPathMap = Map.of(
@@ -197,7 +197,7 @@ public class SegmentPushUtilsTest {
       throws Exception {
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
     PushJobSpec pushJobSpec = new PushJobSpec();
-    pushJobSpec.setPushParallelism(2);
+    pushJobSpec.setSegmentMetadataGenerationParallelism(2);
     jobSpec.setPushJobSpec(pushJobSpec);
     PinotFS mockFs = Mockito.mock(PinotFS.class);
     Map<String, String> segmentUriToTarPathMap = Map.of(
