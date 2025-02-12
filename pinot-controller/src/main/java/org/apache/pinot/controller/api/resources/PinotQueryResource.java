@@ -49,6 +49,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -64,9 +65,11 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
@@ -81,6 +84,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -256,7 +260,8 @@ public class PinotQueryResource {
       HttpHeaders httpHeaders)
       throws ProcessingException {
     // Get resource table name.
-    String tableName;
+    List<Pair<String, String>> tableNamesWithActionType = new ArrayList<>();
+    List<String> clusterActionTypes = new ArrayList<>();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
     if (queryOptions != null) {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
@@ -268,10 +273,23 @@ public class PinotQueryResource {
       return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
     }
     try {
-      String inputTableName =
-          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
-              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
+      if (sqlNode != null) {
+        if (sqlNode instanceof SqlShowTables) {
+          clusterActionTypes.add(Actions.Cluster.GET_TABLE);
+        } else if (sqlNode instanceof SqlDescribeTable) {
+          String tableName = _pinotHelixResourceManager.getActualTableName(
+              ((SqlDescribeTable) sqlNode).getTable().toString(), database);
+          tableNamesWithActionType.add(Pair.of(tableName, Actions.Table.GET_SCHEMA));
+        } else {
+          String tableName = _pinotHelixResourceManager.getActualTableName(RequestUtils.getTableNames(
+              CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator().next(), database);
+          tableNamesWithActionType.add(Pair.of(tableName, Actions.Table.QUERY));
+        }
+      } else {
+        String tableName = _pinotHelixResourceManager.getActualTableName(
+            CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName(), database);
+        tableNamesWithActionType.add(Pair.of(tableName, Actions.Table.QUERY));
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
 
@@ -285,16 +303,33 @@ public class PinotQueryResource {
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
       }
     }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    List<Pair<String, String>> rawTableNamesWithActionType = new ArrayList<>();
+    for (Pair<String, String> tableNameWithActionType: tableNamesWithActionType) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithActionType.getLeft());
+      rawTableNamesWithActionType.add(Pair.of(rawTableName, tableNameWithActionType.getRight()));
+    }
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-      return QueryException.ACCESS_DENIED_ERROR.toString();
+    for (Pair<String, String> rawTableNameWithActionType: rawTableNamesWithActionType) {
+      if (!accessControl.hasAccess(rawTableNameWithActionType.getLeft(), AccessType.READ, httpHeaders,
+          rawTableNameWithActionType.getRight())) {
+        return QueryException.ACCESS_DENIED_ERROR.toString();
+      }
+    }
+    for (String clusterActionType: clusterActionTypes) {
+      if (!accessControl.hasAccess(httpHeaders, TargetType.CLUSTER, null, clusterActionType)) {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+      }
     }
 
     // Get brokers for the resource table.
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
+    List<String> instanceIds =
+            _pinotHelixResourceManager.getBrokerInstancesFor(
+                rawTableNamesWithActionType.isEmpty()
+                    ? _pinotHelixResourceManager.getAllTables(database).get(0)
+                    : rawTableNamesWithActionType.get(0).getLeft()
+            );
     String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
