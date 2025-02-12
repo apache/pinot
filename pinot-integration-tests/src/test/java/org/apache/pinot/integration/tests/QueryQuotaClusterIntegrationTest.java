@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.Properties;
@@ -35,7 +36,9 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -275,9 +278,14 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       ResultSetGroup resultSetGroup =
           _pinotConnection.execute("SET applicationName='default'; SELECT COUNT(*) FROM " + getTableName());
       for (PinotClientException exception : resultSetGroup.getExceptions()) {
-        if (exception.getMessage().contains("QuotaExceededError")) {
-          failCount++;
-          break;
+        try {
+          JsonNode exceptionNode = JsonUtils.stringToJsonNode(exception.getMessage());
+          if (exceptionNode.get("errorCode").intValue() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
+            failCount++;
+            break;
+          }
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
         }
       }
     }
@@ -340,7 +348,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
           executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + getTableName());
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
-        if (exception.toPrettyString().contains("QuotaExceededError")) {
+        if (exception.get("errorCode").asInt() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
           failCount++;
           break;
         }
