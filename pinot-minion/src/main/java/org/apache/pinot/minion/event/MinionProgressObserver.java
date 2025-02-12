@@ -77,13 +77,17 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Override
   @Nullable
   public synchronized List<StatusEntry> getProgress() {
-    return new ArrayList<>(_taskProgressStats.getProgressLogs());
+    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
+    if (minionTaskProgressStats != null && minionTaskProgressStats.getProgressLogs() != null) {
+      return new ArrayList<>(minionTaskProgressStats.getProgressLogs());
+    }
+    return null;
   }
 
   @Nullable
   @Override
   public MinionTaskProgressStats getProgressStats() {
-    return _taskProgressStats;
+    return _progressManager.getTaskProgress(_taskId);
   }
 
   @Override
@@ -122,7 +126,10 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   @Override
   public MinionTaskState getTaskState() {
-    return MinionTaskState.valueOf(_taskProgressStats.getCurrentState());
+    if (_taskProgressStats.getCurrentState() != null) {
+      return MinionTaskState.valueOf(_taskProgressStats.getCurrentState());
+    }
+    return MinionTaskState.UNKNOWN;
   }
 
   @Override

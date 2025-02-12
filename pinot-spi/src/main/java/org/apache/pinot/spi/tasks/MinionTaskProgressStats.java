@@ -27,7 +27,7 @@ public class MinionTaskProgressStats {
   protected String _taskId;
   protected String _currentState;
   protected long _startTimestamp;
-  protected Deque<StatusEntry> _progressLogs;
+  protected Deque<StatusEntry> _progressLogs = new LinkedList<>();
 
   public MinionTaskProgressStats() {
   }
