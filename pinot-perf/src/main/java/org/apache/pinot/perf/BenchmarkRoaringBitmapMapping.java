@@ -289,7 +289,7 @@ public class BenchmarkRoaringBitmapMapping {
     }
     Arrays.fill(copy, 0);
     if (sortLow) {
-      for (int i = 1; i < low.length; ++i) {
+      for (int i = 1; i < low.length; i++) {
         low[i] += low[i - 1];
       }
       for (int value : data) {
@@ -297,7 +297,7 @@ public class BenchmarkRoaringBitmapMapping {
       }
     }
     if (sortHigh) {
-      for (int i = 1; i < high.length; ++i) {
+      for (int i = 1; i < high.length; i++) {
         high[i] += high[i - 1];
       }
       if (sortLow) {
