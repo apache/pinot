@@ -337,7 +337,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
         instanceResponse.addException(QueryErrorCode.QUERY_EXECUTION,
-            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e);
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
