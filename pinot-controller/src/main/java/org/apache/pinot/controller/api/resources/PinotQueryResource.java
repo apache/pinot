@@ -73,6 +73,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -80,7 +81,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
-import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,6 +126,9 @@ public class PinotQueryResource {
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
+    } catch (QueryException ex) {
+      LOGGER.error("Caught exception while processing post request {}", ex.getMessage());
+      return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing post request", wae);
       throw wae;
@@ -146,6 +149,9 @@ public class PinotQueryResource {
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
+    } catch (QueryException ex) {
+      LOGGER.warn("Caught exception while processing get request {}", ex.getMessage());
+      return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing get request", wae);
       throw wae;
@@ -159,11 +165,7 @@ public class PinotQueryResource {
       @Nullable String queryOptions, String endpointUrl)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions;
-    try {
-      sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    } catch (SqlCompilationException ex) {
-      throw QueryErrorCode.SQL_PARSING.asException(ex);
-    }
+    sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
