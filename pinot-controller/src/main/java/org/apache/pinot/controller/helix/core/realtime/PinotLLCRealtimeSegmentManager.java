@@ -21,10 +21,12 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,12 +58,14 @@ import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -78,6 +82,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.Constants;
@@ -181,6 +186,8 @@ public class PinotLLCRealtimeSegmentManager {
    * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
    */
   private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
+  private static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
+
   // 1 hour
   private static final Random RANDOM = new Random();
 
@@ -2306,6 +2313,175 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+  }
+
+  /**
+   * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
+   * will call the server reingestSegment API
+   * on one of the alive servers that are supposed to host that segment according to IdealState.
+   *
+   * API signature:
+   *   POST http://[serverURL]/reingestSegment/[segmentName]
+   *   Request body (JSON):
+   *
+   * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
+   * @param realtimeTableName The table name with type, e.g. "myTable_REALTIME"
+   */
+  public void repairSegmentsInErrorStateForPauselessConsumption(String realtimeTableName) {
+    // Fetch ideal state and external view
+    IdealState idealState = getIdealState(realtimeTableName);
+    ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
+    if (externalView == null) {
+      LOGGER.warn(
+          "External view not found for table: {}, skipping repairing segments in error state for pauseless consumption",
+          realtimeTableName);
+      return;
+    }
+    Map<String, Map<String, String>> segmentToInstanceIdealStateMap = idealState.getRecord().getMapFields();
+    Map<String, Map<String, String>> segmentToInstanceCurrentStateMap = externalView.getRecord().getMapFields();
+
+    // Find segments in ERROR state in externalView
+    List<String> segmentsInErrorStateInAllReplicas = new ArrayList<>();
+    List<String> segmentsInErrorStateInAtLeastOneReplica = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : segmentToInstanceCurrentStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+
+      // Skip non-LLC segments
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        continue;
+      }
+
+      // Skip segments that are not in ideal state
+      Map<String, String> idealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+      if (idealStateMap == null) {
+        continue;
+      }
+
+      Map<String, String> currentStateMap = entry.getValue();
+      int numReplicasInError = 0;
+      for (String state : currentStateMap.values()) {
+        if (SegmentStateModel.ERROR.equals(state)) {
+          numReplicasInError++;
+        }
+      }
+
+      if (numReplicasInError == 0) {
+        continue;
+      }
+
+      // Skip segments that are not ONLINE in ideal state
+      boolean hasOnlineInstance = false;
+      for (String state : idealStateMap.values()) {
+        if (SegmentStateModel.ONLINE.equals(state)) {
+          hasOnlineInstance = true;
+          break;
+        }
+      }
+      if (!hasOnlineInstance) {
+        continue;
+      }
+
+      if (numReplicasInError > 0) {
+        segmentsInErrorStateInAtLeastOneReplica.add(segmentName);
+      }
+
+      if (numReplicasInError == currentStateMap.size()) {
+        segmentsInErrorStateInAllReplicas.add(segmentName);
+      }
+    }
+
+    if (segmentsInErrorStateInAtLeastOneReplica.isEmpty()) {
+      return;
+    }
+
+    LOGGER.warn("Found {} segments with at least one replica in ERROR state: {}, "
+            + "{} segments with all replicas in ERROR state: {} in table: {}, repairing them",
+        segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
+        segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
+
+    for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
+      SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);
+      if (segmentZKMetadata == null) {
+        LOGGER.warn("Segment metadata not found for segment: {} in table: {}, skipping repairing it", segmentName,
+            realtimeTableName);
+        continue;
+      }
+      // We only consider segments that are in COMMITTING state for reingestion
+      if (segmentZKMetadata.getStatus() == Status.COMMITTING
+          && segmentsInErrorStateInAllReplicas.contains(segmentName)) {
+        LOGGER.info("Segment: {} in table: {} is COMMITTING with all replicas in ERROR state. Triggering re-ingestion.",
+            segmentName, realtimeTableName);
+
+        // Find at least one server that should host this segment and is alive
+        Map<String, String> idealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+        assert idealStateMap != null;
+        String aliveServer = pickServerToReingest(idealStateMap.keySet());
+        if (aliveServer == null) {
+          LOGGER.warn("No alive server found to re-ingest segment: {} in table: {}, skipping re-ingestion", segmentName,
+              realtimeTableName);
+          continue;
+        }
+
+        try {
+          triggerReingestion(aliveServer, segmentName);
+          LOGGER.info("Successfully triggered re-ingestion for segment: {} on server: {}", segmentName, aliveServer);
+        } catch (Exception e) {
+          LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
+        }
+      } else if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+        // Trigger reset for segment not in IN_PROGRESS state to download the segment from deep store or peer server
+        _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
+      }
+    }
+  }
+
+  /**
+   * Invokes the server's reingestSegment API via a POST request with JSON payload,
+   * using Simple HTTP APIs.
+   *
+   * POST http://[serverURL]/reingestSegment/[segmentName]
+   */
+  private void triggerReingestion(String serverHostPort, String segmentName)
+      throws IOException, URISyntaxException, HttpErrorStatusException {
+    String scheme = CommonConstants.HTTP_PROTOCOL;
+    if (serverHostPort.contains(CommonConstants.HTTPS_PROTOCOL)) {
+      scheme = CommonConstants.HTTPS_PROTOCOL;
+      serverHostPort = serverHostPort.replace(CommonConstants.HTTPS_PROTOCOL + "://", "");
+    } else if (serverHostPort.contains(CommonConstants.HTTP_PROTOCOL)) {
+      serverHostPort = serverHostPort.replace(CommonConstants.HTTP_PROTOCOL + "://", "");
+    }
+
+    String serverHost = serverHostPort.split(":")[0];
+    String serverPort = serverHostPort.split(":")[1];
+
+    URI reingestUri = FileUploadDownloadClient.getURI(scheme, serverHost, Integer.parseInt(serverPort),
+        REINGEST_SEGMENT_PATH + "/" + segmentName);
+    HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendJsonPostRequest(reingestUri, ""));
+  }
+
+  /**
+   * Picks one server among a set of servers that are supposed to host the segment,
+   */
+  private String pickServerToReingest(Set<String> candidateServers) {
+    try {
+      List<String> serverList = new ArrayList<>(candidateServers);
+      String server = serverList.get(RANDOM.nextInt(serverList.size()));
+      // This should ideally handle https scheme as well
+      BiMap<String, String> instanceToEndpointMap =
+          _helixResourceManager.getDataInstanceAdminEndpoints(candidateServers);
+
+      if (instanceToEndpointMap.isEmpty()) {
+        LOGGER.warn("No instance data admin endpoints found for servers: {}", candidateServers);
+        return null;
+      }
+
+      // return random server
+      return instanceToEndpointMap.get(server);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get Helix instance data admin endpoints for servers: {}", candidateServers, e);
+    }
+    return null;
   }
 
   public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
