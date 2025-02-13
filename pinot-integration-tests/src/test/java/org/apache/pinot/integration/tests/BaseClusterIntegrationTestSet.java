@@ -506,30 +506,31 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   public void testQueryExceptions()
       throws Exception {
-    testQueryException("POTATO", QueryErrorCode.SQL_PARSING.getId());
+    testQueryException("POTATO", QueryErrorCode.SQL_PARSING);
 
     // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
     testQueryException("SELECT COUNT(*) FROM potato",
         useMultiStageQueryEngine()
-            ? QueryErrorCode.QUERY_PLANNING.getId() : QueryErrorCode.TABLE_DOES_NOT_EXIST.getId());
+            ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.TABLE_DOES_NOT_EXIST);
 
     testQueryException("SELECT POTATO(ArrTime) FROM mytable",
         useMultiStageQueryEngine()
-            ? QueryErrorCode.QUERY_PLANNING.getId() : QueryErrorCode.QUERY_VALIDATION.getId());
+            ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.QUERY_VALIDATION);
 
     // ArrTime expects a numeric type
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        QueryErrorCode.QUERY_VALIDATION.getId());
+        useMultiStageQueryEngine()
+            ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
 
     // Cannot use numeric aggregate function for string column
     testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryErrorCode.QUERY_VALIDATION.getId());
+        QueryErrorCode.QUERY_VALIDATION);
   }
 
-  private void testQueryException(String query, int errorCode)
+  private void testQueryException(String query, QueryErrorCode errorCode)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
-    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
+    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode.getId());
   }
 
   /**
