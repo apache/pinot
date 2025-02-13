@@ -239,7 +239,7 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testOptimizedQueries() {
+  public void testOtherQueries() {
     // NOT_EQ on array
     assertEquals(getSelectedIds("'\"$.cities[0]\" != ''Seattle'' '"), Set.of(15, 16, 17, 18, 19, 20, 22, 23));
     assertEquals(getSelectedIds("'\"$.cities[*]\" != ''Seattle'' '"), Set.of(15, 16, 17, 18, 19, 20, 22, 23));
@@ -278,6 +278,13 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
     // '\"$.country\" NOT IN ('''')  throws error for some reason
     assertEquals(getSelectedIds("'\"$.country\" NOT IN ('' '') '"), Set.of(24, 25, 26, 27));
     assertEquals(getSelectedIds("'\"$.country\" NOT IN (''Brazil'', ''Panama'') '"), Set.of(24, 25, 26, 27));
+
+    assertEquals(getSelectedIds("'REGEXP_LIKE(\"$.country\" , ''Brazil|Panama'') '"), Set.of());
+    assertEquals(getSelectedIds("'REGEXP_LIKE(\"$.country\" , ''USA|Canada'') '"), Set.of(24, 25));
+    assertEquals(getSelectedIds("'REGEXP_LIKE(\"$.country\" , ''[MC][ea].*'') '"), Set.of(25, 26));
+    assertEquals(getSelectedIds("'REGEXP_LIKE(\"$.country\" , ''US.*'') '"), Set.of(24));
+
+    assertEquals(getSelectedIds("'\"$.country\" < ''Romania'' '"), Set.of(25, 26, 27));
   }
 
   protected Set<Integer> getSelectedIds(String jsonMatchExpression) {

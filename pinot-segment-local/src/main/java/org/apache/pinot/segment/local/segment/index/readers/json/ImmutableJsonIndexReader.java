@@ -433,9 +433,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         int[] dictIds = getDictIdRangeForKey(key);
 
         ImmutableRoaringBitmap result = null;
+        byte[] dictBuffer = dictIds[0] < dictIds[1] ? _dictionary.getBuffer() : null;
+
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-          //TODO: reading string values can be really expensive, it should use dedicated buffer
-          String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+          String value = _dictionary.getStringValue(dictId, dictBuffer).substring(key.length() + 1);
           if (matcher.reset(value).matches()) {
             if (result == null) {
               result = _invertedIndex.getDocIds(dictId);
@@ -467,10 +468,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
         int[] dictIds = getDictIdRangeForKey(key);
         ImmutableRoaringBitmap result = null;
+        byte[] dictBuffer = dictIds[0] < dictIds[1] ? _dictionary.getBuffer() : null;
 
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-          // TODO: reading string values is expensive, use dedicated buffer
-          String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+          String value = _dictionary.getStringValue(dictId, dictBuffer).substring(key.length() + 1);
           Object valueObj = rangeDataType.convert(value);
           boolean lowerCompareResult =
               lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
@@ -555,8 +556,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       arrayIndexFlattenDocIds = pathKey.getRight().toRoaringBitmap();
     }
     int[] dictIds = getDictIdRangeForKey(jsonPathKey);
+    byte[] dictBuffer = dictIds[0] < dictIds[1] ? _dictionary.getBuffer() : null;
+
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-      String key = _dictionary.getStringValue(dictId);
+      String key = _dictionary.getStringValue(dictId, dictBuffer);
       RoaringBitmap docIds = _invertedIndex.getDocIds(dictId).toRoaringBitmap();
       if (filteredFlattenedDocIds != null) {
         docIds.and(filteredFlattenedDocIds);
