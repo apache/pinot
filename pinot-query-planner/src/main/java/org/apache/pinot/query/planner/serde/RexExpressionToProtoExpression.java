@@ -69,7 +69,6 @@ public class RexExpressionToProtoExpression {
         .setFunctionName(functionCall.getFunctionName())
         .addAllFunctionOperands(protoOperands)
         .setIsDistinct(functionCall.isDistinct())
-        .setIgnoreNulls(functionCall.isIgnoreNulls())
         .build();
   }
 

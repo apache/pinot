@@ -26,7 +26,6 @@ import org.apache.lucene.codecs.PointsFormat;
 import org.apache.lucene.codecs.PostingsFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90DocValuesFormat;
 import org.apache.lucene.codecs.lucene90.Lucene90PointsFormat;
-import org.apache.lucene.codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.perfield.PerFieldDocValuesFormat;
 import org.apache.lucene.codecs.perfield.PerFieldKnnVectorsFormat;
 import org.apache.lucene.codecs.perfield.PerFieldPostingsFormat;
@@ -73,8 +72,8 @@ public class HnswCodec extends FilterCodec {
    *
    * @param mode stored fields compression mode to use for newly flushed/merged segments.
    */
-  public HnswCodec(Lucene912Codec.Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
-    super("Lucene99", new Lucene912Codec(mode));
+  public HnswCodec(KnnVectorsFormat defaultKnnVectorsFormat) {
+    super(null, null);
     _defaultKnnVectorsFormat = defaultKnnVectorsFormat;
     _defaultPostingsFormat = new Lucene90PostingsFormat();
     _defaultDVFormat = new Lucene90DocValuesFormat();
