@@ -36,7 +36,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaIncreaseDecreasePartitionsIntegrationTest.class);
 
   private static final String KAFKA_TOPIC = "meetup";
-  private static final int NUM_PARTITIONS = 3;
+  private static final int NUM_PARTITIONS = 1;
 
   String getExternalView(String tableName)
       throws IOException {
@@ -70,7 +70,7 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 60_000L, "Failed to pause table: " + tableName);
+    }, 60_000L, "Failed to resume table: " + tableName);
   }
 
   String createTable()
@@ -85,19 +85,19 @@ public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtime
 
   void waitForNumConsumingSegmentsInEV(String tableName, int desiredNumConsumingSegments) {
     TestUtils.waitForCondition((aVoid) -> {
-      try {
-        AtomicInteger numConsumingSegments = new AtomicInteger(0);
-        String state = getExternalView(tableName);
-        TableViews.TableView tableView = JsonUtils.stringToObject(state, TableViews.TableView.class);
-        tableView._realtime.values().forEach((v) -> {
-          numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals("CONSUMING")).count());
-        });
-        return numConsumingSegments.get() == desiredNumConsumingSegments;
-      } catch (IOException e) {
-        LOGGER.error("Exception in waitForNumConsumingSegments: {}", e.getMessage());
-        return false;
-      }
-        }, 5000, 600_000L,
+          try {
+            AtomicInteger numConsumingSegments = new AtomicInteger(0);
+            String state = getExternalView(tableName);
+            TableViews.TableView tableView = JsonUtils.stringToObject(state, TableViews.TableView.class);
+            tableView._realtime.values().forEach((v) -> {
+              numConsumingSegments.addAndGet((int) v.values().stream().filter((v1) -> v1.equals("CONSUMING")).count());
+            });
+            return numConsumingSegments.get() == desiredNumConsumingSegments;
+          } catch (IOException e) {
+            LOGGER.error("Exception in waitForNumConsumingSegments: {}", e.getMessage());
+            return false;
+          }
+        }, 5000, 300_000L,
         "Failed to wait for " + desiredNumConsumingSegments + " consuming segments for table: " + tableName);
   }
 

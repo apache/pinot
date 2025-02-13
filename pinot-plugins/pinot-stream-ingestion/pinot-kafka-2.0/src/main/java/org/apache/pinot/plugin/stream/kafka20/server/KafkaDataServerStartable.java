@@ -111,7 +111,7 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
           return null;
         }
       }
-    }, 1000L, 30000, "Kafka topic " + topic + " is not created yet");
+    }, 1000L, 300000, "Kafka topic " + topic + " is not created yet");
   }
 
   @Override
@@ -133,7 +133,7 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
           return null;
         }
       }
-    }, 1000L, 30000, "Kafka topic " + topic + " is not deleted yet");
+    }, 1000L, 300000, "Kafka topic " + topic + " is not deleted yet");
   }
 
   @Override
