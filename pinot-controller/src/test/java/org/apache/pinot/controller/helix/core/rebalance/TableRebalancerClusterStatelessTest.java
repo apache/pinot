@@ -90,7 +90,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null,
+        _helixResourceManager.getTableSizeReader());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
