@@ -34,6 +34,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
@@ -468,7 +469,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(tableName));
     waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
@@ -501,7 +503,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
 
     // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (500 rows -> 2 rows)
@@ -544,7 +547,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5, 2);
 
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
