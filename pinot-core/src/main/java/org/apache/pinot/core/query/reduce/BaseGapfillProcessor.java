@@ -146,6 +146,7 @@ abstract class BaseGapfillProcessor {
    */
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = getAliasedTableDataSchema(brokerResponseNative);
+    replaceColumnNameWithAlias(dataSchema);
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
@@ -174,32 +175,8 @@ abstract class BaseGapfillProcessor {
     }
 
     List<Object[]> rows = brokerResponseNative.getResultTable().getRows();
-    replaceColumnNameWithAlias(dataSchema);
     List<Object[]> resultRows = gapFillAndAggregate(rows, dataSchema, resultTableSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
-  }
-
-  protected DataSchema getAliasedTableDataSchema(BrokerResponseNative brokerResponseNative) {
-    DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
-
-    QueryContext queryContext = _queryContext;
-    // check if we need to consider main query or subquery.
-    if (_gapfillType != GapfillUtils.GapfillType.GAP_FILL) {
-      queryContext = queryContext.getSubquery();
-    }
-
-    int numOfColumns = queryContext.getSelectExpressions().size();
-    String[] aliasedColumnNames = new String[numOfColumns];
-
-    for (int i = 0; i < numOfColumns; i++) {
-      if (queryContext.getAliasList().get(i) != null) {
-        aliasedColumnNames[i] = queryContext.getAliasList().get(i);
-      } else {
-        aliasedColumnNames[i] = queryContext.getSelectExpressions().get(i).toString();
-      }
-    }
-    // create new data schema with alias considered.
-    return new DataSchema(aliasedColumnNames, dataSchema.getColumnDataTypes());
   }
 
   /**
