@@ -315,10 +315,10 @@ public class SegmentDeletionManager {
       if (pinotFS.exists(compressedFileUri)) {
         return compressedFileUri;
       }
-
+      LOGGER.error("No file found for segment: {} in deepstore", segmentId);
       return null;
     } catch (Exception e) {
-      LOGGER.error("No file found for segment: {} in deepstore", segmentId);
+      LOGGER.error("Caught exception while trying to find file for segment: {} in deepstore", segmentId);
       return null;
     }
   }
