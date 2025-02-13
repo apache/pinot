@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -143,12 +144,13 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+    if (segmentMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      _state = BlockingSegmentCompletionFSMState.COMMITTED;
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
-      StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
-      _state = BlockingSegmentCompletionFSMState.COMMITTED;
-      _winningOffset = endOffset;
+      String endOffset = segmentMetadata.getEndOffset();
+      Preconditions.checkState(endOffset != null, "Failed to find end offset for segment: %s", segmentName);
+      _winningOffset = factory.create(endOffset);
       _winner = "UNKNOWN";
     }
   }
