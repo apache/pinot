@@ -59,7 +59,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -93,7 +93,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
-  private SegmentPreprocessThrottler _segmentPreprocessThrottler;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -112,7 +111,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
@@ -120,12 +119,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
-    _segmentPreprocessThrottler = segmentPreprocessThrottler;
     String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
     LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
     _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
-    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks,
-        _segmentPreprocessThrottler);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks, segmentOperationsThrottler);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 

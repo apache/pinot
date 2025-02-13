@@ -28,148 +28,143 @@ import org.slf4j.Logger;
 
 
 /**
- * Base class for segment preprocess throttlers, contains the common logic for the semaphore and handling the pre and
+ * Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
  * post query serving values. The semaphore cannot be null and must contain > 0 total permits
  */
-public abstract class BaseSegmentPreprocessThrottler implements PinotClusterConfigChangeListener {
+public abstract class BaseSegmentOperationsThrottler implements PinotClusterConfigChangeListener {
 
   protected AdjustableSemaphore _semaphore;
   /**
-   * _maxPreprocessConcurrency and _maxPreprocessConcurrencyBeforeServingQueries must be > 0. To effectively disable
-   * throttling, this can be set to a very high value
+   * _maxConcurrency and _maxConcurrencyBeforeServingQueries must be > 0. To effectively disable throttling, this can
+   * be set to a very high value
    */
-  protected int _maxPreprocessConcurrency;
-  protected int _maxPreprocessConcurrencyBeforeServingQueries;
+  protected int _maxConcurrency;
+  protected int _maxConcurrencyBeforeServingQueries;
   protected boolean _isServingQueries;
   private final Logger _logger;
 
   /**
-   * Base segment preprocess throttler constructor
-   * @param maxPreprocessConcurrency configured index preprocessing concurrency
-   * @param maxPreprocessConcurrencyBeforeServingQueries configured preprocessing concurrency before serving queries
+   * Base segment operations throttler constructor
+   * @param maxConcurrency configured concurrency
+   * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
    * @param isServingQueries whether the server is ready to serve queries or not
    * @param logger logger to use
    */
-  public BaseSegmentPreprocessThrottler(int maxPreprocessConcurrency, int maxPreprocessConcurrencyBeforeServingQueries,
+  public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, Logger logger) {
     _logger = logger;
-    _logger.info("Initializing SegmentPreprocessThrottler, maxPreprocessConcurrency: {}, "
-            + "maxPreprocessConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
-        maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries);
-    Preconditions.checkArgument(maxPreprocessConcurrency > 0,
-        "Max preprocess parallelism must be > 0, but found to be: " + maxPreprocessConcurrency);
-    Preconditions.checkArgument(maxPreprocessConcurrencyBeforeServingQueries > 0,
-        "Max preprocess parallelism before serving queries must be > 0, but found to be: "
-            + maxPreprocessConcurrencyBeforeServingQueries);
+    _logger.info("Initializing SegmentOperationsThrottler, maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}, "
+            + "isServingQueries: {}",
+        maxConcurrency, maxConcurrencyBeforeServingQueries, isServingQueries);
+    Preconditions.checkArgument(maxConcurrency > 0, "Max parallelism must be > 0, but found to be: " + maxConcurrency);
+    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries > 0,
+        "Max parallelism before serving queries must be > 0, but found to be: " + maxConcurrencyBeforeServingQueries);
 
-    _maxPreprocessConcurrency = maxPreprocessConcurrency;
-    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
+    _maxConcurrency = maxConcurrency;
+    _maxConcurrencyBeforeServingQueries = maxConcurrencyBeforeServingQueries;
     _isServingQueries = isServingQueries;
 
-    // maxPreprocessConcurrencyBeforeServingQueries is only used prior to serving queries and once the server is
+    // maxConcurrencyBeforeServingQueries is only used prior to serving queries and once the server is
     // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
     // server is starting up.
     if (!isServingQueries) {
-      logger.info("Serving queries is disabled, using preprocess concurrency as: {}",
-          _maxPreprocessConcurrencyBeforeServingQueries);
+      logger.info("Serving queries is disabled, using concurrency as: {}", _maxConcurrencyBeforeServingQueries);
     }
 
     _semaphore = new AdjustableSemaphore(
-        _isServingQueries ? _maxPreprocessConcurrency : _maxPreprocessConcurrencyBeforeServingQueries, true);
+        _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries, true);
     _logger.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
         availablePermits());
   }
 
   public synchronized void startServingQueries() {
-    _logger.info("Serving queries is to be enabled, reset throttling threshold for segment preprocess concurrency, "
+    _logger.info("Serving queries is to be enabled, reset throttling threshold for segment operations concurrency, "
         + "total permits: {}, available permits: {}", totalPermits(), availablePermits());
     _isServingQueries = true;
-    _semaphore.setPermits(_maxPreprocessConcurrency);
+    _semaphore.setPermits(_maxConcurrency);
     _logger.info("Reset throttling completed, new concurrency: {}, total permits: {}, available permits: {}",
-        _maxPreprocessConcurrency, totalPermits(), availablePermits());
+        _maxConcurrency, totalPermits(), availablePermits());
   }
 
-  protected void handleMaxPreprocessConcurrencyChange(Set<String> changedConfigs, Map<String, String> clusterConfigs,
+  protected void handleMaxConcurrencyChange(Set<String> changedConfigs, Map<String, String> clusterConfigs,
       String configName, String defaultConfigValue) {
     if (!changedConfigs.contains(configName)) {
       _logger.info("changedConfigs list indicates config: {} was not updated, skipping updates", configName);
       return;
     }
 
-    String maxParallelSegmentPreprocessesStr =
+    String maxParallelSegmentOperationsStr =
         clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
 
-    int maxPreprocessConcurrency;
+    int maxConcurrency;
     try {
-      maxPreprocessConcurrency = Integer.parseInt(maxParallelSegmentPreprocessesStr);
+      maxConcurrency = Integer.parseInt(maxParallelSegmentOperationsStr);
     } catch (Exception e) {
       _logger.warn("Invalid config {} set to: {}, not making change, fix config and try again", configName,
-          maxParallelSegmentPreprocessesStr);
+          maxParallelSegmentOperationsStr);
       return;
     }
 
-    if (maxPreprocessConcurrency <= 0) {
+    if (maxConcurrency <= 0) {
       _logger.warn("config {}: {} must be > 0, not making change, fix config and try again", configName,
-          maxPreprocessConcurrency);
+          maxConcurrency);
       return;
     }
 
-    if (maxPreprocessConcurrency == _maxPreprocessConcurrency) {
-      _logger.info("No ZK update for config {}, value: {}, total permits: {}", configName, _maxPreprocessConcurrency,
+    if (maxConcurrency == _maxConcurrency) {
+      _logger.info("No ZK update for config {}, value: {}, total permits: {}", configName, _maxConcurrency,
           totalPermits());
       return;
     }
 
-    _logger.info("Updated config: {} from: {} to: {}", configName, _maxPreprocessConcurrency,
-        maxPreprocessConcurrency);
-    _maxPreprocessConcurrency = maxPreprocessConcurrency;
+    _logger.info("Updated config: {} from: {} to: {}", configName, _maxConcurrency, maxConcurrency);
+    _maxConcurrency = maxConcurrency;
 
     if (!_isServingQueries) {
       _logger.info("Serving queries hasn't been enabled yet, not updating the permits with config {}", configName);
       return;
     }
-    _semaphore.setPermits(_maxPreprocessConcurrency);
+    _semaphore.setPermits(_maxConcurrency);
     _logger.info("Updated total permits: {}", totalPermits());
   }
 
-  protected void handleMaxPreprocessConcurrencyBeforeServingQueriesChange(Set<String> changedConfigs,
+  protected void handleMaxConcurrencyBeforeServingQueriesChange(Set<String> changedConfigs,
       Map<String, String> clusterConfigs, String configName, String defaultConfigValue) {
     if (!changedConfigs.contains(configName)) {
       _logger.info("changedConfigs list indicates config: {} was not updated, skipping updates", configName);
       return;
     }
 
-    String maxParallelSegmentPreprocessesBeforeServingQueriesStr =
+    String maxParallelSegmentOperationsBeforeServingQueriesStr =
         clusterConfigs == null ? defaultConfigValue : clusterConfigs.getOrDefault(configName, defaultConfigValue);
 
-    int maxPreprocessConcurrencyBeforeServingQueries;
+    int maxConcurrencyBeforeServingQueries;
     try {
-      maxPreprocessConcurrencyBeforeServingQueries =
-          Integer.parseInt(maxParallelSegmentPreprocessesBeforeServingQueriesStr);
+      maxConcurrencyBeforeServingQueries = Integer.parseInt(maxParallelSegmentOperationsBeforeServingQueriesStr);
     } catch (Exception e) {
       _logger.warn("Invalid config {} set to: {}, not making change, fix config and try again", configName,
-          maxParallelSegmentPreprocessesBeforeServingQueriesStr);
+          maxParallelSegmentOperationsBeforeServingQueriesStr);
       return;
     }
 
-    if (maxPreprocessConcurrencyBeforeServingQueries <= 0) {
+    if (maxConcurrencyBeforeServingQueries <= 0) {
       _logger.warn("config {}: {} must be > 0, not making change, fix config and try again", configName,
-          maxPreprocessConcurrencyBeforeServingQueries);
+          maxConcurrencyBeforeServingQueries);
       return;
     }
 
-    if (maxPreprocessConcurrencyBeforeServingQueries == _maxPreprocessConcurrencyBeforeServingQueries) {
+    if (maxConcurrencyBeforeServingQueries == _maxConcurrencyBeforeServingQueries) {
       _logger.info("No ZK update for config: {} value: {}, total permits: {}", configName,
-          _maxPreprocessConcurrencyBeforeServingQueries, totalPermits());
+          _maxConcurrencyBeforeServingQueries, totalPermits());
       return;
     }
 
-    _logger.info("Updated config: {} from: {} to: {}", configName, _maxPreprocessConcurrencyBeforeServingQueries,
-        maxPreprocessConcurrencyBeforeServingQueries);
-    _maxPreprocessConcurrencyBeforeServingQueries = maxPreprocessConcurrencyBeforeServingQueries;
+    _logger.info("Updated config: {} from: {} to: {}", configName, _maxConcurrencyBeforeServingQueries,
+        maxConcurrencyBeforeServingQueries);
+    _maxConcurrencyBeforeServingQueries = maxConcurrencyBeforeServingQueries;
     if (!_isServingQueries) {
       _logger.info("config: {} was updated before serving queries was enabled, updating the permits", configName);
-      _semaphore.setPermits(_maxPreprocessConcurrencyBeforeServingQueries);
+      _semaphore.setPermits(_maxConcurrencyBeforeServingQueries);
       _logger.info("Updated total permits: {}", totalPermits());
     }
   }
@@ -177,7 +172,7 @@ public abstract class BaseSegmentPreprocessThrottler implements PinotClusterConf
   /**
    * Block trying to acquire the semaphore to perform the segment StarTree index rebuild steps unless interrupted.
    * <p>
-   * {@link #release()} should be called after the segment preprocess completes. It is the responsibility of the caller
+   * {@link #release()} should be called after the segment operation completes. It is the responsibility of the caller
    * to ensure that {@link #release()} is called exactly once for each call to this method.
    *
    * @throws InterruptedException if the current thread is interrupted
