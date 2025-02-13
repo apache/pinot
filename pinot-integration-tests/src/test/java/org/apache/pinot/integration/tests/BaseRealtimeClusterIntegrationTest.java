@@ -56,6 +56,9 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     // Set max segment preprocess parallelism to 8
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment startree preprocess parallelism to 6
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
 
     startBroker();
     startServer();

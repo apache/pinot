@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
@@ -46,18 +47,32 @@ public abstract class BlockExchange {
 
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
+ private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
 
+  protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
+      (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());
+
+  /**
+   * Factory method to create a BlockExchange based on the distribution type.
+   *
+   * It is important to notice that stats should only be sent to one mailbox to avoid sending the same stats multiple
+   * times.
+   * The statsIndexChooser function is used to choose the mailbox index to send stats to.
+   * In most cases the {@link #RANDOM_INDEX_CHOOSER} should be used, but in some cases, like when using spools, the
+   * mailbox index that receives the stats should be tuned.
+   * @param statsIndexChooser a function to choose the mailbox index to send stats to.
+   */
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
-      List<Integer> keys, BlockSplitter splitter) {
+      List<Integer> keys, BlockSplitter splitter, Function<List<SendingMailbox>, Integer> statsIndexChooser) {
     switch (distributionType) {
       case SINGLETON:
-        return new SingletonExchange(sendingMailboxes, splitter);
+        return new SingletonExchange(sendingMailboxes, splitter, statsIndexChooser);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys), splitter);
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys), splitter, statsIndexChooser);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(sendingMailboxes, splitter);
+        return new RandomExchange(sendingMailboxes, splitter, statsIndexChooser);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(sendingMailboxes, splitter);
+        return new BroadcastExchange(sendingMailboxes, splitter, statsIndexChooser);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -66,9 +81,16 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      List<Integer> keys, BlockSplitter splitter) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER);
+  }
+
+  protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
     _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
+    _statsIndexChooser = statsIndexChooser;
   }
 
   /**
@@ -93,7 +115,7 @@ public abstract class BlockExchange {
       int numMailboxes = _sendingMailboxes.size();
       int mailboxIdToSendMetadata;
       if (block.getQueryStats() != null) {
-        mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+        mailboxIdToSendMetadata = _statsIndexChooser.apply(_sendingMailboxes);
         if (LOGGER.isTraceEnabled()) {
           LOGGER.trace("Sending EOS metadata. Only mailbox #{} will get stats", mailboxIdToSendMetadata);
         }

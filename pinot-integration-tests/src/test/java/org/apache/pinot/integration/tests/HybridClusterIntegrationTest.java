@@ -131,6 +131,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Set max segment preprocess parallelism to 10
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(10));
+    // Set max segment startree preprocess parallelism to 6
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
     startBroker();
     startServers(2);
     startKafka();

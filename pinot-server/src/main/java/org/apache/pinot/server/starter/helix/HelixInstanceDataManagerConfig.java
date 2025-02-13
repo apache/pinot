@@ -96,7 +96,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // NOTE: While segment load can be faster, multiple threads will be taken up loading segments, so
   //       it is possible that the query latencies increase during that period.
   //
-  private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
+  public static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
   // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
   private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";

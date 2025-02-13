@@ -79,6 +79,10 @@ public class CommonConstants {
     CONSUMING, NOT_CONSUMING // In error state
   }
 
+  public enum TaskTriggers {
+    CRON_TRIGGER, MANUAL_TRIGGER, ADHOC_TRIGGER, UNKNOWN
+  }
+
   public static class Table {
     public static final String PUSH_FREQUENCY_HOURLY = "hourly";
     public static final String PUSH_FREQUENCY_DAILY = "daily";
@@ -255,6 +259,14 @@ public class CommonConstants {
         "pinot.server.max.segment.preprocess.parallelism.before.serving.queries";
     // Use the below default before enabling queries on the server
     public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES = String.valueOf(100);
+    // Preprocess throttle config specifically for StarTree index rebuild
+    public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM =
+        "pinot.server.max.segment.startree.preprocess.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM = String.valueOf(100);
+    public static final String CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.startree.preprocess.parallelism.before.serving.queries";
+    public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
+        String.valueOf(100);
   }
 
   public static class Broker {
@@ -340,6 +352,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
         "pinot.broker.min.init.indexed.table.capacity";
     public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
+
+    // this config allows enabling is_enable_group_trim hint for all queries and thus enabling V1-style trimming in
+    // leaf nodes and v2-style trimming in intermediate nodes
+    public static final String CONFIG_OF_ENABLE_GROUP_TRIM = "pinot.broker.enable.group.trim";
+    public static final boolean DEFAULT_BROKER_ENABLE_GROUP_TRIM = false;
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -501,6 +518,7 @@ public class CommonConstants {
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
+        public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
@@ -557,6 +575,9 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+
+        // Custom Query ID provided by the client
+        public static final String CLIENT_QUERY_ID = "clientQueryId";
       }
 
       public static class QueryOptionValue {
@@ -756,6 +777,8 @@ public class CommonConstants {
         "pinot.server.query.executor.group.trim.size";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+    public static final String CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+        "pinot.server.mse.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
         "pinot.server.query.executor.min.init.indexed.table.capacity";
 

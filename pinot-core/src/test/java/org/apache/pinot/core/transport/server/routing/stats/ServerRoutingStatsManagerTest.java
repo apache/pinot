@@ -32,10 +32,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class ServerRoutingStatsManagerTest {
@@ -71,15 +68,19 @@ public class ServerRoutingStatsManagerTest {
     ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
         _brokerMetrics);
     assertFalse(manager.isEnabled());
+    assertNull(manager.getServerRoutingStats());
     manager.init();
     assertFalse(manager.isEnabled());
+    assertNull(manager.getServerRoutingStats());
 
     // Test 2: Test enabled.
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
     manager = new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     assertFalse(manager.isEnabled());
+    assertNull(manager.getServerRoutingStats());
     manager.init();
     assertTrue(manager.isEnabled());
+    assertNotNull(manager.getServerRoutingStats());
 
     // Test 3: Shutdown and then init.
     manager.shutDown();
@@ -96,6 +97,7 @@ public class ServerRoutingStatsManagerTest {
     ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
         _brokerMetrics);
     manager.init();
+    assertNotNull(manager.getServerRoutingStats());
 
     List<Pair<String, Integer>> numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
     assertTrue(numInFlightReqList.isEmpty());
