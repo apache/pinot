@@ -24,6 +24,8 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -64,10 +66,12 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -288,7 +292,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _resourceManager = _controllerStarter.getHelixResourceManager();
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, Executors.newFixedThreadPool(10));
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker);
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
+    _resourceManager.getTableSizeReader());
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -4017,5 +4022,147 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNoError(result);
 
     assertEquals(result.get("clientRequestId").asText(), clientRequestId);
+  }
+
+  @Test
+  public void testRebalanceDryRunSummary()
+      throws Exception {
+    // setup the rebalance config
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+
+    TableConfig tableConfig = getOfflineTableConfig();
+
+    // Ensure summary status is null if not enabled
+    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNull(rebalanceResult.getRebalanceSummaryResult());
+
+    // Enable summary, nothing is set
+    rebalanceConfig.setSummary(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
+        tableConfig.getReplication());
+
+    // Add a new server (to force change in instance assignment) and enable reassignInstances
+    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
+        getNumServers() + 1, tableConfig.getReplication());
+
+    // Disable dry-run, summary still enabled
+    rebalanceConfig.setDryRun(false);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNull(rebalanceResult.getRebalanceSummaryResult());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+
+    // Disable summary along with dry-run to do a real rebalance
+    rebalanceConfig.setSummary(false);
+    rebalanceConfig.setDowntime(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNull(rebalanceResult.getRebalanceSummaryResult());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+
+    // Untag the added server
+    _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
+
+    // Re-enable dry-run
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers() + 1,
+        getNumServers(), tableConfig.getReplication());
+
+    // Disable dry-run and summary to do a real rebalance
+    rebalanceConfig.setDryRun(false);
+    rebalanceConfig.setSummary(false);
+    rebalanceConfig.setDowntime(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNull(rebalanceResult.getRebalanceSummaryResult());
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+
+    // Stop the server
+    serverStarter1.stop();
+    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
+        60_000L, "Failed to drop added server");
+
+    // Try dry-run with summary again
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
+        tableConfig.getReplication());
+  }
+
+  private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
+      boolean isSegmentsToBeMoved, int existingNumServers, int newNumServers, int replicationFactor) {
+    assertEquals(rebalanceResult.getStatus(), expectedStatus);
+    RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(summaryResult);
+    assertEquals(summaryResult.getReplicationFactor()._existingValue, replicationFactor,
+        "Existing replication factor doesn't match expected");
+    assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue,
+        "Existing and new replication factor doesn't match");
+    assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers,
+        "Existing number of servers don't match");
+    assertEquals(summaryResult.getNumServers()._newValue, newNumServers, "New number of servers don't match");
+    if (_tableSize > 0) {
+      assertTrue(summaryResult.getEstimatedAverageSegmentSizeInBytes() > 0L,
+          "Avg segment size expected to be > 0 but found to be 0");
+    }
+    if (existingNumServers != newNumServers) {
+      assertTrue(summaryResult.getNumServersGettingNewSegments() > 0, "Expected number of servers should be > 0");
+    } else {
+      assertEquals(summaryResult.getNumServersGettingNewSegments(), 0,
+          "Expected number of servers getting new segments should be 0");
+    }
+
+    if (isSegmentsToBeMoved) {
+      assertTrue(summaryResult.getTotalSegmentsToBeMoved() > 0, "Segments to be moved should be > 0");
+      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(),
+          summaryResult.getTotalSegmentsToBeMoved() * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
+          "Estimated data to be moved in bytes doesn't match");
+      assertTrue(summaryResult.getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
+          "Estimated time to move segments should be more than 0.0 seconds");
+    } else {
+      assertEquals(summaryResult.getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
+      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
+          "Estimated data to be moved in bytes should be 0");
+      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
+          "Estimated time to move segments should be 0.0D");
+    }
+  }
+
+  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs)
+      throws Exception {
+    String jobId = rebalanceResult.getJobId();
+    if (rebalanceResult.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
+      return;
+    }
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
+        try {
+          SimpleHttpResponse httpResponse =
+              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+
+          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
+              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
+          return status != RebalanceResult.Status.IN_PROGRESS;
+        } catch (HttpErrorStatusException | URISyntaxException e) {
+          throw new IOException(e);
+        }
+      } catch (Exception e) {
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to load all segments after rebalance");
   }
 }

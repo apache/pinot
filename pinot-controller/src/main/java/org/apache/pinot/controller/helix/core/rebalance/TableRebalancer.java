@@ -48,6 +48,7 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -60,6 +61,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -120,9 +122,11 @@ public class TableRebalancer {
   private final TableRebalanceObserver _tableRebalanceObserver;
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
+  private final TableSizeReader _tableSizeReader;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
-      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker) {
+      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
+      @Nullable TableSizeReader tableSizeReader) {
     _helixManager = helixManager;
     if (tableRebalanceObserver != null) {
       _tableRebalanceObserver = tableRebalanceObserver;
@@ -132,10 +136,11 @@ public class TableRebalancer {
     _helixDataAccessor = helixManager.getHelixDataAccessor();
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
+    _tableSizeReader = tableSizeReader;
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null);
+    this(helixManager, null, null, null, null);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -582,10 +587,28 @@ public class TableRebalancer {
     }
   }
 
+  private long calculateTableSizePerReplicaInBytes(String tableNameWithType) {
+    long tableSizePerReplicaInBytes = -1;
+    if (_tableSizeReader == null) {
+      LOGGER.warn("tableSizeReader is null, cannot calculate table size for table {}!", tableNameWithType);
+      return tableSizePerReplicaInBytes;
+    }
+    try {
+      TableSizeReader.TableSubTypeSizeDetails tableSizeDetails =
+          _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
+      tableSizePerReplicaInBytes = tableSizeDetails._reportedSizePerReplicaInBytes;
+    } catch (InvalidConfigException e) {
+      String errMsg = String.format("Caught exception while trying to fetch table size details for table: %s",
+          tableNameWithType);
+      LOGGER.error(errMsg, e);
+    }
+    return tableSizePerReplicaInBytes;
+  }
+
   private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, String tableNameWithType, String rebalanceJobId) {
-    LOGGER.info("Calculating rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
-        rebalanceJobId);
+    LOGGER.info("Calculating rebalance summary for table: {} with rebalanceJobId: {}",
+        tableNameWithType, rebalanceJobId);
     int existingReplicationFactor = 0;
     int newReplicationFactor = 0;
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
@@ -616,6 +639,7 @@ public class TableRebalancer {
 
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
+    int numServersGettingDataAdded = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
       Set<String> segmentMap = entry.getValue();
@@ -636,6 +660,7 @@ public class TableRebalancer {
       newSegmentList.removeAll(existingSegmentList);
       int segmentsAdded = newSegmentList.size();
       int segmentsDeleted = existingSegmentList.size() - segmentsUnchanged;
+      numServersGettingDataAdded += segmentsAdded > 0 ? 1 : 0;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(totalNewSegments,
           totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged));
@@ -658,10 +683,34 @@ public class TableRebalancer {
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumberSegmentsTotal, newNumberSegmentsTotal);
 
     int totalSegmentsToBeMoved = newNumberSegmentsTotal - segmentsNotMoved;
+
+    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableNameWithType);
+    long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
+        : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
+    long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
+        : ((long) totalSegmentsToBeMoved) * averageSegmentSizeInBytes;
+    double estimatedTimeToRebalanceInSec = getEstimatedTimeToRebalanceInSec(totalEstimatedDataToBeMovedInBytes,
+        numServersGettingDataAdded);
+
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
-    return new RebalanceSummaryResult(totalSegmentsToBeMoved, numServers, replicationFactor, uniqueNumSegments,
-        totalNumSegments, serverSegmentChangeInfoMap);
+    return new RebalanceSummaryResult(totalSegmentsToBeMoved, numServersGettingDataAdded, averageSegmentSizeInBytes,
+        totalEstimatedDataToBeMovedInBytes, estimatedTimeToRebalanceInSec, numServers, replicationFactor,
+        uniqueNumSegments, totalNumSegments, serverSegmentChangeInfoMap);
+  }
+
+  private static double getEstimatedTimeToRebalanceInSec(long totalEstimatedDataToBeMovedInBytes,
+      int numServersGettingDataAdded) {
+    double estimatedTimeToRebalanceInSec = totalEstimatedDataToBeMovedInBytes == 0 ? 0.0 : -1.0;
+    if (totalEstimatedDataToBeMovedInBytes > 0 && numServersGettingDataAdded > 0) {
+      // Do some processing to figure out what the time to download might be
+      // Assume that data is evenly distributed across all servers
+      long totalDataPerServerInBytes = totalEstimatedDataToBeMovedInBytes / numServersGettingDataAdded;
+      // TODO: Pick a good threshold to calculate estimated time to rebalance. For now assume 100 MB/s data download
+      //       + process rate
+      estimatedTimeToRebalanceInSec = ((double) totalDataPerServerInBytes) / (100.0D * 1024.0D * 1024.0D);
+    }
+    return estimatedTimeToRebalanceInSec;
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {

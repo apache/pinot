@@ -67,27 +67,39 @@ public class RebalanceSummaryResult {
 
   // TODO: Add stats about total data size to be moved and estimated calculations on how long the data move can take
   //       during rebalance. Estimations are fine based on total table size / total number of segments
-  private int _totalSegmentsToBeMoved;
+  private final int _totalSegmentsToBeMoved;
+  private final int _numServersGettingNewSegments;
+  private final long _estimatedAverageSegmentSizeInBytes;
+  private final long _totalEstimatedDataToBeMovedInBytes;
+  private final double _totalEstimatedTimeToMoveDataInSecs;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private RebalanceChangeInfo _numServers;
+  private final RebalanceChangeInfo _numServers;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private RebalanceChangeInfo _replicationFactor;
+  private final RebalanceChangeInfo _replicationFactor;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private RebalanceChangeInfo _numUniqueSegments;
+  private final RebalanceChangeInfo _numUniqueSegments;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private RebalanceChangeInfo _numTotalSegments;
+  private final RebalanceChangeInfo _numTotalSegments;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
+  private final Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
   @JsonCreator
   public RebalanceSummaryResult(
       @JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
+      @JsonProperty("numServersGettingNewSegments") int numServersGettingNewSegments,
+      @JsonProperty("estimatedAverageSegmentSizeInBytes") long estimatedAverageSegmentSizeInBytes,
+      @JsonProperty("totalEstimatedDataToBeMovedInBytes") long totalEstimatedDataToBeMovedInBytes,
+      @JsonProperty("totalEstimatedTimeToMoveDataInSecs") double totalEstimatedTimeToMoveDataInSecs,
       @JsonProperty("numServers") @Nullable RebalanceChangeInfo numServers,
       @JsonProperty("replicationFactor") @Nullable RebalanceChangeInfo replicationFactor,
       @JsonProperty("numUniqueSegments") @Nullable RebalanceChangeInfo numUniqueSegments,
       @JsonProperty("numTotalSegments") @Nullable RebalanceChangeInfo numTotalSegments,
       @JsonProperty("serverSegmentChangeInfo") @Nullable Map<String, ServerSegmentChangeInfo> serverSegmentChangeInfo) {
     _totalSegmentsToBeMoved = totalSegmentsToBeMoved;
+    _numServersGettingNewSegments = numServersGettingNewSegments;
+    _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
+    _totalEstimatedDataToBeMovedInBytes = totalEstimatedDataToBeMovedInBytes;
+    _totalEstimatedTimeToMoveDataInSecs = totalEstimatedTimeToMoveDataInSecs;
     _numServers = numServers;
     _replicationFactor = replicationFactor;
     _numUniqueSegments = numUniqueSegments;
@@ -98,6 +110,26 @@ public class RebalanceSummaryResult {
   @JsonProperty
   public int getTotalSegmentsToBeMoved() {
     return _totalSegmentsToBeMoved;
+  }
+
+  @JsonProperty
+  public int getNumServersGettingNewSegments() {
+    return _numServersGettingNewSegments;
+  }
+
+  @JsonProperty
+  public long getEstimatedAverageSegmentSizeInBytes() {
+    return _estimatedAverageSegmentSizeInBytes;
+  }
+
+  @JsonProperty
+  public long getTotalEstimatedDataToBeMovedInBytes() {
+    return _totalEstimatedDataToBeMovedInBytes;
+  }
+
+  @JsonProperty
+  public double getTotalEstimatedTimeToMoveDataInSecs() {
+    return _totalEstimatedTimeToMoveDataInSecs;
   }
 
   @JsonProperty

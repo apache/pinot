@@ -93,7 +93,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, Executors.newFixedThreadPool(10));
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -177,6 +178,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNull(rebalanceResult.getSegmentAssignment());
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 6);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 3);
 
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap =
         rebalanceResult.getRebalanceSummaryResult().getServerSegmentChangeInfo();
@@ -394,6 +396,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 6);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 6);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     // Without instances reassignment, the rebalance should return status NO_OP, and the existing instance partitions
     // should be used
@@ -417,6 +420,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 6);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 6);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     // With instances reassignment, the rebalance should return status DONE, the existing instance partitions should be
     // removed, and the default instance partitions should be used
@@ -461,6 +465,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 15);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 6);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 3);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 3);
 
     // Rebalance with downtime should succeed
     rebalanceConfig = new RebalanceConfig();
@@ -553,6 +558,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 3);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     // Run actual table rebalance
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
@@ -583,6 +589,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 3);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     // rebalance is NOOP and no change in assignment caused by new instances
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
@@ -615,6 +622,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 15);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 9);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 6);
 
     // rebalance should change assignment
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
@@ -688,6 +696,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 3);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
@@ -714,6 +723,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 3);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 0);
 
     // rebalance is NOOP and no change in assignment caused by new instances
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
@@ -740,6 +750,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getTotalSegmentsToBeMoved(), 30);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._existingValue, 3);
     assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServers()._newValue, 6);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getNumServersGettingNewSegments(), 6);
 
     // rebalance should change assignment
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
