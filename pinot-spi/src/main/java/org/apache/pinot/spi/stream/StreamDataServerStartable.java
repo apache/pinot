@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Properties;
+import org.apache.commons.lang3.NotImplementedException;
 
 
 /**
@@ -60,6 +61,7 @@ public interface StreamDataServerStartable {
    * @param topic
    */
   default void deleteTopic(String topic) {
+    throw new NotImplementedException("deleteTopic is not implemented!");
   }
 
   /**
@@ -68,6 +70,7 @@ public interface StreamDataServerStartable {
    * @param numPartitions
    */
   default void createPartitions(String topic, int numPartitions) {
+    throw new NotImplementedException("createPartitions is not implemented!");
   }
 
   /**
