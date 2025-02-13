@@ -115,7 +115,7 @@ $ cd pinot
 # Build Pinot
 # -Pbin-dist is required to build the binary distribution
 # -Pbuild-shaded-jar is required to build the shaded jar, which is necessary for some features like spark connectors
-$ mvn clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
+$ ./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
 
 # Run the Quick Demo
 $ cd build/
@@ -124,11 +124,11 @@ $ bin/quick-start-batch.sh
 
 For UI development setup refer this [doc](https://github.com/apache/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
 
-Normal Pinot builds are done using the `mvn clean install` command.
+Normal Pinot builds are done using the `./mvnw clean install` command.
 
 However this command can take a long time to run.
 
-For faster builds it is recommended to use `mvn verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
+For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
