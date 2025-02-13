@@ -238,7 +238,7 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
       if (fileToDeleteURI == null) {
-        LOGGER.warn("No segment file found for segment ID: {} in table: {}", segmentId, rawTableName);
+        LOGGER.warn("No segment file found for segment: {} in deep store", segmentId);
         return;
       }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
@@ -318,6 +318,7 @@ public class SegmentDeletionManager {
 
       return null;
     } catch (Exception e) {
+      LOGGER.error("No file found for segment: {} in deepstore", segmentId);
       return null;
     }
   }
