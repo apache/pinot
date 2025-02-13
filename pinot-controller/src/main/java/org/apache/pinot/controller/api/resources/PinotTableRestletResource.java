@@ -143,9 +143,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 })
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
-        SWAGGER_AUTHORIZATION_KEY, description = "The format of the key is  ```\"Basic <token>\" or \"Bearer "
-        + "<token>\"```"), @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-    key = DATABASE, description =
+        SWAGGER_AUTHORIZATION_KEY, description =
+        "The format of the key is  ```\"Basic <token>\" or \"Bearer "
+            + "<token>\"```"), @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER
+    , key = DATABASE, description =
     "Database context passed through http header. If no context is provided 'default' database "
         + "context will be considered.")
 }))
@@ -1302,6 +1303,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setIncludeConsuming(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setBootstrap(true);
+    rebalanceConfig.setDryRun(true);
 
     boolean dryRun = rebalanceConfig.isDryRun();
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
@@ -1327,16 +1329,12 @@ public class PinotTableRestletResource {
       IdealState currentIdealState =
           _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getProperty(idealStatePropertyKey);
 
-      if (currentIdealState == null) {
-        currentIdealState =
-            PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication(), true);
-      }
-
       SegmentAssignment segmentAssignment =
           SegmentAssignmentFactory.getSegmentAssignment(_pinotHelixResourceManager.getHelixZkManager(), tableConfig,
               _controllerMetrics);
 
-      Map<String, Map<String, String>> currentAssignment = currentIdealState.getRecord().getMapFields();
+      Map<String, Map<String, String>> currentAssignment =
+          Map.of(tableNameWithType + "_" + "0", Map.of("Server_someRandomServer_7050", "CONSUMING"));
 
       segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
           tierToInstancePartitionsMap, rebalanceConfig);

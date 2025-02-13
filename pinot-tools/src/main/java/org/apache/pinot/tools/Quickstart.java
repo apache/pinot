@@ -66,7 +66,7 @@ public class Quickstart extends QuickStartBase {
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapOfflineTableDirectories(quickstartTmpDir);
 
     QuickstartRunner runner =
-        new QuickstartRunner(quickstartTableRequests, 1, 1, getNumQuickstartRunnerServers(), 1, quickstartRunnerDir,
+        new QuickstartRunner(quickstartTableRequests, 1, 1, 4, 1, quickstartRunnerDir,
             true, getAuthProvider(), getConfigOverrides(), _zkExternalAddress, true, getClusterConfigOverrides());
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
