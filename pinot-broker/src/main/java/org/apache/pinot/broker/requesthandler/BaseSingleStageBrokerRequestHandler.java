@@ -299,14 +299,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     try {
-      return handleRequestImpl(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
+      return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl);
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }
   }
 
-  protected BrokerResponse handleRequestImpl(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
+  protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
@@ -1081,7 +1081,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       BrokerResponse response =
-          handleRequestImpl(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
+          doHandleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
               httpHeaders, accessControl);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);

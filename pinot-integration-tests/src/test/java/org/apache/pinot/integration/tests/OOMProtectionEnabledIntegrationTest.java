@@ -30,7 +30,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class OOMProtectionIntegrationTest extends BaseClusterIntegrationTestSet {
+public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
