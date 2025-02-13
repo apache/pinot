@@ -112,7 +112,7 @@ public class QueryServerTest extends QueryTestSet {
     reset(mockRunner);
     // should contain error message pattern
     String errorMessage = resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR);
-    assertTrue(errorMessage.contains("foo"));
+    assertTrue(errorMessage.contains("foo"), "Error message should contain 'foo' but it is: " + errorMessage);
   }
 
   @Test(dataProvider = "testSql")

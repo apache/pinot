@@ -270,7 +270,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           "Timeout while submitting request: " + requestId + ", stage: " + stageMetadata.getStageId(), e);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Caught exception while submitting request: " + requestId + ", stage: " + stageMetadata.getStageId(), e);
+          "Caught exception while submitting request: " + requestId + ", stage: " + stageMetadata.getStageId()
+              + ": " + e.getMessage(), e);
     } finally {
       for (CompletableFuture<?> future : workerSubmissionStubs) {
         if (!future.isDone()) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -36,6 +37,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -126,7 +128,10 @@ public class TransformOperatorTest {
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("NumberFormatException"));
+    Map<Integer, String> exceptions = block.getExceptions();
+    String errorMsg = exceptions.get(QueryErrorCode.QUERY_EXECUTION.getId());
+    assertNotNull(errorMsg, "Expected QUERY_EXECUTION error but found " + exceptions);
+    assertTrue(errorMsg.contains("Invalid conversion"), "Expected 'Invalid conversion' but found " + errorMsg);
   }
 
   @Test
