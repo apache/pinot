@@ -114,8 +114,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _workerManager = new WorkerManager(config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID), hostname, port,
-        _routingManager);
+    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
     TlsConfig tlsConfig = config.getProperty(
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
