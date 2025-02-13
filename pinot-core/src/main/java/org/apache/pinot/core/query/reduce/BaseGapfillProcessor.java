@@ -145,7 +145,7 @@ abstract class BaseGapfillProcessor {
    * 3. Aggregate the dataset per time bucket.
    */
   public void process(BrokerResponseNative brokerResponseNative) {
-    DataSchema dataSchema = getAliasedTableDataSchema(brokerResponseNative);
+    DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     replaceColumnNameWithAlias(dataSchema);
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
