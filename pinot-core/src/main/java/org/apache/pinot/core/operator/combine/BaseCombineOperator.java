@@ -38,6 +38,7 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -196,7 +197,14 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         ? "Caught exception while doing operator: " + operator.getClass()
             + " on segment " + operator.getIndexSegment().getSegmentName()
         : "Caught exception while doing operator: " + operator.getClass();
-    QueryErrorCode errorCode = QueryErrorCode.INTERNAL;
+
+    QueryErrorCode errorCode;
+    if (e instanceof QueryException) {
+      QueryException queryException = (QueryException) e;
+      errorCode = queryException.getErrorCode();
+    } else {
+      errorCode = QueryErrorCode.QUERY_EXECUTION;
+    }
     // TODO: Only include exception message if it is a QueryException. Otherwise, it might expose sensitive information
     throw errorCode.asException(errorMessage + ": " + e.getMessage(), e);
   }
