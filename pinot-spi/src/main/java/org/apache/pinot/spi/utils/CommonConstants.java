@@ -267,6 +267,12 @@ public class CommonConstants {
         "pinot.server.max.segment.startree.preprocess.parallelism.before.serving.queries";
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(100);
+    public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
+        "pinot.server.max.segment.download.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM = "100";
+    public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.download.parallelism.before.serving.queries";
+    public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES = "100";
   }
 
   public static class Broker {
