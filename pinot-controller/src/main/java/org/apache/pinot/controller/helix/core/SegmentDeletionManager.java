@@ -28,7 +28,6 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
@@ -44,7 +43,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -237,7 +236,11 @@ public class SegmentDeletionManager {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = getFileToDeleteURI(tableNameWithType, segmentId);
+      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
+      if (fileToDeleteURI == null) {
+        LOGGER.warn("No segment file found for segment ID: {} in table: {}", segmentId, rawTableName);
+        return;
+      }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
       // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
       // This is catch all clean up to ensure that metadata is removed from deep store.
@@ -285,20 +288,38 @@ public class SegmentDeletionManager {
   }
 
   /**
-   * Gets URI for segment deletion by:
-   * 1. Fetching download URL from ZK metadata if available
-   * 2. Otherwise, constructing URI from data dir, table name and segment ID
+   * Gets URI for segment deletion by attempting to locate the segment file in the following order:
+   * 1. Plain segment file (without extension)
+   * 2. Compressed segment file (with .tar.gz extension)
+   *
+   * @param rawTableName The name of the table
+   * @param segmentId The ID of the segment to delete
+   * @return URI of the existing segment file, or null if neither variant exists or in case of filesystem errors
    */
-  private URI getFileToDeleteURI(String tableNameWithType, String segmentId) {
-    String segmentDownloadUrl =
-        Optional.ofNullable(ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentId))
-            .map(SegmentZKMetadata::getDownloadUrl)
-            .orElse(null);
-    if (segmentDownloadUrl != null) {
-      return URIUtils.getUri(segmentDownloadUrl);
+  private URI getFileToDeleteURI(String rawTableName, String segmentId) {
+    try {
+      // Create both URIs upfront
+      URI plainFileUri = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI compressedFileUri = URIUtils.getUri(_dataDir, rawTableName,
+          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+
+      // Get filesystem instance once
+      PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
+
+      // Check for plain segment file first
+      if (pinotFS.exists(plainFileUri)) {
+        return plainFileUri;
+      }
+
+      // Check for compressed segment file
+      if (pinotFS.exists(compressedFileUri)) {
+        return compressedFileUri;
+      }
+
+      return null;
+    } catch (Exception e) {
+      return null;
     }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    return URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
   }
 
   /**
