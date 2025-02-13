@@ -494,13 +494,14 @@ public class QueryDispatcher {
 
       if (queryExceptions.size() == 1) {
         Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
-        throw QueryErrorCode.fromErrorCode(error.getKey()).asException("Error on servers: " + error.getValue());
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(error.getKey());
+        throw errorCode.asException("Received 1 error from servers: " + error.getValue());
       } else {
         Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
         throw QueryErrorCode.fromErrorCode(highestPriorityError.getKey())
-            .asException("Received " + queryExceptions.size() + " errors from server. "
+            .asException("Received " + queryExceptions.size() + " errors from servers. "
                 + "The one with highest priority is: " + highestPriorityError.getValue());
       }
     }

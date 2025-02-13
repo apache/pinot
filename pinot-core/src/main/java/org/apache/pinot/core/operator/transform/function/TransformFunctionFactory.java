@@ -350,8 +350,8 @@ public class TransformFunctionFactory {
         try {
           transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
         } catch (Exception e) {
-          throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
-              e);
+          throw new BadQueryRequestException("Caught exception while initializing transform function: "
+              + functionName + ": " + e.getMessage(), e);
         }
         return transformFunction;
       case IDENTIFIER:
