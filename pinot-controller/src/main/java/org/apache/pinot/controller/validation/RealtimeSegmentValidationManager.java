@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +29,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -120,6 +123,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     } else {
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
+
+    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessConsumptionEnabled) {
+      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig.getTableName());
+    } else if (_segmentAutoResetOnErrorAtValidation) {
+      // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
+      // additional checks for pauseless consumption
+      _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
+    }
   }
 
   /**
@@ -176,13 +188,29 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
 
+    // Ensures all segments in COMMITTING state are properly tracked in ZooKeeper.
+    // Acts as a recovery mechanism for segments that may have failed to register during start of commit protocol.
+    if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+      syncCommittingSegmentsFromMetadata(realtimeTableName, segmentsZKMetadata);
+    }
+
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
+  }
 
-    if (_segmentAutoResetOnErrorAtValidation) {
-      _pinotHelixResourceManager.resetSegments(realtimeTableName, null, true);
+  private void syncCommittingSegmentsFromMetadata(String realtimeTableName,
+      List<SegmentZKMetadata> segmentsZKMetadata) {
+    List<String> committingSegments = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (CommonConstants.Segment.Realtime.Status.COMMITTING.equals(segmentZKMetadata.getStatus())) {
+        committingSegments.add(segmentZKMetadata.getSegmentName());
+      }
+    }
+    LOGGER.info("Adding committing segments to ZK: {}", committingSegments);
+    if (!_llcRealtimeSegmentManager.syncCommittingSegments(realtimeTableName, committingSegments)) {
+      LOGGER.error("Failed to add committing segments for table: {}", realtimeTableName);
     }
   }
 

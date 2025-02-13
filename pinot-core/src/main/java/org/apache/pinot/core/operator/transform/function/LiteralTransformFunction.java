@@ -56,6 +56,10 @@ public class LiteralTransformFunction implements TransformFunction {
     _literalContext = literalContext;
   }
 
+  public LiteralContext getLiteralContext() {
+    return _literalContext;
+  }
+
   public boolean getBooleanLiteral() {
     return _literalContext.getBooleanValue();
   }
