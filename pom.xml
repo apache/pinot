@@ -151,7 +151,7 @@
     <swagger-ui.version>5.18.3</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
-    <jsonsmart.version>2.5.1</jsonsmart.version>
+    <jsonsmart.version>2.5.2</jsonsmart.version>
     <quartz.version>2.5.0</quartz.version>
     <calcite.version>1.37.0</calcite.version>
     <immutables.version>2.10.1</immutables.version>
@@ -192,7 +192,7 @@
     <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>3.3.1</pulsar.version>
-    <flink.version>1.20.0</flink.version>
+    <flink.version>1.20.1</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.17.0</commons-lang3.version>
@@ -271,7 +271,7 @@
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.10.2</c3p0.version>
-    <mchange-commons-java.version>0.3.1</mchange-commons-java.version>
+    <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
 
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>

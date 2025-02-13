@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -32,7 +33,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 class BroadcastExchange extends BlockExchange {
 
   protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
+    super(sendingMailboxes, splitter, BroadcastExchange.RANDOM_INDEX_CHOOSER);
+  }
+
+  protected BroadcastExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    super(sendingMailboxes, splitter, statsIndexChooser);
   }
 
   @Override

@@ -549,9 +549,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
-        new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(), indexLoadingConfig,
-            schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
-            partitionDedupMetadataManager, _isTableReadyToConsumeData);
+        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName, semaphore,
+            partitionUpsertMetadataManager, partitionDedupMetadataManager, _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
@@ -636,6 +635,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             return DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS;
           }
         }).orElse(DEFAULT_SEGMENT_DOWNLOAD_TIMEOUT_MS);
+  }
+
+  @VisibleForTesting
+  protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
+      TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
+      Semaphore semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
+      throws AttemptsExceededException, RetriableOperationException {
+    return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+        indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
+        partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
   /**
