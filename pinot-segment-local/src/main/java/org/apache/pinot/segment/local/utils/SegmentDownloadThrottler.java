@@ -67,4 +67,12 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentDownloadThrottler configs with latest clusterConfigs");
   }
+
+  /**
+   * Get the estimated number of threads waiting for the semaphore
+   * @return the estimated queue length
+   */
+  public int getQueueLength() {
+    return _semaphore.getQueueLength();
+  }
 }

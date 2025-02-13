@@ -71,6 +71,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -807,22 +808,28 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     if (_segmentDownloadSemaphore != null) {
       long startTime = System.currentTimeMillis();
-      _logger.info("Acquiring segment download semaphore for segment: {}, queue-length: {} ", segmentName,
+      _logger.info("Acquiring table level segment download semaphore for segment: {}, queue-length: {} ", segmentName,
           _segmentDownloadSemaphore.getQueueLength());
       _segmentDownloadSemaphore.acquire();
-      _logger.info("Acquired segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
+      _logger.info("Acquired table level segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
           segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
     try {
       if (_segmentOperationsThrottler != null) {
-        _segmentOperationsThrottler.getSegmentDownloadThrottler().acquire();
+        long startTime = System.currentTimeMillis();
+        SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+        _logger.info("Acquiring instance level segment download semaphore for segment: {}, queue-length: {} ",
+            segmentName, segmentDownloadThrottler.getQueueLength());
+        segmentDownloadThrottler.acquire();
+        _logger.info("Acquired instance level segment download semaphore for segment: {} (lock-time={}ms, "
+                + "queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
+            segmentDownloadThrottler.getQueueLength());
       }
       try {
         File untarredSegmentDir;
         if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
           _logger.info("Downloading segment: {} using streamed download-untar with maxStreamRateInByte: {}",
-              segmentName,
-              _streamSegmentDownloadUntarRateLimitBytesPerSec);
+              segmentName, _streamSegmentDownloadUntarRateLimitBytesPerSec);
           AtomicInteger failedAttempts = new AtomicInteger(0);
           try {
             untarredSegmentDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(downloadUrl, tempRootDir,
@@ -831,8 +838,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
                 failedAttempts.get());
           } finally {
             _serverMetrics.addMeteredTableValue(_tableNameWithType,
-                ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
-                failedAttempts.get());
+                ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, failedAttempts.get());
           }
         } else {
           File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
@@ -869,7 +875,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     if (_segmentOperationsThrottler != null) {
-      _segmentOperationsThrottler.getSegmentDownloadThrottler().acquire();
+      long startTime = System.currentTimeMillis();
+      SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+      _logger.info("Acquiring instance level segment download semaphore for peer downloading segment: {}, "
+              + "queue-length: {} ", segmentName, segmentDownloadThrottler.getQueueLength());
+      segmentDownloadThrottler.acquire();
+      _logger.info("Acquired instance level segment download semaphore for peer downloading segment: {} "
+              + "(lock-time={}ms, queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
+          segmentDownloadThrottler.getQueueLength());
     }
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
