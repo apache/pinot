@@ -27,7 +27,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -40,7 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public interface TableDataManagerProvider {
 
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   default TableDataManager getTableDataManager(TableConfig tableConfig) {
     return getTableDataManager(tableConfig, null, null, () -> true);

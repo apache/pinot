@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Used to throttle the total concurrent index rebuilds (for all indexes) on a given Pinot server.
  */
-public class SegmentAllIndexPreprocessThrottler extends BaseSegmentPreprocessThrottler {
+public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAllIndexPreprocessThrottler.class);
 
   /**
@@ -50,10 +50,10 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentPreprocessThr
     }
 
     LOGGER.info("Updating SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
-    handleMaxPreprocessConcurrencyChange(changedConfigs, clusterConfigs,
+    handleMaxConcurrencyChange(changedConfigs, clusterConfigs,
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM);
-    handleMaxPreprocessConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs,
+    handleMaxConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs,
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
