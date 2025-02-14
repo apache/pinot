@@ -238,7 +238,7 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
       if (fileToDeleteURI == null) {
-        LOGGER.warn("No segment file found for segment: {} in deep store", segmentId);
+        LOGGER.warn("No segment file found for segment: {} in deep store, skipping deletion", segmentId);
         return;
       }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
@@ -289,10 +289,9 @@ public class SegmentDeletionManager {
 
   /**
    * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
-   * This handles both server and minion upload scenarios:
-   * - For server uploads: searches for segment file without extension
-   * - For minion uploads (via BaseMultipleSegmentsConversionExecutor etc.): searches for segment file with .tar.gz
-   * extension
+   * Looks for the segment file in two formats:
+   * - Without extension (conventional naming)
+   * - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
    *
    * @param rawTableName name of the table containing the segment
    * @param segmentId name of the segment
@@ -302,12 +301,7 @@ public class SegmentDeletionManager {
   @Nullable
   private URI getFileToDeleteURI(String rawTableName, String segmentId) {
     try {
-      // Create both URIs upfront
       URI plainFileUri = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
-      URI compressedFileUri = URIUtils.getUri(_dataDir, rawTableName,
-          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
-
-      // Get filesystem instance once
       PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
 
       // Check for plain segment file first
@@ -315,14 +309,17 @@ public class SegmentDeletionManager {
         return plainFileUri;
       }
 
-      // Check for compressed segment file
-      if (pinotFS.exists(compressedFileUri)) {
-        return compressedFileUri;
+      URI tarGzFileUri = URIUtils.getUri(_dataDir, rawTableName,
+          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+
+      // Check for .tar.gz segment file
+      if (pinotFS.exists(tarGzFileUri)) {
+        return tarGzFileUri;
       }
-      LOGGER.error("No file found for segment: {} in deepstore", segmentId);
+      LOGGER.error("No file found for segment: {} in deep store", segmentId);
       return null;
     } catch (Exception e) {
-      LOGGER.error("Caught exception while trying to find file for segment: {} in deepstore", segmentId);
+      LOGGER.error("Caught exception while trying to find file for segment: {} in deep store", segmentId);
       return null;
     }
   }
