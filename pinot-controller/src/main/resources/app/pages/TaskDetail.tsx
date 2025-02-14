@@ -125,6 +125,9 @@ const TaskDetail = (props) => {
             <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
           </Grid>
           <Grid item xs={12}>
+            <strong>Triggered By:</strong> {get(taskDebugData, 'triggeredBy', '')}
+          </Grid>
+          <Grid item xs={12}>
             <strong>Number of Sub Tasks:</strong> {get(taskDebugData, 'subtaskCount.total', '')}
           </Grid>
         </Grid>

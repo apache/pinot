@@ -116,6 +116,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String SCHEMA_PATH = "/schemas";
   private static final String OLD_SEGMENT_PATH = "/segments";
   private static final String SEGMENT_PATH = "/v2/segments";
+  private static final String REINGESTED_SEGMENT_UPLOAD_PATH = "/segments/reingested";
   private static final String BATCH_SEGMENT_UPLOAD_PATH = "/segments/batchUpload";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "type=";
@@ -367,6 +368,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public static URI getUploadSegmentURI(URI controllerURI)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(), SEGMENT_PATH);
+  }
+
+  public static URI getReingestedSegmentUploadURI(URI controllerURI)
+      throws URISyntaxException {
+    return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
+        REINGESTED_SEGMENT_UPLOAD_PATH);
   }
 
   public static URI getBatchSegmentUploadURI(URI controllerURI)
@@ -1255,6 +1262,25 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download a file.
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @param connectionRequestTimeoutMs Connection request timeout in milliseconds
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadFile(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider, httpHeaders);
+  }
+
+  /**
    * Download and untar a file in a streamed way with rate limit
    *
    * @param uri URI
@@ -1271,6 +1297,26 @@ public class FileUploadDownloadClient implements AutoCloseable {
       long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
+        httpHeaders, maxStreamRateInByte);
+  }
+
+  /**
+   * Download and untar a file in a streamed way with rate limit
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth token
+   * @param httpHeaders http headers
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders,
+      long maxStreamRateInByte, int connectionRequestTimeoutMs, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadUntarFileStreamed(uri, connectionRequestTimeoutMs, socketTimeoutMs, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
   }
 

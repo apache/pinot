@@ -51,6 +51,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.exception.QueryInfoException;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -67,6 +68,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
@@ -91,6 +93,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
+ * to servers.
+ */
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
@@ -104,19 +110,24 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler) {
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _workerManager = new WorkerManager(hostname, port, _routingManager);
+    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
     TlsConfig tlsConfig = config.getProperty(
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
-    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tlsConfig);
+
+    failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    _queryDispatcher =
+        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tlsConfig, failureDetector,
+            this.isQueryCancellationEnabled());
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
-            + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
-        _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
+            + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
+        _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
+        this.isQueryCancellationEnabled());
     _explainAskingServerDefault = _config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
@@ -298,6 +309,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     }
 
+    String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
+    onQueryStart(requestId, clientRequestId, query);
+
     try {
       Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
@@ -330,12 +344,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             QueryException.getException(queryException, consolidatedMessage));
       } finally {
         Tracing.getThreadAccountant().clear();
+        onQueryFinish(requestId);
       }
       long executionEndTimeNs = System.nanoTime();
       updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION,
           executionEndTimeNs - executionStartTimeNs);
 
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+      brokerResponse.setClientRequestId(clientRequestId);
       brokerResponse.setResultTable(queryResults.getResultTable());
       brokerResponse.setTablesQueried(tableNames);
       brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
@@ -516,16 +532,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public Map<Long, String> getRunningQueries() {
-    // TODO: Support running query tracking for multi-stage engine
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
+  protected boolean handleCancel(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses) {
-    // TODO: Support query cancellation for multi-stage engine
-    throw new UnsupportedOperationException();
+    return _queryDispatcher.cancel(queryId);
   }
 
   /**
@@ -537,5 +546,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
     return setOfStrings.stream().limit(limit)
         .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
+  }
+
+  /**
+   * Check if a server that was previously detected as unhealthy is now healthy.
+   */
+  public boolean retryUnhealthyServer(String instanceId) {
+    LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null) {
+      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
+      return false;
+    }
+
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
   }
 }

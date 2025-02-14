@@ -31,10 +31,16 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.http.Header;
@@ -373,47 +379,24 @@ public class SegmentPushUtils implements Serializable {
       Map<String, String> segmentUriToTarPathMap, List<Header> headers, List<NameValuePair> parameters)
       throws Exception {
     String tableName = spec.getTableSpec().getTableName();
-    Map<String, File> segmentMetadataFileMap = new HashMap<>();
-    List<String> segmentURIs = new ArrayList<>();
-    LOGGER.info("Start pushing segment metadata: {} to locations: {} for table: {}", segmentUriToTarPathMap,
-        Arrays.toString(spec.getPinotClusterSpecs()), tableName);
-    for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
-      String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
-      String fileName = new File(tarFilePath).getName();
-      // segments stored in Pinot deep store do not have .tar.gz extension
-      String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
-          ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
-      SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
-      File segmentMetadataFile;
-      // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
-      // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
-      // which requires downloading the entire segment tar gz file.
-
-      URI metadataTarGzFilePath = generateSegmentMetadataURI(tarFilePath, segmentName);
-      LOGGER.info("Checking if metadata tar gz file {} exists", metadataTarGzFilePath);
-      if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
-        segmentMetadataFile = new File(FileUtils.getTempDirectory(),
-            SegmentUploadConstants.SEGMENT_METADATA_DIR_PREFIX + UUID.randomUUID()
-                + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-        if (segmentMetadataFile.exists()) {
-          FileUtils.forceDelete(segmentMetadataFile);
-        }
-        fileSystem.copyToLocalFile(metadataTarGzFilePath, segmentMetadataFile);
-      } else {
-        segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
-      }
-      segmentMetadataFileMap.put(segmentName, segmentMetadataFile);
-      segmentURIs.add(segmentName);
-      segmentURIs.add(segmentUriPath);
-    }
-
-    File allSegmentsMetadataTarFile = createSegmentsMetadataTarFile(segmentURIs, segmentMetadataFileMap);
+    ConcurrentHashMap<String, File> segmentMetadataFileMap = new ConcurrentHashMap<>();
+    ConcurrentLinkedQueue<String> segmentURIs = new ConcurrentLinkedQueue<>();
     Map<String, File> allSegmentsMetadataMap = new HashMap<>();
-    // the key is unused in batch upload mode and hence 'noopKey'
-    allSegmentsMetadataMap.put("noopKey", allSegmentsMetadataTarFile);
+    File allSegmentsMetadataTarFile = null;
+    int nThreads = spec.getPushJobSpec().getSegmentMetadataGenerationParallelism();
+    ExecutorService executor = Executors.newFixedThreadPool(nThreads);
+    LOGGER.info("Start pushing segment metadata: {} to locations: {} for table: {} with parallelism: {}",
+        segmentUriToTarPathMap, Arrays.toString(spec.getPinotClusterSpecs()), tableName,
+        spec.getPushJobSpec().getPushParallelism());
 
-    // perform metadata push in batch mode for every cluster
     try {
+      generateSegmentMetadataFiles(spec, fileSystem, segmentUriToTarPathMap, segmentMetadataFileMap, segmentURIs,
+          executor);
+      allSegmentsMetadataTarFile = createSegmentsMetadataTarFile(segmentURIs, segmentMetadataFileMap);
+      // the key is unused in batch upload mode and hence 'noopKey'
+      allSegmentsMetadataMap.put("noopKey", allSegmentsMetadataTarFile);
+
+      // perform metadata push in batch mode for every cluster
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -458,10 +441,70 @@ public class SegmentPushUtils implements Serializable {
         });
       }
     } finally {
-      for (Map.Entry<String, File> metadataFileEntry: segmentMetadataFileMap.entrySet()) {
+      for (Map.Entry<String, File> metadataFileEntry : segmentMetadataFileMap.entrySet()) {
         FileUtils.deleteQuietly(metadataFileEntry.getValue());
       }
-      FileUtils.forceDelete(allSegmentsMetadataTarFile);
+      if (allSegmentsMetadataTarFile != null) {
+        FileUtils.deleteQuietly(allSegmentsMetadataTarFile);
+      }
+      executor.shutdown();
+    }
+  }
+
+  @VisibleForTesting
+  static void generateSegmentMetadataFiles(SegmentGenerationJobSpec spec, PinotFS fileSystem,
+      Map<String, String> segmentUriToTarPathMap, ConcurrentHashMap<String, File> segmentMetadataFileMap,
+      ConcurrentLinkedQueue<String> segmentURIs, ExecutorService executor) {
+
+    List<Future<Void>> futures = new ArrayList<>();
+    // Generate segment metadata files in parallel
+    for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
+      futures.add(
+          executor.submit(() -> {
+            String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
+            String fileName = new File(tarFilePath).getName();
+            // segments stored in Pinot deep store do not have .tar.gz extension
+            String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
+                ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
+            SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
+            File segmentMetadataFile;
+            // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the
+            // remote directory. This is to avoid generating a new segment metadata tar gz file every time we push a
+            // segment, which requires downloading the entire segment tar gz file.
+
+            URI metadataTarGzFilePath = generateSegmentMetadataURI(tarFilePath, segmentName);
+            LOGGER.info("Checking if metadata tar gz file {} exists", metadataTarGzFilePath);
+            if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
+              segmentMetadataFile = new File(FileUtils.getTempDirectory(),
+                  SegmentUploadConstants.SEGMENT_METADATA_DIR_PREFIX + UUID.randomUUID()
+                      + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+              if (segmentMetadataFile.exists()) {
+                FileUtils.forceDelete(segmentMetadataFile);
+              }
+              fileSystem.copyToLocalFile(metadataTarGzFilePath, segmentMetadataFile);
+            } else {
+              segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
+            }
+            segmentMetadataFileMap.put(segmentName, segmentMetadataFile);
+            segmentURIs.add(segmentName);
+            segmentURIs.add(segmentUriPath);
+            return null;
+          }));
+    }
+    int errorCount = 0;
+    Exception exception = null;
+    for (Future<Void> future : futures) {
+      try {
+        future.get();
+      } catch (Exception e) {
+        errorCount++;
+        exception = e;
+      }
+    }
+    if (errorCount > 0) {
+      throw new RuntimeException(
+          String.format("%d out of %d segment metadata generation failed", errorCount, segmentUriToTarPathMap.size()),
+          exception);
     }
   }
 
@@ -483,13 +526,13 @@ public class SegmentPushUtils implements Serializable {
   // Additionally, it contains a segmentName to segmentDownloadURI mapping file which allows us to avoid sending the
   // segmentDownloadURI as a header field as there are limitations on the number of headers allowed in the http request.
   @VisibleForTesting
-  static File createSegmentsMetadataTarFile(List<String> segmentURIs, Map<String, File> segmentMetadataFileMap)
+  static File createSegmentsMetadataTarFile(Collection<String> segmentURIs, Map<String, File> segmentMetadataFileMap)
       throws IOException {
     String uuid = UUID.randomUUID().toString();
     File allSegmentsMetadataDir =
         new File(FileUtils.getTempDirectory(), SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX + uuid);
     FileUtils.forceMkdir(allSegmentsMetadataDir);
-    for (Map.Entry<String, File> segmentMetadataTarFileEntry: segmentMetadataFileMap.entrySet()) {
+    for (Map.Entry<String, File> segmentMetadataTarFileEntry : segmentMetadataFileMap.entrySet()) {
       String segmentName = segmentMetadataTarFileEntry.getKey();
       File tarFile = segmentMetadataTarFileEntry.getValue();
       TarCompressionUtils.untarOneFile(tarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,

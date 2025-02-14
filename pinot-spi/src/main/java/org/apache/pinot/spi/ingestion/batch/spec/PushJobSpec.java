@@ -54,6 +54,12 @@ public class PushJobSpec implements Serializable {
   private boolean _batchSegmentUpload;
 
   /**
+   * Applicable for METADATA push type.
+   * Number of threads to use for segment metadata generation.
+   */
+  private int _segmentMetadataGenerationParallelism = 1;
+
+  /**
    * Used in SegmentUriPushJobRunner, which is used to composite the segment uri to send to pinot controller.
    * The URI sends to controller is in the format ${segmentUriPrefix}${segmentPath}${segmentUriSuffix}
    */
@@ -162,5 +168,13 @@ public class PushJobSpec implements Serializable {
 
   public void setBatchSegmentUpload(boolean batchSegmentUpload) {
     _batchSegmentUpload = batchSegmentUpload;
+  }
+
+  public int getSegmentMetadataGenerationParallelism() {
+    return _segmentMetadataGenerationParallelism;
+  }
+
+  public void setSegmentMetadataGenerationParallelism(int segmentMetadataGenerationParallelism) {
+    _segmentMetadataGenerationParallelism = segmentMetadataGenerationParallelism;
   }
 }

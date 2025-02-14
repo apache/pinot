@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.failuredetector;
+package org.apache.pinot.common.failuredetector;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;

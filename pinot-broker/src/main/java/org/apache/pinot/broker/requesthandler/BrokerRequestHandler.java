@@ -83,4 +83,19 @@ public interface BrokerRequestHandler {
   boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception;
+
+  /**
+   * Cancel a query as identified by the clientQueryId provided externally. This method is non-blocking so the query may
+   * still run for a while after calling this method. This cancel method can be called multiple times.
+   * @param clientQueryId the Id assigned to the query by the client
+   * @param timeoutMs timeout to wait for servers to respond the cancel requests
+   * @param executor to send cancel requests to servers in parallel
+   * @param connMgr to provide the http connections
+   * @param serverResponses to collect cancel responses from all servers if a map is provided
+   * @return true if there is a running query for the given clientQueryId.
+   */
+  boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr,
+      Map<String, Integer> serverResponses)
+      throws Exception;
 }
