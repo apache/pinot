@@ -3938,7 +3938,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2, tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2,
+        tableConfig.getReplication());
 
     // Disable dry-run, summary still enabled
     rebalanceConfig.setDryRun(false);
@@ -3963,7 +3964,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1, tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1,
+        tableConfig.getReplication());
 
     // Disable dry-run and summary to do a real rebalance
     rebalanceConfig.setDryRun(false);
