@@ -3932,13 +3932,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Enable summary, nothing is set
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1, tableConfig.getReplication());
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2, tableConfig.getReplication());
 
     // Disable dry-run, summary still enabled
     rebalanceConfig.setDryRun(false);
@@ -3963,7 +3963,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1, tableConfig.getReplication());
 
     // Disable dry-run and summary to do a real rebalance
     rebalanceConfig.setDryRun(false);
@@ -3985,15 +3985,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1, tableConfig.getReplication());
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
-      int numSegmentsToBeMoved, int existingNumServers, int newNumServers) {
+      int numSegmentsToBeMoved, int existingNumServers, int newNumServers, int replicationFactor) {
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult);
-    assertEquals(summaryResult.getReplicationFactor()._existingValue, getNumReplicas(),
+    assertEquals(summaryResult.getReplicationFactor()._existingValue, replicationFactor,
         "Existing replication factor doesn't match expected");
     assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue,
         "Existing and new replication factor doesn't match");
