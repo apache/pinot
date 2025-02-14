@@ -33,7 +33,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.Inverte
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -85,7 +85,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     process(null);
   }
 
-  public void process(@Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+  public void process(@Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       LOGGER.info("Skip preprocessing empty segment: {}", _segmentMetadata.getName());
@@ -160,7 +160,7 @@ public class SegmentPreProcessor implements AutoCloseable {
     // that the other required indices (e.g. forward index) are up-to-date.
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Create/modify/remove star-trees if required.
-      processStarTrees(indexDir, segmentPreprocessThrottler);
+      processStarTrees(indexDir, segmentOperationsThrottler);
       _segmentDirectory.reloadMetadata();
       segmentWriter.save();
     }
@@ -245,7 +245,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   private void processStarTrees(File indexDir,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     // Create/modify/remove star-trees if required
     if (_indexLoadingConfig.isEnableDynamicStarTreeCreation()) {
@@ -270,8 +270,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
       // Generate/remove the star-trees if needed
       if (shouldGenerateStarTree || shouldRemoveStarTree) {
-        if (segmentPreprocessThrottler != null) {
-          segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().acquire();
+        if (segmentOperationsThrottler != null) {
+          segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().acquire();
         }
 
         try {
@@ -288,8 +288,8 @@ public class SegmentPreProcessor implements AutoCloseable {
           }
           _segmentMetadata = new SegmentMetadataImpl(indexDir);
         } finally {
-          if (segmentPreprocessThrottler != null) {
-            segmentPreprocessThrottler.getSegmentStarTreePreprocessThrottler().release();
+          if (segmentOperationsThrottler != null) {
+            segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().release();
           }
         }
       }
