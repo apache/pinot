@@ -1176,7 +1176,7 @@ public class CommonConstants {
          * Returns {@code true} if the segment is completed (DONE/UPLOADED), {@code false} otherwise.
          */
         public boolean isCompleted() {
-          return this != IN_PROGRESS;
+          return this != IN_PROGRESS && this != COMMITTING;
         }
       }
 
