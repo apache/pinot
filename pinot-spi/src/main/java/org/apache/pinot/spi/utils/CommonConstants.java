@@ -614,7 +614,7 @@ public class CommonConstants {
       public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
-      public static final int DEFAULT_MAX_RETIRES = 10;
+      public static final int DEFAULT_MAX_RETRIES = 10;
     }
 
     // Configs related to AdaptiveServerSelection.

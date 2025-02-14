@@ -146,8 +146,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
-    _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
+    _servers.put(new QueryServerInstance("Server_localhost_" + port1, "localhost", port1, port1), server1);
+    _servers.put(new QueryServerInstance("Server_localhost_" + port2, "localhost", port2, port2), server2);
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
