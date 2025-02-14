@@ -26,6 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -444,7 +445,6 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
-    // TODO: Compute value and create query is date trunc is applied on a literal value
     if (dateTruncOperands.get(1).isSetLiteral()) {
       return;
     }
@@ -457,9 +457,13 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     String unit = operands.get(0).getLiteral().getStringValue();
     String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
-    ISOChronology chronology = (operands.size() >= 4)
-        ? DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(operands.get(3).getLiteral().getStringValue()))
-        : ISOChronology.getInstanceUTC();
+    if (operands.size() >= 4) {
+      if (!operands.get(3).getLiteral().getStringValue().equals("UTC")) {
+        // Leave query unoptimized if working with non-UTC time zones
+        return;
+      }
+    }
+    ISOChronology chronology = ISOChronology.getInstanceUTC();
     String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
     switch (filterKind) {
@@ -467,8 +471,6 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
         upperMillis = dateTruncCeil(operands);
         lowerMillis = dateTruncFloor(operands);
-//        System.out.println(lowerMillis + " " + TimeUnit.MILLISECONDS.convert(getLongValue(filterOperands.get(1)), TimeUnit.valueOf(outputTimeUnit.toUpperCase())));
-        System.out.println(lowerMillis + " " + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(lowerMillis));
         if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
           lowerMillis = Long.MAX_VALUE;
           upperMillis = Long.MIN_VALUE;
@@ -578,15 +580,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    */
   private long dateTruncFloor(List<Expression> operands) {
     long timeValue = getLongValue(operands.get(1));
-    String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
-        : TimeUnit.MILLISECONDS.name();
     String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
-    long truncatedTimeInMs = TimeUnit.MILLISECONDS.convert(timeValue,
-        TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
-//    truncatedTimeInMs = DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(),
-//        inputTimeUnit.substring(0, inputTimeUnit.length() - 1)).roundCeiling(truncatedTimeInMs);
-    return truncatedTimeInMs;
+    return TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
   }
 
   /**
@@ -598,23 +594,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     ISOChronology chronology = (operands.size() >= 4)
         ? DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(operands.get(3).getLiteral().getStringValue()))
         : ISOChronology.getInstanceUTC();
-    return DateTimeUtils.getTimestampField(chronology, unit).roundFloor(dateTruncFloor(operands)) + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;
-  }
-
-  public static long[] calculateRangeForDateTrunc(String unit, long targetTruncatedValue,
-      String inputTimeUnit, ISOChronology chronology,
-      String outputTimeUnit) {
-    long truncatedTimeInMs = TimeUnit.MILLISECONDS.convert(targetTruncatedValue,
-        TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
-    DateTimeField field = DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit);
-    truncatedTimeInMs = DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), inputTimeUnit.substring(0, inputTimeUnit.length() - 1)).roundCeiling(truncatedTimeInMs);
-    System.out.println(DateTimeUtils.getTimestampField(chronology, unit).roundFloor(truncatedTimeInMs));
-    long intervalEndInMs = truncatedTimeInMs + field.roundCeiling(1) - 1;
-    System.out.println(DateTimeUtils.getTimestampField(chronology, unit).roundFloor(truncatedTimeInMs) + field.roundCeiling(1) - 1);
-    long intervalStart = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
-        .convert(truncatedTimeInMs, TimeUnit.MILLISECONDS);
-    long intervalEnd = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
-        .convert(intervalEndInMs, TimeUnit.MILLISECONDS);
-    return new long[] { intervalStart, intervalEnd };
+    return DateTimeUtils.getTimestampField(chronology, unit).roundFloor(dateTruncFloor(operands))
+        + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;
   }
 }
