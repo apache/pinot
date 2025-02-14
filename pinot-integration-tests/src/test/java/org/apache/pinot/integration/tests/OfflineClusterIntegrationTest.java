@@ -3938,7 +3938,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, 6, 1, 2);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2);
 
     // Disable dry-run, summary still enabled
     rebalanceConfig.setDryRun(false);
@@ -3963,7 +3963,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, 6, 2, 1);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1);gi
 
     // Disable dry-run and summary to do a real rebalance
     rebalanceConfig.setDryRun(false);
@@ -3993,29 +3993,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult);
-    assertEquals(summaryResult.getReplicationFactor()._existingValue, 1);
-    assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue);
-    assertEquals(summaryResult.getTotalSegmentsToBeMoved(), numSegmentsToBeMoved);
-    assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers);
-    assertEquals(summaryResult.getNumServers()._newValue, newNumServers);
+    assertEquals(summaryResult.getReplicationFactor()._existingValue, getNumReplicas(),
+        "Existing replication factor doesn't match expected");
+    assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue,
+        "Existing and new replication factor doesn't match");
+    assertEquals(summaryResult.getTotalSegmentsToBeMoved(), numSegmentsToBeMoved,
+        "Segments to be moved doesn't match expected");
+    assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers,
+        "Existing number of servers don't match");
+    assertEquals(summaryResult.getNumServers()._newValue, newNumServers, "New number of servers don't match");
     long avgSegmentSize = _tableSize / summaryResult.getNumUniqueSegments()._existingValue;
-    assertEquals(summaryResult.getEstimatedAverageSegmentSizeInBytes(), avgSegmentSize);
+    assertEquals(summaryResult.getEstimatedAverageSegmentSizeInBytes(), avgSegmentSize,
+        "Average segment size doesn't match");
     if (existingNumServers != newNumServers) {
-      assertEquals(summaryResult.getNumServersGettingNewSegments(), Math.abs(newNumServers - existingNumServers));
+      assertEquals(summaryResult.getNumServersGettingNewSegments(), Math.abs(newNumServers - existingNumServers),
+          "Expected number of servers getting new segments doesn't match");
     } else {
-      assertEquals(summaryResult.getNumServersGettingNewSegments(), 0);
+      assertEquals(summaryResult.getNumServersGettingNewSegments(), 0,
+          "Expected number of servers getting new segments should be 0");
     }
 
     if (numSegmentsToBeMoved > 0) {
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(),
-          numSegmentsToBeMoved * summaryResult.getEstimatedAverageSegmentSizeInBytes());
+          numSegmentsToBeMoved * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
+          "Estimated data to be moved in bytes doesn't match");
       double expectedTimeToMoveSegmentsInSec = numSegmentsToBeMoved
           * summaryResult.getEstimatedAverageSegmentSizeInBytes()
           / (double) summaryResult.getNumServersGettingNewSegments() / (100.0D * 1024.0D * 1024.0D);
-      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), expectedTimeToMoveSegmentsInSec);
+      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), expectedTimeToMoveSegmentsInSec,
+          "Estimated time to move segments doesn't match");
     } else {
-      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L);
-      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D);
+      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
+          "Estimated data to be moved in bytes should be 0");
+      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
+          "Estimated time to move segments should be 0.0D");
     }
   }
 
