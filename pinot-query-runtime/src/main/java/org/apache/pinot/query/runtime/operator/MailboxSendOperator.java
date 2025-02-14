@@ -110,8 +110,40 @@ public class MailboxSendOperator extends MultiStageOperator {
           getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
       perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
     }
+
+    Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        Collections.emptyList(), mainSplitter);
+        Collections.emptyList(), mainSplitter, statsIndexChooser);
+  }
+
+  private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
+      MailboxSendNode node) {
+    // Stats must be sent to a single stage. That stage must also be one with a smaller stage id than the current stage.
+    // Ideally, the stage chosen should always be the same in order to have repeatable stats.
+    int minStageIndex = indexOfMinStageId(node);
+    Preconditions.checkState(minStageIndex >= 0, "Invalid minStageIndex: %s", minStageIndex);
+    Preconditions.checkArgument(minStageIndex < ctx.getStageId(),
+        "Min stage index %s should be smaller than current stage id %s",
+        minStageIndex, ctx.getStageId());
+    return sendingMailboxes -> {
+      Preconditions.checkState(minStageIndex <= sendingMailboxes.size(),
+          "Invalid minStageIndex: %s, sendingMailboxes.size(): %s", minStageIndex, sendingMailboxes.size());
+      return minStageIndex;
+    };
+  }
+
+  private static int indexOfMinStageId(MailboxSendNode node) {
+    int minStageId = Integer.MAX_VALUE;
+    int index = 0;
+    int minIndex = Integer.MAX_VALUE;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      if (receiverStageId < minStageId) {
+        minStageId = receiverStageId;
+        minIndex = index;
+      }
+      index++;
+    }
+    return minIndex;
   }
 
   /**

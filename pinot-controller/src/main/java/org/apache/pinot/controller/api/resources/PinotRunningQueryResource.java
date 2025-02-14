@@ -30,8 +30,10 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -160,6 +162,142 @@ public class PinotRunningQueryResource {
     }
   }
 
+  @DELETE
+  @Path("clientQuery/{brokerId}/{clientQueryId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Cancel a query as identified by the clientQueryId", notes = "No effect if no query exists for "
+      + "the given clientQueryId on the requested broker. Query may continue to run for a short while after calling"
+      + "cancel as it's done in a non-blocking manner. The cancel method can be called multiple times.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found on the requested broker")
+  })
+  public String cancelClientQueryInBroker(
+      @ApiParam(value = "Broker that's running the query", required = true) @PathParam("brokerId") String brokerId,
+      @ApiParam(value = "ClientQueryId provided by the client", required = true)
+      @PathParam("clientQueryId") long clientQueryId,
+      @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
+      @DefaultValue("3000") int timeoutMs,
+      @ApiParam(value = "Return verbose responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
+      boolean verbose, @Context HttpHeaders httpHeaders) {
+    InstanceConfig broker = _pinotHelixResourceManager.getHelixInstanceConfig(brokerId);
+    if (broker == null) {
+      throw new WebApplicationException(
+          Response.status(Response.Status.BAD_REQUEST).entity("Unknown broker: " + brokerId).build());
+    }
+    try {
+      Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
+      RequestConfig defaultRequestConfig =
+          RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout).build();
+
+      CloseableHttpClient client =
+          HttpClients.custom().setConnectionManager(_httpConnMgr).setDefaultRequestConfig(defaultRequestConfig).build();
+
+      String protocol = _controllerConf.getControllerBrokerProtocol();
+      int portOverride = _controllerConf.getControllerBrokerPortOverride();
+      int port = portOverride > 0 ? portOverride : Integer.parseInt(broker.getPort());
+      HttpDelete deleteMethod = new HttpDelete(String.format(
+          "%s://%s:%d/clientQuery/%d?verbose=%b",
+          protocol, broker.getHostName(), port, clientQueryId, verbose));
+      Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
+      requestHeaders.forEach(deleteMethod::setHeader);
+      try (CloseableHttpResponse response = client.execute(deleteMethod)) {
+        int status = response.getCode();
+        String responseContent = EntityUtils.toString(response.getEntity());
+        if (status == 200) {
+          return responseContent;
+        }
+        if (status == 404) {
+          throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+              .entity(String.format("Client query: %s not found on the broker: %s", clientQueryId, brokerId)).build());
+        }
+        throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+            String.format("Failed to cancel client query: %s on the broker: %s with unexpected status=%d and resp='%s'",
+                clientQueryId, brokerId, status, responseContent)).build());
+      }
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+          String.format("Failed to cancel client query: %s on the broker: %s due to error: %s", clientQueryId, brokerId,
+              e.getMessage())).build());
+    }
+  }
+
+  @DELETE
+  @Path("clientQuery/{clientQueryId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Cancel a query as identified by the clientQueryId", notes = "No effect if no query exists for"
+      + "the given clientQueryId on any broker. Query may continue to run for a short while after calling"
+      + "cancel as it's done in a non-blocking manner. The cancel method can be called multiple times.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found on any broker")
+  })
+  public String cancelClientQuery(
+      @ApiParam(value = "ClientQueryId provided by the client", required = true)
+      @PathParam("clientQueryId") String clientQueryId,
+      @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
+      @DefaultValue("3000") int timeoutMs,
+      @ApiParam(value = "Return verbose responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
+      boolean verbose, @Context HttpHeaders httpHeaders) {
+    try {
+      Timeout timeout = Timeout.of(timeoutMs, TimeUnit.MILLISECONDS);
+      RequestConfig defaultRequestConfig =
+          RequestConfig.custom().setConnectionRequestTimeout(timeout).setResponseTimeout(timeout).build();
+      CloseableHttpClient client =
+          HttpClients.custom().setConnectionManager(_httpConnMgr).setDefaultRequestConfig(defaultRequestConfig).build();
+
+      String protocol = _controllerConf.getControllerBrokerProtocol();
+      int portOverride = _controllerConf.getControllerBrokerPortOverride();
+
+      Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
+      List<HttpDelete> brokerDeletes = new ArrayList<>();
+      for (InstanceInfo broker: getBrokers(httpHeaders.getHeaderString(DATABASE)).values()) {
+        int port = portOverride > 0 ? portOverride : broker.getPort();
+        HttpDelete delete = new HttpDelete(String.format(
+            "%s://%s:%d/query/%s?client=true&verbose=%b", protocol, broker.getHost(), port, clientQueryId, verbose));
+        requestHeaders.forEach(delete::setHeader);
+        brokerDeletes.add(delete);
+      }
+
+      if (brokerDeletes.isEmpty()) {
+        throw new WebApplicationException(
+            Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("No available brokers").build());
+      }
+
+      Set<Integer> statusCodes = new HashSet<>();
+      for (HttpDelete delete: brokerDeletes) {
+        try (CloseableHttpResponse response = client.execute(delete)) {
+          int status = response.getCode();
+          String responseContent = EntityUtils.toString(response.getEntity());
+          if (status == 200) {
+            return responseContent;
+          } else {
+            statusCodes.add(status);
+          }
+        }
+      }
+
+      if (statusCodes.size() == 1 && statusCodes.iterator().next() == 404) {
+        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+            .entity(String.format("Client query: %s not found on any broker", clientQueryId)).build());
+      }
+
+      statusCodes.remove(404);
+      int status = statusCodes.iterator().next();
+      throw new Exception(
+          String.format("Unexpected status=%d", status));
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+          String.format("Failed to cancel client query: %s due to error: %s", clientQueryId, e.getMessage())).build());
+    }
+  }
+
   @GET
   @Path("/queries")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
@@ -173,10 +311,7 @@ public class PinotRunningQueryResource {
       @ApiParam(value = "Timeout for brokers to return running queries") @QueryParam("timeoutMs") @DefaultValue("3000")
       int timeoutMs, @Context HttpHeaders httpHeaders) {
     try {
-      Map<String, List<InstanceInfo>> tableBrokers =
-          _pinotHelixResourceManager.getTableToLiveBrokersMapping(httpHeaders.getHeaderString(DATABASE));
-      Map<String, InstanceInfo> brokers = new HashMap<>();
-      tableBrokers.values().forEach(list -> list.forEach(info -> brokers.putIfAbsent(getInstanceKey(info), info)));
+      Map<String, InstanceInfo> brokers = getBrokers(httpHeaders.getHeaderString(DATABASE));
       return getRunningQueries(brokers, timeoutMs, createRequestHeaders(httpHeaders));
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -246,5 +381,13 @@ public class PinotRunningQueryResource {
       requestHeaders.put(header, httpHeaders.getHeaderString(header));
     });
     return requestHeaders;
+  }
+
+  private Map<String, InstanceInfo> getBrokers(String database) {
+    Map<String, List<InstanceInfo>> tableBrokers =
+        _pinotHelixResourceManager.getTableToLiveBrokersMapping(database);
+    Map<String, InstanceInfo> brokers = new HashMap<>();
+    tableBrokers.values().forEach(list -> list.forEach(info -> brokers.putIfAbsent(getInstanceKey(info), info)));
+    return brokers;
   }
 }

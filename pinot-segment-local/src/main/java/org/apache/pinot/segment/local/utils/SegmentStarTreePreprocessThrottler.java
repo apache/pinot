@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Used to throttle the total concurrent startree index rebuilds on a given Pinot server.
  */
-public class SegmentStarTreePreprocessThrottler extends BaseSegmentPreprocessThrottler {
+public class SegmentStarTreePreprocessThrottler extends BaseSegmentOperationsThrottler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStarTreePreprocessThrottler.class);
 
   /**
@@ -52,10 +52,10 @@ public class SegmentStarTreePreprocessThrottler extends BaseSegmentPreprocessThr
     }
 
     LOGGER.info("Updating SegmentStarTreePreprocessThrottler configs with latest clusterConfigs");
-    handleMaxPreprocessConcurrencyChange(changedConfigs, clusterConfigs,
+    handleMaxConcurrencyChange(changedConfigs, clusterConfigs,
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM);
-    handleMaxPreprocessConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs,
+    handleMaxConcurrencyBeforeServingQueriesChange(changedConfigs, clusterConfigs,
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentStarTreePreprocessThrottler configs with latest clusterConfigs");

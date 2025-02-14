@@ -50,7 +50,7 @@ import java.time.Duration;
 public class RangeTimeSeriesRequest {
   // TODO: It's not ideal to have another default, that plays with numGroupsLimit, etc.
   public static final int DEFAULT_SERIES_LIMIT = 100_000;
-  public static final int DEFAULT_NUM_GROUPS_LIMIT = -1;
+  public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
   /** Engine allows a Pinot cluster to support multiple Time-Series Query Languages. */
   private final String _language;
   /** Query is the raw query sent by the caller. */

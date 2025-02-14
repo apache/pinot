@@ -1,0 +1,21 @@
+{
+    "metricFieldSpecs": [],
+    "dimensionFieldSpecs": [
+      {
+        "dataType": "STRING",
+        "name": "event_id"
+      }
+    ],
+    "dateTimeFieldSpecs": [
+      {
+        "name": "mtime",
+        "dataType": "TIMESTAMP",
+        "format": "1:MILLISECONDS:TIMESTAMP",
+        "granularity": "1:MILLISECONDS"
+      }
+    ],
+    "schemaName": "upsertMeetupRsvp",
+    "primaryKeyColumns": [
+      "event_id"
+    ]
+}

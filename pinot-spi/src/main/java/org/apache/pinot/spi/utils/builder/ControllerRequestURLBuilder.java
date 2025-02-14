@@ -614,4 +614,16 @@ public class ControllerRequestURLBuilder {
   public String forSegmentUpload() {
     return StringUtil.join("/", _baseUrl, "v2/segments");
   }
+
+  public String forCancelQueryByClientId(String clientRequestId) {
+    return StringUtil.join("/", _baseUrl, "clientQuery", clientRequestId);
+  }
+
+  public String forExternalView(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
+
+  public String forIdealState(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "idealstate");
+  }
 }

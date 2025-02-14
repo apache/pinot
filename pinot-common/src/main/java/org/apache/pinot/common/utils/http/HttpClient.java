@@ -37,6 +37,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.entity.mime.MultipartEntityBuilder;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -83,6 +84,9 @@ public class HttpClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpClient.class);
 
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
+
+  // 3 minutes, match RequestConfig.DEFAULT_CONNECTION_REQUEST_TIMEOUT for backwards compatibility
+  public static final int DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS = 180 * 1000;
   public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
   public static final int DELETE_REQUEST_SOCKET_TIMEOUT_MS = 10 * 1000; // 10 seconds
   public static final String AUTH_HTTP_HEADER = "Authorization";
@@ -383,6 +387,7 @@ public class HttpClient implements AutoCloseable {
    * Download a file using default settings, with an optional auth token
    *
    * @param uri URI
+   * @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
    * @param authProvider auth provider
@@ -391,12 +396,14 @@ public class HttpClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
+  public int downloadFile(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
+      AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
     ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
 
     RequestConfig requestConfig =
-        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+        RequestConfig.custom().setConnectionRequestTimeout(Timeout.ofMilliseconds(connectionRequestTimeoutMs))
+            .setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
 
@@ -426,9 +433,27 @@ public class HttpClient implements AutoCloseable {
   }
 
   /**
+   * Download a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
+      throws IOException, HttpErrorStatusException {
+    return downloadFile(uri, DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS, socketTimeoutMs, dest, authProvider, httpHeaders);
+  }
+
+  /**
    * Download and untar in a streamed manner a file using default settings, with an optional auth token
    *
    * @param uri URI
+   * @param connectionRequestTimeoutMs Connection request timeout (wait for connection from pool) in milliseconds
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
    * @param authProvider auth provider
@@ -439,14 +464,15 @@ public class HttpClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
-      List<Header> httpHeaders, long maxStreamRateInByte)
+  public File downloadUntarFileStreamed(URI uri, int connectionRequestTimeoutMs, int socketTimeoutMs, File dest,
+      AuthProvider authProvider, List<Header> httpHeaders, long maxStreamRateInByte)
       throws IOException, HttpErrorStatusException {
     ClassicHttpRequest request = getDownloadFileRequest(uri, authProvider, httpHeaders);
     File ret;
 
     RequestConfig requestConfig =
-        RequestConfig.custom().setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
+        RequestConfig.custom().setConnectionRequestTimeout(Timeout.ofMilliseconds(connectionRequestTimeoutMs))
+            .setResponseTimeout(Timeout.ofMilliseconds(socketTimeoutMs)).build();
     HttpClientContext clientContext = HttpClientContext.create();
     clientContext.setRequestConfig(requestConfig);
 
@@ -464,6 +490,27 @@ public class HttpClient implements AutoCloseable {
 
       return ret;
     }
+  }
+
+  /**
+   * Download and untar in a streamed manner a file using default settings, with an optional auth token
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param httpHeaders http headers
+   * @param maxStreamRateInByte limit the rate to write download-untar stream to disk, in bytes
+   *                  -1 for no disk write limit, 0 for limit the writing to min(untar, download) rate
+   * @return The untarred directory
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public File downloadUntarFileStreamed(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider,
+      List<Header> httpHeaders, long maxStreamRateInByte)
+      throws IOException, HttpErrorStatusException {
+    return downloadUntarFileStreamed(uri, DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS, socketTimeoutMs, dest, authProvider,
+        httpHeaders, maxStreamRateInByte);
   }
 
   // --------------------------------------------------------------------------
@@ -505,6 +552,13 @@ public class HttpClient implements AutoCloseable {
     }
     if (httpClientConfig.getMaxConnPerRoute() > 0) {
       connManager.setDefaultMaxPerRoute(httpClientConfig.getMaxConnPerRoute());
+    }
+
+    // Set any connection configs
+    if (httpClientConfig.getConnectionTimeoutMs() > 0) {
+      ConnectionConfig.Builder connectionConfigBuilder = ConnectionConfig.custom();
+      connectionConfigBuilder.setConnectTimeout(Timeout.ofMilliseconds(httpClientConfig.getConnectionTimeoutMs()));
+      connManager.setDefaultConnectionConfig(connectionConfigBuilder.build());
     }
 
     HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(connManager);

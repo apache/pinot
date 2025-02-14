@@ -79,6 +79,10 @@ public class CommonConstants {
     CONSUMING, NOT_CONSUMING // In error state
   }
 
+  public enum TaskTriggers {
+    CRON_TRIGGER, MANUAL_TRIGGER, ADHOC_TRIGGER, UNKNOWN
+  }
+
   public static class Table {
     public static final String PUSH_FREQUENCY_HOURLY = "hourly";
     public static final String PUSH_FREQUENCY_DAILY = "daily";
@@ -263,6 +267,12 @@ public class CommonConstants {
         "pinot.server.max.segment.startree.preprocess.parallelism.before.serving.queries";
     public static final String DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES =
         String.valueOf(100);
+    public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM =
+        "pinot.server.max.segment.download.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM = "100";
+    public static final String CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES =
+        "pinot.server.max.segment.download.parallelism.before.serving.queries";
+    public static final String DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES = "100";
   }
 
   public static class Broker {
@@ -348,6 +358,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
         "pinot.broker.min.init.indexed.table.capacity";
     public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
+
+    // this config allows enabling is_enable_group_trim hint for all queries and thus enabling V1-style trimming in
+    // leaf nodes and v2-style trimming in intermediate nodes
+    public static final String CONFIG_OF_ENABLE_GROUP_TRIM = "pinot.broker.enable.group.trim";
+    public static final boolean DEFAULT_BROKER_ENABLE_GROUP_TRIM = false;
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -566,6 +581,9 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+
+        // Custom Query ID provided by the client
+        public static final String CLIENT_QUERY_ID = "clientQueryId";
       }
 
       public static class QueryOptionValue {
@@ -596,7 +614,7 @@ public class CommonConstants {
       public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
       public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
       public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
-      public static final int DEFAULT_MAX_RETIRES = 10;
+      public static final int DEFAULT_MAX_RETRIES = 10;
     }
 
     // Configs related to AdaptiveServerSelection.

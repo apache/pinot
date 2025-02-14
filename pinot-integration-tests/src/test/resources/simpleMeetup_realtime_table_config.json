@@ -1,0 +1,40 @@
+{
+  "tableName": "upsertMeetupRsvp",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "mtime",
+    "timeType": "MILLISECONDS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "upsertMeetupRsvp",
+    "replicasPerPartition": "1",
+    "replicaGroupStrategyConfig": {
+      "partitionColumn": "event_id",
+      "numInstancesPerPartition": 1
+    }
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "streamConfigs": {
+      "stream.kafka.topic.name": "meetup",
+      "bootstrap.servers": "localhost:19092",
+      "stream.kafka.broker.list": "localhost:19092",
+      "streamType": "kafka",
+      "stream.kafka.consumer.type": "lowLevel",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+      "realtime.segment.flush.threshold.size": 30,
+      "realtime.segment.flush.threshold.rows": 30
+    }
+  },
+  "fieldConfigList": [
+  ],
+  "metadata": {
+    "customConfigs": {}
+  },
+  "routing": {
+    "segmentPrunerTypes": ["partition"],
+    "instanceSelectorType": "strictReplicaGroup"
+  }
+}

@@ -26,11 +26,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
@@ -45,7 +43,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
@@ -75,7 +72,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
 
   @Override
   public BaseControllerStarter createControllerStarter() {
-    return new FakePauselessControllerStarter();
+    return new FailureInjectingControllerStarter();
   }
 
   @Override
@@ -110,7 +107,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     startController();
     startBroker();
     startServer();
-
+    setMaxSegmentCompletionTimeMillis();
     setupNonPauselessTable();
     injectFailure();
     setupPauselessTable();
@@ -163,6 +160,14 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     tableConfig.setIngestionConfig(ingestionConfig);
 
     addTableConfig(tableConfig);
+  }
+
+  private void setMaxSegmentCompletionTimeMillis() {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
+    if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
+          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+    }
   }
 
   protected void injectFailure() {
@@ -261,36 +266,5 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
       }
     }
     return false;
-  }
-
-  private static class FakePauselessLLCRealtimeSegmentManager extends FailureInjectingPinotLLCRealtimeSegmentManager {
-
-    public FakePauselessLLCRealtimeSegmentManager(
-        PinotHelixResourceManager helixResourceManager,
-        ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
-      super(helixResourceManager, controllerConf, controllerMetrics);
-    }
-
-    @Override
-    protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
-        long currentTimeMs) {
-      Stat stat = new Stat();
-      getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-      if (currentTimeMs > stat.getMtime() + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
-        LOGGER.info("Segment: {} exceeds the max completion time: {}ms, metadata update time: {}, current time: {}",
-            segmentName, MAX_SEGMENT_COMPLETION_TIME_MILLIS, stat.getMtime(), currentTimeMs);
-        return true;
-      } else {
-        return false;
-      }
-    }
-  }
-
-  private static class FakePauselessControllerStarter extends FailureInjectingControllerStarter {
-
-    @Override
-    protected PinotLLCRealtimeSegmentManager createPinotLLCRealtimeSegmentManager() {
-      return new FakePauselessLLCRealtimeSegmentManager(_helixResourceManager, getConfig(), _controllerMetrics);
-    }
   }
 }

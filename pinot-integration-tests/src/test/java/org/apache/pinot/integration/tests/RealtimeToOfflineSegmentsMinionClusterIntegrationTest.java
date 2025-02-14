@@ -33,6 +33,7 @@ import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -231,13 +232,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
+      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName)))
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      MinionTaskTestUtils.assertNoTaskSchedule(_realtimeTableName,
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _taskManager);
+      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeTableName))
+              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+          _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark, _realtimeTableName);
@@ -283,13 +287,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeMetadataTableName, null)
+      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName)))
           .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
       assertTrue(_taskResourceManager.getTaskQueues().contains(
           PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
       // Should not generate more tasks
-      MinionTaskTestUtils.assertNoTaskSchedule(_realtimeMetadataTableName,
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _taskManager);
+      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName))
+              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+          _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
       waitForTaskToComplete(expectedWatermark, _realtimeMetadataTableName);

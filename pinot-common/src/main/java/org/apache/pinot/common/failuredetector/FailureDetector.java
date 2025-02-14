@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.failuredetector;
+package org.apache.pinot.common.failuredetector;
 
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -38,50 +39,30 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface FailureDetector {
 
   /**
-   * Listener for the failure detector.
-   */
-  interface Listener {
-
-    /**
-     * Notifies the listener of an unhealthy server.
-     */
-    void notifyUnhealthyServer(String instanceId, FailureDetector failureDetector);
-
-    /**
-     * Notifies the listener to retry a previous unhealthy server.
-     */
-    void retryUnhealthyServer(String instanceId, FailureDetector failureDetector);
-
-    /**
-     * Notifies the listener of a previous unhealthy server turning healthy.
-     */
-    void notifyHealthyServer(String instanceId, FailureDetector failureDetector);
-  }
-
-  /**
    * Initializes the failure detector.
    */
   void init(PinotConfiguration config, BrokerMetrics brokerMetrics);
 
   /**
-   * Registers a listener to the failure detector.
+   * Registers a function that will be periodically called to retry unhealthy servers. The function is called with the
+   * instanceId of the unhealthy server and should return true if the server is now healthy, false otherwise.
    */
-  void register(Listener listener);
+  void registerUnhealthyServerRetrier(Function<String, Boolean> unhealthyServerRetrier);
 
   /**
-   * Starts the failure detector. Listeners should be registered before starting the failure detector.
+   * Registers a consumer that will be called with the instanceId of a server that is detected as healthy.
+   */
+  void registerHealthyServerNotifier(Consumer<String> healthyServerNotifier);
+
+  /**
+   * Registers a consumer that will be called with the instanceId of a server that is detected as unhealthy.
+   */
+  void registerUnhealthyServerNotifier(Consumer<String> unhealthyServerNotifier);
+
+  /**
+   * Starts the failure detector.
    */
   void start();
-
-  /**
-   * Notifies the failure detector that a query is submitted.
-   */
-  void notifyQuerySubmitted(QueryResponse queryResponse);
-
-  /**
-   * Notifies the failure detector that a query is finished (COMPLETED, FAILED or TIMED_OUT).
-   */
-  void notifyQueryFinished(QueryResponse queryResponse);
 
   /**
    * Marks a server as healthy.
