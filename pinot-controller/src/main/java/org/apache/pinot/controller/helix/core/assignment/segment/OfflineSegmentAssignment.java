@@ -100,5 +100,4 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
         _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
-
 }

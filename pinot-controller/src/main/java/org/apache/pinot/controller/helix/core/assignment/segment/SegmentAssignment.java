@@ -66,10 +66,4 @@ public interface SegmentAssignment {
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config);
-
-  default void validateSegmentAssignment(Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap,
-      @Nullable List<Tier> sortedTiers, @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap,
-      RebalanceConfig config) {
-
-  }
 }

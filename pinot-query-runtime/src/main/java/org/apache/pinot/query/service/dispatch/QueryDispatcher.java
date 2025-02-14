@@ -518,6 +518,7 @@ public class QueryDispatcher {
       Preconditions.checkState(!deadline.isExpired(), "Deadline expired before query could be sent to servers");
       // Send server fragment to every server
       Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
+          .addAllDispatchPlan(plan.getSerializedServerFragments())
           .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext, serverId))
           .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
           .build();

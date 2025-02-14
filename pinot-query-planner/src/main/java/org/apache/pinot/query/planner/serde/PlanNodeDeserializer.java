@@ -84,7 +84,11 @@ public class PlanNodeDeserializer {
 
   private static AggregateNode deserializeAggregateNode(Plan.PlanNode protoNode) {
     Plan.AggregateNode protoAggregateNode = protoNode.getAggregateNode();
-    return null;
+    return new AggregateNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), convertFunctionCalls(protoAggregateNode.getAggCallsList()),
+        protoAggregateNode.getFilterArgsList(), protoAggregateNode.getGroupKeysList(),
+        convertAggType(protoAggregateNode.getAggType()), protoAggregateNode.getLeafReturnFinalResult(),
+        convertCollations(protoAggregateNode.getCollationsList()), protoAggregateNode.getLimit());
   }
 
   private static FilterNode deserializeFilterNode(Plan.PlanNode protoNode) {
@@ -116,7 +120,7 @@ public class PlanNodeDeserializer {
     Plan.MailboxSendNode protoMailboxSendNode = protoNode.getMailboxSendNode();
 
     List<Integer> receiverIds;
-    List<Integer> protoReceiverIds = null;
+    List<Integer> protoReceiverIds = protoMailboxSendNode.getReceiverStageIdsList();
     if (protoReceiverIds == null || protoReceiverIds.isEmpty()) {
       // This should only happen if a not updated broker sends the request
       receiverIds = List.of(protoMailboxSendNode.getReceiverStageId());

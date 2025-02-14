@@ -551,7 +551,7 @@ public class TableRebalancer {
   /**
    * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
    */
-  public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -593,7 +593,7 @@ public class TableRebalancer {
   /**
    * Fetches/computes the instance partitions and also returns a boolean for whether they are unchanged
    */
-  public Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
+  private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
@@ -676,7 +676,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  public List<Tier> getSortedTiers(TableConfig tableConfig,
+  private List<Tier> getSortedTiers(TableConfig tableConfig,
       @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
     if (CollectionUtils.isNotEmpty(tierConfigs)) {
@@ -693,7 +693,7 @@ public class TableRebalancer {
    * Fetches/computes the instance partitions for sorted tiers and also returns a boolean for whether the
    * instance partitions are unchanged.
    */
-  public Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
+  private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     if (sortedTiers == null) {
       return Pair.of(null, true);
