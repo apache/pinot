@@ -24,7 +24,6 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -67,8 +66,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable()
-      throws ProcessingException {
+  protected void buildRightTable() {
     LOGGER.trace("Building hash table for join operator");
     long startTime = System.currentTimeMillis();
     int numRowsInHashTable = 0;
@@ -78,7 +76,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       // Row based overflow check.
       if (container.size() + numRowsInHashTable > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwProcessingExceptionForJoinRowLimitExceeded(
+          throwForJoinRowLimitExceeded(
               "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
           // Just fill up the buffer.
@@ -115,8 +113,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException {
+  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -128,8 +125,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock)
-      throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock) {
     List<Object[]> container = leftBlock.getContainer();
     ArrayList<Object[]> rows = new ArrayList<>(container.size());
 

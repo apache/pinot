@@ -16,35 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.exception;
-
-import org.apache.pinot.common.response.ProcessingException;
-
+package org.apache.pinot.spi.exception;
 
 /**
- * Exception to contain info about QueryException errors.
- * Throwable version of {@link org.apache.pinot.common.response.broker.QueryProcessingException}
+ * The base runtime exception for Pinot.
+ *
+ * Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
+ * {@link RuntimeException} directly. We should gradually migrate to this class.
+ *
  */
-public class QueryInfoException extends RuntimeException {
-  private ProcessingException _processingException;
+public class PinotRuntimeException extends RuntimeException {
 
-  public QueryInfoException(String message) {
+  public PinotRuntimeException() {
+  }
+
+  public PinotRuntimeException(String message) {
     super(message);
   }
 
-  public QueryInfoException(String message, Throwable cause) {
+  public PinotRuntimeException(String message, Throwable cause) {
     super(message, cause);
   }
 
-  public QueryInfoException(Throwable cause) {
+  public PinotRuntimeException(Throwable cause) {
     super(cause);
-  }
-
-  public ProcessingException getProcessingException() {
-    return _processingException;
-  }
-
-  public void setProcessingException(ProcessingException processingException) {
-    _processingException = processingException;
   }
 }

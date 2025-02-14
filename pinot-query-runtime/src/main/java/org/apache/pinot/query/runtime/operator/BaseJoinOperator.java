@@ -27,8 +27,6 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -40,6 +38,7 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -165,8 +164,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
-      throws ProcessingException {
+  protected TransferableBlock getNextBlock() {
     if (!_isRightTableBuilt) {
       buildRightTable();
     }
@@ -179,11 +177,9 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return transferableBlock;
   }
 
-  protected abstract void buildRightTable()
-      throws ProcessingException;
+  protected abstract void buildRightTable();
 
-  protected TransferableBlock buildJoinedDataBlock()
-      throws ProcessingException {
+  protected TransferableBlock buildJoinedDataBlock() {
     LOGGER.trace("Building joined data block for join operator");
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
@@ -223,8 +219,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     }
   }
 
-  protected abstract List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException;
+  protected abstract List<Object[]> buildJoinedRows(TransferableBlock leftBlock);
 
   protected abstract List<Object[]> buildNonMatchRightRows();
 
@@ -285,11 +280,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
    *
    * @return {@code true} if the limit has been reached, {@code false} otherwise.
    */
-  protected boolean isMaxRowsLimitReached(int numJoinedRows)
-      throws ProcessingException {
+  protected boolean isMaxRowsLimitReached(int numJoinedRows) {
     if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-        throwProcessingExceptionForJoinRowLimitExceeded(
+        throwForJoinRowLimitExceeded(
             "Cannot process join, reached number of rows limit: " + _maxRowsInJoin);
       } else {
         // Skip over remaining blocks until we reach the end of stream since we already breached the rows limit.
@@ -304,11 +298,9 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return false;
   }
 
-  protected static void throwProcessingExceptionForJoinRowLimitExceeded(String reason)
-      throws ProcessingException {
-    ProcessingException resourceLimitExceededException =
-        new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-    resourceLimitExceededException.setMessage(reason
+  protected static void throwForJoinRowLimitExceeded(String reason) {
+    throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+        reason
         + ". Consider increasing the limit for the maximum number of rows in a join either via the query option '"
         + QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"
         + PinotHintOptions.JOIN_HINT_OPTIONS
@@ -316,7 +308,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
         + JoinOverFlowMode.BREAK.name() + "' either via the query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE
         + "' or the '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
         + "'.");
-    throw resourceLimitExceededException;
   }
 
   public enum StatKey implements StatMap.Key {

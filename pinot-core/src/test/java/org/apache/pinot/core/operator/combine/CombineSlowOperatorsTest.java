@@ -25,11 +25,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -41,6 +39,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -53,7 +53,6 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -204,10 +203,10 @@ public class CombineSlowOperatorsTest {
    */
   private void testCombineOperator(List<Operator> operators, BaseOperator combineOperator) {
     BaseResultsBlock intermediateResultsBlock = (BaseResultsBlock) combineOperator.nextBlock();
-    List<ProcessingException> processingExceptions = intermediateResultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    assertTrue(processingExceptions.get(0).getMessage().contains(TimeoutException.class.getName()));
+    List<QueryErrorMessage> errMsgs = intermediateResultsBlock.getErrorMessages();
+    assertNotNull(errMsgs);
+    assertEquals(errMsgs.size(), 1);
+    assertEquals(errMsgs.get(0).getErrCode(), QueryErrorCode.EXECUTION_TIMEOUT);
 
     // When the CombineOperator returns, all operators should be either not scheduled or interrupted, and no operator
     // should be running so that the segment references can be safely released

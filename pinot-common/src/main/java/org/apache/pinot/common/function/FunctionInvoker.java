@@ -24,6 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -112,7 +113,11 @@ public class FunctionInvoker {
       PinotDataType argumentType = FunctionUtils.getArgumentType(argumentClass);
       Preconditions.checkArgument(parameterType != null && argumentType != null,
           "Cannot convert value from class: %s to class: %s", argumentClass, parameterClass);
-      arguments[i] = parameterType.convert(argument, argumentType);
+      try {
+        arguments[i] = parameterType.convert(argument, argumentType);
+      } catch (Exception e) {
+        throw QueryErrorCode.QUERY_EXECUTION.asException("Invalid conversion: " + e.getMessage(), e);
+      }
     }
   }
 

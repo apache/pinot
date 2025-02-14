@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -51,6 +50,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.thrift.TDeserializer;
@@ -284,11 +284,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
       if (cancelled) {
-        dataTable.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceName + " " + e));
+        dataTable.addException(QueryErrorCode.QUERY_CANCELLATION.getId(),
+            "Query cancelled on: " + _instanceName + " " + e.getMessage());
       } else {
-        dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
-            "Query execution error on: " + _instanceName + " " + e));
+        dataTable.addException(QueryErrorCode.QUERY_EXECUTION.getId(),
+            "Query execution error on: " + _instanceName + " " + e.getMessage());
       }
       byte[] serializedDataTable = dataTable.toBytes();
       sendResponse(ctx, requestId, tableNameWithType, queryArrivalTimeMs, serializedDataTable);

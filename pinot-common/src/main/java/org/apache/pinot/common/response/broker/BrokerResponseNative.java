@@ -32,10 +32,10 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -59,16 +59,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
-      new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
+      new BrokerResponseNative(QueryErrorCode.BROKER_RESOURCE_MISSING, "BrokerResourceMissingError");
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
-      new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+      new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST, "TableDoesNotExistError");
   public static final BrokerResponseNative TABLE_IS_DISABLED =
-      new BrokerResponseNative(QueryException.TABLE_IS_DISABLED_ERROR);
+      new BrokerResponseNative(QueryErrorCode.TABLE_IS_DISABLED, "TableIsDisabledError");
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
-  private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private List<BrokerQueryErrorMessage> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
@@ -107,14 +107,18 @@ public class BrokerResponseNative implements BrokerResponse {
   public BrokerResponseNative() {
   }
 
-  public BrokerResponseNative(ProcessingException exception) {
-    _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  public BrokerResponseNative(QueryErrorCode errorCode, String errorMessage) {
+    _exceptions.add(new BrokerQueryErrorMessage(errorCode.getId(), errorMessage));
   }
 
-  public BrokerResponseNative(List<ProcessingException> exceptions) {
-    for (ProcessingException exception : exceptions) {
-      _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
-    }
+  public BrokerResponseNative(QueryErrorMessage errorMsg) {
+    _exceptions.add(BrokerQueryErrorMessage.fromQueryErrorMessage(errorMsg));
+  }
+
+  public static BrokerResponseNative fromBrokerErrors(List<BrokerQueryErrorMessage> exceptions) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    brokerResponse.setExceptions(exceptions);
+    return brokerResponse;
   }
 
   /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
@@ -172,20 +176,16 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public List<QueryProcessingException> getExceptions() {
+  public List<BrokerQueryErrorMessage> getExceptions() {
     return _exceptions;
   }
 
-  public void setExceptions(List<QueryProcessingException> exceptions) {
+  public void setExceptions(List<BrokerQueryErrorMessage> exceptions) {
     _exceptions = exceptions;
   }
 
-  public void addException(QueryProcessingException exception) {
+  public void addException(BrokerQueryErrorMessage exception) {
     _exceptions.add(exception);
-  }
-
-  public void addException(ProcessingException exception) {
-    addException(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
   }
 
   @Override

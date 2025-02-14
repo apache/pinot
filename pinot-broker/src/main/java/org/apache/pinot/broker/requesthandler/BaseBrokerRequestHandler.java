@@ -44,18 +44,18 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -143,7 +143,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       String failureMessage = authorizationResult.getFailureMessage();
       if (StringUtils.isNotBlank(failureMessage)) {
@@ -154,7 +154,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null || !sql.isTextual()) {
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
@@ -168,8 +168,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
       }
     }
 
@@ -179,8 +179,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage =
           "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
       LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
     // Add null handling option from broker config only if there is no override in the query
@@ -214,10 +214,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
     // TODO: Add partial result flag to RequestContext
-    List<QueryProcessingException> exceptions = response.getExceptions();
+    List<BrokerQueryErrorMessage> exceptions = response.getExceptions();
     int numExceptions = exceptions.size();
     List<String> processingExceptions = new ArrayList<>(numExceptions);
-    for (QueryProcessingException exception : exceptions) {
+    for (BrokerQueryErrorMessage exception : exceptions) {
       processingExceptions.add(exception.toString());
     }
     statistics.setProcessingExceptions(processingExceptions);

@@ -23,11 +23,11 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -273,12 +273,25 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected TransferableBlock onTimeout() {
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      // TODO: Add the sender stage id to the error message
+      String errMsg = "Timed out on stage " + _stats.getCurrentStageId() + " waiting for data sent by a child stage";
+      // We log this case as debug because:
+      // - The opchain will already log a stackless message once the opchain fail
+      // - The trace is not useful (the log message is good enough to find where we failed)
+      // - We may fail for timeout reasons often and in case there is an execution error this log will be noisy and
+      //   will make it more difficult to find the real error in the log.
+      LOGGER.debug(errMsg);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.EXECUTION_TIMEOUT.asException(errMsg));
     }
 
     @Override
     protected TransferableBlock onException(Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      // TODO: Add the sender stage id to the error message
+      String errMsg = "Found an error on stage " + _stats.getCurrentStageId() + " while reading from a child stage";
+      // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
+      // with an exception and the stack trace may be useful to find the root cause.
+      LOGGER.warn(errMsg, e);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.INTERNAL.asException(errMsg));
     }
 
     @Override
