@@ -434,9 +434,13 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
         ImmutableRoaringBitmap result = null;
         byte[] dictBuffer = dictIds[0] < dictIds[1] ? _dictionary.getBuffer() : null;
+        StringBuilder value = new StringBuilder();
 
         for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-          String value = _dictionary.getStringValue(dictId, dictBuffer).substring(key.length() + 1);
+          String stringValue = _dictionary.getStringValue(dictId, dictBuffer);
+          value.setLength(0);
+          value.append(stringValue, key.length() + 1, stringValue.length());
+
           if (matcher.reset(value).matches()) {
             if (result == null) {
               result = _invertedIndex.getDocIds(dictId);
