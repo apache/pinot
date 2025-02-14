@@ -69,11 +69,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
-import org.apache.helix.PropertyKey;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -84,7 +82,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -96,9 +93,6 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
-import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -123,7 +117,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -248,7 +241,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateInstanceAssignmentPossible(tableConfig);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -524,7 +517,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
-        validateInstanceAssignmentPossible(tableConfig);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -1293,55 +1286,9 @@ public class PinotTableRestletResource {
   /*
   For the given table config, calculates a target assignment, if possible. Otherwise, throws an exception
    */
-  private void validateInstanceAssignmentPossible(TableConfig tableConfig) {
-
-    String tableNameWithType = tableConfig.getTableName();
-
+  private void validateInstanceAssignment(TableConfig tableConfig) {
     TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
-
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setIncludeConsuming(true);
-    rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setBootstrap(true);
-    rebalanceConfig.setDryRun(true);
-
-    boolean dryRun = rebalanceConfig.isDryRun();
-    boolean reassignInstances = rebalanceConfig.isReassignInstances();
-    boolean bootstrap = rebalanceConfig.isBootstrap();
-
-    try {
-
-      Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
-          tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-          instancePartitionsMapAndUnchanged.getLeft();
-
-      // Calculate instance partitions for tiers if configured
-      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig, null);
-      Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
-          tableRebalancer.getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
-              dryRun);
-      Map<String, InstancePartitions> tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
-
-      PropertyKey idealStatePropertyKey =
-          _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().keyBuilder()
-              .idealStates(tableNameWithType);
-      IdealState currentIdealState =
-          _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getProperty(idealStatePropertyKey);
-
-      SegmentAssignment segmentAssignment =
-          SegmentAssignmentFactory.getSegmentAssignment(_pinotHelixResourceManager.getHelixZkManager(), tableConfig,
-              _controllerMetrics);
-
-      Map<String, Map<String, String>> currentAssignment =
-          Map.of(tableNameWithType + "_" + "0", Map.of("Server_someRandomServer_7050", "CONSUMING"));
-
-      segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
-          tierToInstancePartitionsMap, rebalanceConfig);
-    } catch (Exception e) {
-      LOGGER.error("Could not calculate target assignment for table: {} for the provided table config",
-          tableNameWithType);
-      throw e;
-    }
+    tableRebalancer.getInstancePartitionsMap(tableConfig, false, true, true);
   }
+
 }

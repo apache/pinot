@@ -752,54 +752,98 @@ public class PinotTableRestletResourceTest extends ControllerTest {
    * @throws Exception
    */
   @Test
-  public void validateInvalidReplicaChange()
+  public void validateInvalidReplicationOnTableCreateOrUpdate()
       throws Exception {
 
-    // Create a valid REALTIME table (with #replicas < #servers)
+    //table create
+
+    // Create a REALTIME table with an invalid replication factor. Creation should fail.
     String tableName = "testTable";
     DEFAULT_INSTANCE.addDummySchema(tableName);
-    TableConfig realtimeTableConfigWithoutTagOverrides =
+    TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(3).build();
+            .setNumReplicas(5).build();
 
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      fail("Preconditions failure: Could not create table" + tableName + "with #replicas < #servers");
-    }
-
-    //now, update the table config with #replicas > #servers
-    TableConfig realtimeTableConfigWithTagOverrides =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5)
-            .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
-
-    String controllerURLForUpdateTableConfig =
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName);
-
-    try {
-      sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
-    } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains(
-          "There are less instances: 4 in instance partitions: testTable_CONSUMING than the table replication: 5"));
+          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
+              + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
     }
 
-    //now, update the table config with #replicas <= #servers. This request should pass
-    realtimeTableConfigWithTagOverrides =
+    //OFFLINE table with invalid replication
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
+              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
+    }
+
+    //now validate config updates
+    //first, create REALTIME and OFFLINE tables
+    realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(2)
-            .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
+            .setNumReplicas(1).build();
 
     try {
-      sendPutRequest(controllerURLForUpdateTableConfig, realtimeTableConfigWithTagOverrides.toJsonString());
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      fail("Updating a table config when replication <= #servers in the tenant fails");
+      fail(
+          "Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
+              + "precondition to testing config updates");
+    }
+
+    offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(1).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    } catch (Exception e) {
+      fail(
+          "Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
+              + "precondition to testing config updates");
+    }
+
+    //now, update REALTIME table config with invalid replication
+    realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
+              + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
+    }
+
+    //same for OFFLINE
+    offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
+              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
     }
   }
 
