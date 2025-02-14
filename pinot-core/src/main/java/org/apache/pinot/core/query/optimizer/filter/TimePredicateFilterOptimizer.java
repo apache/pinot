@@ -20,19 +20,13 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.sql.Time;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
-import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -40,7 +34,6 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.transform.function.DateTimeConversionTransformFunction;
 import org.apache.pinot.core.operator.transform.function.DateTruncTransformFunction;
-import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TimeConversionTransformFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -48,16 +41,9 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.sql.FilterKind;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeField;
-import org.joda.time.DateTimeZone;
-import org.joda.time.DurationField;
-import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.time.*;
-
 
 /**
  * The {@code TimePredicateFilterOptimizer} optimizes the time related predicates:
@@ -499,7 +485,6 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         lowerMillis = Long.MIN_VALUE;
         upperInclusive = false;
         upperMillis = dateTruncFloor(operands);
-        System.out.println(upperMillis + " " + DateTimeUtils.getTimestampField(chronology, unit).roundFloor(upperMillis));
         if (upperMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(upperMillis)) {
           upperInclusive = true;
           upperMillis = dateTruncCeil(operands);
