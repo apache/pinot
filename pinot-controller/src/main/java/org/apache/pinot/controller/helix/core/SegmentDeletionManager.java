@@ -288,14 +288,18 @@ public class SegmentDeletionManager {
   }
 
   /**
-   * Gets URI for segment deletion by attempting to locate the segment file in the following order:
-   * 1. Plain segment file (without extension)
-   * 2. Compressed segment file (with .tar.gz extension)
+   * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
+   * This handles both server and minion upload scenarios:
+   * - For server uploads: searches for segment file without extension
+   * - For minion uploads (via BaseMultipleSegmentsConversionExecutor etc.): searches for segment file with .tar.gz
+   * extension
    *
-   * @param rawTableName The name of the table
-   * @param segmentId The ID of the segment to delete
-   * @return URI of the existing segment file, or null if neither variant exists or in case of filesystem errors
+   * @param rawTableName name of the table containing the segment
+   * @param segmentId name of the segment
+   * @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
+   *         or if there are filesystem access errors
    */
+  @Nullable
   private URI getFileToDeleteURI(String rawTableName, String segmentId) {
     try {
       // Create both URIs upfront
