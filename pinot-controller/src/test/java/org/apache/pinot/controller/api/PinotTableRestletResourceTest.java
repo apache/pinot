@@ -39,14 +39,12 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -78,7 +76,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setStreamConfigs(streamConfig.getStreamConfigsMap());
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+        .setStreamConfigs(streamConfig.getStreamConfigsMap());
   }
 
   private void registerMinionTasks() {
@@ -279,7 +278,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPostRequest(_createTableUrl, tableJSONConfigString);
     // table creation should succeed
     TableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
-    assertEquals(tableConfig.getReplication(), Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
+    assertEquals(tableConfig.getReplication(),
+        Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
 
     tableJSONConfigString =
         _realtimeBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
@@ -769,7 +769,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains(
+      assertTrue(e.getMessage().contains(
           "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
     }
@@ -783,7 +783,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains(
+      assertTrue(e.getMessage().contains(
           "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
     }
@@ -827,7 +827,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains(
+      assertTrue(e.getMessage().contains(
           "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
     }
@@ -841,7 +841,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains(
+      assertTrue(e.getMessage().contains(
           "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
     }
