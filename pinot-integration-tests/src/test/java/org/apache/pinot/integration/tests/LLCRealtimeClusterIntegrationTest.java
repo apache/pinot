@@ -435,8 +435,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   public void testForceCommitInBatches()
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
-    String jobId = forceCommit(getTableName(), 1000, 5, 210);
-    testForceCommitInternal(jobId, consumingSegments, 240000L);
+    String jobId = forceCommit(getTableName(), 1, 5, 310);
+    testForceCommitInternal(jobId, consumingSegments, 300000L);
   }
 
   private void testForceCommitInternal(String jobId, Set<String> consumingSegments, long timeoutMs) {
