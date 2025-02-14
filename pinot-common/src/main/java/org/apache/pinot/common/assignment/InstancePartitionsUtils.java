@@ -162,13 +162,13 @@ InstancePartitionsType instancePartitionsType) {
   }
 
   public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
-      String tableNameWithType, String instancePartitionsType, String serverTag, int replicationFactor) {
+      String tableNameWithType, String instancePartitionsType, String serverTag, int tableReplication) {
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
-    Preconditions.checkState(numInstances >= replicationFactor,
-        "Number of instances: %s with tag: %s < table replication factor: %s", numInstances, serverTag,
-        replicationFactor);
+    Preconditions.checkState(numInstances >= tableReplication,
+        "Number of instances: %s with tag: %s < table replication: %s", numInstances, serverTag,
+        tableReplication);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
