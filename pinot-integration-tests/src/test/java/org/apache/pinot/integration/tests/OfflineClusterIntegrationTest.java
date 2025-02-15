@@ -4024,7 +4024,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertTrue(summaryResult.getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
           "Estimated time to move segments should be more than 0.0 seconds");
     } else {
-      assertTrue(summaryResult.getTotalSegmentsToBeMoved() == 0, "Segments to be moved should be 0");
+      assertEquals(summaryResult.getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
           "Estimated data to be moved in bytes should be 0");
       assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
