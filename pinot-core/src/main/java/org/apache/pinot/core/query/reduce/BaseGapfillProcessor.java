@@ -146,6 +146,7 @@ abstract class BaseGapfillProcessor {
    */
   public void process(BrokerResponseNative brokerResponseNative) {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
+    replaceColumnNameWithAlias(dataSchema);
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
@@ -174,7 +175,6 @@ abstract class BaseGapfillProcessor {
     }
 
     List<Object[]> rows = brokerResponseNative.getResultTable().getRows();
-    replaceColumnNameWithAlias(dataSchema);
     List<Object[]> resultRows = gapFillAndAggregate(rows, dataSchema, resultTableSchema);
     brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
   }
