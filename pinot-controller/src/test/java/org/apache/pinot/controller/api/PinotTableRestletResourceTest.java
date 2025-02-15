@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,11 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -747,21 +753,134 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   /**
-   * When a table config is updated with a new replica count that is greater than the number of servers in that
-   * tenant, then the call should fail
+   * Validates the behavior of the system when creating or updating tables with invalid replication factors.
+   * This method tests both REALTIME and OFFLINE table configurations.
+   *
+   * The method performs the following steps:
+   * 1. Attempts to create a REALTIME table with an invalid replication factor of 5, which exceeds the number of
+   *  available instances. The creation is expected to fail, and the test verifies that the exception message
+   *  contains the expected error.
+   * 2. Attempts to create an OFFLINE table with the same invalid replication factor. The creation is expected to
+   *  fail, and the test verifies that the exception message contains the expected error.
+   * 3. Creates REALTIME and OFFLINE tables with a valid replication factor of 1 to establish a baseline for further
+   * testing. These creations are expected to succeed.
+   * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
+   * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
+   * messages are returned.
    * @throws Exception
    */
   @Test
-  public void validateInvalidReplicationOnTableCreateOrUpdate()
+  public void validateInvalidTableReplication()
       throws Exception {
 
-    //table create
+    String rawTableName = "testTable";
+
+    validateRealtimeTableCreationWithInvalidReplication(rawTableName);
+    validateOfflineTableCreationWithInvalidReplication(rawTableName);
+
+    createRealtimeTableWithValidReplication(rawTableName);
+    createOfflineTableWithValidReplication(rawTableName);
+
+    validateRealtimeTableUpdateReplicationToInvalidValue(rawTableName);
+    validateOfflineTableUpdateReplicationToInvalidValue(rawTableName);
+  }
+
+  /**
+   * Validates the behavior of the system when creating or updating tables with invalid replica group configurations.
+   * This method tests the REALTIME table configuration.
+   *
+   * The method performs the following steps:
+   * 1. Attempts to create a REALTIME table with an invalid replica group configuration. The creation is expected to
+   * fail, and the test verifies that the exception message contains the expected error.
+   * 2. Creates a new REALTIME table with a valid replica group configuration to establish a baseline for further
+   * testing. This creation is expected to succeed.
+   * 3. Attempts to update the replica group configuration of the previously created REALTIME table to an invalid
+   * value. The update is expected to fail, and the test verifies that the appropriate error message is returned.
+   *
+   * @throws Exception if any error occurs during the validation process
+   */
+  @Test
+  public void validateInvalidReplicaGroupConfig()
+      throws Exception {
 
     // Create a REALTIME table with an invalid replication factor. Creation should fail.
     String tableName = "testTable";
     DEFAULT_INSTANCE.addDummySchema(tableName);
+
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 2));
+
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).setNumReplicas(10).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Not enough qualified "
+              + "instances, ask for: (numInstancesPerReplicaGroup: 2) * (numReplicaGroups: 4) = 8, having only 4\" "
+              + "while sending request"));
+    }
+
+    //Create a new valid table and update it with invalid replica group config
+    instanceAssignmentConfigMap.clear();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 1));
+
+    realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).setNumReplicas(10).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      fail("Preconditions failure: Could not create a REALTIME table with a valid replica group config as a "
+          + "precondition to testing config updates");
+    }
+
+    //now, update it with an invalid RG config, the update should fail
+    instanceAssignmentConfigMap.clear();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
+        getInstanceAssignmentConfig("DefaultTenant_REALTIME", 1, 8));
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Not enough qualified "
+              + "instances, ask for: (numInstancesPerReplicaGroup: 8) * (numReplicaGroups: 1) = 8, having only 4\" "
+              + "while sending request"));
+    }
+  }
+
+  private void validateOfflineTableUpdateReplicationToInvalidValue(String rawTableName) {
+    TableConfig offlineTableConfig;
+    //same for OFFLINE
+    offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
+              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
+    }
+  }
+
+  private void validateRealtimeTableUpdateReplicationToInvalidValue(String rawTableName) {
+    TableConfig realtimeTableConfig;
+    //now, update REALTIME table config with invalid replication
+    realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
             .setNumReplicas(5).build();
@@ -773,7 +892,42 @@ public class PinotTableRestletResourceTest extends ControllerTest {
           "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
     }
+  }
 
+  private void createOfflineTableWithValidReplication(String rawTableName) {
+    TableConfig offlineTableConfig;
+    offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(1).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    } catch (Exception e) {
+      fail("Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
+          + "precondition to testing config updates");
+    }
+  }
+
+  private void createRealtimeTableWithValidReplication(String rawTableName) {
+    TableConfig realtimeTableConfig;
+    //now validate config updates
+    //first, create REALTIME and OFFLINE tables
+    realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(1).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    } catch (Exception e) {
+      fail("Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
+          + "precondition to testing config updates");
+    }
+  }
+
+  private void validateOfflineTableCreationWithInvalidReplication(String tableName) {
     //OFFLINE table with invalid replication
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
@@ -787,39 +941,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
           "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
     }
+  }
 
-    //now validate config updates
-    //first, create REALTIME and OFFLINE tables
-    realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(1).build();
-
-    try {
-      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
-    } catch (Exception e) {
-      fail(
-          "Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
-              + "precondition to testing config updates");
-    }
-
-    offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(1).build();
-
-    try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    } catch (Exception e) {
-      fail(
-          "Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
-              + "precondition to testing config updates");
-    }
-
-    //now, update REALTIME table config with invalid replication
-    realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+  private void validateRealtimeTableCreationWithInvalidReplication(String rawTableName)
+      throws IOException {
+    // Create a REALTIME table with an invalid replication factor. Creation should fail.
+    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
             .setNumReplicas(5).build();
@@ -831,21 +960,22 @@ public class PinotTableRestletResourceTest extends ControllerTest {
           "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
               + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
     }
-
-    //same for OFFLINE
-    offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(5).build();
-
-    try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
-              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
-    }
   }
+
+  private static InstanceAssignmentConfig getInstanceAssignmentConfig(String tag, int numReplicaGroups,
+      int numInstancesPerReplicaGroup) {
+    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig(tag, false, 0, null);
+    List<String> constraints = new ArrayList<>();
+    constraints.add("constraints1");
+    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 1, numReplicaGroups, numInstancesPerReplicaGroup, 1, 1, true,
+            null);
+    return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
+        instanceReplicaGroupPartitionConfig,
+        InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name(), false);
+  }
+
 
   @AfterClass
   public void tearDown() {
