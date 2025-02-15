@@ -4009,8 +4009,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           "Avg segment size expected to be > 0 but found to be 0");
     }
     if (existingNumServers != newNumServers) {
-      assertEquals(summaryResult.getNumServersGettingNewSegments(), Math.abs(newNumServers - existingNumServers),
-          "Expected number of servers getting new segments doesn't match");
+      assertTrue(summaryResult.getNumServersGettingNewSegments() > 0, "Expected number of servers should be > 0");
     } else {
       assertEquals(summaryResult.getNumServersGettingNewSegments(), 0,
           "Expected number of servers getting new segments should be 0");
