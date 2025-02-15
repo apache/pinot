@@ -897,10 +897,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } else {
           String errorMessage = "Exception while in work";
           _segmentLogger.error(errorMessage, e);
-          postStopConsumedMsg(e.getClass().getName());
           _state = State.ERROR;
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
           _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+          postStopConsumedMsg(e.getClass().getName());
           return;
         }
       }
