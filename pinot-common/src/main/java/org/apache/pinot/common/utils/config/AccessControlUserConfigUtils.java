@@ -46,6 +46,7 @@ public class AccessControlUserConfigUtils {
         String role = simpleFields.get(UserConfig.ROLE_KEY);
 
         List<String> tableList = znRecord.getListField(UserConfig.TABLES_KEY);
+        List<String> excludeTableList = znRecord.getListField(UserConfig.EXCLUDE_TABLES_KEY);
 
         List<String> permissionListFromZNRecord = znRecord.getListField(UserConfig.PERMISSIONS_KEY);
         List<AccessType> permissionList = null;
@@ -53,7 +54,7 @@ public class AccessControlUserConfigUtils {
             permissionList = permissionListFromZNRecord.stream()
                 .map(x -> AccessType.valueOf(x)).collect(Collectors.toList());
         }
-        return new UserConfig(username, password, component, role, tableList, permissionList);
+        return new UserConfig(username, password, component, role, tableList, excludeTableList, permissionList);
     }
 
     public static ZNRecord toZNRecord(UserConfig userConfig)
@@ -72,6 +73,10 @@ public class AccessControlUserConfigUtils {
         List<String> tableList = userConfig.getTables();
         if (tableList != null) {
             listFields.put(UserConfig.TABLES_KEY, userConfig.getTables());
+        }
+        List<String> excludeTableList = userConfig.getExcludeTables();
+        if (excludeTableList != null) {
+            listFields.put(UserConfig.EXCLUDE_TABLES_KEY, userConfig.getExcludeTables());
         }
 
         List<AccessType> permissionList = userConfig.getPermissios();

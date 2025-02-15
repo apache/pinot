@@ -31,6 +31,7 @@ public class UserConfigBuilder {
     private String _password;
     private RoleType _roleType;
     private List<String> _tableList;
+    private List<String> _excludeTableList;
     private List<AccessType> _permissionList;
 
     public UserConfigBuilder setComponentType(ComponentType componentType) {
@@ -58,6 +59,11 @@ public class UserConfigBuilder {
         return this;
     }
 
+    public UserConfigBuilder setExcludeTableList(List<String> excludeTableList) {
+        _excludeTableList = excludeTableList;
+        return this;
+    }
+
     public UserConfigBuilder setPermissionList(List<AccessType> permissionList) {
         _permissionList = permissionList;
         return this;
@@ -65,6 +71,6 @@ public class UserConfigBuilder {
 
     public UserConfig build() {
         return new UserConfig(_username, _password, _componentType.toString(), _roleType.toString(), _tableList,
-            _permissionList);
+            _excludeTableList, _permissionList);
     }
 }
