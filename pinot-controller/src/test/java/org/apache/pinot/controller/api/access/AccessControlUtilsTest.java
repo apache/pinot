@@ -21,8 +21,10 @@ package org.apache.pinot.controller.api.access;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.glassfish.grizzly.http.server.Request;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -31,25 +33,32 @@ public class AccessControlUtilsTest {
   private final String _table = "testTable";
   private final String _endpoint = "/testEndpoint";
 
+  private AccessControl _mockAccessControl;
+  private HttpHeaders _mockHttpHeaders;
+  private Request _mockRequest;
+
+  @BeforeMethod
+  public void beforeMethod() {
+    _mockAccessControl = Mockito.mock(AccessControl.class);
+    _mockHttpHeaders = Mockito.mock(HttpHeaders.class);
+    _mockRequest = Mockito.mock(Request.class);
+  }
+
   @Test
   public void testValidatePermissionAllowed() {
-    AccessControl ac = Mockito.mock(AccessControl.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
-
-    Mockito.when(ac.hasAccess(_table, AccessType.READ, mockHttpHeaders, _endpoint)).thenReturn(true);
-
-    AccessControlUtils.validatePermission(_table, AccessType.READ, mockHttpHeaders, _endpoint, ac);
+    Mockito.when(_mockAccessControl.hasAccess(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint))
+        .thenReturn(true);
+    AccessControlUtils.validatePermission(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint,
+        _mockAccessControl);
   }
 
   @Test
   public void testValidatePermissionDenied() {
-    AccessControl ac = Mockito.mock(AccessControl.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
-
-    Mockito.when(ac.hasAccess(_table, AccessType.READ, mockHttpHeaders, _endpoint)).thenReturn(false);
-
+    Mockito.when(_mockAccessControl.hasAccess(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint))
+        .thenReturn(false);
     try {
-      AccessControlUtils.validatePermission(_table, AccessType.READ, mockHttpHeaders, _endpoint, ac);
+      AccessControlUtils.validatePermission(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint,
+          _mockAccessControl);
       Assert.fail("Expected ControllerApplicationException");
     } catch (ControllerApplicationException e) {
       Assert.assertTrue(e.getMessage().contains("Permission is denied"));
@@ -59,14 +68,12 @@ public class AccessControlUtilsTest {
 
   @Test
   public void testValidatePermissionWithNoSuchMethodError() {
-    AccessControl ac = Mockito.mock(AccessControl.class);
-    HttpHeaders mockHttpHeaders = Mockito.mock(HttpHeaders.class);
-
-    Mockito.when(ac.hasAccess(_table, AccessType.READ, mockHttpHeaders, _endpoint))
+    Mockito.when(_mockAccessControl.hasAccess(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint))
         .thenThrow(new NoSuchMethodError("Method not found"));
 
     try {
-      AccessControlUtils.validatePermission(_table, AccessType.READ, mockHttpHeaders, _endpoint, ac);
+      AccessControlUtils.validatePermission(_table, AccessType.READ, _mockHttpHeaders, _mockRequest, _endpoint,
+          _mockAccessControl);
     } catch (ControllerApplicationException e) {
       Assert.assertTrue(e.getMessage().contains("Caught exception while validating permission"));
       Assert.assertEquals(e.getResponse().getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
