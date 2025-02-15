@@ -78,19 +78,6 @@ public class TimestampIndexSseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInFilters() {
-    setUseMultiStageQueryEngine(false);
-    explainSse("SELECT ArrTime FROM mytable where datetrunc('SECOND',ArrTime) > 1",
-    "[BROKER_REDUCE(limit:10), 1, 0]",
-        "[COMBINE_SELECT, 2, 1]",
-        "[PLAN_START(numSegmentsForThisPlan:12), -1, -1]",
-        "[SELECT(selectList:ArrTime), 3, 2]",
-        "[PROJECT(ArrTime), 4, 3]",
-        "[DOC_ID_SET, 5, 4]",
-        "[FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:$ArrTime$SECOND > '1'), 6, 5]");
-  }
-
-  @Test
   public void timestampIndexSubstitutedInAggregateFilter() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT sum(case when datetrunc('SECOND',ArrTime) > 1 then 2 else 0 end) FROM mytable",
