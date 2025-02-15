@@ -3932,14 +3932,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Enable summary, nothing is set
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1, tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, getNumServers(), getNumServers(),
+        tableConfig.getReplication());
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 1, 2,
-        tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, getNumServers(),
+        getNumServers() + 1, tableConfig.getReplication());
 
     // Disable dry-run, summary still enabled
     rebalanceConfig.setDryRun(false);
@@ -3964,8 +3965,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, 2, 1,
-        tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, getNumServers() + 1,
+        getNumServers(), tableConfig.getReplication());
 
     // Disable dry-run and summary to do a real rebalance
     rebalanceConfig.setDryRun(false);
@@ -3987,7 +3988,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, 1, 1, tableConfig.getReplication());
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, getNumServers(), getNumServers(),
+        tableConfig.getReplication());
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
