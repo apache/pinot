@@ -860,9 +860,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   private void validateOfflineTableUpdateReplicationToInvalidValue(String rawTableName) {
-    TableConfig offlineTableConfig;
-    //same for OFFLINE
-    offlineTableConfig =
+    TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setNumReplicas(5).build();
@@ -877,9 +875,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   private void validateRealtimeTableUpdateReplicationToInvalidValue(String rawTableName) {
-    TableConfig realtimeTableConfig;
-    //now, update REALTIME table config with invalid replication
-    realtimeTableConfig =
+    TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
@@ -895,8 +891,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   private void createOfflineTableWithValidReplication(String rawTableName) {
-    TableConfig offlineTableConfig;
-    offlineTableConfig =
+    TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setNumReplicas(1).build();
@@ -910,10 +905,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   private void createRealtimeTableWithValidReplication(String rawTableName) {
-    TableConfig realtimeTableConfig;
-    //now validate config updates
-    //first, create REALTIME and OFFLINE tables
-    realtimeTableConfig =
+    TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
@@ -928,7 +920,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   private void validateOfflineTableCreationWithInvalidReplication(String tableName) {
-    //OFFLINE table with invalid replication
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
@@ -937,15 +928,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
-              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
+      assertTrue(e.getMessage()
+          .contains("Number of instances: 4 with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
     }
   }
 
   private void validateRealtimeTableCreationWithInvalidReplication(String rawTableName)
       throws IOException {
-    // Create a REALTIME table with an invalid replication factor. Creation should fail.
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
@@ -956,9 +945,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
-              + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
+      assertTrue(e.getMessage().contains("Number of instances: 4 with tag: DefaultTenant_REALTIME < table replication: 5"));
     }
   }
 
