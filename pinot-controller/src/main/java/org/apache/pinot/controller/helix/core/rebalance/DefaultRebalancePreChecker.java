@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -46,7 +47,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   private ExecutorService _executorService;
 
   @Override
-  public void init(PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService) {
+  public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
   }
@@ -59,8 +60,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     Map<String, String> preCheckResult = new HashMap<>();
     // Check for reload status
     Boolean needsReload = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType);
-    preCheckResult.put(NEEDS_RELOAD_STATUS,
-        needsReload == null ? "error" : needsReload ? String.valueOf(true) : String.valueOf(false));
+    preCheckResult.put(NEEDS_RELOAD_STATUS, needsReload == null ? "error" : String.valueOf(needsReload));
     // Check whether minimizeDataMovement is set in TableConfig
     boolean isMinimizeDataMovement = checkIsMinimizeDataMovement(rebalanceJobId, tableNameWithType, tableConfig);
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, String.valueOf(isMinimizeDataMovement));
@@ -76,10 +76,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    *       and add a pre-check here to call that API.
    */
   private Boolean checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType) {
-    // Use at most 10 threads to get whether reload is needed from servers
     LOGGER.info("Fetching whether reload is needed for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
     Boolean needsReload = null;
+    if (_executorService == null) {
+      LOGGER.warn("Executor service is null, skipping needsReload check for table: {} rebalanceJobId: {}",
+          tableNameWithType, rebalanceJobId);
+      return needsReload;
+    }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
       TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
           _pinotHelixResourceManager);
@@ -89,11 +93,13 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
               + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
-      needsReload =
-          needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
-      if (!needsReload && failedResponses > 0) {
-        LOGGER.warn("Received some failed responses from servers and needs reload indicates false from servers that "
-            + "returned responses. Setting return to 'null' to force a manual check");
+      needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
+      if (needsReload) {
+        return needsReload;
+      }
+      if (failedResponses > 0) {
+        LOGGER.warn("Received {} failed responses from servers and needsReload is false from returned responses, "
+            + "check needsReload status manually", failedResponses);
         needsReload = null;
       }
     } catch (InvalidConfigException | IOException e) {

@@ -245,7 +245,7 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      ExecutorService executorService) {
+      @Nullable ExecutorService executorService) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -272,12 +272,20 @@ public class PinotHelixResourceManager {
     _rebalancePreChecker.init(this, executorService);
   }
 
-  public PinotHelixResourceManager(ControllerConf controllerConf, ExecutorService executorService) {
+  public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService);
+  }
+
+  public PinotHelixResourceManager(ControllerConf controllerConf) {
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
+        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
+        LineageManagerFactory.create(controllerConf),
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null);
   }
 
   /**

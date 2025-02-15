@@ -33,7 +33,9 @@ public class RebalancePreCheckerFactory {
       LOGGER.info("Trying to create rebalance pre-checker object for class: {}", rebalancePreCheckerClassName);
       return (RebalancePreChecker) Class.forName(rebalancePreCheckerClassName).newInstance();
     } catch (Exception e) {
-      LOGGER.error("RebalancePreChecker not found: {}", rebalancePreCheckerClassName);
+      String errMsg = String.format("Failed to create rebalance pre-checker for class: %s",
+          rebalancePreCheckerClassName);
+      LOGGER.error(errMsg, e);
       throw new RuntimeException(e);
     }
   }

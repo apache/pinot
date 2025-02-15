@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -309,7 +308,7 @@ public class RebalanceCheckerTest {
     ControllerConf cfg = new ControllerConf();
     cfg.setZkStr("localhost:2181");
     cfg.setHelixClusterName("cluster01");
-    PinotHelixResourceManager pinotHelixManager = new PinotHelixResourceManager(cfg, Executors.newFixedThreadPool(10));
+    PinotHelixResourceManager pinotHelixManager = new PinotHelixResourceManager(cfg);
     HelixManager helixZkManager = mock(HelixManager.class);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE);
