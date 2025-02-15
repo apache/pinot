@@ -55,6 +55,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -100,6 +101,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
+  private final ResourceUtilizationManager _resourceUtilizationManager;
 
   // For cron-based scheduling
   private final Scheduler _scheduler;
@@ -120,11 +122,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics,
       TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache, Executor executor,
-      PoolingHttpClientConnectionManager connectionManager) {
+      PoolingHttpClientConnectionManager connectionManager, ResourceUtilizationManager resourceUtilizationManager) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
         controllerConf.getPinotTaskManagerInitialDelaySeconds(), helixResourceManager, leadControllerManager,
         controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
+    _resourceUtilizationManager = resourceUtilizationManager;
     _taskManagerStatusCache = taskManagerStatusCache;
     _clusterInfoAccessor =
         new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf, controllerMetrics,
@@ -205,6 +208,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (String tableNameWithType : tableNameWithTypes) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       LOGGER.info("Trying to create tasks of type: {}, table: {}", taskType, tableNameWithType);
+      try {
+        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType)) {
+          LOGGER.warn("Resource utilization is above threshold, skipping task creation for table: {}", tableName);
+          _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
+          continue;
+        }
+        _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 0L);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while checking resource utilization for table: {}", tableName, e);
+      }
       List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(tableConfig, taskConfigs);
       if (pinotTaskConfigs.isEmpty()) {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
@@ -695,6 +708,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (TableConfig tableConfig : enabledTableConfigs) {
       String tableName = tableConfig.getTableName();
       try {
+        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName)) {
+          String message = String.format("Skipping tasks generation as resource utilization is not within limits for "
+              + "table: %s. Disk utilization for one or more servers hosting this table has exceeded the threshold. "
+              + "Tasks won't be generated until the issue is mitigated.", tableName);
+          LOGGER.warn(message);
+          response.addSchedulingError(message);
+          _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
+          continue;
+        }
+        _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 0L);
         String minionInstanceTag = minionInstanceTagForTask != null ? minionInstanceTagForTask
             : taskGenerator.getMinionInstanceTag(tableConfig);
         List<PinotTaskConfig> presentTaskConfig =

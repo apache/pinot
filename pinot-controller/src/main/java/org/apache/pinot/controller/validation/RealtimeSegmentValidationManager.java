@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
@@ -58,6 +59,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
   private final StorageQuotaChecker _storageQuotaChecker;
+  private final ResourceUtilizationManager _resourceUtilizationManager;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -67,7 +69,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker,
+      ResourceUtilizationManager resourceUtilizationManager) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
@@ -75,6 +78,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
     _storageQuotaChecker = quotaChecker;
+    _resourceUtilizationManager = resourceUtilizationManager;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
@@ -140,13 +144,39 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
    * Skips updating the pause state if table is paused by admin.
    * Returns true if table is not paused
    */
-  private boolean shouldEnsureConsuming(String tableNameWithType) {
+  @VisibleForTesting
+  boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
-    // if table is paused by admin then don't compute
     if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
-      return false;
+      return false; // if table is paused by admin, then skip subsequent checks
     }
+    // Perform resource utilization checks.
+    boolean isResourceUtilizationWithinLimits =
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType);
+    if (!isResourceUtilizationWithinLimits) {
+      LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          1L);
+      // update IS when table is not paused or paused with another reason code
+      if (!isTablePaused || !pauseStatus.getReasonCode()
+          .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+        _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+            PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
+      }
+      return false; // if resource utilization check failed, then skip subsequent checks
+      // within limits and table previously paused by resource utilization --> unpause
+    } else if (isTablePaused && pauseStatus.getReasonCode()
+        .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      // unset the pause state and allow consuming segment recreation.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
+          PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization within limits");
+      pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
+      isTablePaused = pauseStatus.getPauseFlag();
+    }
+    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+        0L);
+    // Perform storage quota checks.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
     if (isQuotaExceeded == isTablePaused) {
