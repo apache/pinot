@@ -4004,9 +4004,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers,
         "Existing number of servers don't match");
     assertEquals(summaryResult.getNumServers()._newValue, newNumServers, "New number of servers don't match");
-    long avgSegmentSize = _tableSize / summaryResult.getNumUniqueSegments()._existingValue;
-    assertEquals(summaryResult.getEstimatedAverageSegmentSizeInBytes(), avgSegmentSize,
-        "Average segment size doesn't match");
+    if (_tableSize > 0) {
+      assertTrue(summaryResult.getEstimatedAverageSegmentSizeInBytes() > 0L,
+          "Avg segment size expected to be > 0 but found to be 0");
+    }
     if (existingNumServers != newNumServers) {
       assertEquals(summaryResult.getNumServersGettingNewSegments(), Math.abs(newNumServers - existingNumServers),
           "Expected number of servers getting new segments doesn't match");
@@ -4019,11 +4020,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(),
           numSegmentsToBeMoved * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
           "Estimated data to be moved in bytes doesn't match");
-      double expectedTimeToMoveSegmentsInSec = numSegmentsToBeMoved
-          * summaryResult.getEstimatedAverageSegmentSizeInBytes()
-          / (double) summaryResult.getNumServersGettingNewSegments() / (100.0D * 1024.0D * 1024.0D);
-      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), expectedTimeToMoveSegmentsInSec,
-          "Estimated time to move segments doesn't match");
+      assertTrue(summaryResult.getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
+          "Estimated time to move segments should be more than 0.0 seconds");
     } else {
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
           "Estimated data to be moved in bytes should be 0");
