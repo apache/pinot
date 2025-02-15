@@ -121,7 +121,7 @@ public class BenchmarkQueriesMSQE extends BaseClusterIntegrationTest {
       + "  from MyTable \n"
       + "  limit 100000\n"
       + ") \n"
-      + "where regexp_like_const('.*a.*', RAW_STRING_COL )";
+      + "where regexp_like('.*a.*', RAW_STRING_COL )";
 
   public static final String REGEXP_LIKE_VAR_QUERY = "select * from \n"
       + "(\n"
@@ -129,7 +129,7 @@ public class BenchmarkQueriesMSQE extends BaseClusterIntegrationTest {
       + "  from MyTable \n"
       + "  limit 100000\n"
       + ") \n"
-      + "where regexp_like('.*a.*', RAW_STRING_COL )";
+      + "where regexp_like_var('.*a.*', RAW_STRING_COL )";
 
   private Distribution.DataSupplier _supplier;
 
@@ -199,7 +199,7 @@ public class BenchmarkQueriesMSQE extends BaseClusterIntegrationTest {
 
   private void buildSegment(String segmentName)
       throws Exception {
-    LazyDataGenerator rows = BenchmarkQueries.createTestData(_numRows, _supplier);
+    LazyDataGenerator rows = BenchmarkQueriesSSQE.createTestData(_numRows, _supplier);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(_segmentDir.getPath());
     config.setTableName(TABLE_NAME);
