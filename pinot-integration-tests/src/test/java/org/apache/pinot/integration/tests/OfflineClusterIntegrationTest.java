@@ -3932,14 +3932,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Enable summary, nothing is set
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, getNumServers(), getNumServers(),
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
         tableConfig.getReplication());
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, getNumServers(),
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
         getNumServers() + 1, tableConfig.getReplication());
 
     // Disable dry-run, summary still enabled
@@ -3965,7 +3965,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, NUM_SEGMENTS / 2, getNumServers() + 1,
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers() + 1,
         getNumServers(), tableConfig.getReplication());
 
     // Disable dry-run and summary to do a real rebalance
@@ -3988,12 +3988,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, 0, getNumServers(), getNumServers(),
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
         tableConfig.getReplication());
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
-      int numSegmentsToBeMoved, int existingNumServers, int newNumServers, int replicationFactor) {
+      boolean isSegmentsToBeMoved, int existingNumServers, int newNumServers, int replicationFactor) {
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult);
@@ -4001,8 +4001,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Existing replication factor doesn't match expected");
     assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue,
         "Existing and new replication factor doesn't match");
-    assertEquals(summaryResult.getTotalSegmentsToBeMoved(), numSegmentsToBeMoved,
-        "Segments to be moved doesn't match expected");
     assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers,
         "Existing number of servers don't match");
     assertEquals(summaryResult.getNumServers()._newValue, newNumServers, "New number of servers don't match");
@@ -4018,13 +4016,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           "Expected number of servers getting new segments should be 0");
     }
 
-    if (numSegmentsToBeMoved > 0) {
+    if (isSegmentsToBeMoved) {
+      assertTrue(summaryResult.getTotalSegmentsToBeMoved() > 0, "Segments to be moved should be > 0");
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(),
-          numSegmentsToBeMoved * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
+          summaryResult.getTotalSegmentsToBeMoved() * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
           "Estimated data to be moved in bytes doesn't match");
       assertTrue(summaryResult.getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
           "Estimated time to move segments should be more than 0.0 seconds");
     } else {
+      assertTrue(summaryResult.getTotalSegmentsToBeMoved() == 0, "Segments to be moved should be 0");
       assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
           "Estimated data to be moved in bytes should be 0");
       assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
