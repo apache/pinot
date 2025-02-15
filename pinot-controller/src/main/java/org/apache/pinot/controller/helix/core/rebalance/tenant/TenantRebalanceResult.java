@@ -36,7 +36,7 @@ public class TenantRebalanceResult {
       _rebalanceTableResults = new HashMap<>();
       rebalanceTableResults.forEach((table, result) -> {
         _rebalanceTableResults.put(table, new RebalanceResult(result.getJobId(), result.getStatus(),
-            result.getDescription(), null, null, null));
+            result.getDescription(), null, null, null, null));
       });
     }
   }

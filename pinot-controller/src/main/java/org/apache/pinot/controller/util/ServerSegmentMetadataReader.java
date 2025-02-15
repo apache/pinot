@@ -222,8 +222,8 @@ public class ServerSegmentMetadataReader {
    * This method will return metadata of all the servers along with need reload flag.
    * In future additional details like segments list can also be added
    */
-  public List<String> getCheckReloadSegmentsFromServer(String tableNameWithType, Set<String> serverInstances,
-      BiMap<String, String> endpoints, int timeoutMs) {
+  public TableReloadResponse getCheckReloadSegmentsFromServer(String tableNameWithType,
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Checking if reload is needed on segments from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
@@ -250,7 +250,7 @@ public class ServerSegmentMetadataReader {
     }
 
     LOGGER.debug("Retrieved metadata of reload check from servers.");
-    return serversNeedReloadResponses;
+    return new TableReloadResponse(serviceResponse._failedResponseCount, serversNeedReloadResponses);
   }
 
   /**
@@ -504,5 +504,23 @@ public class ServerSegmentMetadataReader {
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  public class TableReloadResponse {
+    private int _numFailedResponses;
+    private List<String> _serverReloadResponses;
+
+    TableReloadResponse(int numFailedResponses, List<String> serverReloadResponses) {
+      _numFailedResponses = numFailedResponses;
+      _serverReloadResponses = serverReloadResponses;
+    }
+
+    public int getNumFailedResponses() {
+      return _numFailedResponses;
+    }
+
+    public List<String> getServerReloadResponses() {
+      return _serverReloadResponses;
+    }
   }
 }

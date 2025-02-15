@@ -252,11 +252,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // queries)
       FunctionRegistry.init();
       _adminApp = createControllerAdminApp();
+      // This executor service is used to do async tasks from multiget util or table rebalancing.
+      _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
-      // This executor service is used to do async tasks from multiget util or table rebalancing.
-      _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");
       _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
           "tenant-rebalance-thread-%d");
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
@@ -324,7 +324,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
    * @return A new instance of PinotHelixResourceManager.
    */
   protected PinotHelixResourceManager createHelixResourceManager() {
-    return new PinotHelixResourceManager(_config);
+    return new PinotHelixResourceManager(_config, _executorService);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {

@@ -34,6 +34,12 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _dryRun = false;
 
+  // Whether to perform pre-checks for rebalance. This only returns the status of each pre-check and does not fail
+  // rebalance
+  @JsonProperty("preChecks")
+  @ApiModelProperty(example = "false")
+  private boolean _preChecks = false;
+
   // Whether to reassign instances before reassigning segments
   @JsonProperty("reassignInstances")
   @ApiModelProperty(example = "false")
@@ -116,6 +122,14 @@ public class RebalanceConfig {
 
   public void setDryRun(boolean dryRun) {
     _dryRun = dryRun;
+  }
+
+  public boolean isPreChecks() {
+    return _preChecks;
+  }
+
+  public void setPreChecks(boolean preChecks) {
+    _preChecks = preChecks;
   }
 
   public boolean isReassignInstances() {
@@ -232,10 +246,10 @@ public class RebalanceConfig {
 
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
-        + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
-        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
-        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
+        + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap
+        + ", _downtime=" + _downtime + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts="
+        + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
         + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
         + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
@@ -245,6 +259,7 @@ public class RebalanceConfig {
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
+    rc._preChecks = cfg._preChecks;
     rc._reassignInstances = cfg._reassignInstances;
     rc._includeConsuming = cfg._includeConsuming;
     rc._bootstrap = cfg._bootstrap;
