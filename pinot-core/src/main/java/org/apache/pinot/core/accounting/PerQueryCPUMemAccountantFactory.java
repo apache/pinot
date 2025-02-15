@@ -278,8 +278,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadCPUTime() {
-      if (_isThreadCPUSamplingEnabled) {
-        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = getThreadResourceUsageProvider().getThreadTimeNs();
+      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
+      if (_isThreadCPUSamplingEnabled && provider != null) {
+        _threadLocalEntry.get()._currentThreadCPUTimeSampleMS = provider.getThreadTimeNs();
       }
     }
 
@@ -289,9 +290,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     @SuppressWarnings("ConstantConditions")
     public void sampleThreadBytesAllocated() {
-      if (_isThreadMemorySamplingEnabled) {
-        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes
-            = getThreadResourceUsageProvider().getThreadAllocatedBytes();
+      ThreadResourceUsageProvider provider = getThreadResourceUsageProvider();
+      if (_isThreadMemorySamplingEnabled && provider != null) {
+        _threadLocalEntry.get()._currentThreadMemoryAllocationSampleBytes = provider.getThreadAllocatedBytes();
       }
     }
 
