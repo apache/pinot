@@ -571,7 +571,7 @@ public class TableRebalancer {
   /**
    * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
    */
-  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+  public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -756,7 +756,7 @@ public class TableRebalancer {
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
             InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
-                storage.getServerTag());
+                storage.getServerTag(), tableConfig.getReplication());
         boolean noExistingInstancePartitions = existingInstancePartitions == null;
         if (!dryRun && !noExistingInstancePartitions) {
           LOGGER.info("Removing instance partitions: {} from ZK", instancePartitionsName);
@@ -785,7 +785,7 @@ public class TableRebalancer {
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
             InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
-                storage.getServerTag());
+                storage.getServerTag(), tableConfig.getReplication());
         return Pair.of(instancePartitions, true);
       }
     }

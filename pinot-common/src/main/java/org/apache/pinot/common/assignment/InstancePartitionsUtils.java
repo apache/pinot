@@ -137,7 +137,7 @@ InstancePartitionsType instancePartitionsType) {
         throw new IllegalStateException();
     }
     return computeDefaultInstancePartitionsForTag(helixManager, tableConfig.getTableName(),
-        instancePartitionsType.toString(), serverTag);
+        instancePartitionsType.toString(), serverTag, tableConfig.getReplication());
   }
 
   /**
@@ -151,6 +151,24 @@ InstancePartitionsType instancePartitionsType) {
     List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
+
+    // Sort the instances and rotate the list based on the table name
+    instances.sort(null);
+    Collections.rotate(instances, -(Math.abs(tableNameWithType.hashCode()) % numInstances));
+    InstancePartitions instancePartitions =
+        new InstancePartitions(getInstancePartitionsName(tableNameWithType, instancePartitionsType));
+    instancePartitions.setInstances(0, 0, instances);
+    return instancePartitions;
+  }
+
+  public static InstancePartitions computeDefaultInstancePartitionsForTag(HelixManager helixManager,
+      String tableNameWithType, String instancePartitionsType, String serverTag, int tableReplication) {
+    List<String> instances = HelixHelper.getInstancesWithTag(helixManager, serverTag);
+    int numInstances = instances.size();
+    Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
+    Preconditions.checkState(numInstances >= tableReplication,
+        "Number of instances: %s with tag: %s < table replication: %s", numInstances, serverTag,
+        tableReplication);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);

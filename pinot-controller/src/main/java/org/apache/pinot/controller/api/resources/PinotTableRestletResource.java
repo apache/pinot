@@ -241,6 +241,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -517,6 +518,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -1290,4 +1292,13 @@ public class PinotTableRestletResource {
       validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
     }
   }
+
+  /*
+  For the given table config, calculates a target assignment, if possible. Otherwise, throws an exception
+   */
+  private void validateInstanceAssignment(TableConfig tableConfig) {
+    TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
+    tableRebalancer.getInstancePartitionsMap(tableConfig, false, true, true);
+  }
+
 }
