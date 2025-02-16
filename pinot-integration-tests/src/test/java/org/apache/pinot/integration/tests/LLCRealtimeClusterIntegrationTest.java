@@ -428,14 +428,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(realtimeTableName);
     String jobId = forceCommit(realtimeTableName);
     testForceCommitInternal(realtimeTableName, jobId, consumingSegments, 60000L);
-  }
 
-  @Test
-  public void testForceCommitInBatches()
-      throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(realtimeTableName);
-    String jobId = forceCommit(realtimeTableName, 1, 5, 140);
+    // Before forceCommitting new segments wait until RealtimeTableDataManager
+    // registers instance of RealtimeSegmentDataManager for the new segments.
+    Thread.sleep(5000);
+
+    realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    consumingSegments = getConsumingSegmentsFromIdealState(realtimeTableName);
+    jobId = forceCommit(realtimeTableName, 1, 5, 140);
     testForceCommitInternal(realtimeTableName, jobId, consumingSegments, 140000L);
   }
 
