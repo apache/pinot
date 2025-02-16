@@ -69,11 +69,13 @@ public class WorkerManager {
   // default table partition function if not specified in hint
   private static final String DEFAULT_TABLE_PARTITION_FUNCTION = "Murmur";
 
+  private final String _instanceId;
   private final String _hostName;
   private final int _port;
   private final RoutingManager _routingManager;
 
-  public WorkerManager(String hostName, int port, RoutingManager routingManager) {
+  public WorkerManager(String instanceId, String hostName, int port, RoutingManager routingManager) {
+    _instanceId = instanceId;
     _hostName = hostName;
     _port = port;
     _routingManager = routingManager;
@@ -84,7 +86,7 @@ public class WorkerManager {
     // worker instance with identical server/mailbox port number.
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
     metadata.setWorkerIdToServerInstanceMap(
-        Collections.singletonMap(0, new QueryServerInstance(_hostName, _port, _port)));
+        Collections.singletonMap(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
     for (PlanFragment child : rootFragment.getChildren()) {
       assignWorkersToNonRootFragment(child, context);
     }

@@ -32,8 +32,9 @@ public class MultiKeysGroupIdGenerator implements GroupIdGenerator {
   private final ValueToIdMap[] _keyToIdMaps;
   private final int _numGroupsLimit;
 
-  public MultiKeysGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns, int numGroupsLimit) {
-    _groupIdMap = new Object2IntOpenHashMap<>();
+  public MultiKeysGroupIdGenerator(ColumnDataType[] keyTypes, int numKeyColumns,
+      int numGroupsLimit, int initialCapacity) {
+    _groupIdMap = new Object2IntOpenHashMap<>(initialCapacity);
     _groupIdMap.defaultReturnValue(INVALID_ID);
     _keyToIdMaps = new ValueToIdMap[numKeyColumns];
     for (int i = 0; i < numKeyColumns; i++) {

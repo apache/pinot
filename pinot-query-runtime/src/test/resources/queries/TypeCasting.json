@@ -128,7 +128,7 @@
       },
       {
         "description": "test Pinot function variances above, but also mixed in with intermediate stage transfer",
-        "sql": "SELECT md5(a.bytesCol), substr(b.stringCol, 5), regexpExtract(a.stringCol, '([\\w]+).*') FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE regexpLike(a.stringCol, b.stringCol)",
+        "sql": "SELECT md5(a.bytesCol), substr(b.stringCol, 5), regexpExtract(a.stringCol, '([\\w]+).*') FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE regexpLikeVar(a.stringCol, b.stringCol)",
         "outputs": [
           ["2f249230a8e7c2bf6005ccd2679259ec", "", "lyons"],
           ["a85a5fd494d9a538e22b696159931c1b", "", "onan"],

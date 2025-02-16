@@ -40,8 +40,11 @@ import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
+import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -77,8 +80,9 @@ public class DimensionTableDataManagerTest {
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
-  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(1, 2,
-      true);
+  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
+      new SegmentAllIndexPreprocessThrottler(1, 2, true), new SegmentStarTreePreprocessThrottler(1, 2, true),
+      new SegmentDownloadThrottler(1, 2, true));
 
   private File _indexDir;
   private IndexLoadingConfig _indexLoadingConfig;
@@ -150,7 +154,7 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, null, null,
-        SEGMENT_PREPROCESS_THROTTLER);
+        SEGMENT_OPERATIONS_THROTTLER);
     tableDataManager.start();
     return tableDataManager;
   }
@@ -173,7 +177,7 @@ public class DimensionTableDataManagerTest {
 
     // assert that segments are released after loading data
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
-        SEGMENT_PREPROCESS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER));
     for (SegmentDataManager segmentManager : returnedManager.acquireAllSegments()) {
       assertEquals(segmentManager.getReferenceCount() - 1, // Subtract this acquisition
           1, // Default ref count
@@ -206,7 +210,7 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"}));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
-        SEGMENT_PREPROCESS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -256,7 +260,7 @@ public class DimensionTableDataManagerTest {
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
-        SEGMENT_PREPROCESS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     PrimaryKey key = new PrimaryKey(new String[]{"SF"});
@@ -314,7 +318,7 @@ public class DimensionTableDataManagerTest {
     assertNull(tableDataManager.lookupRow(key));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
-        SEGMENT_PREPROCESS_THROTTLER));
+        SEGMENT_OPERATIONS_THROTTLER));
 
     // Confirm table is loaded and available for lookup
     assertTrue(tableDataManager.containsKey(key));
@@ -363,7 +367,7 @@ public class DimensionTableDataManagerTest {
 
     try {
       tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
-          SEGMENT_PREPROCESS_THROTTLER));
+          SEGMENT_OPERATIONS_THROTTLER));
       fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;

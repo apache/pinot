@@ -33,7 +33,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
-import org.apache.pinot.segment.local.utils.SegmentPreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
@@ -91,9 +91,9 @@ public class ImmutableSegmentLoader {
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, true, segmentPreprocessThrottler);
+    return load(indexDir, indexLoadingConfig, true, segmentOperationsThrottler);
   }
 
   /**
@@ -111,10 +111,10 @@ public class ImmutableSegmentLoader {
    * This method modifies the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, boolean needPreprocess,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     return load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), needPreprocess,
-        segmentPreprocessThrottler);
+        segmentOperationsThrottler);
   }
 
   /**
@@ -133,9 +133,9 @@ public class ImmutableSegmentLoader {
    * Mostly used by UT cases to add some specific index for testing purpose.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, schema, true, segmentPreprocessThrottler);
+    return load(indexDir, indexLoadingConfig, schema, true, segmentOperationsThrottler);
   }
 
   /**
@@ -153,7 +153,7 @@ public class ImmutableSegmentLoader {
    * modify the segment like to convert segment format, add or remove indices.
    */
   public static ImmutableSegment load(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      boolean needPreprocess, @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      boolean needPreprocess, @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
@@ -163,7 +163,7 @@ public class ImmutableSegmentLoader {
       return new EmptyIndexSegment(segmentMetadata);
     }
     if (needPreprocess) {
-      preprocess(indexDir, indexLoadingConfig, schema, segmentPreprocessThrottler);
+      preprocess(indexDir, indexLoadingConfig, schema, segmentOperationsThrottler);
     }
     String segmentName = segmentMetadata.getName();
     SegmentDirectoryLoaderContext segmentLoaderContext =
@@ -194,22 +194,23 @@ public class ImmutableSegmentLoader {
    * Preprocess the local segment directory according to the current table config and schema.
    */
   public static void preprocess(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
-      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: %s does not exist or is not a directory",
         indexDir);
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     if (segmentMetadata.getTotalDocs() > 0) {
-      if (segmentPreprocessThrottler != null) {
-        segmentPreprocessThrottler.acquire();
+      if (segmentOperationsThrottler != null) {
+        segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().acquire();
       }
       try {
         convertSegmentFormat(indexDir, indexLoadingConfig, segmentMetadata);
-        preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig, schema);
+        preprocessSegment(indexDir, segmentMetadata.getName(), segmentMetadata.getCrc(), indexLoadingConfig, schema,
+            segmentOperationsThrottler);
       } finally {
-        if (segmentPreprocessThrottler != null) {
-          segmentPreprocessThrottler.release();
+        if (segmentOperationsThrottler != null) {
+          segmentOperationsThrottler.getSegmentAllIndexPreprocessThrottler().release();
         }
       }
     }
@@ -282,6 +283,9 @@ public class ImmutableSegmentLoader {
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
+    if (indexLoadingConfig.isSkipSegmentPreprocess()) {
+      return false;
+    }
     if (needConvertSegmentFormat(indexLoadingConfig, segmentDirectory.getSegmentMetadata())) {
       return true;
     }
@@ -319,7 +323,8 @@ public class ImmutableSegmentLoader {
   }
 
   private static void preprocessSegment(File indexDir, String segmentName, String segmentCrc,
-      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
+      IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
     PinotConfiguration segmentDirectoryConfigs = indexLoadingConfig.getSegmentDirectoryConfigs();
     SegmentDirectoryLoaderContext segmentLoaderContext =
@@ -334,7 +339,7 @@ public class ImmutableSegmentLoader {
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
     try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
-      preProcessor.process();
+      preProcessor.process(segmentOperationsThrottler);
     }
   }
 }

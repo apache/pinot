@@ -255,8 +255,8 @@ export const getTableJobs = (tableName: string, jobTypes?: string): Promise<Axio
 export const getSegmentReloadStatus = (jobId: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/segments/segmentReloadStatus/${jobId}`, {headers});
 
-export const deleteTable = (tableName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.delete(`/tables/${tableName}`, {headers});
+export const deleteTable = (tableName: string, retention?: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.delete(`/tables/${tableName}${retention ? `?retention=${retention}` : ''}`, {headers});
 
 export const deleteSchema = (schemaName: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/schemas/${schemaName}`, {headers});

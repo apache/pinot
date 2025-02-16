@@ -173,7 +173,7 @@ public class BlockExchangeTest {
     }
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(destinations, splitter);
+      super(destinations, splitter, BlockExchange.RANDOM_INDEX_CHOOSER);
     }
 
     @Override

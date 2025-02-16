@@ -22,6 +22,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
 import org.apache.helix.InstanceType;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -63,7 +64,9 @@ public class TableViewsTest extends ControllerTest {
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     DEFAULT_INSTANCE.getHelixResourceManager()
         .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(OFFLINE_TABLE_NAME),
-            SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
+            SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME),
+            getDownloadURL(DEFAULT_INSTANCE.getHelixResourceManager().getDataDir(), OFFLINE_TABLE_NAME,
+                OFFLINE_SEGMENT_NAME));
 
     // Create the hybrid table
     DEFAULT_INSTANCE.addDummySchema(HYBRID_TABLE_NAME);
@@ -166,6 +169,10 @@ public class TableViewsTest extends ControllerTest {
     return JsonUtils.stringToObject(
         sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
+  }
+
+  private String getDownloadURL(String controllerDataDir, String rawTableName, String segmentId) {
+    return URIUtils.getUri(controllerDataDir, rawTableName, URIUtils.encode(segmentId)).toString();
   }
 
   @AfterClass
