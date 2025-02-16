@@ -128,6 +128,7 @@ public class FileIngestionHelper {
         default: {
           copyMultipartToLocal(payload._multiPart, inputFile);
           LOGGER.info("Copied multipart payload to local file: {}", inputDir.getAbsolutePath());
+          break;
         }
       }
 

@@ -218,7 +218,8 @@ public class PinotIngestionRestletResource {
 
   private DataPayload createDataPayload(String sourceURIStr) throws URISyntaxException {
     URI uri = new URI(sourceURIStr);
-    boolean httpSchema = CommonConstants.HTTP_PROTOCOL.equals(uri.getScheme()) || CommonConstants.HTTPS_PROTOCOL.equals(uri.getScheme());
+    String schema = uri.getScheme();
+    boolean httpSchema = CommonConstants.HTTP_PROTOCOL.equals(schema) || CommonConstants.HTTPS_PROTOCOL.equals(schema);
     if (httpSchema) {
       return DataPayload.newPublicUriPayload(uri);
     } else {

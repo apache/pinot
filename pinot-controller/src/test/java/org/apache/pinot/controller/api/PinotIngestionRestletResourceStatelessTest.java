@@ -105,7 +105,8 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     assertEquals(segments.size(), 1);
 
     // ingest from public file URI
-    String uri = "https://gist.githubusercontent.com/cyrilou242/ee95e5c8735755b9453136715b9d330b/raw/ea52d9e5c45dcf003ebb0cca25e4f2057e0b2502/pinotIngestionRestletResourceTest_data.csv";
+    String uri = "https://gist.githubusercontent.com/cyrilou242/ee95e5c8735755b9453136715b9d330b/raw/"
+            + "ea52d9e5c45dcf003ebb0cca25e4f2057e0b2502/pinotIngestionRestletResourceTest_data.csv";
     sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap, uri));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 2);
