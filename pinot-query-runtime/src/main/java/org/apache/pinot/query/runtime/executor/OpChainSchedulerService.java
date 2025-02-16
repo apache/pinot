@@ -51,9 +51,17 @@ public class OpChainSchedulerService {
       public void runJob() {
         TransferableBlock returnedErrorBlock = null;
         Throwable thrown = null;
+<<<<<<< HEAD
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
+=======
+        // TODO: Now that request id, stage and worker is registered on MDC, we can remove the the OpChain text
+        //   from the log messages.
+        try {
+          operatorChain.getContext().registerOnMDC();
+
+>>>>>>> b81170becd (Implement MdcExecutor to manage MDC context for query execution)
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
@@ -74,6 +82,8 @@ public class OpChainSchedulerService {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
+          operatorChain.getContext().unregisterFromMDC();
+
           _submittedOpChainMap.remove(operatorChain.getId());
           if (returnedErrorBlock != null || thrown != null) {
             if (thrown == null) {

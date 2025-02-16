@@ -135,21 +135,22 @@ public abstract class QueryScheduler {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
-
-    _latestQueryTime.accumulate(System.currentTimeMillis());
-    InstanceResponseBlock instanceResponse;
-    try {
-      instanceResponse = _queryExecutor.execute(queryRequest, executorService);
-    } catch (Exception e) {
-      LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
-          queryRequest.getBrokerId(), e);
-      // For not handled exceptions
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      instanceResponse = new InstanceResponseBlock();
-      instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
-    }
+    queryRequest.registerOnMdc();
 
     try {
+      _latestQueryTime.accumulate(System.currentTimeMillis());
+      InstanceResponseBlock instanceResponse;
+      try {
+        instanceResponse = _queryExecutor.execute(queryRequest, executorService);
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
+            queryRequest.getBrokerId(), e);
+        // For not handled exceptions
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
+        instanceResponse = new InstanceResponseBlock();
+        instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+      }
+
       long requestId = queryRequest.getRequestId();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
@@ -179,6 +180,7 @@ public abstract class QueryScheduler {
 
       return responseBytes;
     } finally {
+      queryRequest.unregisterFromMdc();
       Tracing.ThreadAccountantOps.clear();
     }
   }
