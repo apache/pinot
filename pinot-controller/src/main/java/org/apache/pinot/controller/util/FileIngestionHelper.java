@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -60,6 +61,8 @@ import org.slf4j.LoggerFactory;
 public class FileIngestionHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileIngestionHelper.class);
   private static final String SEGMENT_UPLOADER_CLASS = "org.apache.pinot.plugin.segmentuploader.SegmentUploaderDefault";
+
+  private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
 
   private static final String WORKING_DIR_PREFIX = "working_dir";
   private static final String INPUT_DATA_DIR = "input_data_dir";
@@ -111,12 +114,21 @@ public class FileIngestionHelper {
       // Copy file to local working dir
       File inputFile = new File(inputDir, String.format(
           "%s.%s", DATA_FILE_PREFIX, _batchConfigMap.get(BatchConfigProperties.INPUT_FORMAT).toLowerCase()));
-      if (payload._payloadType == PayloadType.URI) {
-        copyURIToLocal(_batchConfigMap, payload._uri, inputFile);
-        LOGGER.info("Copied from URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
-      } else {
-        copyMultipartToLocal(payload._multiPart, inputFile);
-        LOGGER.info("Copied multipart payload to local file: {}", inputDir.getAbsolutePath());
+      switch (payload._payloadType) {
+        case BUCKET_URI: {
+          copyBucketURIToLocal(_batchConfigMap, payload._uri, inputFile);
+          LOGGER.info("Copied from bucket URI: {} to local file: {}", payload._uri, inputFile.getAbsolutePath());
+          break;
+        }
+        case PUBLIC_URI: {
+          copyPublicURIToLocal(payload._uri, inputFile);
+          LOGGER.info("Copied from public URI: {} to local file: {}", payload._uri, inputDir.getAbsolutePath());
+          break;
+        }
+        default: {
+          copyMultipartToLocal(payload._multiPart, inputFile);
+          LOGGER.info("Copied multipart payload to local file: {}", inputDir.getAbsolutePath());
+        }
       }
 
       // Update batch config map with values for file upload
@@ -172,9 +184,9 @@ public class FileIngestionHelper {
   }
 
   /**
-   * Copy the file from given URI to local file
+   * Copy the file from given Bucket URI to local file
    */
-  public static void copyURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
+  public static void copyBucketURIToLocal(Map<String, String> batchConfigMap, URI sourceFileURI, File destFile)
       throws Exception {
     String sourceFileURIScheme = sourceFileURI.getScheme();
     if (!PinotFSFactory.isSchemeSupported(sourceFileURIScheme)) {
@@ -199,10 +211,18 @@ public class FileIngestionHelper {
   }
 
   /**
+   * Copy the file from given Public URI to local file
+   */
+  private void copyPublicURIToLocal(URI sourceFileURI, File destFile) throws Exception {
+    AuthProvider nullAuthProvider = null; // We download files only from a public URI
+    FILE_UPLOAD_DOWNLOAD_CLIENT.downloadFile(sourceFileURI, destFile, nullAuthProvider);
+  }
+
+  /**
    * Enum to identify the source of ingestion file
    */
   private enum PayloadType {
-    URI, FILE
+    BUCKET_URI, PUBLIC_URI, FILE
   }
 
   /**
@@ -213,14 +233,22 @@ public class FileIngestionHelper {
     FormDataMultiPart _multiPart;
     URI _uri;
 
-    public DataPayload(FormDataMultiPart multiPart) {
-      _payloadType = PayloadType.FILE;
+    private DataPayload(PayloadType payloadType, FormDataMultiPart multiPart, URI uri) {
+      _payloadType = payloadType;
       _multiPart = multiPart;
+      _uri = uri;
     }
 
-    public DataPayload(URI uri) {
-      _payloadType = PayloadType.URI;
-      _uri = uri;
+    public static DataPayload newFilePayload(FormDataMultiPart multiPart) {
+      return new DataPayload(PayloadType.FILE, multiPart, null);
+    }
+
+    public static DataPayload newBucketUriPayload(URI uri) {
+      return new DataPayload(PayloadType.BUCKET_URI, null, uri);
+    }
+
+    public static DataPayload newPublicUriPayload(URI uri) {
+      return new DataPayload(PayloadType.PUBLIC_URI, null, uri);
     }
   }
 }

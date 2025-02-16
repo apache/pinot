@@ -128,8 +128,6 @@ public class PinotIngestionRestletResource {
    *                          fs class name (input.fs.className)
    *                          fs configs (input.fs.prop.<property>)
    * @param fileUpload file to upload as a multipart
-   * @param fileUri file URI to download from the public remote file.
-   *                It's prioritized over fileUpload param if both are provided
    * @param asyncResponse injected async response to return result
    */
   @POST
@@ -150,18 +148,10 @@ public class PinotIngestionRestletResource {
           String tableNameWithType, @ApiParam(value =
       "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. "
           + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
-      FormDataMultiPart fileUpload, @ApiParam(value = "File URI to download from the public remote file. "
-          + "It's prioritized over fileUpload param if both are provided.") @QueryParam("fileUri") URI fileUri,
-      @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
+      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      DataPayload dataPayload;
-      if (fileUri != null) {
-        dataPayload = new DataPayload(fileUri);
-      } else {
-        dataPayload = new DataPayload(fileUpload);
-      }
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, dataPayload));
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, DataPayload.newFilePayload(fileUpload)));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -213,7 +203,8 @@ public class PinotIngestionRestletResource {
       @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
+      DataPayload dataPayload = createDataPayload(sourceURIStr);
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, dataPayload));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -222,6 +213,16 @@ public class PinotIngestionRestletResource {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
           String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
+  }
+
+  private DataPayload createDataPayload(String sourceURIStr) throws URISyntaxException {
+    URI uri = new URI(sourceURIStr);
+    boolean httpSchema = CommonConstants.HTTP_PROTOCOL.equals(uri.getScheme()) || CommonConstants.HTTPS_PROTOCOL.equals(uri.getScheme());
+    if (httpSchema) {
+      return DataPayload.newPublicUriPayload(uri);
+    } else {
+      return DataPayload.newBucketUriPayload(uri);
     }
   }
 
