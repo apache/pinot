@@ -1292,7 +1292,7 @@ public class PinotTableRestletResource {
    */
   private void validateInstanceAssignment(TableConfig tableConfig) {
     TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
-    tableRebalancer.getInstancePartitionsMap(tableConfig, false, true, true);
+    tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
   }
 
 }
