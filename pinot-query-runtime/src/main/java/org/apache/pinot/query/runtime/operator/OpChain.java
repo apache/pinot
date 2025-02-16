@@ -35,6 +35,7 @@ public class OpChain implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChain.class);
 
   private final OpChainId _id;
+  private final OpChainExecutionContext _context;
   private final MultiStageOperator _root;
   private final Consumer<OpChainId> _finishCallback;
   private final ThreadExecutionContext _parentContext;
@@ -45,10 +46,15 @@ public class OpChain implements AutoCloseable {
   }
 
   public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback) {
+    _context = context;
     _id = context.getId();
     _root = root;
     _finishCallback = finishCallback;
     _parentContext = context.getParentContext();
+  }
+
+  public OpChainExecutionContext getContext() {
+    return _context;
   }
 
   public OpChainId getId() {
