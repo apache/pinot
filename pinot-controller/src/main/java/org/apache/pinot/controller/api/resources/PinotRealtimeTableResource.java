@@ -256,15 +256,14 @@ public class PinotRealtimeTableResource {
         _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
 
     if (segmentsYetToBeCommitted.size() < segmentsToCheck.size()) {
-      controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
-          JsonUtils.objectToString(segmentsYetToBeCommitted));
       _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
           ControllerJobType.FORCE_COMMIT, prev -> true);
     }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
-    result.put("segmentsYetToBeCommitted", segmentsYetToBeCommitted);
-    result.put("numberOfSegmentsYetToBeCommitted", segmentsYetToBeCommitted.size());
+    result.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST, segmentsYetToBeCommitted);
+    result.put(CommonConstants.ControllerJob.NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED,
+        segmentsYetToBeCommitted.size());
     return JsonUtils.objectToJsonNode(result);
   }
 
