@@ -62,22 +62,21 @@ public class ParserUtils {
    * 2. Data schema has all columns set to default type (STRING) (when all segments pruned on server).
    *
    * Priority is:
-   * - Types from multi-stage engine validation for the given query.
+   * - Types from multi-stage engine validation for the given query (if allowed).
    * - Types from schema for the given table (only applicable to selection fields).
    * - Types from single-stage engine response (no action).
    *
    * Multi-stage engine schema will be available only if query compiles.
    */
-  public static void fillEmptyResponseSchema(boolean useMSQE, BrokerResponse response, TableCache tableCache, Schema schema,
-      String database, String query) {
+  public static void fillEmptyResponseSchema(boolean useMSQE, BrokerResponse response, TableCache tableCache,
+      Schema schema, String database, String query) {
     Preconditions.checkState(response.getNumRowsResultSet() == 0, "Cannot fill schema for non-empty response");
 
     DataSchema dataSchema = response.getResultTable() != null ? response.getResultTable().getDataSchema() : null;
 
     List<RelDataTypeField> dataTypeFields = null;
-    // TURN ON with pinot.broker.usemsqe.missingschema=true
-    // only for clusters where no queries with huge IN clauses are expected
-    // https://github.com/apache/pinot/issues/15064
+    // Turn on (with pinot.broker.use.msqe.schema=true or query option useMsqeWhenEmptySchema=true) only for
+    // clusters where no queries with huge IN clauses are expected (see https://github.com/apache/pinot/issues/15064)
     if (useMSQE) {
       try {
         QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);

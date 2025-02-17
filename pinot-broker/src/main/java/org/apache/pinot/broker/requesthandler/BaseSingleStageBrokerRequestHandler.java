@@ -873,8 +873,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
     if (brokerResponse.getNumRowsResultSet() == 0) {
-      boolean useMSQE = _useMSQEWhenEmptySchema || "true".equalsIgnoreCase(
-          pinotQuery.getQueryOptions().getOrDefault(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA, "false"));
+      boolean useMSQE = useMSQEToFillEmptySchema(pinotQuery);
       ParserUtils.fillEmptyResponseSchema(useMSQE, brokerResponse, _tableCache, schema, database, query);
     }
 
@@ -908,6 +907,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
 
     return brokerResponse;
+  }
+
+  /**
+   * Determines if MSQE can be used to try to fill an empty schema response.
+   */
+  private boolean useMSQEToFillEmptySchema(@Nullable PinotQuery pinotQuery) {
+    String optValue =
+        pinotQuery != null ? pinotQuery.getQueryOptions().get(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA) : null;
+    if (StringUtils.isNotBlank(optValue)) {
+      return Boolean.parseBoolean(optValue);
+    }
+    return _useMSQEWhenEmptySchema;
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
@@ -970,8 +981,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    boolean useMSQE = _useMSQEWhenEmptySchema || "true".equalsIgnoreCase(
-        pinotQuery.getQueryOptions().getOrDefault(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA, "false"));
+    boolean useMSQE = useMSQEToFillEmptySchema(pinotQuery);
     ParserUtils.fillEmptyResponseSchema(useMSQE, brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
