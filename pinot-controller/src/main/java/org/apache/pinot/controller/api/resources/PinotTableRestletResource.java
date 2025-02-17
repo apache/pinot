@@ -1292,7 +1292,12 @@ public class PinotTableRestletResource {
    */
   private void validateInstanceAssignment(TableConfig tableConfig) {
     TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
-    tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
+    try {
+      tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
+    } catch (Exception e) {
+      LOGGER.error("Exception calculating instance partitions for table: {}", tableConfig.getTableName());
+      throw new RuntimeException("Exception calculating instance partitions for table:" + tableConfig.getTableName());
+    }
   }
 
 }
