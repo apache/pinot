@@ -47,6 +47,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+//CHECKSTYLE:OFF
 import static org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.*;
 //CHECKSTYLE:ON
 

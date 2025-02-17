@@ -93,16 +93,18 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       throws Exception {
     assert routeInfo.getOfflineBrokerRequest() != null || routeInfo.getRealtimeBrokerRequest() != null;
     if (routeInfo.getRequestContext().isSampledRequest()) {
-      routeInfo.getServerBrokerRequest().getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
+      routeInfo.getServerBrokerRequest().getPinotQuery()
+          .putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
 
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(routeInfo);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(routeInfo);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
+      BrokerMeter meter =
+          QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
+              ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS
+              : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
       _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), meter, 1);
     }
     if (asyncQueryResponse.getFailedServer() != null) {
@@ -130,10 +132,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     int numServersResponded = dataTableMap.size();
 
     long reduceStartTimeNs = System.nanoTime();
-    long reduceTimeoutMs = routeInfo.getTimeoutMs() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
+    long reduceTimeoutMs =
+        routeInfo.getTimeoutMs() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
     BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(routeInfo.getOriginalBrokerRequest(), routeInfo.getServerBrokerRequest(), dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
+        _brokerReduceService.reduceOnDataTable(routeInfo.getOriginalBrokerRequest(), routeInfo.getServerBrokerRequest(),
+            dataTableMap, reduceTimeoutMs, _brokerMetrics);
     long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     _brokerMetrics.addPhaseTiming(routeInfo.getRawTableName(), BrokerQueryPhase.REDUCE, reduceTimeNanos);
 
@@ -152,15 +155,18 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       brokerResponse.addException(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
 
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
-          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
+      BrokerMeter meter =
+          QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
+              ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
+              : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
       _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), meter, 1);
     }
     if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(),
+          BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
-    _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
+    _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+        totalResponseSize);
 
     return brokerResponse;
   }
