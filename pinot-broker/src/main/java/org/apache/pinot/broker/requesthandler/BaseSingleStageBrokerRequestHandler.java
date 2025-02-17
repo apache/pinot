@@ -310,139 +310,71 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
+  static class CompileResult {
+    final PinotQuery _pinotQuery;
+    final PinotQuery _serverPinotQuery;
+    Schema _schema;
+    final String _tableName;
+    final String _rawTableName;
+    final BrokerResponse _brokerResponse;
+
+    public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
+        String rawTableName) {
+      _pinotQuery = pinotQuery;
+      _serverPinotQuery = serverPinotQuery;
+      _schema = schema;
+      _tableName = tableName;
+      _rawTableName = rawTableName;
+      _brokerResponse = null;
+    }
+
+    public CompileResult(BrokerResponse brokerResponse) {
+      _pinotQuery = null;
+      _serverPinotQuery = null;
+      _schema = null;
+      _tableName = null;
+      _rawTableName = null;
+      _brokerResponse = brokerResponse;
+    }
+  }
+
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
-    PinotQuery pinotQuery;
+    String rawTableName = "UNKNOWN";
+    CompileResult compileResult = null;
     try {
-      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
-    } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      // Check if the query is a v2 supported query
-      String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
-      if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
-            "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
-                + "the multi-stage query engine "
-                + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)")));
-      } else {
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
-      }
-    }
-
-    if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
-      pinotQuery.setLimit(_defaultQueryLimit);
-    }
-
-    if (isLiteralOnlyQuery(pinotQuery)) {
-      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
-      try {
-        if (pinotQuery.isExplain()) {
-          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
-          return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
-        }
-        return processLiteralOnlyQuery(requestId, pinotQuery, requestContext);
-      } catch (Exception e) {
-        // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
-        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
-            query, e.getMessage());
-      }
-    }
-
-    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
-    DataSource dataSource = serverPinotQuery.getDataSource();
-    if (dataSource == null) {
-      LOGGER.info("Data source (FROM clause) not found in request {}: {}", requestId, query);
-      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
-      return new BrokerResponseNative(
-          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Data source (FROM clause) not found"));
-    }
-    if (dataSource.getJoin() != null) {
-      LOGGER.info("JOIN is not supported in request {}: {}", requestId, query);
-      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
-      return new BrokerResponseNative(
-          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "JOIN is not supported"));
-    }
-    if (dataSource.getTableName() == null) {
-      LOGGER.info("Table name not found in request {}: {}", requestId, query);
-      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
-      return new BrokerResponseNative(
-          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Table name not found"));
-    }
-
-    try {
-      handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
-          accessControl);
-    } catch (Exception e) {
-      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
-          e.getMessage());
-      requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-    }
-
-    boolean ignoreCase = _tableCache.isIgnoreCase();
-    String tableName;
-    try {
-      tableName =
-          getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
-              _tableCache);
+      compileResult =
+          compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
+              accessControl);
     } catch (DatabaseConflictException e) {
       LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
-    }
-    dataSource.setTableName(tableName);
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    requestContext.setTableName(rawTableName);
-
-    AuthorizationResult authorizationResult =
-        accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
-
-    if (!authorizationResult.hasAccess()) {
-      throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
-    }
-
-    try {
-      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
-      if (columnNameMap != null) {
-        updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, columnNameMap);
-      }
-    } catch (Exception e) {
-      // Throw exceptions with column in-existence error.
-      if (e instanceof BadQueryRequestException) {
-        LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
-            e.getMessage());
-        requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
-        return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
-      }
-      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+    } catch (BadQueryRequestException e) {
+      LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
           e.getMessage());
+      requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+      if (compileResult != null) {
+        rawTableName = compileResult._rawTableName;
+      }
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
     }
 
-    if (_defaultHllLog2m > 0) {
-      handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
-    }
-    if (_enableQueryLimitOverride) {
-      handleQueryLimitOverride(serverPinotQuery, _queryResponseLimit);
-    }
-    handleSegmentPartitionedDistinctCountOverride(serverPinotQuery,
-        getSegmentPartitionedColumns(_tableCache, tableName));
-    if (_enableDistinctCountBitmapOverride) {
-      handleDistinctCountBitmapOverride(serverPinotQuery);
+    if (compileResult._brokerResponse != null) {
+      return compileResult._brokerResponse;
     }
 
-    Schema schema = _tableCache.getSchema(rawTableName);
-    if (schema != null) {
-      handleDistinctMultiValuedOverride(serverPinotQuery, schema);
-    }
-
+    Schema schema = compileResult._schema;
+    String tableName = compileResult._tableName;
+    rawTableName = compileResult._rawTableName;
+    PinotQuery pinotQuery = compileResult._pinotQuery;
+    PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
     long compilationEndTimeNs = System.nanoTime();
     // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
@@ -453,7 +385,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-    authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
+    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
 
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
         System.nanoTime() - compilationEndTimeNs);
@@ -908,6 +840,145 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
 
     return brokerResponse;
+  }
+
+  private CompileResult compileRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl) {
+    PinotQuery pinotQuery;
+    try {
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      // Check if the query is a v2 supported query
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
+      if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
+        return new CompileResult(new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
+            new Exception(
+                "It seems that the query is only supported by the multi-stage query engine, please retry the query "
+                    + "using "
+                    + "the multi-stage query engine "
+                    + "(https://docs.pinot.apache.org/developers/advanced/v2-multi-stage-query-engine)"))));
+      } else {
+        return new CompileResult(
+            new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e)));
+      }
+    }
+
+    if (isDefaultQueryResponseLimitEnabled() && !pinotQuery.isSetLimit()) {
+      pinotQuery.setLimit(_defaultQueryLimit);
+    }
+
+    if (isLiteralOnlyQuery(pinotQuery)) {
+      LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
+      try {
+        if (pinotQuery.isExplain()) {
+          // EXPLAIN PLAN results to show that query is evaluated exclusively by Broker.
+          return new CompileResult(BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT);
+        }
+        return new CompileResult(processLiteralOnlyQuery(requestId, pinotQuery, requestContext));
+      } catch (Exception e) {
+        // TODO: refine the exceptions here to early termination the queries won't requires to send to servers.
+        LOGGER.warn("Unable to execute literal request {}: {} at broker, fallback to server query. {}", requestId,
+            query, e.getMessage());
+      }
+    }
+
+    PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    DataSource dataSource = serverPinotQuery.getDataSource();
+    if (dataSource == null) {
+      LOGGER.info("Data source (FROM clause) not found in request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new CompileResult(new BrokerResponseNative(
+          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Data source (FROM clause) not found")));
+    }
+    if (dataSource.getJoin() != null) {
+      LOGGER.info("JOIN is not supported in request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new CompileResult(new BrokerResponseNative(
+          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "JOIN is not supported")));
+    }
+    if (dataSource.getTableName() == null) {
+      LOGGER.info("Table name not found in request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new CompileResult(new BrokerResponseNative(
+          QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, "Table name not found")));
+    }
+
+    try {
+      handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders,
+          accessControl);
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
+          e.getMessage());
+      requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
+      return new CompileResult(
+          new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e)));
+    }
+
+    boolean ignoreCase = _tableCache.isIgnoreCase();
+    String tableName;
+    try {
+      tableName =
+          getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
+              _tableCache);
+    } catch (DatabaseConflictException e) {
+      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new CompileResult(
+          new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e)));
+    }
+    dataSource.setTableName(tableName);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    requestContext.setTableName(rawTableName);
+
+    AuthorizationResult authorizationResult =
+        accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
+
+    if (!authorizationResult.hasAccess()) {
+      throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+    }
+
+    try {
+      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      if (columnNameMap != null) {
+        updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, columnNameMap);
+      }
+    } catch (Exception e) {
+      // Throw exceptions with column in-existence error.
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
+            e.getMessage());
+        requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+        return new CompileResult(
+            new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e)));
+      }
+      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+          e.getMessage());
+    }
+
+    if (_defaultHllLog2m > 0) {
+      handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
+    }
+    if (_enableQueryLimitOverride) {
+      handleQueryLimitOverride(serverPinotQuery, _queryResponseLimit);
+    }
+    handleSegmentPartitionedDistinctCountOverride(serverPinotQuery,
+        getSegmentPartitionedColumns(_tableCache, tableName));
+    if (_enableDistinctCountBitmapOverride) {
+      handleDistinctCountBitmapOverride(serverPinotQuery);
+    }
+
+    Schema schema = _tableCache.getSchema(rawTableName);
+    if (schema != null) {
+      handleDistinctMultiValuedOverride(serverPinotQuery, schema);
+    }
+
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
