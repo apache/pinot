@@ -704,6 +704,9 @@ public class CommonConstants {
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
+
+    public static final String USE_MSQE_COMPILER_FOR_MISSING_SCHEMA = "pinot.broker.usemsqe.missingschema";
+    public static final boolean DEFAULT_USE_MSQE_COMPILER_FOR_MISSING_SCHEMA = false;
   }
 
   public static class Server {

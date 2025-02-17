@@ -146,6 +146,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   // if >= 0, then overrides default limit of 10, otherwise setting is ignored
   protected final int _defaultQueryLimit;
   protected final boolean _enableMultistageMigrationMetric;
+  protected final boolean _useMSQEWhenEmptySchema;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
 
@@ -178,6 +179,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
     }
+
+    _useMSQEWhenEmptySchema = _config.getProperty(Broker.USE_MSQE_COMPILER_FOR_MISSING_SCHEMA,
+        Broker.DEFAULT_USE_MSQE_COMPILER_FOR_MISSING_SCHEMA);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -868,13 +872,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
-    // DISABLED until we face this issue:
-    // https://github.com/apache/pinot/issues/15064
-    /*
     if (brokerResponse.getNumRowsResultSet() == 0) {
-      ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+      ParserUtils.fillEmptyResponseSchema(_useMSQEWhenEmptySchema, brokerResponse, _tableCache, schema, database, query);
     }
-    */
 
     // Set total query processing time
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
@@ -968,9 +968,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    // DISABLED until we face this issue:
-    // https://github.com/apache/pinot/issues/15064
-    //ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+    ParserUtils.fillEmptyResponseSchema(_useMSQEWhenEmptySchema, brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,

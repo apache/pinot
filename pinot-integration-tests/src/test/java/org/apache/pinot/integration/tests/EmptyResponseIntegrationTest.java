@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -51,7 +52,6 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that checks data types for queries with no rows returned.
  */
-@Test(enabled = false)
 public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -81,6 +81,12 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     return Collections.singletonList(
         new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
             CompressionCodec.MV_ENTRY_DICT, null));
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+    brokerConf.setProperty(CommonConstants.Broker.USE_MSQE_COMPILER_FOR_MISSING_SCHEMA, true);
   }
 
   @BeforeClass
