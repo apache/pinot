@@ -43,6 +43,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
@@ -637,6 +638,13 @@ public class TableRebalancer {
     RebalanceSummaryResult.RebalanceChangeInfo numServers
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumServers, newNumServers);
 
+    List<InstanceConfig> instanceConfigs = _helixDataAccessor.getChildValues(
+        _helixDataAccessor.keyBuilder().instanceConfigs(), true);
+    Map<String, List<String>> instanceToTagsMap = new HashMap<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      instanceToTagsMap.put(instanceConfig.getInstanceName(), instanceConfig.getTags());
+    }
+
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
     int numServersGettingDataAdded = 0;
@@ -649,6 +657,7 @@ public class TableRebalancer {
       Set<String> existingSegmentList = new HashSet<>();
       int segmentsUnchanged = 0;
       int totalExistingSegments = 0;
+      RebalanceSummaryResult.ServerStatus serverStatus = RebalanceSummaryResult.ServerStatus.ADDED;
       if (existingServersToSegmentMap.containsKey(server)) {
         totalExistingSegments = existingServersToSegmentMap.get(server).size();
         existingSegmentList.addAll(existingServersToSegmentMap.get(server));
@@ -656,30 +665,33 @@ public class TableRebalancer {
         intersection.retainAll(newSegmentList);
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
+        serverStatus = RebalanceSummaryResult.ServerStatus.UNCHANGED;
       }
       newSegmentList.removeAll(existingSegmentList);
       int segmentsAdded = newSegmentList.size();
       int segmentsDeleted = existingSegmentList.size() - segmentsUnchanged;
       numServersGettingDataAdded += segmentsAdded > 0 ? 1 : 0;
 
-      serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(totalNewSegments,
-          totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged));
+      serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
+          totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
+          instanceToTagsMap.getOrDefault(server, null)));
     }
 
     for (Map.Entry<String, Set<String>> entry : existingServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
       if (!serverSegmentChangeInfoMap.containsKey(server)) {
-        serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(0,
-            entry.getValue().size(), 0, entry.getValue().size(), 0));
+        serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
+            RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
+            instanceToTagsMap.getOrDefault(server, null)));
       }
     }
 
-    RebalanceSummaryResult.RebalanceChangeInfo uniqueNumSegments
+    RebalanceSummaryResult.RebalanceChangeInfo numSegmentsInSingleReplica
         = new RebalanceSummaryResult.RebalanceChangeInfo(currentAssignment.size(), targetAssignment.size());
 
     int existingNumberSegmentsTotal = existingReplicationFactor * currentAssignment.size();
     int newNumberSegmentsTotal = newReplicationFactor * targetAssignment.size();
-    RebalanceSummaryResult.RebalanceChangeInfo totalNumSegments
+    RebalanceSummaryResult.RebalanceChangeInfo numSegmentsAcrossAllReplicas
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumberSegmentsTotal, newNumberSegmentsTotal);
 
     int totalSegmentsToBeMoved = newNumberSegmentsTotal - segmentsNotMoved;
@@ -692,11 +704,15 @@ public class TableRebalancer {
     double estimatedTimeToRebalanceInSec = getEstimatedTimeToRebalanceInSec(totalEstimatedDataToBeMovedInBytes,
         numServersGettingDataAdded);
 
+    RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(numServersGettingDataAdded,
+        numServers, serverSegmentChangeInfoMap);
+    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
+        averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes, estimatedTimeToRebalanceInSec,
+        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas);
+
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
-    return new RebalanceSummaryResult(totalSegmentsToBeMoved, numServersGettingDataAdded, averageSegmentSizeInBytes,
-        totalEstimatedDataToBeMovedInBytes, estimatedTimeToRebalanceInSec, numServers, replicationFactor,
-        uniqueNumSegments, totalNumSegments, serverSegmentChangeInfoMap);
+    return new RebalanceSummaryResult(serverInfo, segmentInfo);
   }
 
   private static double getEstimatedTimeToRebalanceInSec(long totalEstimatedDataToBeMovedInBytes,

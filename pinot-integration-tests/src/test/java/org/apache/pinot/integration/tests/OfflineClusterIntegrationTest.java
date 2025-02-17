@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -180,6 +181,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private PinotHelixResourceManager _resourceManager;
   private TableRebalancer _tableRebalancer;
+  private ExecutorService _executorService;
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -291,7 +293,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
-    preChecker.init(_helixResourceManager, Executors.newFixedThreadPool(10));
+    _executorService = Executors.newFixedThreadPool(10);
+    preChecker.init(_helixResourceManager, _executorService);
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
     _resourceManager.getTableSizeReader());
   }
@@ -3067,6 +3070,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     stopController();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    _executorService.shutdown();
   }
 
   private void testInstanceDecommission()
@@ -4098,6 +4102,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
         tableConfig.getReplication());
+
+    // Try dry-run with summary and pre-checks
+    rebalanceConfig.setPreChecks(true);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
+        tableConfig.getReplication());
+    assertNotNull(rebalanceResult.getPreChecksResult());
+    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+    assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS), "false");
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
+        "false");
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
@@ -4105,38 +4121,74 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult);
-    assertEquals(summaryResult.getReplicationFactor()._existingValue, replicationFactor,
+    assertNotNull(summaryResult.getServerInfo());
+    assertNotNull(summaryResult.getSegmentInfo());
+    assertEquals(summaryResult.getSegmentInfo().getReplicationFactor().getValueBeforeRebalance(), replicationFactor,
         "Existing replication factor doesn't match expected");
-    assertEquals(summaryResult.getReplicationFactor()._existingValue, summaryResult.getReplicationFactor()._newValue,
+    assertEquals(summaryResult.getSegmentInfo().getReplicationFactor().getValueBeforeRebalance(),
+        summaryResult.getSegmentInfo().getReplicationFactor().getExpectedValueAfterRebalance(),
         "Existing and new replication factor doesn't match");
-    assertEquals(summaryResult.getNumServers()._existingValue, existingNumServers,
+    assertEquals(summaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), existingNumServers,
         "Existing number of servers don't match");
-    assertEquals(summaryResult.getNumServers()._newValue, newNumServers, "New number of servers don't match");
+    assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), newNumServers,
+        "New number of servers don't match");
     if (_tableSize > 0) {
-      assertTrue(summaryResult.getEstimatedAverageSegmentSizeInBytes() > 0L,
+      assertTrue(summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes() > 0L,
           "Avg segment size expected to be > 0 but found to be 0");
     }
     if (existingNumServers != newNumServers) {
-      assertTrue(summaryResult.getNumServersGettingNewSegments() > 0, "Expected number of servers should be > 0");
+      assertTrue(summaryResult.getServerInfo().getNumServersGettingNewSegments() > 0,
+          "Expected number of servers should be > 0");
     } else {
-      assertEquals(summaryResult.getNumServersGettingNewSegments(), 0,
+      assertEquals(summaryResult.getServerInfo().getNumServersGettingNewSegments(), 0,
           "Expected number of servers getting new segments should be 0");
     }
 
     if (isSegmentsToBeMoved) {
-      assertTrue(summaryResult.getTotalSegmentsToBeMoved() > 0, "Segments to be moved should be > 0");
-      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(),
-          summaryResult.getTotalSegmentsToBeMoved() * summaryResult.getEstimatedAverageSegmentSizeInBytes(),
+      assertTrue(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved() > 0,
+          "Segments to be moved should be > 0");
+      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(),
+          summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved()
+              * summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes(),
           "Estimated data to be moved in bytes doesn't match");
-      assertTrue(summaryResult.getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
+      assertTrue(summaryResult.getSegmentInfo().getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
           "Estimated time to move segments should be more than 0.0 seconds");
     } else {
-      assertEquals(summaryResult.getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
-      assertEquals(summaryResult.getTotalEstimatedDataToBeMovedInBytes(), 0L,
+      assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
+      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(), 0L,
           "Estimated data to be moved in bytes should be 0");
-      assertEquals(summaryResult.getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
+      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
           "Estimated time to move segments should be 0.0D");
     }
+
+    // Validate server status stats with numServers information
+    Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap =
+        summaryResult.getServerInfo().getServerSegmentChangeInfo();
+    int numServersAdded = 0;
+    int numServersRemoved = 0;
+    int numServersUnchanged = 0;
+    for (RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChangeInfo : serverSegmentChangeInfoMap.values()) {
+      switch (serverSegmentChangeInfo.getServerStatus()) {
+        case UNCHANGED:
+          numServersUnchanged++;
+          break;
+        case ADDED:
+          numServersAdded++;
+          break;
+        case REMOVED:
+          numServersRemoved++;
+          break;
+        default:
+          Assert.fail(String.format("Unknown server status encountered: %s",
+              serverSegmentChangeInfo.getServerStatus()));
+          break;
+      }
+    }
+
+    Assert.assertEquals(summaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(),
+        numServersRemoved + numServersUnchanged);
+    Assert.assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
+        numServersAdded + numServersUnchanged);
   }
 
   protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs)
