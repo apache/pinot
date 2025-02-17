@@ -890,7 +890,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               break;
           }
         }
-      } catch (Exception e) {
+      } catch (Throwable e) {
         if (_shouldStop) {
           _segmentLogger.info("Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
               e.toString());
