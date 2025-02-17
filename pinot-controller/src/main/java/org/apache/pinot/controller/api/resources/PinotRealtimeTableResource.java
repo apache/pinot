@@ -256,6 +256,8 @@ public class PinotRealtimeTableResource {
         _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
 
     if (segmentsYetToBeCommitted.size() < segmentsToCheck.size()) {
+      controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
+          JsonUtils.objectToString(segmentsYetToBeCommitted));
       _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
           ControllerJobType.FORCE_COMMIT, prev -> true);
     }

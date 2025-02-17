@@ -2053,7 +2053,6 @@ public class PinotLLCRealtimeSegmentManager {
       sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
     } else {
       List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
-      System.err.println("segmentBatchList: " + segmentBatchList);
       ExecutorService executor = Executors.newSingleThreadExecutor();
       executor.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType, batchConfig));
       executor.shutdown();
@@ -2063,9 +2062,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType,
       ForceCommitBatchConfig forceCommitBatchConfig) {
-    System.err.println("Start processBatchesSequentially: " + segmentBatchList);
+    Set<String> prevBatch = null;
     try {
-      Set<String> prevBatch = null;
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
         if (prevBatch != null) {
           waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
@@ -2074,23 +2072,18 @@ public class PinotLLCRealtimeSegmentManager {
         prevBatch = segmentBatchToCommit;
       }
     } catch (Throwable t) {
-      System.err.println("Caught exception in processBatchesSequentially: " + t);
-      t.printStackTrace(System.err);
+      LOGGER.error("Caught exception while force committing segment batches: {}", segmentBatchList, t);
+      throw new RuntimeException(t);
     }
   }
 
   private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
-      ForceCommitBatchConfig forceCommitBatchConfig) {
-    System.err.println("Wait until prev batch is complete: " + segmentBatchToCommit);
+      ForceCommitBatchConfig forceCommitBatchConfig)
+      throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
     int batchStatusCheckTimeoutMs = forceCommitBatchConfig.getBatchStatusCheckTimeoutMs();
 
-    try {
-      Thread.sleep(batchStatusCheckIntervalMs);
-    } catch (InterruptedException e) {
-      LOGGER.error("Exception occurred while waiting for the forceCommit of segments: {}", segmentBatchToCommit, e);
-      throw new RuntimeException(e);
-    }
+    Thread.sleep(batchStatusCheckIntervalMs);
 
     int maxAttempts = (batchStatusCheckTimeoutMs + batchStatusCheckIntervalMs - 1) / batchStatusCheckIntervalMs;
     RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxAttempts, batchStatusCheckIntervalMs);
@@ -2104,7 +2097,6 @@ public class PinotLLCRealtimeSegmentManager {
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
               + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
-      LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
 
@@ -2259,7 +2251,6 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
-      System.err.println("Sending force commit message to servers for segments: " + consumingSegments);
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setInstanceName("%");
       recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
