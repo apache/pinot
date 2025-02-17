@@ -24,29 +24,28 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
-import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
-import org.apache.pinot.spi.tasks.StatusEntry;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DefaultMinionTaskProgressManager implements MinionTaskProgressManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMinionTaskProgressManager.class);
+public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserverStorageManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMinionTaskObserverStorageManager.class);
 
   public static final String MAX_NUM_STATUS_TO_TRACK = "pinot.minion.task.maxNumStatusToTrack";
   public static final int DEFAULT_MAX_NUM_STATUS_TO_TRACK = 128;
 
-  private final Map<String, MinionTaskProgressStats> _minionTaskProgressStatsMap = new HashMap<>();
+  private final Map<String, MinionTaskBaseObserverStats> _minionTaskProgressStatsMap = new HashMap<>();
   private int _maxNumStatusToTrack;
 
-  private static final DefaultMinionTaskProgressManager DEFAULT_INSTANCE;
+  private static final DefaultMinionTaskObserverStorageManager DEFAULT_INSTANCE;
   static {
-    DEFAULT_INSTANCE = new DefaultMinionTaskProgressManager();
+    DEFAULT_INSTANCE = new DefaultMinionTaskObserverStorageManager();
     DEFAULT_INSTANCE.init(new MinionConf());
   }
 
-  public static DefaultMinionTaskProgressManager getDefaultInstance() {
+  public static DefaultMinionTaskObserverStorageManager getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
@@ -54,28 +53,28 @@ public class DefaultMinionTaskProgressManager implements MinionTaskProgressManag
   public void init(PinotConfiguration configuration) {
     try {
       _maxNumStatusToTrack =
-          Integer.parseInt(configuration.getProperty(DefaultMinionTaskProgressManager.MAX_NUM_STATUS_TO_TRACK));
+          Integer.parseInt(configuration.getProperty(DefaultMinionTaskObserverStorageManager.MAX_NUM_STATUS_TO_TRACK));
     } catch (NumberFormatException e) {
       LOGGER.warn("Unable to parse the value of '{}' using default value: {}",
-          DefaultMinionTaskProgressManager.MAX_NUM_STATUS_TO_TRACK,
-          DefaultMinionTaskProgressManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK);
-      _maxNumStatusToTrack = DefaultMinionTaskProgressManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK;
+          DefaultMinionTaskObserverStorageManager.MAX_NUM_STATUS_TO_TRACK,
+          DefaultMinionTaskObserverStorageManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK);
+      _maxNumStatusToTrack = DefaultMinionTaskObserverStorageManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK;
     }
   }
 
   @Nullable
   @Override
-  public MinionTaskProgressStats getTaskProgress(String taskId) {
+  public MinionTaskBaseObserverStats getTaskProgress(String taskId) {
     if (_minionTaskProgressStatsMap.containsKey(taskId)) {
-      return new MinionTaskProgressStats(_minionTaskProgressStatsMap.get(taskId));
+      return new MinionTaskBaseObserverStats(_minionTaskProgressStatsMap.get(taskId));
     }
     return null;
   }
 
   @Override
-  public synchronized void setTaskProgress(String taskId, MinionTaskProgressStats progress) {
+  public synchronized void setTaskProgress(String taskId, MinionTaskBaseObserverStats progress) {
     _minionTaskProgressStatsMap.put(taskId, progress);
-    Deque<StatusEntry> progressLogs = progress.getProgressLogs();
+    Deque<MinionTaskBaseObserverStats.StatusEntry> progressLogs = progress.getProgressLogs();
     int logSize = progressLogs.size();
     int overflow = Math.max(logSize - _maxNumStatusToTrack, 0);
     if (overflow > 0) {
@@ -84,7 +83,7 @@ public class DefaultMinionTaskProgressManager implements MinionTaskProgressManag
   }
 
   @Override
-  public MinionTaskProgressStats deleteTaskProgress(String taskId) {
+  public MinionTaskBaseObserverStats deleteTaskProgress(String taskId) {
     return _minionTaskProgressStatsMap.remove(taskId);
   }
 }

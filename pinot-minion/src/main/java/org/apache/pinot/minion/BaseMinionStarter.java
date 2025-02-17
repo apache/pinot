@@ -54,7 +54,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.event.DefaultMinionTaskObserverStorageManager;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.event.MinionEventObservers;
@@ -70,7 +70,7 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -172,9 +172,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _eventObserverFactoryRegistry.registerEventObserverFactory(eventObserverFactory);
   }
 
-  public MinionTaskProgressManager getMinionTaskProgressManager() {
+  public MinionTaskObserverStorageManager getMinionTaskProgressManager() {
     String progressManagerClassName = _config.getProperty(MinionConf.MINION_TASK_PROGRESS_MANAGER_CLASS);
-    MinionTaskProgressManager progressManager = null;
+    MinionTaskObserverStorageManager progressManager = null;
     if (progressManagerClassName != null) {
       try {
         LOGGER.info("Trying to create MinionTaskProgressManager with {}", progressManagerClassName);
@@ -186,7 +186,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     }
     if (progressManager == null) {
       LOGGER.info("Creating MinionTaskProgressManager with DefaultMinionTaskProgressManager");
-      progressManager = new DefaultMinionTaskProgressManager();
+      progressManager = new DefaultMinionTaskObserverStorageManager();
     }
     progressManager.init(_config);
     return progressManager;

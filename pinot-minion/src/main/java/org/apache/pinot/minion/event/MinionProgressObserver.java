@@ -26,8 +26,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
-import org.apache.pinot.spi.tasks.StatusEntry;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class MinionProgressObserver extends DefaultMinionEventObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
 
-  protected MinionTaskProgressStats _taskProgressStats = new MinionTaskProgressStats();
+  protected MinionTaskBaseObserverStats _taskProgressStats = new MinionTaskBaseObserverStats();
   protected String _taskId;
 
   @Override
@@ -48,7 +47,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
     _taskId = pinotTaskConfig.getTaskId();
     _taskProgressStats.setTaskId(_taskId);
-    addStatus(new StatusEntry.Builder()
+    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .timestamp(_taskProgressStats.getStartTimestamp())
         .status("Task started")
         .build());
@@ -67,7 +66,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
       LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
     }
     _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
-    addStatus(new StatusEntry.Builder()
+    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .timestamp(System.currentTimeMillis())
         .status((progress == null) ? "" : progress.toString())
         .build());
@@ -76,17 +75,17 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   @Override
   @Nullable
-  public synchronized List<StatusEntry> getProgress() {
-    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
-    if (minionTaskProgressStats != null && minionTaskProgressStats.getProgressLogs() != null) {
-      return new ArrayList<>(minionTaskProgressStats.getProgressLogs());
+  public synchronized List<MinionTaskBaseObserverStats.StatusEntry> getProgress() {
+    MinionTaskBaseObserverStats minionTaskObserverStats = _progressManager.getTaskProgress(_taskId);
+    if (minionTaskObserverStats != null && minionTaskObserverStats.getProgressLogs() != null) {
+      return new ArrayList<>(minionTaskObserverStats.getProgressLogs());
     }
     return null;
   }
 
   @Nullable
   @Override
-  public MinionTaskProgressStats getProgressStats() {
+  public MinionTaskBaseObserverStats getProgressStats() {
     return _progressManager.getTaskProgress(_taskId);
   }
 
@@ -94,7 +93,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.SUCCEEDED.name());
-    addStatus(new StatusEntry.Builder()
+    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .timestamp(endTs)
         .status("Task succeeded in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
         .build());
@@ -105,7 +104,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.CANCELLED.name());
-    addStatus(new StatusEntry.Builder()
+    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .timestamp(endTs)
         .status("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
         .build());
@@ -116,7 +115,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.ERROR.name());
-    addStatus(new StatusEntry.Builder()
+    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .timestamp(endTs)
         .status("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
             + ExceptionUtils.getStackTrace(e))
@@ -137,17 +136,17 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     return _taskProgressStats.getStartTimestamp();
   }
 
-  private synchronized void addStatus(StatusEntry statusEntry) {
-    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
-    Deque<StatusEntry> progressLogs;
-    if (minionTaskProgressStats != null) {
-      progressLogs = minionTaskProgressStats.getProgressLogs();
+  private synchronized void addStatus(MinionTaskBaseObserverStats.StatusEntry statusEntry) {
+    MinionTaskBaseObserverStats minionTaskObserverStats = _progressManager.getTaskProgress(_taskId);
+    Deque<MinionTaskBaseObserverStats.StatusEntry> progressLogs;
+    if (minionTaskObserverStats != null) {
+      progressLogs = minionTaskObserverStats.getProgressLogs();
     } else {
       progressLogs = new LinkedList<>();
     }
     progressLogs.add(statusEntry);
 
-    _progressManager.setTaskProgress(_taskId, new MinionTaskProgressStats(_taskProgressStats)
+    _progressManager.setTaskProgress(_taskId, new MinionTaskBaseObserverStats(_taskProgressStats)
         .setProgressLogs(progressLogs));
   }
 

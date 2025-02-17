@@ -25,7 +25,7 @@ import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 import static org.testng.Assert.assertTrue;
 
@@ -41,7 +41,8 @@ public class TestEventObserverFactory implements MinionEventObserverFactory {
   }
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskProgressManager taskProgressManager) {
+  public void init(MinionTaskZkMetadataManager zkMetadataManager,
+      MinionTaskObserverStorageManager taskProgressManager) {
   }
 
   @Override
@@ -53,7 +54,7 @@ public class TestEventObserverFactory implements MinionEventObserverFactory {
   public MinionEventObserver create() {
     return new MinionEventObserver() {
       @Override
-      public void init(MinionTaskProgressManager progressManager) {
+      public void init(MinionTaskObserverStorageManager progressManager) {
       }
 
       @Override

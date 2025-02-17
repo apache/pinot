@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +48,11 @@ public class EventObserverFactoryRegistry {
    *       convention can significantly reduce the time of class scanning.
    */
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
-    this(zkMetadataManager, DefaultMinionTaskProgressManager.getDefaultInstance());
+    this(zkMetadataManager, DefaultMinionTaskObserverStorageManager.getDefaultInstance());
   }
 
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager,
-      MinionTaskProgressManager taskProgressManager) {
+      MinionTaskObserverStorageManager taskProgressManager) {
     long startTimeMs = System.currentTimeMillis();
     Set<Class<?>> classes = PinotReflectionUtils
         .getClassesThroughReflection(EVENT_OBSERVER_FACTORY_PACKAGE_REGEX_PATTERN, EventObserverFactory.class);

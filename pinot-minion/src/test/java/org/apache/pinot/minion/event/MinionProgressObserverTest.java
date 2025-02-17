@@ -21,7 +21,7 @@ package org.apache.pinot.minion.event;
 import java.util.List;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionTestUtils;
-import org.apache.pinot.spi.tasks.StatusEntry;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -36,7 +36,7 @@ public class MinionProgressObserverTest {
     PinotTaskConfig pinotTaskConfig = MinionTestUtils.getPinotTaskConfig(null);
 
     observer.notifyTaskStart(pinotTaskConfig);
-    List<StatusEntry> progress = observer.getProgress();
+    List<MinionTaskBaseObserverStats.StatusEntry> progress = observer.getProgress();
     assertNotNull(progress);
     assertEquals(progress.size(), 1);
 
@@ -50,7 +50,7 @@ public class MinionProgressObserverTest {
     observer.notifyTaskError(pinotTaskConfig, new Exception("bad bug"));
     progress = observer.getProgress();
     assertEquals(progress.size(), 3);
-    StatusEntry entry = progress.get(0);
+    MinionTaskBaseObserverStats.StatusEntry entry = progress.get(0);
     assertTrue(entry.getStatus().contains("generating"), entry.getStatus());
     entry = progress.get(2);
     assertTrue(entry.getStatus().contains("bad bug"), entry.getStatus());

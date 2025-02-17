@@ -20,7 +20,7 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
 /**
@@ -28,10 +28,10 @@ import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
  */
 public class DefaultMinionEventObserver implements MinionEventObserver {
 
-  protected MinionTaskProgressManager _progressManager;
+  protected MinionTaskObserverStorageManager _progressManager;
 
   @Override
-  public void init(MinionTaskProgressManager progressManager) {
+  public void init(MinionTaskObserverStorageManager progressManager) {
     _progressManager = progressManager;
   }
 

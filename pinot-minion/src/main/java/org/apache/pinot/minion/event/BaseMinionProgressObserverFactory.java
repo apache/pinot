@@ -19,7 +19,7 @@
 package org.apache.pinot.minion.event;
 
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
 /**
@@ -27,7 +27,7 @@ import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
  */
 public abstract class BaseMinionProgressObserverFactory implements MinionEventObserverFactory {
 
-  protected MinionTaskProgressManager _taskProgressManager;
+  protected MinionTaskObserverStorageManager _taskProgressManager;
 
   /**
    * Initializes the task executor factory.
@@ -36,7 +36,8 @@ public abstract class BaseMinionProgressObserverFactory implements MinionEventOb
   }
 
   @Override
-  public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskProgressManager taskProgressManager) {
+  public void init(MinionTaskZkMetadataManager zkMetadataManager,
+      MinionTaskObserverStorageManager taskProgressManager) {
     _taskProgressManager = taskProgressManager;
   }
 
