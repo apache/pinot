@@ -584,6 +584,10 @@ public class CommonConstants {
 
         // Custom Query ID provided by the client
         public static final String CLIENT_QUERY_ID = "clientQueryId";
+
+        // Use MSQE compiler when trying to fill a response with no schema metadata
+        // (overrides the "pinot.broker.usemsqe.missingschema" broker conf)
+        public static final String USE_MSQE_EMPTY_SCHEMA = "useMsqeWhenEmptySchema";
       }
 
       public static class QueryOptionValue {
