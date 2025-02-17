@@ -428,6 +428,98 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
+  private SuccessResponse uploadReingestedSegment(String tableName, FormDataMultiPart multiPart, HttpHeaders headers,
+      Request request) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+
+    // TODO: Consider validating the segment name and table name from the header against the actual segment
+    extractHttpHeader(headers, CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER);
+    extractHttpHeader(headers, CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+
+    String uploadTypeStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+    if (!FileUploadType.METADATA.name().equals(uploadTypeStr)) {
+      throw new ControllerApplicationException(LOGGER, "Reingestion upload type must be METADATA",
+          Response.Status.BAD_REQUEST);
+    }
+    String sourceDownloadURIStr = extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+    if (StringUtils.isEmpty(sourceDownloadURIStr)) {
+      throw new ControllerApplicationException(LOGGER, "Source download URI is required", Response.Status.BAD_REQUEST);
+    }
+    String copySegmentToDeepStore =
+        extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
+    if (!Boolean.parseBoolean(copySegmentToDeepStore)) {
+      throw new ControllerApplicationException(LOGGER, "COPY_SEGMENT_TO_DEEP_STORE must be true for reingestion upload",
+          Response.Status.BAD_REQUEST);
+    }
+
+    File tempTarFile = null;
+    File tempSegmentDir = null;
+    try {
+      ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
+      String tempFileName = TMP_DIR_PREFIX + UUID.randomUUID();
+      tempTarFile = new File(provider.getFileUploadTempDir(), tempFileName);
+      tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
+
+      long segmentSizeInBytes;
+      createSegmentFileFromMultipart(multiPart, tempTarFile);
+      PinotFS pinotFS = null;
+      try {
+        URI segmentURI = new URI(sourceDownloadURIStr);
+        pinotFS = PinotFSFactory.create(segmentURI.getScheme());
+        segmentSizeInBytes = pinotFS.length(segmentURI);
+      } catch (Exception e) {
+        segmentSizeInBytes = -1;
+        LOGGER.warn("Could not fetch segment size for metadata push", e);
+      } finally {
+        if (pinotFS != null) {
+          pinotFS.close();
+        }
+      }
+
+      String metadataProviderClass = DefaultMetadataExtractor.class.getName();
+      SegmentMetadata segmentMetadata = getSegmentMetadata(tempTarFile, tempSegmentDir, metadataProviderClass);
+      String segmentName = segmentMetadata.getName();
+
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
+      LOGGER.info("Processing upload request for reingested segment: {} of table: {} from client: {}", segmentName,
+          realtimeTableName, clientAddress);
+
+      // Update download URI if controller is responsible for moving the segment to the deep store
+      URI dataDirURI = provider.getDataDirURI();
+      String dataDirPath = dataDirURI.toString();
+      String encodedSegmentName = URIUtils.encode(segmentName);
+      String finalSegmentLocationPath = URIUtils.getPath(dataDirPath, rawTableName, encodedSegmentName);
+      String segmentDownloadURIStr;
+      if (dataDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+        segmentDownloadURIStr = URIUtils.getPath(provider.getVip(), "segments", rawTableName, encodedSegmentName);
+      } else {
+        segmentDownloadURIStr = finalSegmentLocationPath;
+      }
+      URI finalSegmentLocationURI = URIUtils.getUri(finalSegmentLocationPath);
+      LOGGER.info("Using segment download URI: {} for reingested segment: {} of table: {}", segmentDownloadURIStr,
+          segmentName, realtimeTableName);
+
+      ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
+      zkOperator.completeReingestedSegmentOperations(realtimeTableName, segmentMetadata, finalSegmentLocationURI,
+          sourceDownloadURIStr, segmentDownloadURIStr, segmentSizeInBytes);
+
+      return new SuccessResponse(
+          "Successfully uploaded reingested segment: " + segmentName + " of table: " + realtimeTableName);
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER,
+          "Exception while uploading reingested segment: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    } finally {
+      FileUtils.deleteQuietly(tempTarFile);
+      FileUtils.deleteQuietly(tempSegmentDir);
+    }
+  }
+
   // Method used to update a list of segments in batch mode with the METADATA upload type.
   private SuccessResponse uploadSegments(String tableName, TableType tableType, FormDataMultiPart multiPart,
       boolean enableParallelPushProtection, boolean allowRefresh, HttpHeaders headers, Request request) {
@@ -962,6 +1054,35 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Path("segments/reingested")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPLOAD_SEGMENT)
+  @Authenticate(AccessType.CREATE)
+  @ApiOperation(value = "Reingest a realtime segment", notes = "Reingest a segment as multipart file")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully reingested segment"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 403, message = "Segment validation fails"),
+      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
+      @ApiResponse(code = 412, message = "CRC check fails"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS)
+  public void uploadReingestedSegment(FormDataMultiPart multiPart,
+      @ApiParam(value = "Name of the table", required = true)
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName, @Context HttpHeaders headers,
+      @Context Request request, @Suspended AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadReingestedSegment(tableName, multiPart, headers, request));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
     }
   }
 

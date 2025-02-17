@@ -43,7 +43,7 @@ USER presto
 RUN git clone ${PRESTO_GIT_URL} ${PRESTO_BUILD_DIR} && \
     cd ${PRESTO_BUILD_DIR} && \
     git checkout ${PRESTO_BRANCH} && \
-    echo "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/3.9.7/apache-maven-3.9.7-bin.zip" > .mvn/wrapper/maven-wrapper.properties && \
+    echo "distributionUrl=https://repo1.maven.org/maven2/org/apache/maven/apache-maven/3.9.9/apache-maven-3.9.9-bin.zip" > .mvn/wrapper/maven-wrapper.properties && \
     ./mvnw clean install -DskipTests && \
     mkdir -p ${PRESTO_HOME}/data && \
     cp -r presto-server/target/presto-server-*/presto-server-*/* ${PRESTO_HOME} && \

@@ -43,6 +43,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -235,7 +236,11 @@ public class SegmentDeletionManager {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
+      if (fileToDeleteURI == null) {
+        LOGGER.warn("No segment file found for segment: {} in deep store, skipping deletion", segmentId);
+        return;
+      }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
       // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
       // This is catch all clean up to ensure that metadata is removed from deep store.
@@ -279,6 +284,43 @@ public class SegmentDeletionManager {
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
+    }
+  }
+
+  /**
+   * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
+   * Looks for the segment file in two formats:
+   * - Without extension (conventional naming)
+   * - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
+   *
+   * @param rawTableName name of the table containing the segment
+   * @param segmentId name of the segment
+   * @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
+   *         or if there are filesystem access errors
+   */
+  @Nullable
+  private URI getFileToDeleteURI(String rawTableName, String segmentId) {
+    try {
+      URI plainFileUri = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
+
+      // Check for plain segment file first
+      if (pinotFS.exists(plainFileUri)) {
+        return plainFileUri;
+      }
+
+      URI tarGzFileUri = URIUtils.getUri(_dataDir, rawTableName,
+          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+
+      // Check for .tar.gz segment file
+      if (pinotFS.exists(tarGzFileUri)) {
+        return tarGzFileUri;
+      }
+      LOGGER.error("No file found for segment: {} in deep store", segmentId);
+      return null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while trying to find file for segment: {} in deep store", segmentId);
+      return null;
     }
   }
 
