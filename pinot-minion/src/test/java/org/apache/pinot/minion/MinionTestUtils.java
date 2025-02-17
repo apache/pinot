@@ -22,9 +22,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.event.DefaultMinionTaskObserverStorageManager;
 import org.apache.pinot.minion.event.MinionProgressObserver;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
 public class MinionTestUtils {
@@ -34,15 +34,15 @@ public class MinionTestUtils {
 
   public static MinionProgressObserver getMinionProgressObserver() {
     MinionProgressObserver progressObserver = new MinionProgressObserver();
-    progressObserver.init(DefaultMinionTaskProgressManager.getDefaultInstance());
+    progressObserver.init(DefaultMinionTaskObserverStorageManager.getDefaultInstance());
     return progressObserver;
   }
 
   public static MinionProgressObserver getMinionProgressObserver(int progressLimit) {
     MinionProgressObserver progressObserver = new MinionProgressObserver();
     MinionConf conf = new MinionConf();
-    conf.setProperty(DefaultMinionTaskProgressManager.MAX_NUM_STATUS_TO_TRACK, progressLimit);
-    MinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager();
+    conf.setProperty(DefaultMinionTaskObserverStorageManager.MAX_NUM_STATUS_TO_TRACK, progressLimit);
+    MinionTaskObserverStorageManager progressManager = new DefaultMinionTaskObserverStorageManager();
     progressManager.init(conf);
     progressObserver.init(progressManager);
     return progressObserver;

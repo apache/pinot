@@ -20,8 +20,8 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
-import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
 /**
@@ -29,7 +29,7 @@ import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
  */
 public interface MinionEventObserver {
 
-  void init(MinionTaskProgressManager progressManager);
+  void init(MinionTaskObserverStorageManager progressManager);
 
   /**
    * Invoked when a minion task starts.
@@ -53,7 +53,7 @@ public interface MinionEventObserver {
   }
 
   @Nullable
-  default MinionTaskProgressStats getProgressStats() {
+  default MinionTaskBaseObserverStats getProgressStats() {
     return null;
   }
 

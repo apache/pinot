@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.event.DefaultMinionTaskObserverStorageManager;
 import org.apache.pinot.minion.event.MinionProgressObserver;
 
 
@@ -29,7 +29,7 @@ public class MinionTaskTestUtils {
 
   public static MinionProgressObserver getMinionProgressObserver() {
     MinionProgressObserver progressObserver = new MinionProgressObserver();
-    progressObserver.init(DefaultMinionTaskProgressManager.getDefaultInstance());
+    progressObserver.init(DefaultMinionTaskObserverStorageManager.getDefaultInstance());
     return progressObserver;
   }
 }
