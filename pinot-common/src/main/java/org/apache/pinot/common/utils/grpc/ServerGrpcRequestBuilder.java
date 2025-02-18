@@ -32,7 +32,7 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 
-public class GrpcRequestBuilder {
+public class ServerGrpcRequestBuilder {
   private long _requestId;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
@@ -42,39 +42,39 @@ public class GrpcRequestBuilder {
   private BrokerRequest _brokerRequest;
   private List<String> _segments;
 
-  public GrpcRequestBuilder setRequestId(long requestId) {
+  public ServerGrpcRequestBuilder setRequestId(long requestId) {
     _requestId = requestId;
     return this;
   }
 
-  public GrpcRequestBuilder setBrokerId(String brokerId) {
+  public ServerGrpcRequestBuilder setBrokerId(String brokerId) {
     _brokerId = brokerId;
     return this;
   }
 
-  public GrpcRequestBuilder setEnableTrace(boolean enableTrace) {
+  public ServerGrpcRequestBuilder setEnableTrace(boolean enableTrace) {
     _enableTrace = enableTrace;
     return this;
   }
 
-  public GrpcRequestBuilder setEnableStreaming(boolean enableStreaming) {
+  public ServerGrpcRequestBuilder setEnableStreaming(boolean enableStreaming) {
     _enableStreaming = enableStreaming;
     return this;
   }
 
-  public GrpcRequestBuilder setSql(String sql) {
+  public ServerGrpcRequestBuilder setSql(String sql) {
     _payloadType = Request.PayloadType.SQL;
     _sql = sql;
     return this;
   }
 
-  public GrpcRequestBuilder setBrokerRequest(BrokerRequest brokerRequest) {
+  public ServerGrpcRequestBuilder setBrokerRequest(BrokerRequest brokerRequest) {
     _payloadType = Request.PayloadType.BROKER_REQUEST;
     _brokerRequest = brokerRequest;
     return this;
   }
 
-  public GrpcRequestBuilder setSegments(List<String> segments) {
+  public ServerGrpcRequestBuilder setSegments(List<String> segments) {
     _segments = segments;
     return this;
   }
