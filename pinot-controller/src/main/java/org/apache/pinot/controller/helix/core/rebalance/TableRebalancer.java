@@ -735,8 +735,8 @@ public class TableRebalancer {
             tierName, tableNameWithType);
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
-            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
-                storage.getServerTag(), tableConfig);
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig, tierName,
+                storage.getServerTag());
         boolean noExistingInstancePartitions = existingInstancePartitions == null;
         if (!dryRun && !noExistingInstancePartitions) {
           LOGGER.info("Removing instance partitions: {} from ZK", instancePartitionsName);
@@ -764,8 +764,8 @@ public class TableRebalancer {
       } else {
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
-            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
-                storage.getServerTag(), tableConfig);
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig, tierName,
+                storage.getServerTag());
         return Pair.of(instancePartitions, true);
       }
     }

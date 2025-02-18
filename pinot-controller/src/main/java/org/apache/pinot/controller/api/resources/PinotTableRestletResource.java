@@ -1287,8 +1287,8 @@ public class PinotTableRestletResource {
     }
   }
 
-  /*
-  For the given table config, calculates a target assignment, if possible. Otherwise, throws an exception
+  /**
+   * Try to calculate the instance partitions for the given table config. Throws exception if it fails.
    */
   private void validateInstanceAssignment(TableConfig tableConfig) {
     TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
@@ -1296,7 +1296,7 @@ public class PinotTableRestletResource {
       tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Exception calculating instance partitions for table: " + tableConfig.getTableName() + ", reason: "
+          "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "
               + e.getMessage());
     }
   }

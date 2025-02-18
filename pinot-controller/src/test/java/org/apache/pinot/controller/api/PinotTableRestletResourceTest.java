@@ -768,12 +768,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
    * 4. Attempts to update the replication factor of the previously created REALTIME and OFFLINE tables to the
    * invalid value of 5. These updates are expected to fail, and the test verifies that the appropriate error
    * messages are returned.
-   * @throws Exception
+   *
+   * @throws Exception if any error occurs during the validation process
    */
   @Test
   public void validateInvalidTableReplication()
       throws Exception {
-
     String rawTableName = "validateInvalidTableReplication";
 
     validateTableCreationWithInvalidReplication(rawTableName, TableType.REALTIME);
@@ -813,11 +813,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
         getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 2));
 
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).setNumReplicas(10).build();
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setServerTenant("DefaultTenant")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setNumReplicas(10)
+        .build();
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
@@ -825,16 +830,21 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
 
-    //Create a new valid table and update it with invalid replica group config
+    // Create a new valid table and update it with invalid replica group config
     instanceAssignmentConfigMap.clear();
     instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
         getInstanceAssignmentConfig("DefaultTenant_REALTIME", 4, 1));
 
-    realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).setNumReplicas(10).build();
+    realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setServerTenant("DefaultTenant")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .setNumReplicas(10)
+        .build();
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
@@ -843,7 +853,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
           + "precondition to testing config updates");
     }
 
-    //now, update it with an invalid RG config, the update should fail
+    // Update it with an invalid RG config, the update should fail
     instanceAssignmentConfigMap.clear();
     instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(),
         getInstanceAssignmentConfig("DefaultTenant_REALTIME", 1, 8));
@@ -855,20 +865,28 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  /*
-  Updating an existing REALTIME table with an invalid replication factor should throw an exception
+  /**
+   * Updating existing REALTIME table with invalid replication factor should throw exception.
    */
   private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     TableConfig tableConfig =
         tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
-            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5).build()
-            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
-                .setRetentionTimeValue("5").setNumReplicas(5).build();
+            .setNumReplicas(5)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(5)
+            .build();
 
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
@@ -880,13 +898,21 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private void createTableWithValidReplication(String rawTableName, TableType tableType) {
     TableConfig tableConfig =
         tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
-            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(1).build()
-            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
-                .setRetentionTimeValue("5").setNumReplicas(1).build();
+            .setNumReplicas(1)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(1)
+            .build();
 
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
@@ -896,8 +922,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  /*
-  When  table is created with invalid replication factor, it should throw an exception
+  /**
+   * When table is created with invalid replication factor, it should throw exception.
    */
   private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
@@ -905,13 +931,21 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
     TableConfig tableConfig =
         tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
-            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5).build()
-            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
-                .setRetentionTimeValue("5").setNumReplicas(5).build();
+            .setNumReplicas(5)
+            .build() : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn")
+            .setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS")
+            .setRetentionTimeValue("5")
+            .setNumReplicas(5)
+            .build();
 
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());

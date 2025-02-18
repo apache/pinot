@@ -69,19 +69,20 @@ public final class TierConfigUtils {
    * @return InstancePartitions if the one can be derived from the given sorted tiers, null otherwise
    */
   @Nullable
-  public static InstancePartitions getTieredInstancePartitionsForSegment(String tableNameWithType,
-      TableConfig tableConfig, String segmentName, @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
+  public static InstancePartitions getTieredInstancePartitionsForSegment(TableConfig tableConfig, String segmentName,
+      @Nullable List<Tier> sortedTiers, HelixManager helixManager) {
     if (CollectionUtils.isEmpty(sortedTiers)) {
       return null;
     }
 
     // Find first applicable tier
+    String tableNameWithType = tableConfig.getTableName();
     for (Tier tier : sortedTiers) {
       if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
         // Compute default instance partitions
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-        return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableNameWithType,
-            tier.getName(), storage.getServerTag(), tableConfig);
+        return InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(helixManager, tableConfig, tier.getName(),
+            storage.getServerTag());
       }
     }
 
