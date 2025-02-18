@@ -86,6 +86,12 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   }
 
   @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+    brokerConf.setProperty(CommonConstants.Broker.USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
+  }
+
+  @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     try {
       LOGGER.info("Set segment.store.uri: {} for server with scheme: {}", _controllerConfig.getDataDir(),

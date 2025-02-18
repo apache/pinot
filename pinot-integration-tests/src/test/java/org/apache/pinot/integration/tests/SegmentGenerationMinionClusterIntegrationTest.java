@@ -29,7 +29,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -45,6 +47,12 @@ import static org.testng.Assert.assertEquals;
 
 public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationMinionClusterIntegrationTest.class);
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
+    brokerConf.setProperty(CommonConstants.Broker.USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
+  }
 
   @BeforeClass
   public void setUp()
