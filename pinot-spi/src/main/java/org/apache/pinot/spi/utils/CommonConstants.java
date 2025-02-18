@@ -586,7 +586,7 @@ public class CommonConstants {
         public static final String CLIENT_QUERY_ID = "clientQueryId";
 
         // Use MSQE compiler when trying to fill a response with no schema metadata
-        // (overrides the "pinot.broker.use.msqe.schema" broker conf)
+        // (overrides the "pinot.broker.use.msqe.to.fill.empty.response.schema" broker conf)
         public static final String USE_MSQE_EMPTY_SCHEMA = "useMsqeWhenEmptySchema";
       }
 
@@ -709,8 +709,9 @@ public class CommonConstants {
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
 
-    public static final String USE_MSQE_COMPILER_FOR_MISSING_SCHEMA = "pinot.broker.use.msqe.schema";
-    public static final boolean DEFAULT_USE_MSQE_COMPILER_FOR_MISSING_SCHEMA = false;
+    public static final String USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
+        "pinot.broker.use.msqe.to.fill.empty.response.schema";
+    public static final boolean DEFAULT_USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
   }
 
   public static class Server {

@@ -362,6 +362,11 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
+  public static Boolean isUseMSQEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+    String useMSQEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA);
+    return useMSQEToFillEmptySchema != null ? Boolean.parseBoolean(useMSQEToFillEmptySchema) : defaultValue;
+  }
+
   @Nullable
   private static Integer uncheckedParseInt(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {

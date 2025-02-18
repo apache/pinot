@@ -75,8 +75,9 @@ public class ParserUtils {
     DataSchema dataSchema = response.getResultTable() != null ? response.getResultTable().getDataSchema() : null;
 
     List<RelDataTypeField> dataTypeFields = null;
-    // Turn on (with pinot.broker.use.msqe.schema=true or query option useMsqeWhenEmptySchema=true) only for
-    // clusters where no queries with huge IN clauses are expected (see https://github.com/apache/pinot/issues/15064)
+    // Turn on (with pinot.broker.use.msqe.to.fill.empty.response.schema=true or query option
+    // useMsqeWhenEmptySchema=true) only for clusters where no queries with huge IN clauses are expected
+    // (see https://github.com/apache/pinot/issues/15064)
     if (useMSQE) {
       try {
         QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);

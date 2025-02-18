@@ -180,8 +180,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
     }
 
-    _useMSQEWhenEmptySchema = _config.getProperty(Broker.USE_MSQE_COMPILER_FOR_MISSING_SCHEMA,
-        Broker.DEFAULT_USE_MSQE_COMPILER_FOR_MISSING_SCHEMA);
+    _useMSQEWhenEmptySchema = _config.getProperty(Broker.USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA,
+        Broker.DEFAULT_USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -873,7 +873,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
     if (brokerResponse.getNumRowsResultSet() == 0) {
-      boolean useMSQE = useMSQEToFillEmptySchema(pinotQuery);
+      boolean useMSQE = QueryOptionsUtils.isUseMSQEToFillEmptySchema(
+          pinotQuery.getQueryOptions(), _useMSQEWhenEmptySchema);
       ParserUtils.fillEmptyResponseSchema(useMSQE, brokerResponse, _tableCache, schema, database, query);
     }
 
@@ -907,18 +908,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats));
 
     return brokerResponse;
-  }
-
-  /**
-   * Determines if MSQE can be used to try to fill an empty schema response.
-   */
-  private boolean useMSQEToFillEmptySchema(@Nullable PinotQuery pinotQuery) {
-    String optValue =
-        pinotQuery != null ? pinotQuery.getQueryOptions().get(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA) : null;
-    if (StringUtils.isNotBlank(optValue)) {
-      return Boolean.parseBoolean(optValue);
-    }
-    return _useMSQEWhenEmptySchema;
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
@@ -981,7 +970,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    boolean useMSQE = useMSQEToFillEmptySchema(pinotQuery);
+    boolean useMSQE = QueryOptionsUtils.isUseMSQEToFillEmptySchema(
+        pinotQuery.getQueryOptions(), _useMSQEWhenEmptySchema);
     ParserUtils.fillEmptyResponseSchema(useMSQE, brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
