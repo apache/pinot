@@ -1295,9 +1295,7 @@ public class PinotTableRestletResource {
     try {
       tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
     } catch (Exception e) {
-      LOGGER.error("Exception calculating instance partitions for table: {}", tableConfig.getTableName());
-      throw new RuntimeException("Exception calculating instance partitions for table:" + tableConfig.getTableName());
+      throw new RuntimeException("Exception calculating instance partitions for table: " + tableConfig.getTableName());
     }
   }
-
 }

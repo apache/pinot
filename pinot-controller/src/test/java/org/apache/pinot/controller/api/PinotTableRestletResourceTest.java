@@ -51,6 +51,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -805,6 +806,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Create a REALTIME table with an invalid replication factor. Creation should fail.
     String tableName = "testTable";
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
@@ -820,10 +822,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Not enough qualified "
-              + "instances, ask for: (numInstancesPerReplicaGroup: 2) * (numReplicaGroups: 4) = 8, having only 4\" "
-              + "while sending request"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
 
     //Create a new valid table and update it with invalid replica group config
@@ -852,14 +851,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Not enough qualified "
-              + "instances, ask for: (numInstancesPerReplicaGroup: 8) * (numReplicaGroups: 1) = 8, having only 4\" "
-              + "while sending request"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
   private void validateOfflineTableUpdateReplicationToInvalidValue(String rawTableName) {
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
@@ -868,13 +866,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_OFFLINE: java.lang.IllegalStateException: Number of instances: 4"
-              + " with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
+  /*
+  Updating an existing REALTIME table with an invalid replication factor should throw an exception
+   */
   private void validateRealtimeTableUpdateReplicationToInvalidValue(String rawTableName) {
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
@@ -884,9 +884,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains(
-          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Number of instances: 4"
-              + " with tag: DefaultTenant_REALTIME < table replication factor: 5"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
@@ -919,22 +917,26 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  private void validateOfflineTableCreationWithInvalidReplication(String tableName) {
+  private void validateOfflineTableCreationWithInvalidReplication(String rawTableName) {
+    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
     TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
             .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setNumReplicas(5).build();
 
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("Number of instances: 4 with tag: DefaultTenant_OFFLINE < table replication factor: 5"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
+  /*
+  When a table is REALTIME table is created with invalid replication factor, it should throw an exception
+   */
   private void validateRealtimeTableCreationWithInvalidReplication(String rawTableName)
       throws IOException {
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
@@ -945,7 +947,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Number of instances: 4 with tag: DefaultTenant_REALTIME < table replication: 5"));
+      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
