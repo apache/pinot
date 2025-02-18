@@ -167,8 +167,7 @@ InstancePartitionsType instancePartitionsType) {
     int numInstances = instances.size();
     Preconditions.checkState(numInstances > 0, "No instance found with tag: %s", serverTag);
     Preconditions.checkState(numInstances >= tableReplication,
-        "Number of instances: %s with tag: %s < table replication: %s", numInstances, serverTag,
-        tableReplication);
+        "Number of instances: %s with tag: %s < table replication: %s", numInstances, serverTag, tableReplication);
 
     // Sort the instances and rotate the list based on the table name
     instances.sort(null);
