@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.tasks;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Objects;
@@ -77,14 +78,14 @@ public class MinionTaskBaseObserverStats {
     return this;
   }
 
-  public static MinionTaskBaseObserverStats fromJsonString(String statsJson)
+  public MinionTaskBaseObserverStats fromJsonString(String statsJson)
       throws JsonProcessingException {
     return JsonUtils.stringToObject(statsJson, MinionTaskBaseObserverStats.class);
   }
 
-  public static String toJsonString(MinionTaskBaseObserverStats stats)
+  public String toJsonString()
       throws JsonProcessingException {
-    return JsonUtils.objectToString(stats);
+    return JsonUtils.objectToString(this);
   }
 
   @Override
@@ -96,8 +97,8 @@ public class MinionTaskBaseObserverStats {
       return false;
     }
     MinionTaskBaseObserverStats stats = (MinionTaskBaseObserverStats) o;
-    return _startTimestamp == stats._startTimestamp && _taskId.equals(stats._taskId)
-        && _currentState.equals(stats._currentState);
+    return _startTimestamp == stats.getStartTimestamp() && _taskId.equals(stats.getTaskId())
+        && _currentState.equals(stats.getCurrentState());
   }
 
   @Override
@@ -105,6 +106,7 @@ public class MinionTaskBaseObserverStats {
     return Objects.hash(_taskId, _currentState, _startTimestamp);
   }
 
+  @JsonDeserialize(builder = StatusEntry.Builder.class)
   public static class StatusEntry {
     private final long _ts;
     private final LogLevel _level;
@@ -138,17 +140,17 @@ public class MinionTaskBaseObserverStats {
       private LogLevel _level = LogLevel.INFO;
       private String _status;
 
-      public Builder timestamp(long ts) {
+      public Builder withTs(long ts) {
         _ts = ts;
         return this;
       }
 
-      public Builder level(LogLevel level) {
+      public Builder withLevel(LogLevel level) {
         _level = level;
         return this;
       }
 
-      public Builder status(String status) {
+      public Builder withStatus(String status) {
         _status = status;
         return this;
       }
