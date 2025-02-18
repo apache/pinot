@@ -52,7 +52,11 @@ public class OpChainSchedulerService {
         boolean isFinished = false;
         TransferableBlock returnedErrorBlock = null;
         Throwable thrown = null;
+        // TODO: Now that request id, stage and worker is registered on MDC, we can remove the the OpChain text
+        //   from the log messages.
         try {
+          operatorChain.getContext().registerOnMDC();
+
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
@@ -74,6 +78,8 @@ public class OpChainSchedulerService {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
+          operatorChain.getContext().unregisterFromMDC();
+
           _submittedOpChainMap.remove(operatorChain.getId());
           if (returnedErrorBlock != null || thrown != null) {
             if (thrown == null) {
