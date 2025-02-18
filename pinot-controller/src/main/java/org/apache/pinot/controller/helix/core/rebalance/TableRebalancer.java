@@ -571,7 +571,7 @@ public class TableRebalancer {
   /**
    * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
    */
-  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+  public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
@@ -755,7 +755,7 @@ public class TableRebalancer {
             tierName, tableNameWithType);
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
-            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig, tierName,
                 storage.getServerTag());
         boolean noExistingInstancePartitions = existingInstancePartitions == null;
         if (!dryRun && !noExistingInstancePartitions) {
@@ -784,7 +784,7 @@ public class TableRebalancer {
       } else {
         PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
         InstancePartitions instancePartitions =
-            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig, tierName,
                 storage.getServerTag());
         return Pair.of(instancePartitions, true);
       }

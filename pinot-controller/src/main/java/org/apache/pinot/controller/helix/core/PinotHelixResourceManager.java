@@ -2398,7 +2398,7 @@ public class PinotHelixResourceManager {
         updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
 
         InstancePartitions tierInstancePartitions =
-            TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, segmentName, sortedTiers,
+            TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                 _helixZkManager);
         if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
           // Override instance partitions for offline table
@@ -2466,7 +2466,7 @@ public class PinotHelixResourceManager {
           // Update segment tier to support direct assignment for multiple data directories
           updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
           InstancePartitions tierInstancePartitions =
-              TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, segmentName, sortedTiers,
+              TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                   _helixZkManager);
           if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
             // Override instance partitions for offline table

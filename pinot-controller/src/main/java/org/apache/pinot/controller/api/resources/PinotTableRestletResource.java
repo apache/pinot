@@ -241,6 +241,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -517,6 +518,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
         TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
+        validateInstanceAssignment(tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -1288,6 +1290,20 @@ public class PinotTableRestletResource {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig.getSchemaName() != null) {
       validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
+  }
+
+  /**
+   * Try to calculate the instance partitions for the given table config. Throws exception if it fails.
+   */
+  private void validateInstanceAssignment(TableConfig tableConfig) {
+    TableRebalancer tableRebalancer = new TableRebalancer(_pinotHelixResourceManager.getHelixZkManager());
+    try {
+      tableRebalancer.getInstancePartitionsMap(tableConfig, true, true, true);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to calculate instance partitions for table: " + tableConfig.getTableName() + ", reason: "
+              + e.getMessage());
     }
   }
 }
