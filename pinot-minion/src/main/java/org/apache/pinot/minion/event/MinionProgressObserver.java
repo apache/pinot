@@ -48,8 +48,8 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     _taskId = pinotTaskConfig.getTaskId();
     _taskProgressStats.setTaskId(_taskId);
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .timestamp(_taskProgressStats.getStartTimestamp())
-        .status("Task started")
+        .withTs(_taskProgressStats.getStartTimestamp())
+        .withStatus("Task started")
         .build());
     super.notifyTaskStart(pinotTaskConfig);
   }
@@ -67,8 +67,8 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     }
     _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .timestamp(System.currentTimeMillis())
-        .status((progress == null) ? "" : progress.toString())
+        .withTs(System.currentTimeMillis())
+        .withStatus((progress == null) ? "" : progress.toString())
         .build());
     super.notifyProgress(pinotTaskConfig, progress);
   }
@@ -94,8 +94,8 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.SUCCEEDED.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .timestamp(endTs)
-        .status("Task succeeded in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .withTs(endTs)
+        .withStatus("Task succeeded in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
         .build());
     super.notifyTaskSuccess(pinotTaskConfig, executionResult);
   }
@@ -105,8 +105,8 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.CANCELLED.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .timestamp(endTs)
-        .status("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .withTs(endTs)
+        .withStatus("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
         .build());
     super.notifyTaskCancelled(pinotTaskConfig);
   }
@@ -116,8 +116,8 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.ERROR.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .timestamp(endTs)
-        .status("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
+        .withTs(endTs)
+        .withStatus("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
             + ExceptionUtils.getStackTrace(e))
         .build());
     super.notifyTaskError(pinotTaskConfig, e);
