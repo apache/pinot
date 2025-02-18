@@ -897,7 +897,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   /*
-  When a table is REALTIME table is created with invalid replication factor, it should throw an exception
+  When  table is created with invalid replication factor, it should throw an exception
    */
   private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
