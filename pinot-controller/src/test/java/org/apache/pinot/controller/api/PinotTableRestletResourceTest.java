@@ -827,7 +827,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
 
     // Create a new valid table and update it with invalid replica group config
@@ -861,7 +861,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
   }
 
@@ -891,7 +891,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
   }
 
@@ -950,7 +950,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
+      assertTrue(e.getMessage().contains("Failed to calculate instance partitions for table: " + tableNameWithType));
     }
   }
 
