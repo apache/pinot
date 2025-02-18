@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -54,7 +54,7 @@ class DispatchClient {
     } else {
       _channel = NettyChannelBuilder
           .forAddress(host, port)
-          .sslContext(GrpcQueryClient.buildSslContext(tlsConfig))
+          .sslContext(ServerGrpcQueryClient.buildSslContext(tlsConfig))
           .build();
     }
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
