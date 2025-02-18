@@ -122,7 +122,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, we will create dictionary encoded forward index by default
   public enum EncodingType {
-    RAW, DICTIONARY
+    RAW, DICTIONARY, MAP
   }
 
   // If null, there won't be any index

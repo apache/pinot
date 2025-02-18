@@ -159,6 +159,17 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
               copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
             }
           }
+          //Map Columns have virtual child columns where indexes are created per keys
+          //and index_map contains the mapping of pinot buffer to these keys
+          for (Object childColumn : v2Metadata.getColumnMetadataMap().get(column).getChildColumns()) {
+            for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+              if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
+                copyIndexIfExists(v2DataReader, v3DataWriter,
+                    column + V1Constants.MetadataKeys.Column.CHILD_COLUMN_METADATA_KEY_SEPARATOR + childColumn,
+                    indexType);
+              }
+            }
+          }
         }
         v3DataWriter.save();
       }
@@ -202,6 +213,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File v3MetadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
 
     final PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(v2MetadataFile);
+
     // update the segment version
     properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v3.toString());
     CommonsConfigurationUtils.saveToFile(properties, v3MetadataFile);
