@@ -76,7 +76,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Override
   @Nullable
   public synchronized List<MinionTaskBaseObserverStats.StatusEntry> getProgress() {
-    MinionTaskBaseObserverStats minionTaskObserverStats = _progressManager.getTaskProgress(_taskId);
+    MinionTaskBaseObserverStats minionTaskObserverStats = _observerStorageManager.getTaskProgress(_taskId);
     if (minionTaskObserverStats != null && minionTaskObserverStats.getProgressLogs() != null) {
       return new ArrayList<>(minionTaskObserverStats.getProgressLogs());
     }
@@ -86,7 +86,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Nullable
   @Override
   public MinionTaskBaseObserverStats getProgressStats() {
-    return _progressManager.getTaskProgress(_taskId);
+    return _observerStorageManager.getTaskProgress(_taskId);
   }
 
   @Override
@@ -137,7 +137,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   }
 
   private synchronized void addStatus(MinionTaskBaseObserverStats.StatusEntry statusEntry) {
-    MinionTaskBaseObserverStats minionTaskObserverStats = _progressManager.getTaskProgress(_taskId);
+    MinionTaskBaseObserverStats minionTaskObserverStats = _observerStorageManager.getTaskProgress(_taskId);
     Deque<MinionTaskBaseObserverStats.StatusEntry> progressLogs;
     if (minionTaskObserverStats != null) {
       progressLogs = minionTaskObserverStats.getProgressLogs();
@@ -146,14 +146,14 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     }
     progressLogs.add(statusEntry);
 
-    _progressManager.setTaskProgress(_taskId, new MinionTaskBaseObserverStats(_taskProgressStats)
+    _observerStorageManager.setTaskProgress(_taskId, new MinionTaskBaseObserverStats(_taskProgressStats)
         .setProgressLogs(progressLogs));
   }
 
   @Override
   public void cleanup() {
     if (_taskId != null) {
-      _progressManager.deleteTaskProgress(_taskId);
+      _observerStorageManager.deleteTaskProgress(_taskId);
     }
   }
 }
