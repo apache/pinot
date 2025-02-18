@@ -28,11 +28,11 @@ import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
  */
 public class DefaultMinionEventObserver implements MinionEventObserver {
 
-  protected MinionTaskObserverStorageManager _progressManager;
+  protected MinionTaskObserverStorageManager _observerStorageManager;
 
   @Override
-  public void init(MinionTaskObserverStorageManager progressManager) {
-    _progressManager = progressManager;
+  public void init(MinionTaskObserverStorageManager observerStorageManager) {
+    _observerStorageManager = observerStorageManager;
   }
 
   @Override
