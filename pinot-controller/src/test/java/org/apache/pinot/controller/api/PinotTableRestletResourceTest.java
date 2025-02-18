@@ -774,16 +774,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void validateInvalidTableReplication()
       throws Exception {
 
-    String rawTableName = "testTable";
+    String rawTableName = "validateInvalidTableReplication";
 
-    validateRealtimeTableCreationWithInvalidReplication(rawTableName);
-    validateOfflineTableCreationWithInvalidReplication(rawTableName);
+    validateTableCreationWithInvalidReplication(rawTableName, TableType.REALTIME);
+    validateTableCreationWithInvalidReplication(rawTableName, TableType.OFFLINE);
 
-    createRealtimeTableWithValidReplication(rawTableName);
-    createOfflineTableWithValidReplication(rawTableName);
+    createTableWithValidReplication(rawTableName, TableType.REALTIME);
+    createTableWithValidReplication(rawTableName, TableType.OFFLINE);
 
-    validateRealtimeTableUpdateReplicationToInvalidValue(rawTableName);
-    validateOfflineTableUpdateReplicationToInvalidValue(rawTableName);
+    validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.REALTIME);
+    validateTableUpdateReplicationToInvalidValue(rawTableName, TableType.OFFLINE);
   }
 
   /**
@@ -805,7 +805,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws Exception {
 
     // Create a REALTIME table with an invalid replication factor. Creation should fail.
-    String tableName = "testTable";
+    String tableName = "validateInvalidReplicaGroupConfig";
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
@@ -855,97 +855,66 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  private void validateOfflineTableUpdateReplicationToInvalidValue(String rawTableName) {
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(5).build();
-
-    try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
-    }
-  }
-
   /*
   Updating an existing REALTIME table with an invalid replication factor should throw an exception
    */
-  private void validateRealtimeTableUpdateReplicationToInvalidValue(String rawTableName) {
-    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+  private void validateTableUpdateReplicationToInvalidValue(String rawTableName, TableType tableType) {
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5).build();
+            .setNumReplicas(5).build()
+            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
+                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
+                .setRetentionTimeValue("5").setNumReplicas(5).build();
 
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
   }
 
-  private void createOfflineTableWithValidReplication(String rawTableName) {
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(1).build();
-
-    try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    } catch (Exception e) {
-      fail("Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
-          + "precondition to testing config updates");
-    }
-  }
-
-  private void createRealtimeTableWithValidReplication(String rawTableName) {
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+  private void createTableWithValidReplication(String rawTableName, TableType tableType) {
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(1).build();
+            .setNumReplicas(1).build()
+            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
+                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
+                .setRetentionTimeValue("5").setNumReplicas(1).build();
 
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     } catch (Exception e) {
-      fail("Preconditions failure: Could not create a REALTIME table with valid replication factor of 1 as a "
-          + "precondition to testing config updates");
-    }
-  }
-
-  private void validateOfflineTableCreationWithInvalidReplication(String rawTableName) {
-    String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-    TableConfig offlineTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-            .setNumReplicas(5).build();
-
-    try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
+      fail("Preconditions failure: Could not create a " + tableType.toString()
+          + " table with valid replication factor of 1 as a " + "precondition to testing config updates");
     }
   }
 
   /*
   When a table is REALTIME table is created with invalid replication factor, it should throw an exception
    */
-  private void validateRealtimeTableCreationWithInvalidReplication(String rawTableName)
+  private void validateTableCreationWithInvalidReplication(String rawTableName, TableType tableType)
       throws IOException {
-    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
-    TableConfig realtimeTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName).setServerTenant("DefaultTenant")
-            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+    TableConfig tableConfig =
+        tableType == TableType.REALTIME ? new TableConfigBuilder(TableType.REALTIME).setTableName(rawTableName)
+            .setServerTenant("DefaultTenant").setTimeColumnName("timeColumn").setTimeType("DAYS")
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .setNumReplicas(5).build();
+            .setNumReplicas(5).build()
+            : new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setServerTenant("DefaultTenant")
+                .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS")
+                .setRetentionTimeValue("5").setNumReplicas(5).build();
 
     try {
-      sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+      sendPostRequest(_createTableUrl, tableConfig.toJsonString());
     } catch (Exception e) {
       assertTrue(e.getMessage().contains("Exception calculating instance partitions for table: " + tableNameWithType));
     }
