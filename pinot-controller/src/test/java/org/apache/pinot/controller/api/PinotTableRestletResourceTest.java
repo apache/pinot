@@ -965,7 +965,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name(), false);
   }
 
-
   @AfterClass
   public void tearDown() {
     DEFAULT_INSTANCE.stopSharedTestSetup();
