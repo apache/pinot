@@ -173,10 +173,11 @@ public class RebalanceSummaryResult {
   }
 
   public static class SegmentInfo {
+    // TODO: Add a metric to estimate the total time it will take to rebalance
     private final int _totalSegmentsToBeMoved;
+    private final int _maxSegmentsAddedToASingleServer;
     private final long _estimatedAverageSegmentSizeInBytes;
     private final long _totalEstimatedDataToBeMovedInBytes;
-    private final double _totalEstimatedTimeToMoveDataInSecs;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _replicationFactor;
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -187,25 +188,25 @@ public class RebalanceSummaryResult {
     /**
      * Constructor for SegmentInfo
      * @param totalSegmentsToBeMoved total number of segments to be moved as part of this rebalance
+     * @param maxSegmentsAddedToASingleServer maximum segments added to a single server as part of this rebalance
      * @param estimatedAverageSegmentSizeInBytes estimated average size of segments in bytes
      * @param totalEstimatedDataToBeMovedInBytes total estimated amount of data to be moved as part of this rebalance
-     * @param totalEstimatedTimeToMoveDataInSecs total estimated time to move the segments as part of this rebalance
      * @param replicationFactor replication factor before and after this rebalance
      * @param numSegmentsInSingleReplica number of segments in single replica before and after this rebalance
      * @param numSegmentsAcrossAllReplicas total number of segments across all replicas before and after this rebalance
      */
     @JsonCreator
     public SegmentInfo(@JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
+        @JsonProperty("maxSegmentsAddedToASingleServer") int maxSegmentsAddedToASingleServer,
         @JsonProperty("estimatedAverageSegmentSizeInBytes") long estimatedAverageSegmentSizeInBytes,
         @JsonProperty("totalEstimatedDataToBeMovedInBytes") long totalEstimatedDataToBeMovedInBytes,
-        @JsonProperty("totalEstimatedTimeToMoveDataInSecs") double totalEstimatedTimeToMoveDataInSecs,
         @JsonProperty("replicationFactor") @Nullable RebalanceChangeInfo replicationFactor,
         @JsonProperty("numSegmentsInSingleReplica") @Nullable RebalanceChangeInfo numSegmentsInSingleReplica,
         @JsonProperty("numSegmentsAcrossAllReplicas") @Nullable RebalanceChangeInfo numSegmentsAcrossAllReplicas) {
       _totalSegmentsToBeMoved = totalSegmentsToBeMoved;
+      _maxSegmentsAddedToASingleServer = maxSegmentsAddedToASingleServer;
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
       _totalEstimatedDataToBeMovedInBytes = totalEstimatedDataToBeMovedInBytes;
-      _totalEstimatedTimeToMoveDataInSecs = totalEstimatedTimeToMoveDataInSecs;
       _replicationFactor = replicationFactor;
       _numSegmentsInSingleReplica = numSegmentsInSingleReplica;
       _numSegmentsAcrossAllReplicas = numSegmentsAcrossAllReplicas;
@@ -217,6 +218,11 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
+    public int getMaxSegmentsAddedToASingleServer() {
+      return _maxSegmentsAddedToASingleServer;
+    }
+
+    @JsonProperty
     public long getEstimatedAverageSegmentSizeInBytes() {
       return _estimatedAverageSegmentSizeInBytes;
     }
@@ -224,11 +230,6 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public long getTotalEstimatedDataToBeMovedInBytes() {
       return _totalEstimatedDataToBeMovedInBytes;
-    }
-
-    @JsonProperty
-    public double getTotalEstimatedTimeToMoveDataInSecs() {
-      return _totalEstimatedTimeToMoveDataInSecs;
     }
 
     @JsonProperty

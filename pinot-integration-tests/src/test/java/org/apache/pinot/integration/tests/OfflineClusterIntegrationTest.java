@@ -296,7 +296,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, _executorService);
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
-    _resourceManager.getTableSizeReader());
+        _resourceManager.getTableSizeReader());
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -4151,14 +4151,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved()
               * summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes(),
           "Estimated data to be moved in bytes doesn't match");
-      assertTrue(summaryResult.getSegmentInfo().getTotalEstimatedTimeToMoveDataInSecs() > 0.0D,
-          "Estimated time to move segments should be more than 0.0 seconds");
+      assertTrue(summaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer() > 0,
+          "Estimated max number of segments to move in a single server should be > 0");
     } else {
       assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0, "Segments to be moved should be 0");
       assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(), 0L,
           "Estimated data to be moved in bytes should be 0");
-      assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedTimeToMoveDataInSecs(), 0.0D,
-          "Estimated time to move segments should be 0.0D");
+      assertEquals(summaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer(), 0,
+          "Estimated max number of segments to move in a single server should be 0");
     }
 
     // Validate server status stats with numServers information

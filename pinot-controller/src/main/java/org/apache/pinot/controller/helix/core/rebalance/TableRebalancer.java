@@ -594,15 +594,16 @@ public class TableRebalancer {
       LOGGER.warn("tableSizeReader is null, cannot calculate table size for table {}!", tableNameWithType);
       return tableSizePerReplicaInBytes;
     }
+    LOGGER.info("Fetching the table size for rebalance summary for table: {}", tableNameWithType);
     try {
+      // TODO: Consider making the timeoutMs for fetching table size via table rebalancer configurable
       TableSizeReader.TableSubTypeSizeDetails tableSizeDetails =
           _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
       tableSizePerReplicaInBytes = tableSizeDetails._reportedSizePerReplicaInBytes;
     } catch (InvalidConfigException e) {
-      String errMsg = String.format("Caught exception while trying to fetch table size details for table: %s",
-          tableNameWithType);
-      LOGGER.error(errMsg, e);
+      LOGGER.error("Caught exception while trying to fetch table size details for table: {}", tableNameWithType, e);
     }
+    LOGGER.info("Fetched the table size for rebalance summary for table: {}", tableNameWithType);
     return tableSizePerReplicaInBytes;
   }
 
@@ -617,24 +618,22 @@ public class TableRebalancer {
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       existingReplicationFactor = entrySet.getValue().size();
-      for (Map.Entry<String, String> segmentEntrySet : entrySet.getValue().entrySet()) {
-        existingServersToSegmentMap.putIfAbsent(segmentEntrySet.getKey(), new HashSet<>());
-        existingServersToSegmentMap.get(segmentEntrySet.getKey()).add(entrySet.getKey());
+      for (String segmentKey : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
       newReplicationFactor = entrySet.getValue().size();
-      for (Map.Entry<String, String> segmentEntrySet : entrySet.getValue().entrySet()) {
-        newServersToSegmentMap.putIfAbsent(segmentEntrySet.getKey(), new HashSet<>());
-        newServersToSegmentMap.get(segmentEntrySet.getKey()).add(entrySet.getKey());
+      for (String segmentKey : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
     RebalanceSummaryResult.RebalanceChangeInfo replicationFactor
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingReplicationFactor, newReplicationFactor);
 
-    int existingNumServers = existingServersToSegmentMap.keySet().size();
-    int newNumServers = newServersToSegmentMap.keySet().size();
+    int existingNumServers = existingServersToSegmentMap.size();
+    int newNumServers = newServersToSegmentMap.size();
     RebalanceSummaryResult.RebalanceChangeInfo numServers
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumServers, newNumServers);
 
@@ -648,28 +647,31 @@ public class TableRebalancer {
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
     int numServersGettingDataAdded = 0;
+    int maxSegmentsAddedToServer = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
-      Set<String> segmentMap = entry.getValue();
-      int totalNewSegments = segmentMap.size();
+      Set<String> segmentSet = entry.getValue();
+      int totalNewSegments = segmentSet.size();
 
-      Set<String> newSegmentList = new HashSet<>(segmentMap);
-      Set<String> existingSegmentList = new HashSet<>();
+      Set<String> newSegmentList = new HashSet<>(segmentSet);
+      Set<String> existingSegmentSet = new HashSet<>();
       int segmentsUnchanged = 0;
       int totalExistingSegments = 0;
       RebalanceSummaryResult.ServerStatus serverStatus = RebalanceSummaryResult.ServerStatus.ADDED;
       if (existingServersToSegmentMap.containsKey(server)) {
-        totalExistingSegments = existingServersToSegmentMap.get(server).size();
-        existingSegmentList.addAll(existingServersToSegmentMap.get(server));
-        Set<String> intersection = new HashSet<>(existingServersToSegmentMap.get(server));
+        Set<String> segmentSetForServer = existingServersToSegmentMap.get(server);
+        totalExistingSegments = segmentSetForServer.size();
+        existingSegmentSet.addAll(segmentSetForServer);
+        Set<String> intersection = new HashSet<>(segmentSetForServer);
         intersection.retainAll(newSegmentList);
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
         serverStatus = RebalanceSummaryResult.ServerStatus.UNCHANGED;
       }
-      newSegmentList.removeAll(existingSegmentList);
+      newSegmentList.removeAll(existingSegmentSet);
       int segmentsAdded = newSegmentList.size();
-      int segmentsDeleted = existingSegmentList.size() - segmentsUnchanged;
+      maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
+      int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
       numServersGettingDataAdded += segmentsAdded > 0 ? 1 : 0;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
@@ -701,32 +703,18 @@ public class TableRebalancer {
         : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : ((long) totalSegmentsToBeMoved) * averageSegmentSizeInBytes;
-    double estimatedTimeToRebalanceInSec = getEstimatedTimeToRebalanceInSec(totalEstimatedDataToBeMovedInBytes,
-        numServersGettingDataAdded);
 
     RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(numServersGettingDataAdded,
         numServers, serverSegmentChangeInfoMap);
+    // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
+    //       rebalance time can vary with number of segments added
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
-        averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes, estimatedTimeToRebalanceInSec,
+        maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
         replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas);
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
     return new RebalanceSummaryResult(serverInfo, segmentInfo);
-  }
-
-  private static double getEstimatedTimeToRebalanceInSec(long totalEstimatedDataToBeMovedInBytes,
-      int numServersGettingDataAdded) {
-    double estimatedTimeToRebalanceInSec = totalEstimatedDataToBeMovedInBytes == 0 ? 0.0 : -1.0;
-    if (totalEstimatedDataToBeMovedInBytes > 0 && numServersGettingDataAdded > 0) {
-      // Do some processing to figure out what the time to download might be
-      // Assume that data is evenly distributed across all servers
-      long totalDataPerServerInBytes = totalEstimatedDataToBeMovedInBytes / numServersGettingDataAdded;
-      // TODO: Pick a good threshold to calculate estimated time to rebalance. For now assume 100 MB/s data download
-      //       + process rate
-      estimatedTimeToRebalanceInSec = ((double) totalDataPerServerInBytes) / (100.0D * 1024.0D * 1024.0D);
-    }
-    return estimatedTimeToRebalanceInSec;
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {
