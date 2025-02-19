@@ -60,7 +60,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
                 false));
       } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
-            null, null, null, null));
+            null, null, null, null, null));
       }
     });
     if (config.isDryRun()) {
@@ -71,7 +71,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         if (result.getStatus() == RebalanceResult.Status.DONE) {
           rebalanceResult.put(table, new RebalanceResult(result.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller task status for the", result.getInstanceAssignment(),
-              result.getTierInstanceAssignment(), result.getSegmentAssignment(), result.getPreChecksResult()));
+              result.getTierInstanceAssignment(), result.getSegmentAssignment(), result.getPreChecksResult(),
+              result.getRebalanceSummaryResult()));
         }
       }
     }
