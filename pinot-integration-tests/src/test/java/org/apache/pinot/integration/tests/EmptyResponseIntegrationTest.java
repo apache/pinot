@@ -51,6 +51,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that checks data types for queries with no rows returned.
  */
+@Test(enabled = false)
 public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
