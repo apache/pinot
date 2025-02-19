@@ -52,6 +52,14 @@ public interface BrokerResponse {
   }
 
   /**
+   * Convert the broker response metadata to JSON String.
+   */
+  default String toMetadataJsonString()
+      throws IOException {
+    return JsonUtils.objectToString(this, "resultTable");
+  }
+
+  /**
    * Returns the result table.
    */
   @Nullable

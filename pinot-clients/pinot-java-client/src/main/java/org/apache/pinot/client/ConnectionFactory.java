@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import org.apache.pinot.client.grpc.GrpcConnection;
 
 
 /**
@@ -223,6 +224,10 @@ public class ConnectionFactory {
   public static Connection fromHostList(Properties properties, List<String> brokers,
       PinotClientTransport transport) {
     return new Connection(properties, brokers, transport);
+  }
+
+  public static GrpcConnection fromHostListGrpc(Properties properties, List<String> brokers) {
+    return new GrpcConnection(properties, brokers);
   }
 
   private static PinotClientTransport getDefault(Properties connectionProperties) {

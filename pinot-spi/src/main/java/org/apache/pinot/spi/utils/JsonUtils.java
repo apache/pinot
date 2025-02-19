@@ -30,6 +30,8 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
@@ -242,6 +244,18 @@ public class JsonUtils {
   public static String objectToString(Object object)
       throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
+  }
+
+  public static String objectToString(Object object, String... ignoreProperties)
+      throws JsonProcessingException {
+    try {
+      SimpleFilterProvider filters = new SimpleFilterProvider()
+          .addFilter("dynamicFilter",
+              SimpleBeanPropertyFilter.serializeAllExcept(ignoreProperties));
+      return DEFAULT_MAPPER.writer(filters).writeValueAsString(object);
+    } catch (Exception e) {
+      throw new RuntimeException("Error serializing object", e);
+    }
   }
 
   public static void objectToOutputStream(Object object, OutputStream outputStream)
