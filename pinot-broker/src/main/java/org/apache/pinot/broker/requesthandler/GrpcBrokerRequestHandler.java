@@ -166,22 +166,30 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   /**
    * Check if a server that was previously detected as unhealthy is now healthy.
    */
-  private boolean retryUnhealthyServer(String instanceId) {
+  private FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
 
     String hostnamePort = _streamingQueryClient._instanceIdToHostnamePortMap.get(instanceId);
-    ServerGrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
-
-    if (client == null) {
-      LOGGER.warn("No GrpcQueryClient found for server with instanceId: {}", instanceId);
-      return false;
+    // Could occur if the cluster is only serving multi-stage queries
+    if (hostnamePort == null) {
+      LOGGER.debug("No GrpcQueryClient found for server with instanceId: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    ServerGrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
+
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 }

@@ -169,6 +169,14 @@ public class QueryRouter {
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
+  public boolean hasChannel(ServerInstance serverInstance) {
+    if (_serverChannelsTls != null) {
+      return _serverChannelsTls.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+    } else {
+      return _serverChannels.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+    }
+  }
+
   /**
    * Connects to the given server, returns {@code true} if the server is successfully connected.
    */
