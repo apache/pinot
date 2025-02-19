@@ -315,6 +315,8 @@ public class TableRebalancer {
 
     RebalanceSummaryResult summaryResult = null;
     if (summary) {
+      // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
+      // is expected or not based on the summary results
       summaryResult = calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId);
     }
 
@@ -603,7 +605,8 @@ public class TableRebalancer {
     } catch (InvalidConfigException e) {
       LOGGER.error("Caught exception while trying to fetch table size details for table: {}", tableNameWithType, e);
     }
-    LOGGER.info("Fetched the table size for rebalance summary for table: {}", tableNameWithType);
+    LOGGER.info("Fetched the table size (per replica size: {}) for rebalance summary for table: {}",
+        tableSizePerReplicaInBytes, tableNameWithType);
     return tableSizePerReplicaInBytes;
   }
 
@@ -656,7 +659,7 @@ public class TableRebalancer {
       Set<String> segmentSet = entry.getValue();
       int totalNewSegments = segmentSet.size();
 
-      Set<String> newSegmentList = new HashSet<>(segmentSet);
+      Set<String> newSegmentSet = new HashSet<>(segmentSet);
       Set<String> existingSegmentSet = new HashSet<>();
       int segmentsUnchanged = 0;
       int totalExistingSegments = 0;
@@ -666,7 +669,7 @@ public class TableRebalancer {
         totalExistingSegments = segmentSetForServer.size();
         existingSegmentSet.addAll(segmentSetForServer);
         Set<String> intersection = new HashSet<>(segmentSetForServer);
-        intersection.retainAll(newSegmentList);
+        intersection.retainAll(newSegmentSet);
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
         serverStatus = RebalanceSummaryResult.ServerStatus.UNCHANGED;
@@ -674,8 +677,8 @@ public class TableRebalancer {
       } else {
         serversAdded.add(server);
       }
-      newSegmentList.removeAll(existingSegmentSet);
-      int segmentsAdded = newSegmentList.size();
+      newSegmentSet.removeAll(existingSegmentSet);
+      int segmentsAdded = newSegmentSet.size();
       if (segmentsAdded > 0) {
         serversGettingNewSegments.add(server);
       }

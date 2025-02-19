@@ -35,6 +35,33 @@ import javax.annotation.Nullable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceSummaryResult {
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final ServerInfo _serverInfo;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final SegmentInfo _segmentInfo;
+
+  /**
+   * Constructor for RebalanceSummaryResult
+   * @param serverInfo server related summary information
+   * @param segmentInfo segment related summary information
+   */
+  @JsonCreator
+  public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
+      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo) {
+    _serverInfo = serverInfo;
+    _segmentInfo = segmentInfo;
+  }
+
+  @JsonProperty
+  public ServerInfo getServerInfo() {
+    return _serverInfo;
+  }
+
+  @JsonProperty
+  public SegmentInfo getSegmentInfo() {
+    return _segmentInfo;
+  }
+
   public static class ServerSegmentChangeInfo {
     private final ServerStatus _serverStatus;
     private final int _totalSegmentsAfterRebalance;
@@ -287,33 +314,6 @@ public class RebalanceSummaryResult {
     public RebalanceChangeInfo getNumSegmentsAcrossAllReplicas() {
       return _numSegmentsAcrossAllReplicas;
     }
-  }
-
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  private final ServerInfo _serverInfo;
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  private final SegmentInfo _segmentInfo;
-
-  /**
-   * Constructor for RebalanceSummaryResult
-   * @param serverInfo server related summary information
-   * @param segmentInfo segment related summary information
-   */
-  @JsonCreator
-  public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
-      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo) {
-    _serverInfo = serverInfo;
-    _segmentInfo = segmentInfo;
-  }
-
-  @JsonProperty
-  public ServerInfo getServerInfo() {
-    return _serverInfo;
-  }
-
-  @JsonProperty
-  public SegmentInfo getSegmentInfo() {
-    return _segmentInfo;
   }
 
   public enum ServerStatus {
