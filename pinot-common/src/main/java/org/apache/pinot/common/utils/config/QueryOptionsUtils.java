@@ -362,9 +362,9 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
-  public static Boolean isUseMSQEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
-    String useMSQEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSQE_EMPTY_SCHEMA);
-    return useMSQEToFillEmptySchema != null ? Boolean.parseBoolean(useMSQEToFillEmptySchema) : defaultValue;
+  public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+    String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
+    return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
   @Nullable

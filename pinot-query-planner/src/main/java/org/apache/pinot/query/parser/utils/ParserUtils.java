@@ -68,17 +68,17 @@ public class ParserUtils {
    *
    * Multi-stage engine schema will be available only if query compiles.
    */
-  public static void fillEmptyResponseSchema(boolean useMSQE, BrokerResponse response, TableCache tableCache,
+  public static void fillEmptyResponseSchema(boolean useMSE, BrokerResponse response, TableCache tableCache,
       Schema schema, String database, String query) {
     Preconditions.checkState(response.getNumRowsResultSet() == 0, "Cannot fill schema for non-empty response");
 
     DataSchema dataSchema = response.getResultTable() != null ? response.getResultTable().getDataSchema() : null;
 
     List<RelDataTypeField> dataTypeFields = null;
-    // Turn on (with pinot.broker.use.msqe.to.fill.empty.response.schema=true or query option
-    // useMsqeWhenEmptySchema=true) only for clusters where no queries with huge IN clauses are expected
+    // Turn on (with pinot.broker.use.mse.to.fill.empty.response.schema=true or query option
+    // useMSEToFillEmptyResponseSchema=true) only for clusters where no queries with huge IN clauses are expected
     // (see https://github.com/apache/pinot/issues/15064)
-    if (useMSQE) {
+    if (useMSE) {
       try {
         QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
         RelRoot node = queryEnvironment.getRelRootIfCanCompile(query);

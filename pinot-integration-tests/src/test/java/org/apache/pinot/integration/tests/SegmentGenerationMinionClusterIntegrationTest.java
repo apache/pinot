@@ -51,7 +51,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.USE_MSQE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
+    brokerConf.setProperty(CommonConstants.Broker.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
   }
 
   @BeforeClass
