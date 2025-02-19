@@ -96,5 +96,9 @@ public interface MinionEventObserver {
     return -1;
   }
 
+  /**
+   * Place to handle the cleanup required on {@link MinionTaskObserverStorageManager} for the associated task.
+   * This method should be called before removing the observer.
+   */
   void cleanup();
 }

@@ -106,6 +106,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     _taskProgressStats.setCurrentState(MinionTaskState.CANCELLED.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(endTs)
+        .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.WARN)
         .withStatus("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
         .build());
     super.notifyTaskCancelled(pinotTaskConfig);
@@ -117,6 +118,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     _taskProgressStats.setCurrentState(MinionTaskState.ERROR.name());
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(endTs)
+        .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
         .withStatus("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
             + ExceptionUtils.getStackTrace(e))
         .build());

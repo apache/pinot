@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.minion.event;
 
+import com.google.common.base.Preconditions;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
@@ -55,7 +57,7 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
       _maxNumStatusToTrack =
           Integer.parseInt(configuration.getProperty(DefaultMinionTaskObserverStorageManager.MAX_NUM_STATUS_TO_TRACK));
     } catch (NumberFormatException e) {
-      LOGGER.warn("Unable to parse the value of '{}' using default value: {}",
+      LOGGER.warn("Unable to parse the configured value: {}, using the default value: {} instead.",
           DefaultMinionTaskObserverStorageManager.MAX_NUM_STATUS_TO_TRACK,
           DefaultMinionTaskObserverStorageManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK);
       _maxNumStatusToTrack = DefaultMinionTaskObserverStorageManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK;
@@ -65,6 +67,7 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
   @Nullable
   @Override
   public MinionTaskBaseObserverStats getTaskProgress(String taskId) {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(taskId), "taskId is null or empty");
     if (_minionTaskProgressStatsMap.containsKey(taskId)) {
       return new MinionTaskBaseObserverStats(_minionTaskProgressStatsMap.get(taskId));
     }
@@ -73,6 +76,7 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
 
   @Override
   public synchronized void setTaskProgress(String taskId, MinionTaskBaseObserverStats progress) {
+    Preconditions.checkNotNull(progress, "Cannot store null MinionTaskBaseObserverStats object.");
     _minionTaskProgressStatsMap.put(taskId, progress);
     Deque<MinionTaskBaseObserverStats.StatusEntry> progressLogs = progress.getProgressLogs();
     int logSize = progressLogs.size();
@@ -84,6 +88,7 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
 
   @Override
   public MinionTaskBaseObserverStats deleteTaskProgress(String taskId) {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(taskId), "taskId is null or empty");
     return _minionTaskProgressStatsMap.remove(taskId);
   }
 }
