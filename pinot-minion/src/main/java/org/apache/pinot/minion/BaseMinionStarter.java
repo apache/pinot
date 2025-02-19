@@ -175,7 +175,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   public MinionTaskObserverStorageManager getMinionTaskProgressManager() {
     String progressManagerClassName = _config.getProperty(MinionConf.MINION_TASK_PROGRESS_MANAGER_CLASS);
     MinionTaskObserverStorageManager progressManager = null;
-    if (progressManagerClassName != null) {
+    if (StringUtils.isNotEmpty(progressManagerClassName)) {
       try {
         LOGGER.info("Trying to create MinionTaskProgressManager with {}", progressManagerClassName);
         progressManager = PluginManager.get().createInstance(progressManagerClassName);

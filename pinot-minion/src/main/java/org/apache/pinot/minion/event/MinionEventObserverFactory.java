@@ -33,7 +33,8 @@ public interface MinionEventObserverFactory {
   void init(MinionTaskZkMetadataManager zkMetadataManager);
 
   /**
-   * Initializes the task executor factory.
+   * Initializes the task executor factory with the specified {@link MinionTaskObserverStorageManager}
+   * to manage the storage of stats recorded by the {@link MinionEventObserver}.
    */
   void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskObserverStorageManager taskProgressManager);
 
