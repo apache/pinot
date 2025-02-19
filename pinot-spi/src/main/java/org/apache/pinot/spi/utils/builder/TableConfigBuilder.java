@@ -56,8 +56,8 @@ public class TableConfigBuilder {
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
-  private static final String DEFAULT_LOAD_MODE = "MMAP";
   private static final String MMAP_LOAD_MODE = "MMAP";
+  private static final String DEFAULT_LOAD_MODE = MMAP_LOAD_MODE;
 
   private final TableType _tableType;
   private String _tableName;
