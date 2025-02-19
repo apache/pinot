@@ -112,15 +112,14 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
-  @Nullable
   private final FailureDetector _failureDetector;
 
-  public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null, null, false);
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
+    this(mailboxService, failureDetector, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig,
-      @Nullable FailureDetector failureDetector, boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
@@ -271,9 +270,7 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
-        if (_failureDetector != null) {
-          _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
-        }
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
       }
     }
 
@@ -284,6 +281,12 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
+          // subsequent query failures
+          if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
+              != ConnectivityState.READY) {
+            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+          }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
               resp.getThrowable());
