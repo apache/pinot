@@ -44,7 +44,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
-  protectedgi ExecutorService _executorService;
+  protected ExecutorService _executorService;
 
   @Override
   public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService) {
