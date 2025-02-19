@@ -1183,9 +1183,13 @@ public class CommonConstants {
 
         /**
          * Returns {@code true} if the segment is completed (DONE/UPLOADED), {@code false} otherwise.
+         *
+         * The segment is
+         * 1. still Consuming if the status is IN_PROGRESS
+         * 2. just done consuming but not yet committed if the status is COMMITTING (for pauseless tables)
          */
         public boolean isCompleted() {
-          return this != IN_PROGRESS;
+          return (this == DONE) || (this == UPLOADED);
         }
       }
 
