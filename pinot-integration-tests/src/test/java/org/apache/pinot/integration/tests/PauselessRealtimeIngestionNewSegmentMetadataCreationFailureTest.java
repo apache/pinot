@@ -70,7 +70,6 @@ public class PauselessRealtimeIngestionNewSegmentMetadataCreationFailureTest
               segmentZKMetadata -> segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING)
           .count() == NUM_REALTIME_SEGMENTS_ZK_METADATA_WITH_FAILURE;
     }, 1000, 100000, "Some segments are still IN_PROGRESS");
-
     runValidationAndVerify();
   }
 }
