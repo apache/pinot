@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 
@@ -138,21 +139,41 @@ public class RebalanceSummaryResult {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numServers;
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Set<String> _serversAdded;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Set<String> _serversRemoved;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Set<String> _serversUnchanged;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Set<String> _serversGettingNewSegments;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
     /**
      * Constructor for ServerInfo
      * @param numServersGettingNewSegments total number of servers receiving new segments as part of this rebalance
      * @param numServers number of servers before and after this rebalance
+     * @param serversAdded set of servers getting added as part of this rebalance
+     * @param serversRemoved set of servers getting removed as part of this rebalance
+     * @param serversUnchanged set of servers existing both before and as part of this rebalance
+     * @param serversGettingNewSegments set of servers getting segments added
      * @param serverSegmentChangeInfo per server statistics for this rebalance
      */
     @JsonCreator
     public ServerInfo(@JsonProperty("numServersGettingNewSegments") int numServersGettingNewSegments,
         @JsonProperty("numServers") @Nullable RebalanceChangeInfo numServers,
+        @JsonProperty("serversAdded") @Nullable Set<String> serversAdded,
+        @JsonProperty("serversRemoved") @Nullable Set<String> serversRemoved,
+        @JsonProperty("serversUnchanged") @Nullable Set<String> serversUnchanged,
+        @JsonProperty("serversGettingNewSegments") @Nullable Set<String> serversGettingNewSegments,
         @JsonProperty("serverSegmentChangeInfo")
         @Nullable Map<String, ServerSegmentChangeInfo> serverSegmentChangeInfo) {
       _numServersGettingNewSegments = numServersGettingNewSegments;
       _numServers = numServers;
+      _serversAdded = serversAdded;
+      _serversRemoved = serversRemoved;
+      _serversUnchanged = serversUnchanged;
+      _serversGettingNewSegments = serversGettingNewSegments;
       _serverSegmentChangeInfo = serverSegmentChangeInfo;
     }
 
@@ -164,6 +185,26 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public RebalanceChangeInfo getNumServers() {
       return _numServers;
+    }
+
+    @JsonProperty
+    public Set<String> getServersAdded() {
+      return _serversAdded;
+    }
+
+    @JsonProperty
+    public Set<String> getServersRemoved() {
+      return _serversRemoved;
+    }
+
+    @JsonProperty
+    public Set<String> getServersUnchanged() {
+      return _serversUnchanged;
+    }
+
+    @JsonProperty
+    public Set<String> getServersGettingNewSegments() {
+      return _serversGettingNewSegments;
     }
 
     @JsonProperty

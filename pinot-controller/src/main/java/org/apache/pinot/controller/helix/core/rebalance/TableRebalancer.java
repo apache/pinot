@@ -644,9 +644,12 @@ public class TableRebalancer {
       instanceToTagsMap.put(instanceConfig.getInstanceName(), instanceConfig.getTags());
     }
 
+    Set<String> serversAdded = new HashSet<>();
+    Set<String> serversRemoved = new HashSet<>();
+    Set<String> serversUnchanged = new HashSet<>();
+    Set<String> serversGettingNewSegments = new HashSet<>();
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
-    int numServersGettingDataAdded = 0;
     int maxSegmentsAddedToServer = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
@@ -667,12 +670,17 @@ public class TableRebalancer {
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
         serverStatus = RebalanceSummaryResult.ServerStatus.UNCHANGED;
+        serversUnchanged.add(server);
+      } else {
+        serversAdded.add(server);
       }
       newSegmentList.removeAll(existingSegmentSet);
       int segmentsAdded = newSegmentList.size();
+      if (segmentsAdded > 0) {
+        serversGettingNewSegments.add(server);
+      }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
       int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
-      numServersGettingDataAdded += segmentsAdded > 0 ? 1 : 0;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
@@ -682,6 +690,7 @@ public class TableRebalancer {
     for (Map.Entry<String, Set<String>> entry : existingServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
       if (!serverSegmentChangeInfoMap.containsKey(server)) {
+        serversRemoved.add(server);
         serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
             RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
             instanceToTagsMap.getOrDefault(server, null)));
@@ -704,8 +713,10 @@ public class TableRebalancer {
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : ((long) totalSegmentsToBeMoved) * averageSegmentSizeInBytes;
 
-    RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(numServersGettingDataAdded,
-        numServers, serverSegmentChangeInfoMap);
+    // Set some of the sets to null if they are empty to ensure they don't show up in the result
+    RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(
+        serversGettingNewSegments.size(), numServers, serversAdded, serversRemoved, serversUnchanged,
+        serversGettingNewSegments, serverSegmentChangeInfoMap);
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,

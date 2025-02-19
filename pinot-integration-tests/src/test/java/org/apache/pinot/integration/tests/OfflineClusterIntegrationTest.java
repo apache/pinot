@@ -4136,6 +4136,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertTrue(summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes() > 0L,
           "Avg segment size expected to be > 0 but found to be 0");
     }
+    assertEquals(summaryResult.getServerInfo().getNumServersGettingNewSegments(),
+        summaryResult.getServerInfo().getServersGettingNewSegments().size());
     if (existingNumServers != newNumServers) {
       assertTrue(summaryResult.getServerInfo().getNumServersGettingNewSegments() > 0,
           "Expected number of servers should be > 0");
@@ -4189,10 +4191,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         numServersRemoved + numServersUnchanged);
     Assert.assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(),
         numServersAdded + numServersUnchanged);
+
+    assertEquals(numServersAdded, summaryResult.getServerInfo().getServersAdded().size());
+    assertEquals(numServersRemoved, summaryResult.getServerInfo().getServersRemoved().size());
+    assertEquals(numServersUnchanged, summaryResult.getServerInfo().getServersUnchanged().size());
   }
 
-  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs)
-      throws Exception {
+  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs) {
     String jobId = rebalanceResult.getJobId();
     if (rebalanceResult.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
       return;
