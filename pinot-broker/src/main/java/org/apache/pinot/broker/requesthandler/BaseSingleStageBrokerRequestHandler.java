@@ -146,6 +146,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final int _defaultQueryLimit;
   protected final Map<Long, QueryServers> _queriesById;
   protected final boolean _enableMultistageMigrationMetric;
+  protected final boolean _useMSEToFillEmptyResponseSchema;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
 
@@ -174,6 +175,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
     }
+
+    _useMSEToFillEmptyResponseSchema = _config.getProperty(Broker.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA,
+        Broker.DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
 
     LOGGER.info("Initialized {} with broker id: {}, timeout: {}ms, query response limit: {}, "
             + "default query limit {}, query log max length: {}, query log max rate: {}, query cancellation "
@@ -853,7 +857,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
       // this is an attempt to return more faithful information based on other sources
       if (brokerResponse.getNumRowsResultSet() == 0) {
-        ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+        boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
+            pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
+        ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
       }
 
       // Set total query processing time
@@ -928,7 +934,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+    boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
+        pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
+    ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, null));

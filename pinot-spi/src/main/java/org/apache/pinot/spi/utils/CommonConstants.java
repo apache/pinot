@@ -557,6 +557,10 @@ public class CommonConstants {
         public static final String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+
+        // Use MSE compiler when trying to fill a response with no schema metadata
+        // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
+        public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
       }
 
       public static class QueryOptionValue {
@@ -677,6 +681,10 @@ public class CommonConstants {
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
+
+    public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
+        "pinot.broker.use.mse.to.fill.empty.response.schema";
+    public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
   }
 
   public static class Server {
