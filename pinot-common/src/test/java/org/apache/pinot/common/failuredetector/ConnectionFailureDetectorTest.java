@@ -139,11 +139,16 @@ public class ConnectionFailureDetectorTest {
 
   @Test
   public void testRetryWithMultipleUnhealthyServerRetriers() {
-    _unhealthyServerRetrier = new UnhealthyServerRetrier(7);
+    _unhealthyServerRetrier = new UnhealthyServerRetrier(5);
     _failureDetector.registerUnhealthyServerRetrier(_unhealthyServerRetrier);
 
-    UnhealthyServerRetrier unhealthyServerRetrier2 = new UnhealthyServerRetrier(8);
+    // This retrier will only be called after the first retrier starts returning HEALTHY. So we expect a total of 7
+    // failures and 8 retries until the server is marked as healthy again.
+    UnhealthyServerRetrier unhealthyServerRetrier2 = new UnhealthyServerRetrier(2);
     _failureDetector.registerUnhealthyServerRetrier(unhealthyServerRetrier2);
+
+    // Register a retrier that isn't aware of the failing server. This should not affect the retry process.
+    _failureDetector.registerUnhealthyServerRetrier(instanceId -> FailureDetector.ServerState.UNKNOWN);
 
     _failureDetector.markServerUnhealthy(INSTANCE_ID);
     verify(Collections.singleton(INSTANCE_ID), 1, 0);
@@ -151,25 +156,25 @@ public class ConnectionFailureDetectorTest {
     // Should retry until both unhealthy server retriers return that the server is healthy
     TestUtils.waitForCondition(aVoid -> {
       int numRetries = _unhealthyServerRetrier._retryUnhealthyServerCalled;
-      if (numRetries < 9) {
+      if (numRetries < 8) {
         // Avoid test flakiness by not making these assertions close to the end of the expected retry period
-        if (numRetries > 0 && numRetries <= 7) {
+        if (numRetries > 0 && numRetries <= 5) {
           assertEquals(_failureDetector.getUnhealthyServers(), Collections.singleton(INSTANCE_ID));
           assertEquals(MetricValueUtils.getGlobalGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS), 1);
         }
         return false;
       }
-      assertEquals(numRetries, 9);
+      assertEquals(numRetries, 8);
       // There might be a small delay between the successful attempt and removing failed server from the unhealthy
       // servers. Perform a check instead of an assertion.
       return _failureDetector.getUnhealthyServers().isEmpty()
           && MetricValueUtils.getGaugeValue(_brokerMetrics, BrokerGauge.UNHEALTHY_SERVERS.getGaugeName()) == 0
           && _unhealthyServerNotifier._notifyUnhealthyServerCalled == 1
           && _healthyServerNotifier._notifyHealthyServerCalled == 1;
-    }, 5_000L, "Failed to get 5 retries");
+    }, 5_000L, "Failed to get 8 retries");
 
     // Verify no further retries
-    assertEquals(_unhealthyServerRetrier._retryUnhealthyServerCalled, 9);
+    assertEquals(_unhealthyServerRetrier._retryUnhealthyServerCalled, 8);
   }
 
   private void verify(Set<String> expectedUnhealthyServers, int expectedNotifyUnhealthyServerCalled,
@@ -206,7 +211,7 @@ public class ConnectionFailureDetectorTest {
     }
   }
 
-  private static class UnhealthyServerRetrier implements Function<String, Boolean> {
+  private static class UnhealthyServerRetrier implements Function<String, FailureDetector.ServerState> {
     int _retryUnhealthyServerCalled = 0;
     final int _numFailures;
 
@@ -215,10 +220,11 @@ public class ConnectionFailureDetectorTest {
     }
 
     @Override
-    public Boolean apply(String instanceId) {
+    public FailureDetector.ServerState apply(String instanceId) {
       assertEquals(instanceId, INSTANCE_ID);
       _retryUnhealthyServerCalled++;
-      return _retryUnhealthyServerCalled > _numFailures;
+      return _retryUnhealthyServerCalled > _numFailures ? FailureDetector.ServerState.HEALTHY
+          : FailureDetector.ServerState.UNHEALTHY;
     }
   }
 }

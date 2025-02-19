@@ -45,9 +45,11 @@ public interface FailureDetector {
 
   /**
    * Registers a function that will be periodically called to retry unhealthy servers. The function is called with the
-   * instanceId of the unhealthy server and should return true if the server is now healthy, false otherwise.
+   * instanceId of the unhealthy server and should return {@link ServerState#HEALTHY} if the server is now healthy,
+   * {@link ServerState#UNHEALTHY} if the server is still unhealthy, and {@link ServerState#UNKNOWN} if the retrier
+   * does not know about this server.
    */
-  void registerUnhealthyServerRetrier(Function<String, Boolean> unhealthyServerRetrier);
+  void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier);
 
   /**
    * Registers a consumer that will be called with the instanceId of a server that is detected as healthy.
@@ -83,4 +85,10 @@ public interface FailureDetector {
    * Stops the failure detector.
    */
   void stop();
+
+  enum ServerState {
+    HEALTHY,
+    UNHEALTHY,
+    UNKNOWN
+  }
 }

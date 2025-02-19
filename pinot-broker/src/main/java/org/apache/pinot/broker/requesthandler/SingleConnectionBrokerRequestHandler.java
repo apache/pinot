@@ -179,19 +179,26 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   /**
    * Check if a server that was previously detected as unhealthy is now healthy.
    */
-  public boolean retryUnhealthyServer(String instanceId) {
+  public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
+
+    // Could occur if the cluster is only serving multi-stage queries
+    if (!_queryRouter.hasChannel(serverInstance)) {
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+
     if (_queryRouter.connect(serverInstance)) {
       LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
-      return true;
+      return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
   }
 }

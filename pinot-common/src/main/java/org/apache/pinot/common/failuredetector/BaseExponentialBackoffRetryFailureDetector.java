@@ -48,7 +48,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   protected final ConcurrentHashMap<String, RetryInfo> _unhealthyServerRetryInfoMap = new ConcurrentHashMap<>();
   protected final DelayQueue<RetryInfo> _retryInfoDelayQueue = new DelayQueue<>();
 
-  protected final List<Function<String, Boolean>> _unhealthyServerRetriers = new ArrayList<>();
+  protected final List<Function<String, ServerState>> _unhealthyServerRetriers = new ArrayList<>();
   protected Consumer<String> _healthyServerNotifier;
   protected Consumer<String> _unhealthyServerNotifier;
   protected BrokerMetrics _brokerMetrics;
@@ -74,7 +74,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
-  public void registerUnhealthyServerRetrier(Function<String, Boolean> unhealthyServerRetrier) {
+  public void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier) {
     _unhealthyServerRetriers.add(unhealthyServerRetrier);
   }
 
@@ -110,9 +110,11 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
           }
           LOGGER.info("Retry unhealthy server: {}", instanceId);
           boolean recovered = true;
-          for (Function<String, Boolean> unhealthyServerRetrier : _unhealthyServerRetriers) {
-            if (!unhealthyServerRetrier.apply(instanceId)) {
+          for (Function<String, ServerState> unhealthyServerRetrier : _unhealthyServerRetriers) {
+            ServerState serverState = unhealthyServerRetrier.apply(instanceId);
+            if (serverState == ServerState.UNHEALTHY) {
               recovered = false;
+              break;
             }
           }
           if (recovered) {

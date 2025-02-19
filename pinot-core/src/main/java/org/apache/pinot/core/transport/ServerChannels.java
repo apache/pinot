@@ -133,6 +133,10 @@ public class ServerChannels {
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
   }
 
+  public boolean hasChannel(ServerRoutingInstance serverRoutingInstance) {
+    return _serverToChannelMap.containsKey(serverRoutingInstance);
+  }
+
   public void connect(ServerRoutingInstance serverRoutingInstance)
       throws InterruptedException, TimeoutException {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
