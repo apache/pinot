@@ -53,8 +53,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   }
 
   @Override
-  public Map<String, String> check(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig) {
+  public Map<String, String> check(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
     Map<String, String> preCheckResult = new HashMap<>();
