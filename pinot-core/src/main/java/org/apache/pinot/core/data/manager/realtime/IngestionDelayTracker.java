@@ -287,10 +287,8 @@ public class IngestionDelayTracker {
               ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
               () -> getPartitionEndToEndIngestionDelayMs(partitionId));
         }
-        if (currentOffset != null && latestOffset != null) {
-          _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
-              () -> getPartitionIngestionOffsetLag(partitionId));
-        }
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+            () -> getPartitionIngestionOffsetLag(partitionId));
 
         if (currentOffset != null) {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
