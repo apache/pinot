@@ -217,16 +217,24 @@ public class QueryDispatcher {
     }
   }
 
-  public boolean checkConnectivityToInstance(String instanceId) {
+  public FailureDetector.ServerState checkConnectivityToInstance(String instanceId) {
     String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
-    DispatchClient client = _dispatchClientMap.get(hostnamePort);
 
-    if (client == null) {
-      LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
-      return false;
+    // Could occur if the cluster is only serving single-stage queries
+    if (hostnamePort == null) {
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 
   private boolean isQueryCancellationEnabled() {
