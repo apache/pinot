@@ -51,6 +51,8 @@ public class OpChainSchedulerService {
       public void runJob() {
         TransferableBlock returnedErrorBlock = null;
         Throwable thrown = null;
+        // try-with-resources to ensure that the operator chain is closed
+        // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
