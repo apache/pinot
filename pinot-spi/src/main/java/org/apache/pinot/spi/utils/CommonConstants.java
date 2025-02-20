@@ -586,6 +586,10 @@ public class CommonConstants {
 
         // Custom Query ID provided by the client
         public static final String CLIENT_QUERY_ID = "clientQueryId";
+
+        // Use MSE compiler when trying to fill a response with no schema metadata
+        // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
+        public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
       }
 
       public static class QueryOptionValue {
@@ -706,6 +710,10 @@ public class CommonConstants {
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
+
+    public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
+        "pinot.broker.use.mse.to.fill.empty.response.schema";
+    public static final boolean DEFAULT_USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = false;
   }
 
   public static class Server {
@@ -1177,9 +1185,13 @@ public class CommonConstants {
 
         /**
          * Returns {@code true} if the segment is completed (DONE/UPLOADED), {@code false} otherwise.
+         *
+         * The segment is
+         * 1. still Consuming if the status is IN_PROGRESS
+         * 2. just done consuming but not yet committed if the status is COMMITTING (for pauseless tables)
          */
         public boolean isCompleted() {
-          return this != IN_PROGRESS;
+          return (this == DONE) || (this == UPLOADED);
         }
       }
 
