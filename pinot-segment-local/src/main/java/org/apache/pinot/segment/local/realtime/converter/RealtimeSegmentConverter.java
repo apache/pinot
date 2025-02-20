@@ -70,7 +70,7 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion,@Nullable ServerMetrics serverMetrics)
+  public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
 
