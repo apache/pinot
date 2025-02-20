@@ -492,6 +492,6 @@ public class PinotAggregateExchangeNodeInsertRule {
       }
     }
 
-    return CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM;
+    return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
   }
 }
