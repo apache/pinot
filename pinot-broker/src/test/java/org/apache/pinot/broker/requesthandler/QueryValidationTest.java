@@ -19,12 +19,18 @@
 
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class QueryValidationTest {
@@ -114,6 +120,46 @@ public class QueryValidationTest {
   }
 
   @Test
+  public void testGroovyScripts()
+      throws JsonProcessingException {
+    // setup secure groovy config
+    GroovyFunctionEvaluator.setConfig(GroovyStaticAnalyzerConfig.createDefault());
+
+    String inValidGroovyQuery = "SELECT groovy('{\"returnType\":\"INT\",\"isSingleValue\":true}') FROM foo";
+    runUnsupportedGroovy(inValidGroovyQuery, "Groovy transform function must have at least 2 argument");
+
+    String groovyInvalidMethodInvokeQuery =
+        "SELECT groovy('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'return [\"bash\", \"-c\", \"echo Hello,"
+            + " World!\"].execute().text') FROM foo";
+    runUnsupportedGroovy(groovyInvalidMethodInvokeQuery, "Expression [MethodCallExpression] is not allowed");
+
+    String groovyInvalidImportsQuery =
+        "SELECT groovy( '{\"returnType\":\"INT\",\"isSingleValue\":true}', 'def args = [\"QuickStart\", \"-type\", "
+            + "\"REALTIME\"] as String[]; org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2') FROM foo";
+    runUnsupportedGroovy(groovyInvalidImportsQuery, "Indirect import checks prevents usage of expression");
+
+    String groovyInOrderByClause =
+        "SELECT colA, colB FROM foo ORDER BY groovy('{\"returnType\":\"STRING\",\"isSingleValue\":true}', 'return "
+            + "[\"bash\", \"-c\", \"echo Hello, World!\"].execute().text') DESC";
+    runUnsupportedGroovy(groovyInOrderByClause, "Expression [MethodCallExpression] is not allowed");
+
+    String groovyInHavingClause =
+        "SELECT colA, SUM(colB) AS totalB, groovy('{\"returnType\":\"DOUBLE\",\"isSingleValue\":true}', 'arg0 / "
+            + "arg1', SUM(colB), COUNT(*)) AS avgB FROM foo GROUP BY colA HAVING groovy('{\"returnType\":\"BOOLEAN\","
+            + "\"isSingleValue\":true}', 'System.metaClass.methods.each { method -> if (method.name.md5() == "
+            + "\"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} }', SUM(colB))";
+    runUnsupportedGroovy(groovyInHavingClause, "Indirect import checks prevents usage of expression");
+
+    String groovyInWhereClause =
+        "SELECT colA, colB FROM foo WHERE groovy('{\"returnType\":\"BOOLEAN\",\"isSingleValue\":true}', 'System.exit"
+            + "(10)', colA)";
+    runUnsupportedGroovy(groovyInWhereClause, "Indirect import checks prevents usage of expression");
+
+    // Reset groovy config for rest of the testing
+    GroovyFunctionEvaluator.setConfig(null);
+  }
+
+  @Test
   public void testReplicaGroupToQueryInvalidQuery() {
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("SET numReplicaGroupsToQuery='illegal'; SELECT COUNT(*) FROM MY_TABLE");
@@ -125,12 +171,22 @@ public class QueryValidationTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     try {
-      BaseSingleStageBrokerRequestHandler.rejectGroovyQuery(pinotQuery);
+      BaseSingleStageBrokerRequestHandler.rejectGroovyQuery(pinotQuery, queryContainsGroovy);
       if (queryContainsGroovy) {
-        Assert.fail("Query should have failed since groovy was found in query: " + pinotQuery);
+        fail("Query should have failed since groovy was found in query: " + pinotQuery);
       }
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Groovy transform functions are disabled for queries");
+    }
+  }
+
+  private static void runUnsupportedGroovy(String query, String errorMsg) {
+    try {
+      PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+      BaseSingleStageBrokerRequestHandler.rejectGroovyQuery(pinotQuery, false);
+      fail("Query should have failed since malicious groovy was found in query");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(errorMsg));
     }
   }
 
@@ -138,7 +194,7 @@ public class QueryValidationTest {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 1000);
-      Assert.fail("Query should have failed");
+      fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), errorMessage);
     }
@@ -149,7 +205,7 @@ public class QueryValidationTest {
     try {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       BaseSingleStageBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
-      Assert.fail("Query should have failed");
+      fail("Query should have failed");
     } catch (Exception e) {
       Assert.assertEquals(errorMessage, e.getMessage());
     }
@@ -161,7 +217,7 @@ public class QueryValidationTest {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
       BaseSingleStageBrokerRequestHandler.updateColumnNames(rawTableName, pinotQuery, isCaseInsensitive, columnNameMap);
     } catch (Exception e) {
-      Assert.fail("Query should have succeeded");
+      fail("Query should have succeeded");
     }
   }
 }

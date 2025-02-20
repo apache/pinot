@@ -78,8 +78,6 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.segment.local.function.GroovyConfigChangeListener;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
@@ -160,7 +158,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
-  protected GroovyConfigChangeListener _groovyConfigChangeListener;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -701,12 +698,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
-
-    // Initializing Groovy execution security
-    _groovyConfigChangeListener = new GroovyConfigChangeListener();
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_groovyConfigChangeListener);
-    GroovyFunctionEvaluator.configureGroovySecurity(
-        _serverConf.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
 
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
