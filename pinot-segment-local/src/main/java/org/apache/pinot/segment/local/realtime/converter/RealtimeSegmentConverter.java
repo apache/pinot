@@ -70,7 +70,7 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
+  public void build(@Nullable SegmentVersion segmentVersion,@Nullable ServerMetrics serverMetrics)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
 
@@ -116,7 +116,7 @@ public class RealtimeSegmentConverter {
       }
     }
 
-    if (segmentPartitionConfig != null) {
+    if (segmentPartitionConfig != null && serverMetrics != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
         int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
