@@ -67,8 +67,7 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
   @Nullable
   @Override
   public MinionTaskBaseObserverStats getTaskProgress(String taskId) {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(taskId), "taskId is null or empty");
-    if (_minionTaskProgressStatsMap.containsKey(taskId)) {
+    if (StringUtils.isNotEmpty(taskId) && _minionTaskProgressStatsMap.containsKey(taskId)) {
       return new MinionTaskBaseObserverStats(_minionTaskProgressStatsMap.get(taskId));
     }
     return null;
@@ -88,7 +87,9 @@ public class DefaultMinionTaskObserverStorageManager implements MinionTaskObserv
 
   @Override
   public MinionTaskBaseObserverStats deleteTaskProgress(String taskId) {
-    Preconditions.checkArgument(StringUtils.isNotEmpty(taskId), "taskId is null or empty");
-    return _minionTaskProgressStatsMap.remove(taskId);
+    if (StringUtils.isNotEmpty(taskId) && _minionTaskProgressStatsMap.containsKey(taskId)) {
+      return _minionTaskProgressStatsMap.remove(taskId);
+    }
+    return null;
   }
 }

@@ -42,10 +42,12 @@ public class PinotTaskProgressResourceTest {
     MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
 
     MinionEventObserver observer2 = MinionTestUtils.getMinionProgressObserver();
+    observer2.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t02"));
     observer2.notifyProgress(MinionTestUtils.getPinotTaskConfig("t02"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
 
     MinionEventObserver observer3 = MinionTestUtils.getMinionProgressObserver();
+    observer3.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t03"));
     observer3.notifyTaskSuccess(MinionTestUtils.getPinotTaskConfig("t03"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
