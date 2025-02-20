@@ -26,6 +26,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,24 +44,25 @@ public final class AccessControlUtils {
   /**
    * Validate permission for the given access type against the given table
    *
-   * @param tableName name of the table to be accessed (post database name translation)
-   * @param accessType type of the access
-   * @param httpHeaders HTTP headers containing requester identity required by access control object
-   * @param endpointUrl the request url for which this access control is called
+   * @param tableName     name of the table to be accessed (post database name translation)
+   * @param accessType    type of the access
+   * @param httpHeaders   HTTP headers containing requester identity required by access control object
+   * @param request       the request for which this access controll is called
+   * @param endpointUrl   the request url for which this access control is called
    * @param accessControl AccessControl object which does the actual validation
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
-      @Nullable HttpHeaders httpHeaders, String endpointUrl, AccessControl accessControl) {
+      @Nullable HttpHeaders httpHeaders, Request request, String endpointUrl, AccessControl accessControl) {
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     try {
       if (rawTableName == null) {
-        if (accessControl.hasAccess(accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(accessType, httpHeaders, request, endpointUrl)) {
           return;
         }
       } else {
-        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, endpointUrl)) {
+        if (accessControl.hasAccess(rawTableName, accessType, httpHeaders, request, endpointUrl)) {
           return;
         }
       }
