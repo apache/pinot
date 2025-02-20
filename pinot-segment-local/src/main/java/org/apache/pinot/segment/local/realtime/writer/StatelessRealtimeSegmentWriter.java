@@ -333,7 +333,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     long startTimeMs = now();
     try {
       if (_segBuildSemaphore != null) {
-        _logger.info("Trying to acquire semaphore for building segment");
+        _logger.info("Trying to acquire semaphore for building segment: {}", _segmentName);
         Instant acquireStart = Instant.now();
         int timeoutSeconds = 5;
         while (!_segBuildSemaphore.tryAcquire(timeoutSeconds, TimeUnit.SECONDS)) {
@@ -345,36 +345,44 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     } catch (InterruptedException e) {
       throw new RuntimeException("Interrupted while waiting for segment build semaphore", e);
     }
-    long lockAcquireTimeMs = now();
-    _logger.info("Acquired lock for building segment in {} ms", lockAcquireTimeMs - startTimeMs);
-
-    // Build a segment from in-memory rows.
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset(_startOffset.toString());
-    segmentZKPropsConfig.setEndOffset(_endOffset.toString());
-
-    // Build the segment
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, _resourceTmpDir.getAbsolutePath(), _schema,
-            _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-            _tableConfig.getIndexingConfig().isNullHandlingEnabled());
     try {
-      converter.build(null, null);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to build segment", e);
-    }
-    _logger.info("Successfully built segment (Column Mode: {}) in {} ms", converter.isColumnMajorEnabled(),
-        now() - lockAcquireTimeMs);
+      long lockAcquireTimeMs = now();
+      _logger.info("Acquired lock for building segment in {} ms", lockAcquireTimeMs - startTimeMs);
 
-    File indexDir = new File(_resourceTmpDir, _segmentName);
-    File segmentTarFile = new File(_resourceTmpDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    try {
-      TarCompressionUtils.createCompressedTarFile(new File(_resourceTmpDir, _segmentName), segmentTarFile);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while tarring index directory from: " + indexDir + " to: " + segmentTarFile, e);
+      // Build a segment from in-memory rows.
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset(_startOffset.toString());
+      segmentZKPropsConfig.setEndOffset(_endOffset.toString());
+
+      // Build the segment
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, _resourceTmpDir.getAbsolutePath(),
+              _schema,
+              _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
+              _tableConfig.getIndexingConfig().isNullHandlingEnabled());
+      try {
+        converter.build(null, null);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to build segment", e);
+      }
+      _logger.info("Successfully built segment (Column Mode: {}) in {} ms", converter.isColumnMajorEnabled(),
+          now() - lockAcquireTimeMs);
+
+      File indexDir = new File(_resourceTmpDir, _segmentName);
+      File segmentTarFile = new File(_resourceTmpDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      try {
+        TarCompressionUtils.createCompressedTarFile(new File(_resourceTmpDir, _segmentName), segmentTarFile);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Caught exception while tarring index directory from: " + indexDir + " to: " + segmentTarFile, e);
+      }
+      return segmentTarFile;
+    } finally {
+      if (_segBuildSemaphore != null) {
+        _logger.info("Releasing semaphore for building segment");
+        _segBuildSemaphore.release();
+      }
     }
-    return segmentTarFile;
   }
 
   protected long now() {
