@@ -1479,8 +1479,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new BadQueryRequestException("Groovy transform function must have at least 2 argument");
     }
     // second argument in the groovy function is groovy script
-    String scriptExpression = operands.get(1).getLiteral().getStringValue();
-    new GroovyFunctionEvaluator(String.format("groovy({%s})", scriptExpression));
+    String script = operands.get(1).getLiteral().getStringValue();
+    GroovyFunctionEvaluator.parseGroovyScript(String.format("groovy({%s})", script));
   }
 
   /**

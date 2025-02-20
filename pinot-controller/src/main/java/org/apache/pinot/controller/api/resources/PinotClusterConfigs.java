@@ -216,7 +216,7 @@ public class PinotClusterConfigs {
       GroovyStaticAnalyzerConfig groovyConfig = GroovyStaticAnalyzerConfig.fromJson(body);
       properties.put(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG, groovyConfig.toJson());
       admin.setConfig(configScope, properties);
-      GroovyFunctionEvaluator.setConfig(groovyConfig);
+      GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(groovyConfig);
       return new SuccessResponse("Updated Groovy Static Analyzer config.");
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config",

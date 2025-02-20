@@ -123,7 +123,7 @@ public class QueryValidationTest {
   public void testGroovyScripts()
       throws JsonProcessingException {
     // setup secure groovy config
-    GroovyFunctionEvaluator.setConfig(GroovyStaticAnalyzerConfig.createDefault());
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig.createDefault());
 
     String inValidGroovyQuery = "SELECT groovy('{\"returnType\":\"INT\",\"isSingleValue\":true}') FROM foo";
     runUnsupportedGroovy(inValidGroovyQuery, "Groovy transform function must have at least 2 argument");
@@ -156,7 +156,7 @@ public class QueryValidationTest {
     runUnsupportedGroovy(groovyInWhereClause, "Indirect import checks prevents usage of expression");
 
     // Reset groovy config for rest of the testing
-    GroovyFunctionEvaluator.setConfig(null);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(null);
   }
 
   @Test

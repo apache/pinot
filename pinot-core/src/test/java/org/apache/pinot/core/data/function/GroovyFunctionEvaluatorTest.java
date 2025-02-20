@@ -56,9 +56,10 @@ public class GroovyFunctionEvaluatorTest {
         getDefaultAllowedImports(),
         List.of("invoke", "execute"),
         false);
-    GroovyFunctionEvaluator.setConfig(config);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
 
     for (String script : scripts) {
+      GroovyFunctionEvaluator.parseGroovyScript(script);
       GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
       GenericRow row = new GenericRow();
       Object result = groovyFunctionEvaluator.evaluate(row);
@@ -89,11 +90,11 @@ public class GroovyFunctionEvaluatorTest {
         getDefaultAllowedImports(),
         List.of("invoke", "execute"),
         false);
-    GroovyFunctionEvaluator.setConfig(config);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
 
     for (String script : scripts) {
       try {
-        new GroovyFunctionEvaluator(script);
+        GroovyFunctionEvaluator.parseGroovyScript(script);
         fail("Groovy analyzer failed to catch malicious script");
       } catch (Exception ignored) {
       }
@@ -113,7 +114,7 @@ public class GroovyFunctionEvaluatorTest {
 
     GroovyStaticAnalyzerConfig config =
         new GroovyStaticAnalyzerConfig(List.of(), List.of(), List.of(), List.of(), false);
-    GroovyFunctionEvaluator.setConfig(config);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
 
     for (String script : scripts) {
       try {

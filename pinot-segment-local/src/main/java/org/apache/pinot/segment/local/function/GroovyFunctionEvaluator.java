@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.control.CompilerConfiguration;
@@ -62,14 +61,14 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String ARGUMENTS_GROUP_NAME = "arguments";
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
-  private static GroovyStaticAnalyzerConfig _config;
-  private static AbstractMetrics.Meter _securityViolationCounter;
+  private static GroovyStaticAnalyzerConfig _groovyStaticAnalyzerConfig;
 
   private final List<String> _arguments;
   private final int _numArguments;
   private final Binding _binding;
   private final Script _script;
   private final String _expression;
+  private static CompilerConfiguration _compilerConfiguration = new CompilerConfiguration();
 
   public GroovyFunctionEvaluator(String closure) {
     _expression = closure;
@@ -83,14 +82,23 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
     _numArguments = _arguments.size();
     _binding = new Binding();
-    final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
-
-    final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = getConfig();
-    _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
+    String scriptText = matcher.group(SCRIPT_GROUP_NAME);
+    _script = createSafeShell(_binding).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
     return GROOVY_EXPRESSION_PREFIX;
+  }
+
+  /**
+   * This method is used to parse the Groovy script and check if the script is valid.
+   * @param script Groovy script to be parsed.
+   */
+  public static void parseGroovyScript(String script) {
+    Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(script);
+    Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", script);
+    String scriptText = matcher.group(SCRIPT_GROUP_NAME);
+    new GroovyShell(new Binding(), _compilerConfiguration).parse(scriptText);
   }
 
   /**
@@ -99,47 +107,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
    * to execute malicious code.
    *
    * @param binding Binding instance to be used by Groovy Shell.
-   * @param groovyConfig GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
    * @return GroovyShell instance with static syntax analysis.
    */
-  private GroovyShell createSafeShell(Binding binding, GroovyStaticAnalyzerConfig groovyConfig) {
-    CompilerConfiguration config = new CompilerConfiguration();
-
-    if (groovyConfig != null) {
-      ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
-      SecureASTCustomizer secure = new SecureASTCustomizer();
-
-      secure.addExpressionCheckers(expression -> {
-        if (expression instanceof MethodCallExpression) {
-          MethodCallExpression method = (MethodCallExpression) expression;
-          return !groovyConfig.getDisallowedMethodNames().contains(method.getMethodAsString());
-        } else {
-          return true;
-        }
-      });
-
-      secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
-      secure.setImportsWhitelist(groovyConfig.getAllowedImports());
-      secure.setStaticImportsWhitelist(groovyConfig.getAllowedImports());
-      secure.setReceiversWhiteList(groovyConfig.getAllowedReceivers());
-
-      // Block all * imports
-      secure.setStaticStarImportsWhitelist(groovyConfig.getAllowedImports());
-      secure.setStarImportsWhitelist(groovyConfig.getAllowedImports());
-
-      // Allow all expression and token types
-      secure.setExpressionsBlacklist(List.of());
-      secure.setTokensBlacklist(List.of());
-
-      secure.setMethodDefinitionAllowed(groovyConfig.isMethodDefinitionAllowed());
-      secure.setIndirectImportCheckEnabled(true);
-      secure.setClosuresAllowed(true);
-      secure.setPackageAllowed(false);
-
-      config.addCompilationCustomizers(imports, secure);
-    }
-
-    return new GroovyShell(binding, config);
+  private GroovyShell createSafeShell(Binding binding) {
+    return new GroovyShell(binding, _compilerConfiguration);
   }
 
   @Override
@@ -181,17 +152,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return _expression;
   }
 
-  public static GroovyStaticAnalyzerConfig getConfig() {
-    synchronized (GroovyFunctionEvaluator.class) {
-      return _config;
-    }
-  }
-
   public static void configureGroovySecurity(String groovyASTConfig)
       throws Exception {
     try {
       if (groovyASTConfig != null) {
-        setConfig(GroovyStaticAnalyzerConfig.fromJson(groovyASTConfig));
+        setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig.fromJson(groovyASTConfig));
       } else {
         LOGGER.info("No Groovy Security Configuration found, Groovy static analysis is disabled");
       }
@@ -202,17 +167,56 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   /**
    * Initialize or update the configuration for the Groovy Static Analyzer.
-   * @param config GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
+   * Update compiler configuration to include the new configuration.
+   * @param groovyStaticAnalyzerConfig GroovyStaticAnalyzerConfig instance to be used for static syntax analysis.
    */
-  public static void setConfig(GroovyStaticAnalyzerConfig config)
+  public static void setGroovyStaticAnalyzerConfig(GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig)
       throws JsonProcessingException {
     synchronized (GroovyFunctionEvaluator.class) {
-      if (config != null) {
-        LOGGER.info("Setting Groovy Static Analyzer Config: {}", config.toJson());
+      _groovyStaticAnalyzerConfig = groovyStaticAnalyzerConfig;
+      if (groovyStaticAnalyzerConfig != null) {
+        _compilerConfiguration = createSecureGroovyConfig();
+        LOGGER.info("Setting Groovy Static Analyzer Config: {}", groovyStaticAnalyzerConfig.toJson());
       } else {
+        _compilerConfiguration = new CompilerConfiguration();
         LOGGER.info("Disabling Groovy Static Analysis");
       }
-      _config = config;
     }
+  }
+
+  private static CompilerConfiguration createSecureGroovyConfig() {
+    GroovyStaticAnalyzerConfig groovyConfig = _groovyStaticAnalyzerConfig;
+    ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
+    SecureASTCustomizer secure = new SecureASTCustomizer();
+
+    secure.addExpressionCheckers(expression -> {
+      if (expression instanceof MethodCallExpression) {
+        MethodCallExpression method = (MethodCallExpression) expression;
+        return !groovyConfig.getDisallowedMethodNames().contains(method.getMethodAsString());
+      } else {
+        return true;
+      }
+    });
+
+    secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
+    secure.setImportsWhitelist(groovyConfig.getAllowedImports());
+    secure.setStaticImportsWhitelist(groovyConfig.getAllowedImports());
+    secure.setReceiversWhiteList(groovyConfig.getAllowedReceivers());
+
+    // Block all * imports
+    secure.setStaticStarImportsWhitelist(groovyConfig.getAllowedImports());
+    secure.setStarImportsWhitelist(groovyConfig.getAllowedImports());
+
+    // Allow all expression and token types
+    secure.setExpressionsBlacklist(List.of());
+    secure.setTokensBlacklist(List.of());
+
+    secure.setMethodDefinitionAllowed(groovyConfig.isMethodDefinitionAllowed());
+    secure.setIndirectImportCheckEnabled(true);
+    secure.setClosuresAllowed(true);
+    secure.setPackageAllowed(false);
+
+    CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
+    return compilerConfiguration.addCompilationCustomizers(imports, secure);
   }
 }
