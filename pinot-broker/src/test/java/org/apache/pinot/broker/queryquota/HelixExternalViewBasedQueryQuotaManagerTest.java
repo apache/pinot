@@ -514,7 +514,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     runQueries();
 
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
-    _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
+      _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
