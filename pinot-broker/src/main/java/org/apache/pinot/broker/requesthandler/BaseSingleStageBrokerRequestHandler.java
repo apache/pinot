@@ -356,6 +356,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               accessControl);
 
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
+      /*
+       * If the compileRequest method set the BrokerResponse field, then it is either an error response or
+       * a literal-only query. In either case, we can return the response directly.
+       */
       return compileResult._errorOrLiteralOnlyBrokerResponse;
     }
 
