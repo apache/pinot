@@ -344,18 +344,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throws Exception {
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
-    String rawTableName = "UNKNOWN";
-    CompileResult compileResult = null;
-    try {
-      compileResult =
+    CompileResult compileResult =
           compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
               accessControl);
-    } catch (DatabaseConflictException e) {
-      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
-      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
-    }
 
     if (compileResult._brokerResponse != null) {
       return compileResult._brokerResponse;
@@ -363,7 +354,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     Schema schema = compileResult._schema;
     String tableName = compileResult._tableName;
-    rawTableName = compileResult._rawTableName;
+    String rawTableName = compileResult._rawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
     long compilationEndTimeNs = System.nanoTime();
