@@ -291,6 +291,10 @@
       <groupId>net.sourceforge.fmpp</groupId>
       <artifactId>fmpp</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache-extras.beanshell</groupId>
+      <artifactId>bsh</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
