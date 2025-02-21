@@ -310,10 +310,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  static class CompileResult {
+  private static class CompileResult {
     final PinotQuery _pinotQuery;
     final PinotQuery _serverPinotQuery;
-    Schema _schema;
+    final Schema _schema;
     final String _tableName;
     final String _rawTableName;
     final BrokerResponse _brokerResponse;
@@ -355,15 +355,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
-    } catch (BadQueryRequestException e) {
-      LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
-          e.getMessage());
-      requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
-      if (compileResult != null) {
-        rawTableName = compileResult._rawTableName;
-      }
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
-      return new BrokerResponseNative(QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, e));
     }
 
     if (compileResult._brokerResponse != null) {
