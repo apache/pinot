@@ -175,6 +175,19 @@ public class TimePredicateFilterOptimizerTest {
         new Range("1620777600000", true, "1620863999999", true));
     testDateTrunc("datetrunc('DAY', col) BETWEEN 1620950399000 AND 1621036799999",
         new Range("1620950399000", true, "1621036799999", true));
+    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620777600000 AND 1620863999999",
+        new Range("1620777600000", true, "1620863999999", true));
+    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620777600000 AND 1620950399999",
+        new Range("1620777600000", true, "1620950399999", true));
+    testDateTrunc("DATETRUNC('DAY', col) between 1620777600000 and 1620863999999",
+        new Range("1620777600000", true, "1620863999999", true));
+    testInvalidFilterOptimizer("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') BETWEEN 453630 AND 453631");
+    testInvalidFilterOptimizer("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND "
+        + "39193718399999");
+    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620777600000 AND 1621036799999",
+        new Range("1620777600000", true, "1621036799999", true));
+    testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
+        new Range("453630", true, "453632", true));
 
     // TODO: Currently time filter optimizers do not support 'literal = func()' syntax
     testInvalidFilterOptimizer("453630 = datetrunc('DAY', col)");
