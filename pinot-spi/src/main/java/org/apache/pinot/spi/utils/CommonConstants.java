@@ -28,6 +28,8 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 
 
 public class CommonConstants {
+  public static final String GROOVY_STATIC_ANALYZER_CONFIG = "pinot.server.groovy.static.analyzer";
+
   private CommonConstants() {
   }
 
