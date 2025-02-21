@@ -315,6 +315,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * is successful then all member variables other than BrokerResponse will be available. If compilation is not
    * successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
    * It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
+   * The only exception is that a BrokerResponse is returned for a literal-only query.
    */
   private static class CompileResult {
     final PinotQuery _pinotQuery;
@@ -322,7 +323,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
-    final BrokerResponse _errorBrokerResponse;
+    final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
         String rawTableName) {
@@ -331,16 +332,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
-      _errorBrokerResponse = null;
+      _errorOrLiteralOnlyBrokerResponse = null;
     }
 
-    public CompileResult(BrokerResponse errorBrokerResponse) {
+    public CompileResult(BrokerResponse errorOrLiteralOnlyBrokerResponse) {
       _pinotQuery = null;
       _serverPinotQuery = null;
       _schema = null;
       _tableName = null;
       _rawTableName = null;
-      _errorBrokerResponse = errorBrokerResponse;
+      _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
   }
 
@@ -354,8 +355,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
               accessControl);
 
-    if (compileResult._errorBrokerResponse != null) {
-      return compileResult._errorBrokerResponse;
+    if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
+      return compileResult._errorOrLiteralOnlyBrokerResponse;
     }
 
     Schema schema = compileResult._schema;
