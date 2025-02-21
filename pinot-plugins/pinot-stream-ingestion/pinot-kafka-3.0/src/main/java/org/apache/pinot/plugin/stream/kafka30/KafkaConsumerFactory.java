@@ -48,6 +48,6 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
     return new KafkaPartitionLevelConsumer(clientId, _streamConfig,
-        partitionGroupConsumptionStatus.getPartitionGroupId());
+        partitionGroupConsumptionStatus.getStreamPartitionGroupId());
   }
 }
