@@ -61,7 +61,7 @@ import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.config.QueryExecutorConfig;
+import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -86,6 +86,7 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,10 +112,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throws ConfigurationException {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
-    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
     LOGGER.info("Trying to build SegmentPrunerService");
-    _segmentPrunerService = new SegmentPrunerService(queryExecutorConfig.getPrunerConfig());
-    String planMakerClass = queryExecutorConfig.getPlanMakerClass();
+    _segmentPrunerService = new SegmentPrunerService(new SegmentPrunerConfig(config.subset(Server.PRUNER)));
+    String planMakerClass = config.getProperty(Server.PLAN_MAKER_CLASS, Server.DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS);
     LOGGER.info("Trying to build PlanMaker with class: {}", planMakerClass);
     try {
       _planMaker = PluginManager.get().createInstance(planMakerClass);
@@ -122,7 +122,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throw new RuntimeException("Caught exception while creating PlanMaker with class: " + planMakerClass);
     }
     _planMaker.init(config);
-    _defaultTimeoutMs = queryExecutorConfig.getTimeOut();
+    _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
         _enablePrefetch);

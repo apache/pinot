@@ -112,15 +112,14 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
-  @Nullable
   private final FailureDetector _failureDetector;
 
-  public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null, null, false);
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
+    this(mailboxService, failureDetector, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig,
-      @Nullable FailureDetector failureDetector, boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
@@ -218,16 +217,24 @@ public class QueryDispatcher {
     }
   }
 
-  public boolean checkConnectivityToInstance(String instanceId) {
+  public FailureDetector.ServerState checkConnectivityToInstance(String instanceId) {
     String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
-    DispatchClient client = _dispatchClientMap.get(hostnamePort);
 
-    if (client == null) {
-      LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
-      return false;
+    // Could occur if the cluster is only serving single-stage queries
+    if (hostnamePort == null) {
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 
   private boolean isQueryCancellationEnabled() {
@@ -271,9 +278,7 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
-        if (_failureDetector != null) {
-          _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
-        }
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
       }
     }
 
@@ -284,6 +289,12 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
+          // subsequent query failures
+          if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
+              != ConnectivityState.READY) {
+            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+          }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
               resp.getThrowable());
