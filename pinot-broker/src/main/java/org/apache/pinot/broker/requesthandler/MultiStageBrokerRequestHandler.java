@@ -172,8 +172,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
           CommonConstants.Broker.DEFAULT_OF_SPOOLS);
-      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GROUP_TRIM,
-          CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM);
+      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
+          CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
 
       queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)

@@ -214,13 +214,6 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Integer getGroupTrimSize(Map<String, String> queryOptions) {
-    String groupTrimSize = queryOptions.get(QueryOptionKey.GROUP_TRIM_SIZE);
-    // NOTE: Non-positive value means turning off the intermediate level trim
-    return uncheckedParseInt(QueryOptionKey.GROUP_TRIM_SIZE, groupTrimSize);
-  }
-
-  @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
     String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
     // NOTE: Non-positive value means turning off the segment level trim
@@ -239,6 +232,13 @@ public class QueryOptionsUtils {
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
     // NOTE: Non-positive value means turning off the broker level trim
     return uncheckedParseInt(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, minBrokerGroupTrimSizeString);
+  }
+
+  @Nullable
+  public static Integer getMSEMinGroupTrimSize(Map<String, String> queryOptions) {
+    String mseMinGroupTrimSizeString = queryOptions.get(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the intermediate stage trim
+    return uncheckedParseInt(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, mseMinGroupTrimSizeString);
   }
 
   @Nullable

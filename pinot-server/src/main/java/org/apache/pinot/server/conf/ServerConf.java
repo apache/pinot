@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Server.*;
 
@@ -53,7 +52,7 @@ public class ServerConf {
   }
 
   public boolean isNettyServerEnabled() {
-    return _serverConf.getProperty(Server.CONFIG_OF_NETTY_SERVER_ENABLED, Server.DEFAULT_NETTY_SERVER_ENABLED);
+    return _serverConf.getProperty(CONFIG_OF_NETTY_SERVER_ENABLED, DEFAULT_NETTY_SERVER_ENABLED);
   }
 
   public int getNettyPort() {
@@ -61,7 +60,7 @@ public class ServerConf {
   }
 
   public boolean isNettyTlsServerEnabled() {
-    return _serverConf.getProperty(Server.CONFIG_OF_NETTYTLS_SERVER_ENABLED, Server.DEFAULT_NETTYTLS_SERVER_ENABLED);
+    return _serverConf.getProperty(CONFIG_OF_NETTYTLS_SERVER_ENABLED, DEFAULT_NETTYTLS_SERVER_ENABLED);
   }
 
   public int getNettyTlsPort() {
@@ -69,11 +68,11 @@ public class ServerConf {
   }
 
   public boolean isEnableGrpcServer() {
-    return _serverConf.getProperty(Server.CONFIG_OF_ENABLE_GRPC_SERVER, Server.DEFAULT_ENABLE_GRPC_SERVER);
+    return _serverConf.getProperty(CONFIG_OF_ENABLE_GRPC_SERVER, DEFAULT_ENABLE_GRPC_SERVER);
   }
 
   public boolean isGrpcTlsServerEnabled() {
-    return _serverConf.getProperty(Server.CONFIG_OF_GRPCTLS_SERVER_ENABLED, Server.DEFAULT_GRPCTLS_SERVER_ENABLED);
+    return _serverConf.getProperty(CONFIG_OF_GRPCTLS_SERVER_ENABLED, DEFAULT_GRPCTLS_SERVER_ENABLED);
   }
 
   public boolean isMultiStageServerEnabled() {
@@ -91,7 +90,7 @@ public class ServerConf {
   }
 
   public int getGrpcPort() {
-    return _serverConf.getProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT);
+    return _serverConf.getProperty(CONFIG_OF_GRPC_PORT, DEFAULT_GRPC_PORT);
   }
 
   public int getMultiStageServicePort() {
@@ -144,7 +143,7 @@ public class ServerConf {
   }
 
   public String getMetricsPrefix() {
-    return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, Server.DEFAULT_METRICS_PREFIX);
+    return _serverConf.getProperty(PINOT_SERVER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
   }
 
   public PinotConfiguration getPinotConfig() {
