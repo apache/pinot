@@ -77,11 +77,7 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
       if (!(merger instanceof OverwriteMerger)) {
         Object prevValue = previousRow.getValue(column);
         if (prevValue != null) {
-          if (newRow.isNullValue(column)) {
-            resultHolder.put(column, prevValue);
-          } else {
-            resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
-          }
+          resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
         }
       } else {
         // Overwrite mergers
