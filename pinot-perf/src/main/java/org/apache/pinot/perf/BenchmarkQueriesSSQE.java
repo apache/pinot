@@ -69,11 +69,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
-public class BenchmarkQueries extends BaseQueriesTest {
+public class BenchmarkQueriesSSQE extends BaseQueriesTest {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkQueries.class.getSimpleName());
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkQueriesSSQE.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
@@ -88,6 +88,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
   private static final String TIMESTAMP_COL = "TSTMP_COL";
+  private static final String JSON_COL = "JSON_COL";
   private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
 
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
@@ -97,6 +98,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME, TIMESTAMP_COL))
       .setSortedColumn(SORTED_COL_NAME)
       .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setJsonIndexColumns(List.of(JSON_COL))
       .setStarTreeIndexConfigs(
           Collections.singletonList(
               new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
@@ -114,6 +116,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(TIMESTAMP_COL, FieldSpec.DataType.TIMESTAMP)
+      .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
       .build();
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
@@ -200,6 +203,19 @@ public class BenchmarkQueries extends BaseQueriesTest {
           + " group by 1 "
           + " limit 1000000\n";
 
+  public static final String JSON_MATCH_QUERY =
+      "SELECT\n"
+          + "  COUNT(*) AS count,\n"
+          + "  SUM(INT_COL) AS size,\n"
+          + "  LOW_CARDINALITY_STRING_COL as type\n"
+          + "FROM MyTable\n"
+          + "WHERE JSON_MATCH(\n"
+          + "    JSON_COL,\t\n"
+          + "    '(\"$.type\" = ''type0'' OR (\"$.type\" = ''type1'' AND (\"$.changes[0].author.name\" != ''author10''"
+          + "     OR \"$.changes[1].author.name\" IS NOT NULL)))'\n"
+          + "  )\n"
+          + "GROUP BY LOW_CARDINALITY_STRING_COL";
+
   @Param({"1", "2", "10", "50"})
   private int _numSegments;
   @Param("1500000")
@@ -212,7 +228,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
       COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
       FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY, FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY,
-      FILTERING_ON_TIMESTAMP_QUERY, REGEXP_REPLACE_QUERY
+      FILTERING_ON_TIMESTAMP_QUERY, REGEXP_REPLACE_QUERY, JSON_MATCH_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -253,6 +269,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
       private final String[] _lowCardinalityValues =
           IntStream.range(0, 10).mapToObj(i -> "value" + i).toArray(String[]::new);
       private Distribution.DataSupplier _supplier = supplier;
+      private String[] _jsons = generateJsons();
 
       @Override
       public int size() {
@@ -270,6 +287,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
         row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
         row.putValue(LOW_CARDINALITY_STRING_COL, _lowCardinalityValues[i % _lowCardinalityValues.length]);
         row.putValue(TIMESTAMP_COL, i * 1200 * 1000L);
+        row.putValue(JSON_COL, _jsons[i % _jsons.length]);
 
         return null;
       }
@@ -278,6 +296,25 @@ public class BenchmarkQueries extends BaseQueriesTest {
       public void rewind() {
         _strings.clear();
         _supplier.reset();
+      }
+
+      private String[] generateJsons() {
+        String[] jsons = new String[1000];
+        StringBuilder buffer = new StringBuilder();
+
+        for (int i = 0; i < jsons.length; i++) {
+          buffer.setLength(0);
+          buffer.append("{ \"type\": \"type").append(i % 50).append("\"")
+              .append(", \"changes\": [ ")
+              .append("{ \"author\": { \"name\": \"author").append(i % 1000).append("\" } }");
+          if (i % 2 == 0) {
+            buffer.append(", { \"author\": { \"name\": \"author").append(i % 100).append("\" } }");
+          }
+          buffer.append(" ] }");
+          jsons[i] = buffer.toString();
+        }
+
+        return jsons;
       }
     };
   }
