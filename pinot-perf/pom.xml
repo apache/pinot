@@ -126,6 +126,10 @@
               <name>pinot-BenchmarkDictionary</name>
             </program>
             <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkObjectOpenHashMap</mainClass>
+              <name>pinot-BenchmarkObjectOpenHashMap</name>
+            </program>
+            <program>
               <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>
               <name>pinot-BenchmarkDictionaryCreation</name>
             </program>
