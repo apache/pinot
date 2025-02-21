@@ -44,4 +44,9 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public boolean isAlwaysFalse() {
+    return true;
+  }
 }
