@@ -57,6 +57,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.store.ColumnIndexUtils;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -75,6 +76,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private final File _indexDir;
   private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
+  private final TreeMap<String, TreeMap<String, ColumnMetadata>> _childColumnMetadataMap;
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
@@ -106,6 +108,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       throws IOException, ConfigurationException {
     _indexDir = null;
     _columnMetadataMap = new TreeMap<>();
+    _childColumnMetadataMap = new TreeMap<>();
     _schema = new Schema();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
@@ -126,6 +129,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = new TreeMap<>();
+    _childColumnMetadataMap = new TreeMap<>();
     _schema = new Schema();
 
     PropertiesConfiguration segmentMetadataPropertiesConfiguration =
@@ -146,6 +150,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(String rawTableName, String segmentName, Schema schema, long creationTime) {
     _indexDir = null;
     _columnMetadataMap = null;
+    _childColumnMetadataMap = null;
     _rawTableName = rawTableName;
     _segmentName = segmentName;
     _schema = schema;
@@ -236,6 +241,17 @@ public class SegmentMetadataImpl implements SegmentMetadata {
           ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadataPropertiesConfiguration);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
+      if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP && !columnMetadata.getChildColumns()
+          .isEmpty()) {
+        TreeMap<String, ColumnMetadata> childColumnMetadataMap = new TreeMap<>();
+        for (Object childColumn : columnMetadata.getChildColumns()) {
+          ColumnMetadata childColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(
+              column + V1Constants.MetadataKeys.Column.CHILD_COLUMN_METADATA_KEY_SEPARATOR + (String) childColumn,
+                  segmentMetadataPropertiesConfiguration);
+          childColumnMetadataMap.put((String) childColumn, childColumnMetadata);
+        }
+        _childColumnMetadataMap.put(column, childColumnMetadataMap);
+      }
     }
 
     // Load index metadata
@@ -413,6 +429,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
     return _columnMetadataMap;
+  }
+
+  @Override
+  public TreeMap<String, TreeMap<String, ColumnMetadata>> getChildColumnMetadataMap() {
+    return _childColumnMetadataMap;
   }
 
   @Override
