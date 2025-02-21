@@ -141,7 +141,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+    MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();

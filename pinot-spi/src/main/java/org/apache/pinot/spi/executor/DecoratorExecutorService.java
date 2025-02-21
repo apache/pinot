@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.executor;
+package org.apache.pinot.spi.executor;
 
 import java.util.Collection;
 import java.util.List;
@@ -28,61 +28,23 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-
 /**
- * A delegator executor service that sets MDC context for the query.
- *
- * By using this executor, all tasks submitted to the executor will have the MDC context set to the query context.
- * This is easier and safer to apply than setting the MDC context manually for each task.
- * You can read more about MDC in <a href="https://www.baeldung.com/mdc-in-log4j-2-logback">this baeldung post</a>
- *
- * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
- *
+ * DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
+ * functionality.
  */
-public abstract class MdcExecutor implements ExecutorService {
+public abstract class DecoratorExecutorService implements ExecutorService {
   private final ExecutorService _executorService;
 
-  public MdcExecutor(ExecutorService executorService) {
+  public DecoratorExecutorService(ExecutorService executorService) {
     _executorService = executorService;
   }
 
-  protected abstract boolean alreadyRegistered();
+  protected abstract <T> Callable<T> decorate(Callable<T> task);
 
-  protected abstract void registerOnMDC();
+  protected abstract Runnable decorate(Runnable task);
 
-  protected abstract void unregisterFromMDC();
-
-  private <T> Callable<T> mdcCallable(Callable<T> task) {
-    return () -> {
-      if (alreadyRegistered()) {
-        return task.call();
-      }
-      try {
-        registerOnMDC();
-        return task.call();
-      } finally {
-        unregisterFromMDC();
-      }
-    };
-  }
-
-  private <T> Collection<? extends Callable<T>> mdcCallables(Collection<? extends Callable<T>> tasks) {
-    return tasks.stream().map(this::mdcCallable).collect(Collectors.toList());
-  }
-
-  private Runnable mdcRunnable(Runnable task) {
-    return () -> {
-      if (alreadyRegistered()) {
-        task.run();
-        return;
-      }
-      try {
-        registerOnMDC();
-        task.run();
-      } finally {
-        unregisterFromMDC();
-      }
-    };
+  protected <T> Collection<? extends Callable<T>> decorateTasks(Collection<? extends Callable<T>> tasks) {
+    return tasks.stream().map(this::decorate).collect(Collectors.toList());
   }
 
   @Override
@@ -113,47 +75,87 @@ public abstract class MdcExecutor implements ExecutorService {
 
   @Override
   public <T> Future<T> submit(Callable<T> task) {
-    return _executorService.submit(mdcCallable(task));
+    return _executorService.submit(decorate(task));
   }
 
   @Override
   public <T> Future<T> submit(Runnable task, T result) {
-    return _executorService.submit(mdcRunnable(task), result);
+    return _executorService.submit(decorate(task), result);
   }
 
   @Override
   public Future<?> submit(Runnable task) {
-    return _executorService.submit(mdcRunnable(task));
+    return _executorService.submit(decorate(task));
   }
 
   @Override
   public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
       throws InterruptedException {
-    return _executorService.invokeAll(mdcCallables(tasks));
+    return _executorService.invokeAll(decorateTasks(tasks));
   }
 
   @Override
   public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
       long timeout, TimeUnit unit)
       throws InterruptedException {
-    return _executorService.invokeAll(mdcCallables(tasks), timeout, unit);
+    return _executorService.invokeAll(decorateTasks(tasks), timeout, unit);
   }
 
   @Override
   public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
       throws InterruptedException, ExecutionException {
-    return _executorService.invokeAny(mdcCallables(tasks));
+    return _executorService.invokeAny(decorateTasks(tasks));
   }
 
   @Override
   public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout,
       TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
-    return _executorService.invokeAny(mdcCallables(tasks), timeout, unit);
+    return _executorService.invokeAny(decorateTasks(tasks), timeout, unit);
   }
 
   @Override
   public void execute(Runnable command) {
-    _executorService.execute(command);
+    _executorService.execute(decorate(command));
+  }
+
+  public static abstract class BeforeAfter extends DecoratorExecutorService {
+    public BeforeAfter(ExecutorService executorService) {
+      super(executorService);
+    }
+
+    /**
+     * Called before the runnable/callable is executed
+     */
+    public abstract void before();
+
+    /**
+     * Called after the runnable/callable is executed, even if it fails
+     */
+    public abstract void after();
+
+    @Override
+    protected <T> Callable<T> decorate(Callable<T> task) {
+      return () -> {
+        before();
+        try {
+          return task.call();
+        } finally {
+          after();
+        }
+      };
+    }
+
+    @Override
+    protected Runnable decorate(Runnable task) {
+      return () -> {
+        before();
+        try {
+          task.run();
+        } finally {
+          after();
+        }
+      };
+    }
   }
 }
