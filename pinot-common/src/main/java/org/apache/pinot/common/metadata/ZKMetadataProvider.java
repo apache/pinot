@@ -885,10 +885,10 @@ public class ZKMetadataProvider {
     return WorkloadConfigUtils.fromZNRecord(znRecord);
   }
 
-  public static boolean setClusterWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName,
+  public static boolean setWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       WorkloadConfig workloadConfig) throws Exception {
 
-    String path = constructPropertyStorePathForWorkloadConfig(workloadName);
+    String path = constructPropertyStorePathForWorkloadConfig(workloadConfig.getWorkloadName());
     boolean isNewConfig = !propertyStore.exists(path, AccessOption.PERSISTENT);
     ZNRecord znRecord = isNewConfig ? new ZNRecord(path)
         : propertyStore.get(path, null, AccessOption.PERSISTENT);
@@ -899,7 +899,7 @@ public class ZKMetadataProvider {
         : propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void removeWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName) {
+  public static void deleteWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName) {
     String propertyStorePath = constructPropertyStorePathForWorkloadConfig(workloadName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);

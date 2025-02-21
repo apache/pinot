@@ -21,7 +21,9 @@ package org.apache.pinot.spi.config.workload;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class WorkloadConfig extends BaseJsonConfig {
@@ -30,7 +32,7 @@ public class WorkloadConfig extends BaseJsonConfig {
   private static final String ENFORCEMENT_PROFILE = "enforcementProfile";
 
   @JsonPropertyDescription("Unique identifier for the workload")
-  private String _workloadId;
+  private String _workloadName;
 
   @JsonPropertyDescription("Enforcement profile for the workload")
   private EnforcementProfile _enforcementProfile;
@@ -38,24 +40,32 @@ public class WorkloadConfig extends BaseJsonConfig {
   @JsonCreator
   public WorkloadConfig(@JsonProperty(value = WORKLOAD_ID, required = true) String workloadId,
       @JsonProperty(value = ENFORCEMENT_PROFILE, required = true) EnforcementProfile enforcementProfile) {
-    _workloadId = workloadId;
+    _workloadName = workloadId;
     _enforcementProfile = enforcementProfile;
   }
 
-  public String getWorkloadId() {
-    return _workloadId;
+  public String getWorkloadName() {
+    return _workloadName;
   }
 
   public EnforcementProfile getEnforcementProfile() {
     return _enforcementProfile;
   }
 
-  public void setWorkloadId(String workloadId) {
-    _workloadId = workloadId;
+  public void setWorkloadName(String workloadName) {
+    _workloadName = workloadName;
   }
 
   public void setEnforcementProfile(EnforcementProfile enforcementProfile) {
     _enforcementProfile = enforcementProfile;
   }
 
+  @Override
+  public String toJsonString() {
+    try {
+      return JsonUtils.objectToString(this);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
 }
