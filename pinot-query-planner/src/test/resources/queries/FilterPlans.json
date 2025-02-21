@@ -1,0 +1,114 @@
+{
+  "filter_planning_tests": {
+    "queries": [
+      {
+        "description": "Small IN clause",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 IN ('a1', 'a2', 'a3')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3')])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Large IN clause",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 IN ('a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20', 'a21', 'a22', 'a23', 'a24', 'a25', 'a26', 'a27', 'a28', 'a29', 'a30')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3', _UTF-8'a4', _UTF-8'a5', _UTF-8'a6', _UTF-8'a7', _UTF-8'a8', _UTF-8'a9', _UTF-8'a10', _UTF-8'a11', _UTF-8'a12', _UTF-8'a13', _UTF-8'a14', _UTF-8'a15', _UTF-8'a16', _UTF-8'a17', _UTF-8'a18', _UTF-8'a19', _UTF-8'a20', _UTF-8'a21', _UTF-8'a22', _UTF-8'a23', _UTF-8'a24', _UTF-8'a25', _UTF-8'a26', _UTF-8'a27', _UTF-8'a28', _UTF-8'a29', _UTF-8'a30')])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "IN clause with multiple columns",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE col2 IN ('a1', 'a2', 'a3')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3')])",
+          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "IN clause with other filters",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 IN ('a1', 'a2', 'a3') AND col3 > 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[AND(>($2, 0), IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3'))])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "IN clause with other filters",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 IN ('a1', 'a2', 'a3') OR col3 > 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[OR(>($2, 0), IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3'))])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Small NOT IN clause",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 NOT IN ('a1', 'a2', 'a3')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[NOT_IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3')])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Large NOT IN clause",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 NOT IN ('a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18', 'a19', 'a20', 'a21', 'a22', 'a23', 'a24', 'a25', 'a26', 'a27', 'a28', 'a29', 'a30')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[NOT_IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3', _UTF-8'a4', _UTF-8'a5', _UTF-8'a6', _UTF-8'a7', _UTF-8'a8', _UTF-8'a9', _UTF-8'a10', _UTF-8'a11', _UTF-8'a12', _UTF-8'a13', _UTF-8'a14', _UTF-8'a15', _UTF-8'a16', _UTF-8'a17', _UTF-8'a18', _UTF-8'a19', _UTF-8'a20', _UTF-8'a21', _UTF-8'a22', _UTF-8'a23', _UTF-8'a24', _UTF-8'a25', _UTF-8'a26', _UTF-8'a27', _UTF-8'a28', _UTF-8'a29', _UTF-8'a30')])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "NOT IN clause with multiple columns",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE col2 NOT IN ('a1', 'a2', 'a3')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[NOT_IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3')])",
+          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "NOT IN clause with other filters",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 NOT IN ('a1', 'a2', 'a3') AND col3 > 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[AND(>($2, 0), NOT_IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3'))])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "NOT IN clause with other filters",
+        "sql": "EXPLAIN PLAN FOR SELECT col1 FROM a WHERE col2 NOT IN ('a1', 'a2', 'a3') OR col3 > 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalFilter(condition=[OR(>($2, 0), NOT_IN($1, _UTF-8'a1', _UTF-8'a2', _UTF-8'a3'))])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}
