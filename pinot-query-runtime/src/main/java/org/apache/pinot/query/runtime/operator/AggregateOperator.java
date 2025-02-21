@@ -85,8 +85,10 @@ public class AggregateOperator extends MultiStageOperator {
 
   // trimming - related members
   private final int _groupTrimSize;
-  // Comparator is used in priority queue, and the order is reversed so that peek() can be used to compare with each
-  // output row
+  /**
+   * Comparator is used in priority queue, and the order is reversed so that peek() returns the smallest row to be
+   * compared with other rows.
+   */
   @Nullable
   private final Comparator<Object[]> _comparator;
 
@@ -113,16 +115,16 @@ public class AggregateOperator extends MultiStageOperator {
     int groupTrimSize = Integer.MAX_VALUE;
     Comparator<Object[]> comparator = null;
     int limit = node.getLimit();
-    if (limit > 0) {
+    int minGroupTrimSize = getMinGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
+    if (limit > 0 && minGroupTrimSize > 0) {
+      // Trim is enabled
       List<RelFieldCollation> collations = node.getCollations();
       if (collations.isEmpty()) {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
         groupTrimSize = limit;
       } else {
-        int minGroupTrimSize = getMinGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
         groupTrimSize = GroupByUtils.getTableCapacity(limit, minGroupTrimSize);
-        if (groupTrimSize <= 0) {
-          groupTrimSize = Integer.MAX_VALUE;
-        }
         if (groupTrimSize < Integer.MAX_VALUE) {
           comparator = new SortUtils.SortComparator(_resultSchema, collations, true);
         }

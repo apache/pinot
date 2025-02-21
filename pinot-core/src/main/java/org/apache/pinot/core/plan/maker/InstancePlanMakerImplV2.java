@@ -65,6 +65,11 @@ import org.slf4j.LoggerFactory;
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
+  public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
+  public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
+
+  // The following fields are deprecated and will be removed after 1.4 release
+  // Use CommonConstants.Server.* instead
   @Deprecated
   public static final String MAX_EXECUTION_THREADS_KEY = Server.MAX_EXECUTION_THREADS;
   @Deprecated
@@ -96,9 +101,6 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = Server.GROUPBY_TRIM_THRESHOLD;
   @Deprecated
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
-
-  public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
-  public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
