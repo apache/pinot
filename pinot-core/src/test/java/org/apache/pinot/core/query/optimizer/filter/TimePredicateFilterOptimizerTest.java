@@ -170,7 +170,14 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'UTC', 'DAYS') = 453630",
         new Range("39193632000000", true, "39193718399999", true));
     testInvalidFilterOptimizer("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') = 453630");
-    // TODO: add between predicate test
+
+    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620777600000 AND 1620863999999",
+        new Range("1620777600000", true, "1620863999999", true));
+    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620950399000 AND 1621036799999",
+        new Range("1620950399000", true, "1621036799999", true));
+
+    // TODO: Currently time filter optimizers do not support 'literal = func()' syntax
+    testInvalidFilterOptimizer("453630 = datetrunc('DAY', col)");
   }
 
   /**

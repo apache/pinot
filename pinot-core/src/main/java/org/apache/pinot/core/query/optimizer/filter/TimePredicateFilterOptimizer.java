@@ -457,6 +457,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
         upperMillis = dateTruncCeil(operands);
         lowerMillis = dateTruncFloor(operands);
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the filter is
+        // impossible and is converted to an impossible filter that is optimized away downstream
         if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
           lowerMillis = Long.MAX_VALUE;
           upperMillis = Long.MIN_VALUE;
@@ -576,10 +579,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    */
   private long dateTruncCeil(List<Expression> operands) {
     String unit = operands.get(0).getLiteral().getStringValue();
-    ISOChronology chronology = (operands.size() >= 4)
-        ? DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(operands.get(3).getLiteral().getStringValue()))
-        : ISOChronology.getInstanceUTC();
-    return DateTimeUtils.getTimestampField(chronology, unit).roundFloor(dateTruncFloor(operands))
+    return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(dateTruncFloor(operands))
         + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;
   }
 }
