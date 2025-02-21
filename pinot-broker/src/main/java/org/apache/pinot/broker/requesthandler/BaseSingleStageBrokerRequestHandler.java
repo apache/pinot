@@ -310,13 +310,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
+  /**
+   * CompileResult holds the result of the compilation phase. Compilation may or may not be successful. If compilation
+   * is successful then all member variables other than BrokerResponse will be available. If compilation is not
+   * successful, then only the BrokerResponse is set. This is done to keep the current behaviour as is.
+   * It became hard to keep the current behaviour if we were to throw an exception from the compileRequest method.
+   */
   private static class CompileResult {
     final PinotQuery _pinotQuery;
     final PinotQuery _serverPinotQuery;
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
-    final BrokerResponse _brokerResponse;
+    final BrokerResponse _errorBrokerResponse;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
         String rawTableName) {
@@ -325,16 +331,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
-      _brokerResponse = null;
+      _errorBrokerResponse = null;
     }
 
-    public CompileResult(BrokerResponse brokerResponse) {
+    public CompileResult(BrokerResponse errorBrokerResponse) {
       _pinotQuery = null;
       _serverPinotQuery = null;
       _schema = null;
       _tableName = null;
       _rawTableName = null;
-      _brokerResponse = brokerResponse;
+      _errorBrokerResponse = errorBrokerResponse;
     }
   }
 
@@ -348,8 +354,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
               accessControl);
 
-    if (compileResult._brokerResponse != null) {
-      return compileResult._brokerResponse;
+    if (compileResult._errorBrokerResponse != null) {
+      return compileResult._errorBrokerResponse;
     }
 
     Schema schema = compileResult._schema;
