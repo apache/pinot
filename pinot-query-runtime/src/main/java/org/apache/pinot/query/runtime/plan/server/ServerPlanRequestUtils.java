@@ -40,7 +40,7 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.executor.MdcExecutor;
+import org.apache.pinot.core.query.executor.MdcQueryExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -106,7 +106,7 @@ public class ServerPlanRequestUtils {
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
       boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+    MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
