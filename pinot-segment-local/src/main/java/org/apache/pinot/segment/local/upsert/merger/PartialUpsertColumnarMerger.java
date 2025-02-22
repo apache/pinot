@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
+import org.apache.pinot.segment.local.upsert.merger.columnar.ForceOverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.OverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMergerFactory;
@@ -74,10 +75,17 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
       // (1) If the value of the previous is null value, skip merging and use the new value
       // (2) Else If the value of new value is null, use the previous value (even for comparison columns)
       // (3) Else If the column is not a comparison column, we applied the merged value to it
-      if (!(merger instanceof OverwriteMerger)) {
+      if (merger instanceof ForceOverwriteMerger) {
+        Object prevValue = previousRow.getValue(column);
+        resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
+      } else if (!(merger instanceof OverwriteMerger)) {
         Object prevValue = previousRow.getValue(column);
         if (prevValue != null) {
-          resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
+          if (newRow.isNullValue(column)) {
+            resultHolder.put(column, prevValue);
+          } else {
+            resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
+          }
         }
       } else {
         // Overwrite mergers
