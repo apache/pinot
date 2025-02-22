@@ -86,7 +86,7 @@ public class InstanceAssignmentTest {
 
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 2 instances
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     // Instances of index 4 to 7 are not assigned because of the hash-based rotation
@@ -110,7 +110,8 @@ public class InstanceAssignmentTest {
 
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 3 instances, then these 3
     // instances should be assigned to 2 partitions, each with 2 instances
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
     // Instance of index 7 is not assigned because of the hash-based rotation
@@ -168,7 +169,7 @@ public class InstanceAssignmentTest {
     // instances should be assigned to 2 partitions, each with 2 instances
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -211,7 +212,8 @@ public class InstanceAssignmentTest {
     // instances should be assigned to 2 partitions, each with 2 instances
     // Leverage the latest instancePartitions from last computation as the parameter.
     // Data movement is minimized so that: i2 -> i10, i6 -> i11
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -254,7 +256,8 @@ public class InstanceAssignmentTest {
             partitionColumn), null, true);
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -291,7 +294,8 @@ public class InstanceAssignmentTest {
             partitionColumn), null, true);
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -322,7 +326,8 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
             partitionColumn), null, true);
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -367,7 +372,8 @@ public class InstanceAssignmentTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, numPartitions, numInstancesPerPartition, true,
             partitionColumn), null, true);
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -425,7 +431,7 @@ public class InstanceAssignmentTest {
     // should be assigned to 10 partitions, each with 1 instance
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -467,7 +473,8 @@ public class InstanceAssignmentTest {
           .setMapField(InstanceUtils.POOL_KEY, Map.of(OFFLINE_TAG, Integer.toString(i % numPools)));
       instanceConfigs.add(instanceConfig);
     }
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
     assertEquals(instancePartitions.getNumPartitions(), numPartitions);
 
@@ -604,7 +611,8 @@ public class InstanceAssignmentTest {
       }
       System.out.println("");
       InstancePartitions instancePartitions =
-          driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existing, preConfigured);
+          driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existing, preConfigured,
+              false);
       assertEquals(instancePartitions.getNumReplicaGroups(), numTargetReplicaGroups);
       assertEquals(instancePartitions.getNumPartitions(), 1);
 
@@ -662,7 +670,8 @@ public class InstanceAssignmentTest {
             SERVER_INSTANCE_ID_PREFIX + 20));
 
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, preConfigured);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, preConfigured,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -755,7 +764,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
-            existingInstancePartitions, preConfigured);
+            existingInstancePartitions, preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -855,7 +864,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -947,7 +956,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -1045,7 +1054,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -1166,7 +1175,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -1259,7 +1268,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -1345,7 +1354,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
 
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
@@ -1416,7 +1425,7 @@ public class InstanceAssignmentTest {
 
     instancePartitions =
         driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
-            preConfigured);
+            preConfigured, false);
 
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
@@ -1485,7 +1494,7 @@ public class InstanceAssignmentTest {
     // pool 0: [ i3, i4, i0, i1, i2 ]
     // pool 1: [ i8, i9, i5, i6, i7 ]
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1515,7 +1524,8 @@ public class InstanceAssignmentTest {
     // Math.abs("myTable_OFFLINE".hashCode()) % 5 = 3
     // pool 0: [  i3,  i4,  i0,  i1,  i2 ]
     // pool 2: [ i13, i14, i10, i11, i12 ]
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1537,7 +1547,8 @@ public class InstanceAssignmentTest {
     // The instances should be rotated 3 places
     // pool 2: [ i13, i14, i10, i11, i12 ]
     // pool 0: [  i3,  i4,  i0,  i1,  i2 ]
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1558,7 +1569,8 @@ public class InstanceAssignmentTest {
     // Math.abs("myTable_OFFLINE".hashCode()) % 5 = 3
     // pool 0: [ i3, i4, i0, i1, i2 ]
     // pool 1: [ i8, i9, i5, i6, i7 ]
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1584,7 +1596,8 @@ public class InstanceAssignmentTest {
     //          r0  r2  r0  r2
     // pool 1: [i8, i9, i5, i6, i7]
     //          r1  r1
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1624,7 +1637,8 @@ public class InstanceAssignmentTest {
     //  r0     r1
     InstancePartitions existingInstancePartitions = null;
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1638,7 +1652,8 @@ public class InstanceAssignmentTest {
     // The actual assignment should be the same as last one.
     existingInstancePartitions = instancePartitions;
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1664,7 +1679,8 @@ public class InstanceAssignmentTest {
     // pool 0: [ i3, i4, i0, i1, i2 ]
     // pool 1: [ i8, i9, i5, i6, i7 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1700,7 +1716,8 @@ public class InstanceAssignmentTest {
     //   pool 1: [ i8, i9, i5, i6, i7 ]
     //             r1  r1
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1743,7 +1760,8 @@ public class InstanceAssignmentTest {
     //     pool 1: [ i7, i9, i11, i5,  i6 ]
     //               r1  r1
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1779,7 +1797,8 @@ public class InstanceAssignmentTest {
     //     pool 1: [ i7, i9, i11, i5,  i6 ]
     //               r1  r1   r1  r1   r1
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1817,7 +1836,8 @@ public class InstanceAssignmentTest {
     //     pool 0: [ i2, i4,  i0, i1, i10, i12 ]
     //     pool 1: [ i7, i9, i11, i5,  i6, i13 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1848,7 +1868,8 @@ public class InstanceAssignmentTest {
     //     pool 0: [ i12, i4,  i0,  i1, i10 ]
     //     pool 1: [  i7, i9, i11, i13,  i6 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1882,7 +1903,8 @@ public class InstanceAssignmentTest {
     //     pool 0: [ i12, i4,  i0,  i1, i10 ]
     //     pool 1: [  i7, i9, i11, i13,  i6 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1913,7 +1935,8 @@ public class InstanceAssignmentTest {
     //     pool 0: [ i12, i4,  i0,  i1, i10 ]
     //     pool 1: [  i7, i9, i11, i13,  i6 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1948,7 +1971,8 @@ public class InstanceAssignmentTest {
     //   pool 1: [  i7, i9, i11, i13,  i6 ]
     //   pool 2: [ i22, i23, i19, i20,i21 ]
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, existingInstancePartitions,
+            false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -1977,7 +2001,7 @@ public class InstanceAssignmentTest {
     // No instance assignment config
     assertFalse(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.OFFLINE));
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Instance assignment is not allowed for the given table config");
@@ -1991,7 +2015,7 @@ public class InstanceAssignmentTest {
 
     // No instance with correct tag
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "No enabled instance has the tag: tenant_OFFLINE");
@@ -2003,7 +2027,7 @@ public class InstanceAssignmentTest {
 
     // All instances should be assigned as replica-group 0 partition 0
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     List<String> expectedInstances = new ArrayList<>(numInstances);
@@ -2021,7 +2045,7 @@ public class InstanceAssignmentTest {
 
     // No instance has correct pool configured
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "No enabled instance has the pool configured for the tag: tenant_OFFLINE");
@@ -2038,7 +2062,8 @@ public class InstanceAssignmentTest {
 
     // Math.abs("myTable_OFFLINE".hashCode()) % 2 = 0
     // All instances in pool 0 should be assigned as replica-group 0 partition 0
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), 1);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     expectedInstances.clear();
@@ -2055,7 +2080,7 @@ public class InstanceAssignmentTest {
 
     // Ask for too many pools
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Not enough instance pools (2 in the cluster, asked for 3)");
@@ -2067,7 +2092,7 @@ public class InstanceAssignmentTest {
 
     // Ask for pool that does not exist
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Cannot find all instance pools configured: [0, 2]");
@@ -2081,7 +2106,7 @@ public class InstanceAssignmentTest {
 
     // Ask for too many instances
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Not enough qualified instances from pool: 0 (5 in the pool, asked for 6)");
@@ -2095,7 +2120,7 @@ public class InstanceAssignmentTest {
 
     // Number of replica-groups must be positive
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Number of replica-groups must be positive");
@@ -2107,7 +2132,7 @@ public class InstanceAssignmentTest {
 
     // Ask for too many replica-groups
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
@@ -2120,7 +2145,7 @@ public class InstanceAssignmentTest {
 
     // Ask for too many instances
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Not enough qualified instances from pool: 0 (5 in the pool, asked for 6)");
@@ -2132,7 +2157,7 @@ public class InstanceAssignmentTest {
 
     // Ask for too many instances per partition
     try {
-      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
@@ -2148,7 +2173,8 @@ public class InstanceAssignmentTest {
     //         r0  r2  r0  r2
     // pool1: [i8, i9, i5, i6, i7]
     //         r1  r1
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), 3);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     assertEquals(instancePartitions.getInstances(0, 0),
@@ -2215,7 +2241,8 @@ public class InstanceAssignmentTest {
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
-      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+          false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(),
@@ -2249,7 +2276,8 @@ public class InstanceAssignmentTest {
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
-      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+          false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Not enough qualified instances, ask for: (numInstancesPerReplicaGroup: 6) * "
@@ -2291,7 +2319,8 @@ public class InstanceAssignmentTest {
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     try {
-      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+      instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+          false);
       fail();
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "The instances are not balanced for each pool (fault-domain)");
@@ -2331,7 +2360,7 @@ public class InstanceAssignmentTest {
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
 
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2403,7 +2432,8 @@ public class InstanceAssignmentTest {
         .build();
     driver = new InstanceAssignmentDriver(tableConfig);
     // existingInstancePartitions = instancePartitions
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2486,7 +2516,8 @@ public class InstanceAssignmentTest {
         .setSegmentPartitionConfig(segmentPartitionConfig).build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2559,7 +2590,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2615,7 +2647,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2682,7 +2715,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2748,7 +2782,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2819,7 +2854,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2870,7 +2906,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
@@ -2934,7 +2971,8 @@ public class InstanceAssignmentTest {
             .build();
     driver = new InstanceAssignmentDriver(tableConfig);
 
-    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions);
+    instancePartitions = driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions,
+        false);
     assertEquals(instancePartitions.getNumReplicaGroups(), numReplicaGroups);
     assertEquals(instancePartitions.getNumPartitions(), 1);
     /*
