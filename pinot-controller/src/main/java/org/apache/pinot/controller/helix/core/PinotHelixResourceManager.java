@@ -1977,7 +1977,8 @@ public class PinotHelixResourceManager {
             InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
         InstancePartitions instancePartitions;
         if (!hasPreConfiguredInstancePartitions) {
-          instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
+          instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null,
+              false);
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
         } else {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
@@ -1986,7 +1987,7 @@ public class PinotHelixResourceManager {
                 InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
                     referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
             instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null,
-                preConfiguredInstancePartitions);
+                preConfiguredInstancePartitions, false);
             LOGGER.info("Persisting instance partitions: {} (based on {})", instancePartitions,
                 preConfiguredInstancePartitions);
           } else {
@@ -2012,7 +2013,7 @@ public class PinotHelixResourceManager {
                 tableNameWithType);
             InstancePartitions instancePartitions =
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
-                    tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
+                    tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()), false);
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
           }
