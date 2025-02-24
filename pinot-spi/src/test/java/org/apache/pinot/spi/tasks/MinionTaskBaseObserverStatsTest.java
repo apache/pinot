@@ -19,7 +19,13 @@
 package org.apache.pinot.spi.tasks;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.File;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -29,17 +35,24 @@ public class MinionTaskBaseObserverStatsTest {
   private static final String TEST_PROPERTY = "some test property";
   private static final String TASK_ID = "randomString";
   private static final String CURRENT_STATE = "IN_PROGRESS";
-  private static final long TS = System.currentTimeMillis();
+  private static final String CURRENT_STAGE = "testStage";
+  private static final long TS = 1740407875728L;
   private static final String STATUS = "task status";
 
   @Test
   public void testSerDeser()
-      throws JsonProcessingException {
+      throws Exception {
+    Map<String, MinionTaskBaseObserverStats.Timer> stageTimes = new HashMap<>();
+    stageTimes.put(CURRENT_STATE, new MinionTaskBaseObserverStats.Timer());
+    stageTimes.put(CURRENT_STAGE, new MinionTaskBaseObserverStats.Timer());
     TestObserverStats stats = (TestObserverStats) new TestObserverStats()
         .setTestProperty(TEST_PROPERTY)
         .setTaskId(TASK_ID)
         .setCurrentState(CURRENT_STATE)
-        .setStartTimestamp(TS);
+        .setCurrentStage(CURRENT_STAGE)
+        .setStartTimestamp(TS)
+        .setEndTimestamp(TS)
+        .setStageTimes(stageTimes);
     stats.getProgressLogs().offer(new MinionTaskBaseObserverStats.StatusEntry.Builder()
             .withTs(TS)
             .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.INFO)
@@ -51,10 +64,12 @@ public class MinionTaskBaseObserverStatsTest {
     Assert.assertEquals(stats2, stats);
   }
 
-  private String getTestObjectString() {
-    return "{\"testProperty\":\"" + TEST_PROPERTY + "\",\"startTimestamp\":" + TS
-        + ",\"currentState\":\"" + CURRENT_STATE + "\",\"progressLogs\":[{\"level\":\"INFO\",\"status\":\"" + STATUS
-        + "\",\"ts\":" + TS + "}],\"taskId\":\"" + TASK_ID + "\"}";
+  private String getTestObjectString()
+      throws Exception {
+    URL resource = MinionTaskBaseObserverStatsTest.class.getClassLoader()
+        .getResource("observer_stats_test_payload.json");
+    Assert.assertNotNull(resource);
+    return FileUtils.readFileToString(new File(resource.toURI()), StandardCharsets.UTF_8);
   }
 
   public static class TestObserverStats extends MinionTaskBaseObserverStats {
@@ -78,8 +93,8 @@ public class MinionTaskBaseObserverStatsTest {
     @Override
     public boolean equals(Object o) {
       if (this == o) {
-      return true;
-    }
+        return true;
+      }
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
@@ -89,7 +104,7 @@ public class MinionTaskBaseObserverStatsTest {
 
     @Override
     public int hashCode() {
-      return Objects.hash(getTaskId(), getCurrentState(), getStartTimestamp(), getTestProperty());
+      return Objects.hash(super.hashCode(), _testProperty);
     }
   }
 }

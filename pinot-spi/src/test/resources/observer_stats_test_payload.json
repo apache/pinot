@@ -1,0 +1,26 @@
+{
+  "testProperty": "some test property",
+  "currentState": "IN_PROGRESS",
+  "startTimestamp": 1740407875728,
+  "endTimestamp": 1740407875728,
+  "currentStage": "testStage",
+  "stageTimes": {
+    "IN_PROGRESS": {
+      "startTimeMs": 0,
+      "totalTimeMs": 0
+    },
+    "testStage": {
+      "startTimeMs": 0,
+      "totalTimeMs": 0
+    }
+  },
+  "progressLogs": [
+    {
+      "ts": 1740407875728,
+      "stage": "test",
+      "status": "task status",
+      "level": "INFO"
+    }
+  ],
+  "taskId": "randomString"
+}

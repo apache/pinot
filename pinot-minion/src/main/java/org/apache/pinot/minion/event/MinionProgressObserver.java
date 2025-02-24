@@ -187,10 +187,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     }
     if (!stageTimes.containsKey(currentStage)) {
       stageTimes.put(currentStage, new MinionTaskBaseObserverStats.Timer());
-      // if end time is non-zero it indicates terminal stage in which case no need to start the timer
-      if (_taskProgressStats.getEndTimestamp() == 0) {
-        stageTimes.get(currentStage).start();
-      }
+      stageTimes.get(currentStage).start();
     }
 
     MinionTaskBaseObserverStats minionTaskObserverStats = _observerStorageManager.getTaskProgress(_taskId);

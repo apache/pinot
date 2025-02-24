@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.tasks;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.Deque;
@@ -153,6 +155,17 @@ public class MinionTaskBaseObserverStats {
     private long _startTimeMs = 0;
     private long _resumeTimeMs = 0;
 
+    public Timer() {
+    }
+
+    public Timer(@JsonProperty("totalTimeMs") long totalTimeMs,
+        @JsonProperty("startTimeMs") long startTimeMs,
+        @JsonProperty("resumeTimeMs") long resumeTimeMs) {
+      _totalTimeMs = totalTimeMs;
+      _startTimeMs = startTimeMs;
+      _resumeTimeMs = resumeTimeMs;
+    }
+
     public void start() {
       _startTimeMs = System.currentTimeMillis();
       _resumeTimeMs = _startTimeMs;
@@ -171,6 +184,11 @@ public class MinionTaskBaseObserverStats {
 
     public long getTotalTimeMs() {
       return _totalTimeMs;
+    }
+
+    @JsonIgnore
+    public long getResumeTimeMs() {
+      return _resumeTimeMs;
     }
   }
 
