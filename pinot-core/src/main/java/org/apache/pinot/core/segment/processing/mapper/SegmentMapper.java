@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,10 +188,15 @@ public class SegmentMapper {
           writeRecord(transformedRow);
         }
       } catch (Exception e) {
+        String logMessage = "Caught exception while reading data.";
+        observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
+            .withStatus(logMessage + " Reason : " + e.getMessage())
+            .build());
         if (!continueOnError) {
-          throw new RuntimeException("Caught exception while reading data", e);
+          throw new RuntimeException(logMessage, e);
         } else {
-          LOGGER.debug("Caught exception while reading data", e);
+          LOGGER.debug(logMessage, e);
           continue;
         }
       }
