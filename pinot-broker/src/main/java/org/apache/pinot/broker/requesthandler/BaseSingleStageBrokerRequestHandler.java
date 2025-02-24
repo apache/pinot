@@ -516,7 +516,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
-    rejectGroovyQuery(serverPinotQuery, handlerContext._disableGroovy);
+    validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
     if (handlerContext._useApproximateFunction) {
       handleApproximateFunctionOverride(serverPinotQuery);
     }
@@ -1428,35 +1428,35 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * Verifies that no groovy is present in the PinotQuery when disabled.
    */
   @VisibleForTesting
-  static void rejectGroovyQuery(PinotQuery pinotQuery, boolean disableGroovy) {
+  static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
-      rejectGroovyQuery(expression, disableGroovy);
+      validateGroovyScript(expression, disableGroovy);
     }
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (orderByList != null) {
       for (Expression expression : orderByList) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        rejectGroovyQuery(expression.getFunctionCall().getOperands().get(0), disableGroovy);
+        validateGroovyScript(expression.getFunctionCall().getOperands().get(0), disableGroovy);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      rejectGroovyQuery(havingExpression, disableGroovy);
+      validateGroovyScript(havingExpression, disableGroovy);
     }
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      rejectGroovyQuery(filterExpression, disableGroovy);
+      validateGroovyScript(filterExpression, disableGroovy);
     }
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
-        rejectGroovyQuery(expression, disableGroovy);
+        validateGroovyScript(expression, disableGroovy);
       }
     }
   }
 
-  private static void rejectGroovyQuery(Expression expression, boolean disableGroovy) {
+  private static void validateGroovyScript(Expression expression, boolean disableGroovy) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
@@ -1469,7 +1469,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
     for (Expression operandExpression : function.getOperands()) {
-      rejectGroovyQuery(operandExpression, disableGroovy);
+      validateGroovyScript(operandExpression, disableGroovy);
     }
   }
 

@@ -416,7 +416,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Initializing Groovy execution security
     GroovyFunctionEvaluator.configureGroovySecurity(
-        _config.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+        _config.getProperty(CommonConstants.Groovy.GROOVY_INGESTION_STATIC_ANALYZER_CONFIG,
+            _config.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));

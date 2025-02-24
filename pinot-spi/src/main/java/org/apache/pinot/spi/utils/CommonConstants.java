@@ -28,8 +28,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 
 
 public class CommonConstants {
-  public static final String GROOVY_STATIC_ANALYZER_CONFIG = "pinot.server.groovy.static.analyzer";
-
   private CommonConstants() {
   }
 
@@ -1513,5 +1511,16 @@ public class CommonConstants {
         "pinot.forward.index.default.target.max.chunk.size";
     public static final String CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK =
         "pinot.forward.index.default.target.docs.per.chunk";
+  }
+
+  /**
+   * Configuration for setting up groovy static analyzer.
+   * User can config different configuration for query and ingestion (table creation and update) static analyzer.
+   * The all configuration is the default configuration for both query and ingestion static analyzer.
+   */
+  public static class Groovy {
+    public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.all.groovy.static.analyzer";
+    public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.query.groovy.static.analyzer";
+    public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.ingestion.groovy.static.analyzer";
   }
 }

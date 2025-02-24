@@ -481,7 +481,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     // Initializing Groovy execution security
     GroovyFunctionEvaluator.configureGroovySecurity(
-        _brokerConf.getProperty(CommonConstants.GROOVY_STATIC_ANALYZER_CONFIG));
+        _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
+            _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
     // Register the service status handler
     registerServiceStatusHandler();
