@@ -53,6 +53,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.integration.tests.realtime.utils.FailureInjectingRealtimeTableDataManager.MAX_NUMBER_OF_FAILURES;
 import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -162,7 +163,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     addTableConfig(tableConfig);
     Thread.sleep(60000L);
     TestUtils.waitForCondition(
-        (aVoid) -> atLeastOneErrorSegmentInExternalView(TableNameBuilder.REALTIME.tableNameWithType(getTableName())),
+        (aVoid) -> numberOfErrorSegmentInExternalView(TableNameBuilder.REALTIME.tableNameWithType(getTableName()))
+            == MAX_NUMBER_OF_FAILURES,
         1000, 600000, "Segments still not in error state");
   }
 
@@ -275,18 +277,19 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     assertEquals(segmentAssignment.size(), numSegmentsExpected);
   }
 
-  private boolean atLeastOneErrorSegmentInExternalView(String tableName) {
+  private int numberOfErrorSegmentInExternalView(String tableName) {
+    int errorSegmentCount = 0;
     ExternalView resourceEV = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), tableName);
     Map<String, Map<String, String>> segmentAssigment = resourceEV.getRecord().getMapFields();
     for (Map<String, String> serverToStateMap : segmentAssigment.values()) {
       for (String state : serverToStateMap.values()) {
         if (state.equals("ERROR")) {
-          return true;
+          errorSegmentCount++;
         }
       }
     }
-    return false;
+    return errorSegmentCount;
   }
 
   private void assertUploadUrlEmpty(List<SegmentZKMetadata> segmentZKMetadataList) {

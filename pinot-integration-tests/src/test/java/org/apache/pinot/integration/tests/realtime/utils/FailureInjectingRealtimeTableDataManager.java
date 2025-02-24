@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests.realtime.utils;
 
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -36,7 +37,8 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
 public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataManager {
-  private volatile boolean _hasFailedOnce = false;
+  public static final int MAX_NUMBER_OF_FAILURES = 10;
+  private final AtomicInteger _numberOfFailures = new AtomicInteger(0);
 
   public FailureInjectingRealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -55,13 +57,8 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       throws AttemptsExceededException, RetriableOperationException {
 
     boolean addFailureToCommits = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-
-    if (addFailureToCommits) {
-      if (_hasFailedOnce) {
-        addFailureToCommits = false;
-      } else {
-        _hasFailedOnce = true;
-      }
+    if (addFailureToCommits && _numberOfFailures.getAndIncrement() >= MAX_NUMBER_OF_FAILURES) {
+      addFailureToCommits = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
         indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, addFailureToCommits);

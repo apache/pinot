@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -42,7 +43,7 @@ public class SegmentPrunerServiceTest {
 
   public SegmentPrunerServiceTest() {
     PinotConfiguration pinotConf = new PinotConfiguration();
-    pinotConf.setProperty(SegmentPrunerConfig.SEGMENT_PRUNER_NAMES_KEY, "[]");
+    pinotConf.setProperty(Server.CLASS, "[]");
     _emptyPrunerConf = new SegmentPrunerConfig(pinotConf);
   }
 

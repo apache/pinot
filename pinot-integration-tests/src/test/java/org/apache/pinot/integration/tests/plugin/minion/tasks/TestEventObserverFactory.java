@@ -25,6 +25,7 @@ import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
 import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 import static org.testng.Assert.assertTrue;
 
@@ -40,6 +41,11 @@ public class TestEventObserverFactory implements MinionEventObserverFactory {
   }
 
   @Override
+  public void init(MinionTaskZkMetadataManager zkMetadataManager,
+      MinionTaskObserverStorageManager taskProgressManager) {
+  }
+
+  @Override
   public String getTaskType() {
     return SimpleMinionClusterIntegrationTest.TASK_TYPE;
   }
@@ -47,6 +53,10 @@ public class TestEventObserverFactory implements MinionEventObserverFactory {
   @Override
   public MinionEventObserver create() {
     return new MinionEventObserver() {
+      @Override
+      public void init(MinionTaskObserverStorageManager progressManager) {
+      }
+
       @Override
       public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
         SimpleMinionClusterIntegrationTest.TASK_START_NOTIFIED.set(true);
@@ -67,6 +77,10 @@ public class TestEventObserverFactory implements MinionEventObserverFactory {
       @Override
       public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
         SimpleMinionClusterIntegrationTest.TASK_ERROR_NOTIFIED.set(true);
+      }
+
+      @Override
+      public void cleanup() {
       }
     };
   }

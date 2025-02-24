@@ -48,6 +48,8 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -263,5 +265,80 @@ public class LeafStageTransferableBlockOperatorTest {
     Assert.assertTrue(resultBlock.isEndOfStreamBlock());
 
     operator.close();
+  }
+
+  @Test
+  public void closeMethodInterruptsSseTasks() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator operator =
+        spy(
+            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
+                queryExecutor, _executorService)
+        );
+
+    _operatorRef.set(operator);
+
+    // When:
+    operator.close();
+
+    // Then:
+    verify(operator).cancelSseTasks();
+  }
+
+  @Test
+  public void cancelMethodInterruptsSseTasks() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator operator =
+        spy(
+            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
+                queryExecutor, _executorService)
+        );
+
+    _operatorRef.set(operator);
+
+    // When:
+    operator.cancel(new RuntimeException("test"));
+
+    // Then:
+    verify(operator).cancelSseTasks();
+  }
+
+  @Test
+  public void earlyTerminateMethodInterruptsSseTasks() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator operator =
+        spy(
+            new LeafStageTransferableBlockOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema,
+                queryExecutor, _executorService)
+        );
+
+    _operatorRef.set(operator);
+
+    // When:
+    operator.earlyTerminate();
+
+    // Then:
+    verify(operator).cancelSseTasks();
   }
 }
