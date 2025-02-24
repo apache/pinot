@@ -9,17 +9,17 @@ import static org.testng.AssertJUnit.*;
 
 public class MaxTasksExecutorTest {
 
-  private static final int MAX_THREADS = 5;
+  private static final int MAX_TASKS = 5;
 
   @Test
   public void testExecutor()
       throws Exception {
-    MaxTasksExecutor ex = new MaxTasksExecutor(MAX_THREADS, Executors.newCachedThreadPool());
+    MaxTasksExecutor ex = new MaxTasksExecutor(MAX_TASKS, Executors.newCachedThreadPool());
 
     final Semaphore sem1 = new Semaphore(0);
     final Semaphore sem2 = new Semaphore(0);
 
-    for (int i = 1; i <= MAX_THREADS; i++) {
+    for (int i = 1; i <= MAX_TASKS; i++) {
       ex.execute(() -> {
         sem2.release();
         sem1.acquireUninterruptibly();
@@ -30,12 +30,12 @@ public class MaxTasksExecutorTest {
     try {
       ex.execute(() -> {
       });
-      fail("Should not allow more than " + MAX_THREADS + " threads");
+      fail("Should not allow more than " + MAX_TASKS + " threads");
     } catch (Exception e) {
       // as expected
     }
 
-    for (int i = MAX_THREADS; i > 0; i--) {
+    for (int i = MAX_TASKS; i > 0; i--) {
       sem1.release();
     }
 

@@ -20,12 +20,17 @@ public class MaxTasksExecutor extends DecoratorExecutorService {
     _max = max;
   }
 
-  @Override
-  protected <T> Callable<T> decorate(Callable<T> task) {
+  protected void checkTaskAllowed() {
     if (_running.get() >= _max) {
       throw new IllegalStateException("Exceeded maximum number of tasks");
     }
+  }
+
+  @Override
+  protected <T> Callable<T> decorate(Callable<T> task) {
+    checkTaskAllowed();
     return () -> {
+      checkTaskAllowed();
       try {
         _running.getAndIncrement();
         return task.call();
@@ -37,10 +42,9 @@ public class MaxTasksExecutor extends DecoratorExecutorService {
 
   @Override
   protected Runnable decorate(Runnable task) {
-    if (_running.get() >= _max) {
-      throw new IllegalStateException("Exceeded maximum number of tasks");
-    }
+    checkTaskAllowed();
     return () -> {
+      checkTaskAllowed();
       try {
         _running.getAndIncrement();
         task.run();
