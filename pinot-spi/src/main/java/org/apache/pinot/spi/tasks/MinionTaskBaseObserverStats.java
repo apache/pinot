@@ -151,17 +151,24 @@ public class MinionTaskBaseObserverStats {
   public static class Timer {
     private long _totalTimeMs = 0;
     private long _startTimeMs = 0;
+    private long _resumeTimeMs = 0;
 
     public void start() {
       _startTimeMs = System.currentTimeMillis();
+      _resumeTimeMs = _startTimeMs;
     }
 
     public void stop() {
-      if (_startTimeMs != 0) {
-        _totalTimeMs += System.currentTimeMillis() - _startTimeMs;
-        _startTimeMs = 0;
+      if (_resumeTimeMs != 0) {
+        _totalTimeMs += System.currentTimeMillis() - _resumeTimeMs;
+        _resumeTimeMs = 0;
       }
     }
+
+    public long getStartTimeMs() {
+      return _startTimeMs;
+    }
+
     public long getTotalTimeMs() {
       return _totalTimeMs;
     }
