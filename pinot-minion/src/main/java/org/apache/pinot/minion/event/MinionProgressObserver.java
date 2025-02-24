@@ -68,7 +68,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     MinionTaskBaseObserverStats.StatusEntry statusEntry = null;
     _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
     if (progress instanceof MinionTaskBaseObserverStats.StatusEntry) {
-      statusEntry= (MinionTaskBaseObserverStats.StatusEntry) progress;
+      statusEntry = (MinionTaskBaseObserverStats.StatusEntry) progress;
       progressMessage = statusEntry.getStatus();
     } else if (progress instanceof MinionTaskBaseObserverStats) {
       MinionTaskBaseObserverStats stats = (MinionTaskBaseObserverStats) progress;
@@ -77,7 +77,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
         statusEntry = stats.getProgressLogs().pollFirst();
         progressMessage = statusEntry != null ? statusEntry.getStatus() : null;
       }
-    } else if (progress != null){
+    } else if (progress != null) {
       progressMessage = progress.toString();
       statusEntry = new MinionTaskBaseObserverStats.StatusEntry.Builder()
           .withStatus(progressMessage)

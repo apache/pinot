@@ -139,7 +139,7 @@ public class MinionTaskBaseObserverStats {
     }
     MinionTaskBaseObserverStats stats = (MinionTaskBaseObserverStats) o;
     return _startTimestamp == stats.getStartTimestamp() && _endTimestamp == stats.getEndTimestamp()
-        &&_taskId.equals(stats.getTaskId()) && _currentState.equals(stats.getCurrentState())
+        && _taskId.equals(stats.getTaskId()) && _currentState.equals(stats.getCurrentState())
         && _currentStage.equals(stats.getCurrentStage());
   }
 
