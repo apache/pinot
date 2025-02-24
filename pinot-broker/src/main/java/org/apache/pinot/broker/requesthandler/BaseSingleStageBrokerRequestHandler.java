@@ -882,7 +882,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         .filter(exception -> exception.getErrorCode() == QueryException.QUERY_VALIDATION_ERROR_CODE)
         .findFirst()
         .ifPresent(exception -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1));
-    if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
+    if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions()) && !pinotQuery.isExplain()) {
       brokerResponse.setResultTable(null);
     }
     if (QueryOptionsUtils.isSecondaryWorkload(pinotQuery.getQueryOptions())) {
@@ -1596,7 +1596,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setResultTable(resultTable);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     augmentStatistics(requestContext, brokerResponse);
-    if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
+    if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions()) && !pinotQuery.isExplain()) {
       brokerResponse.setResultTable(null);
     }
     return brokerResponse;
