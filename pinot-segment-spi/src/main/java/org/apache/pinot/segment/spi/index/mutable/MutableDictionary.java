@@ -48,4 +48,11 @@ public interface MutableDictionary extends Dictionary {
     // This method should not be called for unsorted dictionary.
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * This method returns a boolean denoting whether the mutable index can consume any more rows or not.
+   */
+  default boolean canAddMore() {
+    return true;
+  }
 }
