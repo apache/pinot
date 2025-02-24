@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
 public class MinionProgressObserver extends DefaultMinionEventObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
 
-  protected MinionTaskBaseObserverStats _taskProgressStats = new MinionTaskBaseObserverStats();
+  protected final MinionTaskBaseObserverStats _taskProgressStats = new MinionTaskBaseObserverStats();
   protected String _taskId;
 
   @Override
@@ -50,6 +51,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(_taskProgressStats.getStartTimestamp())
         .withStatus("Task started")
+        .withStage(MinionTaskState.IN_PROGRESS.name())
         .build());
     super.notifyTaskStart(pinotTaskConfig);
   }
@@ -62,14 +64,29 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
    */
   @Override
   public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
-    }
+    String progressMessage = null;
+    MinionTaskBaseObserverStats.StatusEntry statusEntry = null;
     _taskProgressStats.setCurrentState(MinionTaskState.IN_PROGRESS.name());
-    addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
-        .withTs(System.currentTimeMillis())
-        .withStatus((progress == null) ? "" : progress.toString())
-        .build());
+    if (progress instanceof MinionTaskBaseObserverStats.StatusEntry) {
+      statusEntry= (MinionTaskBaseObserverStats.StatusEntry) progress;
+      progressMessage = statusEntry.getStatus();
+    } else if (progress instanceof MinionTaskBaseObserverStats) {
+      MinionTaskBaseObserverStats stats = (MinionTaskBaseObserverStats) progress;
+      // Only one progress log must be recorded at once and should not be bulked
+      if (stats.getProgressLogs() != null) {
+        statusEntry = stats.getProgressLogs().pollFirst();
+        progressMessage = statusEntry != null ? statusEntry.getStatus() : null;
+      }
+    } else if (progress != null){
+      progressMessage = progress.toString();
+      statusEntry = new MinionTaskBaseObserverStats.StatusEntry.Builder()
+          .withStatus(progressMessage)
+          .build();
+    }
+    if (LOGGER.isDebugEnabled() && progressMessage != null) {
+      LOGGER.debug("Update progress: {} for task: {}", progressMessage, pinotTaskConfig.getTaskId());
+    }
+    addStatus(statusEntry);
     super.notifyProgress(pinotTaskConfig, progress);
   }
 
@@ -93,9 +110,11 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.SUCCEEDED.name());
+    _taskProgressStats.setEndTimestamp(endTs);
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(endTs)
         .withStatus("Task succeeded in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .withStage(MinionTaskState.SUCCEEDED.name())
         .build());
     super.notifyTaskSuccess(pinotTaskConfig, executionResult);
   }
@@ -104,10 +123,12 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.CANCELLED.name());
+    _taskProgressStats.setEndTimestamp(endTs);
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(endTs)
         .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.WARN)
         .withStatus("Task got cancelled after " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms")
+        .withStage(MinionTaskState.CANCELLED.name())
         .build());
     super.notifyTaskCancelled(pinotTaskConfig);
   }
@@ -116,11 +137,13 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
     _taskProgressStats.setCurrentState(MinionTaskState.ERROR.name());
+    _taskProgressStats.setEndTimestamp(endTs);
     addStatus(new MinionTaskBaseObserverStats.StatusEntry.Builder()
         .withTs(endTs)
         .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
         .withStatus("Task failed in " + (endTs - _taskProgressStats.getStartTimestamp()) + "ms with error: "
             + ExceptionUtils.getStackTrace(e))
+        .withStage(MinionTaskState.ERROR.name())
         .build());
     super.notifyTaskError(pinotTaskConfig, e);
   }
@@ -139,6 +162,37 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   }
 
   private synchronized void addStatus(MinionTaskBaseObserverStats.StatusEntry statusEntry) {
+    if (statusEntry == null) {
+      // if no status entry provided, only update the task progress if the _taskProgressStats has updated values
+      MinionTaskBaseObserverStats minionTaskObserverStats = _observerStorageManager.getTaskProgress(_taskId);
+      if (minionTaskObserverStats != null && !minionTaskObserverStats.equals(_taskProgressStats)) {
+        _observerStorageManager.setTaskProgress(_taskId, new MinionTaskBaseObserverStats(_taskProgressStats));
+      }
+      return;
+    }
+    String incomingStage = statusEntry.getStage();
+    if (_taskProgressStats.getCurrentStage() == null) {
+      _taskProgressStats.setCurrentStage(incomingStage != null ? incomingStage : MinionTaskState.UNKNOWN.name());
+    }
+    String currentStage = _taskProgressStats.getCurrentStage();
+    Map<String, MinionTaskBaseObserverStats.Timer> stageTimes = _taskProgressStats.getStageTimes();
+    if (incomingStage != null && !currentStage.equals(incomingStage)) {
+      // stage transition
+      stageTimes.get(currentStage).stop();
+      currentStage = incomingStage;
+      _taskProgressStats.setCurrentStage(currentStage);
+    } else {
+      // carry forward current stage if stage not specified
+      statusEntry.updateStage(currentStage);
+    }
+    if (!stageTimes.containsKey(currentStage)) {
+      stageTimes.put(currentStage, new MinionTaskBaseObserverStats.Timer());
+      // if end time is non-zero it indicates terminal stage in which case no need to start the timer
+      if (_taskProgressStats.getEndTimestamp() == 0) {
+        stageTimes.get(currentStage).start();
+      }
+    }
+
     MinionTaskBaseObserverStats minionTaskObserverStats = _observerStorageManager.getTaskProgress(_taskId);
     Deque<MinionTaskBaseObserverStats.StatusEntry> progressLogs;
     if (minionTaskObserverStats != null) {
@@ -146,8 +200,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     } else {
       progressLogs = new LinkedList<>();
     }
-    progressLogs.add(statusEntry);
-
+    progressLogs.offer(statusEntry);
     _observerStorageManager.setTaskProgress(_taskId, new MinionTaskBaseObserverStats(_taskProgressStats)
         .setProgressLogs(progressLogs));
   }

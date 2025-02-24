@@ -40,8 +40,12 @@ public class MinionTaskBaseObserverStatsTest {
         .setTaskId(TASK_ID)
         .setCurrentState(CURRENT_STATE)
         .setStartTimestamp(TS);
-    stats.getProgressLogs().offer(new MinionTaskBaseObserverStats.StatusEntry(
-        TS, MinionTaskBaseObserverStats.StatusEntry.LogLevel.INFO, STATUS));
+    stats.getProgressLogs().offer(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withTs(TS)
+            .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.INFO)
+            .withStatus(STATUS)
+            .withStage("test")
+        .build());
     String statsString = getTestObjectString();
     TestObserverStats stats2 = stats.fromJsonString(statsString);
     Assert.assertEquals(stats2, stats);
