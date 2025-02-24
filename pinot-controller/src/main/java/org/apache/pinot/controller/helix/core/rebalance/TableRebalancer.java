@@ -200,7 +200,7 @@ public class TableRebalancer {
         "Start rebalancing table: {} with dryRun: {}, summary: {}, preChecks: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
             + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, externalViewCheckIntervalInMs: {}, "
-            + "externalViewStabilizationTimeoutInMs: {}, forceMinimizeDataMovement: {}",
+            + "externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}",
         tableNameWithType, dryRun, summary, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, forceMinimizeDataMovement);
