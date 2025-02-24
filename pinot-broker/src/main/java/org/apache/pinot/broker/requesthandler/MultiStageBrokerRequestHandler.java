@@ -559,6 +559,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
   }
 }
