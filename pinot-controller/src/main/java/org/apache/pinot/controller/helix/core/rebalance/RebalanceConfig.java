@@ -86,8 +86,8 @@ public class RebalanceConfig {
   // Whether to enforce Minimal Data Movement Algorithm. If set to false, the minimizeDataMovement flag in the table
   // config will be used to determine whether to run the Minimal Data Movement Algorithm.
   @JsonProperty("minimizeDataMovement")
-  @ApiModelProperty(example = "true")
-  private boolean _minimizeDataMovement = true;
+  @ApiModelProperty(example = "false")
+  private boolean _minimizeDataMovement = false;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
