@@ -70,6 +70,8 @@ public enum AggregationFunctionType {
    * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
    */
   DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER, SqlTypeName.INTEGER),
+  DISTINCTCOUNTGLOBAL("distinctCountGlobal", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,
+      SqlTypeName.INTEGER),
   DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
   DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER,

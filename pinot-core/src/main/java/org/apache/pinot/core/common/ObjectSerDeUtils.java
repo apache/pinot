@@ -54,7 +54,6 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -124,7 +123,7 @@ public class ObjectSerDeUtils {
     Map(8),
     IntSet(9),
     TDigest(10),
-//    DistinctTable(11),
+    //    DistinctTable(11),
     DataSketch(12),
     Geometry(13),
     RoaringBitmap(14),
@@ -247,9 +246,9 @@ public class ObjectSerDeUtils {
         }
         throw new IllegalArgumentException(
             "Unsupported type of value: " + objectSet.first().getClass().getSimpleName());
-      } else if (value instanceof ObjectSet) {
-        ObjectSet objectSet = (ObjectSet) value;
-        if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
+      } else if (value instanceof Set) {
+        Set set = (Set) value;
+        if (set.isEmpty() || set.iterator().next() instanceof String) {
           return ObjectType.StringSet;
         } else {
           return ObjectType.BytesSet;

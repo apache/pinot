@@ -358,6 +358,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
+          case DISTINCTCOUNTGLOBAL:
+            return new DistinctCountGlobalAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
