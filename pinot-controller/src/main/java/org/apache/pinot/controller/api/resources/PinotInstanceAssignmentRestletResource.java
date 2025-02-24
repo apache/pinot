@@ -263,7 +263,7 @@ public class PinotInstanceAssignmentRestletResource {
               InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
       instancePartitionsMap.put(instancePartitionsType.toString(),
           new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-              existingInstancePartitions, false));
+              existingInstancePartitions));
     } else {
       if (InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType)) {
         // fetch the existing instance partitions, if the table, this is referenced in the new instance partitions
@@ -280,7 +280,7 @@ public class PinotInstanceAssignmentRestletResource {
                 instancePartitionsType.getInstancePartitionsName(rawTableName));
         instancePartitionsMap.put(instancePartitionsType.toString(),
             new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-                existingInstancePartitions, preConfigured, false));
+                existingInstancePartitions, preConfigured));
       } else {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
         instancePartitionsMap.put(instancePartitionsType.toString(),
@@ -305,8 +305,7 @@ public class PinotInstanceAssignmentRestletResource {
 
           instancePartitionsMap.put(tierConfig.getName(),
               new InstanceAssignmentDriver(tableConfig).assignInstances(tierConfig.getName(), instanceConfigs,
-                  existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()),
-                  false));
+                  existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName())));
         }
       }
     }
