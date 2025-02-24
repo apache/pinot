@@ -54,6 +54,11 @@ public class InstanceAssignmentDriver {
   }
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
+      List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
+    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions, false);
+  }
+
+  public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
       boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
@@ -66,6 +71,13 @@ public class InstanceAssignmentDriver {
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
+      @Nullable InstancePartitions preConfiguredInstancePartitions) {
+    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions,
+        preConfiguredInstancePartitions, false);
+  }
+
+  public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
+      List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
       @Nullable InstancePartitions preConfiguredInstancePartitions, boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
     InstanceAssignmentConfig assignmentConfig =
@@ -74,6 +86,11 @@ public class InstanceAssignmentDriver {
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
         assignmentConfig, instanceConfigs, existingInstancePartitions, preConfiguredInstancePartitions,
         forceMinimizeDataMovement);
+  }
+
+  public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
+    return assignInstances(tierName, instanceConfigs, existingInstancePartitions, instanceAssignmentConfig, false);
   }
 
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
