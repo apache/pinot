@@ -77,7 +77,7 @@ public class MinionEventObservers {
             if (task._endTs + _eventObserverCleanupDelayMs <= nowMs) {
               LOGGER.info("Cleaning up event observer for task: {} that ended at: {}, now at: {} after delay: {}",
                   task._taskId, task._endTs, nowMs, _eventObserverCleanupDelayMs);
-              _taskEventObservers.remove(task._taskId);
+              _taskEventObservers.remove(task._taskId).cleanup();
               _endedTaskQueue.poll();
             } else {
               _availableToClean.await(task._endTs + _eventObserverCleanupDelayMs - nowMs, TimeUnit.MILLISECONDS);
@@ -139,7 +139,7 @@ public class MinionEventObservers {
   public void removeMinionEventObserver(String taskId) {
     if (_eventObserverCleanupDelayMs <= 0) {
       LOGGER.debug("Clean up event observer for task: {} immediately", taskId);
-      _taskEventObservers.remove(taskId);
+      _taskEventObservers.remove(taskId).cleanup();
       return;
     }
     LOGGER.debug("Clean up event observer for task: {} after delay: {}", taskId, _eventObserverCleanupDelayMs);
