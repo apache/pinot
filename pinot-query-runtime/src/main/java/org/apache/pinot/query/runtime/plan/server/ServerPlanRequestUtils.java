@@ -113,12 +113,12 @@ public class ServerPlanRequestUtils {
       }
 
       @Override
-      protected void registerOnMDC() {
-        executionContext.registerOnMDC();
+      protected void registerInMdc() {
+        executionContext.registerInMdc();
       }
 
       @Override
-      protected void unregisterFromMDC() {
+      protected void unregisterFromMdc() {
         executionContext.unregisterFromMDC();
       }
     };

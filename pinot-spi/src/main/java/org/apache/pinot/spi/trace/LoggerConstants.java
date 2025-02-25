@@ -43,12 +43,16 @@ public enum LoggerConstants {
     return _key;
   }
 
-  public void registerOnMdc(String value) {
-    registerOnMdcIfNotSet(value, false);
+  public void registerInMdc(String value) {
+    registerInMdcIfNotSet(value, true);
   }
 
-  public boolean registerOnMdcIfNotSet(String value, boolean override) {
-    if (override && MDC.get(_key) != null) {
+  public boolean registerInMdcIfNotSet(String value) {
+    return registerInMdcIfNotSet(value, false);
+  }
+
+  public boolean registerInMdcIfNotSet(String value, boolean override) {
+    if (!override && MDC.get(_key) != null) {
       return false;
     }
     MDC.put(_key, value);

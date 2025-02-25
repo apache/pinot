@@ -66,12 +66,12 @@ public abstract class MdcExecutor extends DecoratorExecutorService {
   /**
    * Register the MDC context for the query.
    */
-  protected abstract void registerOnMDC();
+  protected abstract void registerInMdc();
 
   /**
    * Unregister the MDC context for the query.
    */
-  protected abstract void unregisterFromMDC();
+  protected abstract void unregisterFromMdc();
 
   @Override
   protected <T> Callable<T> decorate(Callable<T> task) {
@@ -81,10 +81,10 @@ public abstract class MdcExecutor extends DecoratorExecutorService {
         return task.call();
       }
       try {
-        registerOnMDC();
+        registerInMdc();
         return task.call();
       } finally {
-        unregisterFromMDC();
+        unregisterFromMdc();
       }
     };
   }
@@ -97,10 +97,10 @@ public abstract class MdcExecutor extends DecoratorExecutorService {
         return;
       }
       try {
-        registerOnMDC();
+        registerInMdc();
         task.run();
       } finally {
-        unregisterFromMDC();
+        unregisterFromMdc();
       }
     };
   }

@@ -149,12 +149,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
 
       @Override
-      protected void registerOnMDC() {
-        queryRequest.registerOnMdc();
+      protected void registerInMdc() {
+        queryRequest.registerInMdc();
       }
 
       @Override
-      protected void unregisterFromMDC() {
+      protected void unregisterFromMdc() {
         queryRequest.unregisterFromMdc();
       }
     };
