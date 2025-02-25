@@ -858,6 +858,188 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
 
+
+  @Test
+  public void testRebalanceWithMinimizeDataMovementInstanceAssignments()
+      throws Exception {
+    // TODO: try balanced (default) instance assignment
+    int numServers = 6;
+    for (int i = 0; i < numServers; i++) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+    }
+
+    // Create the table with default balanced segment assignment
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
+
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
+
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TIERED_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i,
+              nowInDays), null);
+    }
+
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
+
+    // Try dry-run summary mode
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    RebalanceSummaryResult rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(rebalanceSummaryResult);
+    assertNotNull(rebalanceSummaryResult.getServerInfo());
+    RebalanceSummaryResult.ServerInfo rebalanceServerInfo = rebalanceSummaryResult.getServerInfo();
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    assertEquals(rebalanceServerInfo.getNumServers().getExpectedValueAfterRebalance(), numServers);
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    // Segment assignment should not change
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    // add one server instance
+    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + numServers, true);
+
+    // Table without instance assignment config should work fine (ignore) with the minimizeDataMovement flag set
+    // Try dry-run summary mode
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(rebalanceSummaryResult);
+    assertNotNull(rebalanceSummaryResult.getServerInfo());
+    rebalanceServerInfo = rebalanceSummaryResult.getServerInfo();
+    // Should see the added server
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceServerInfo.getNumServers().getValueBeforeRebalance(), numServers);
+    assertEquals(rebalanceServerInfo.getNumServers().getExpectedValueAfterRebalance(), numServers + 1);
+
+    // Rebalance
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    // Should see the added server in the instance assignment
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getInstances(0, 0).size(), numServers + 1);
+
+    // One instance per replica group, no partition
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false,
+            null), null, false);
+
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Try dry-run summary mode
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+
+    rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(rebalanceSummaryResult);
+    assertNotNull(rebalanceSummaryResult.getServerInfo());
+    rebalanceServerInfo = rebalanceSummaryResult.getServerInfo();
+    // With instance assignment config, the number of servers is reduced to the number of replica groups
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceServerInfo.getNumServers().getValueBeforeRebalance(), numServers + 1);
+    assertEquals(rebalanceServerInfo.getNumServers().getExpectedValueAfterRebalance(), NUM_REPLICAS);
+
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS);
+
+
+    // increase replica group size by 1
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS + 1, 1, 0, 0, false,
+            null), null, true);
+
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Try dry-run summary mode
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
+
+    // with minimize data movement, we should add 1 server only
+    assertEquals(rebalanceServerInfo.getServersAdded().size(), 1);
+    assertEquals(rebalanceServerInfo.getServersRemoved().size(), 0);
+
+
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS + 1);
+
+
+    // decrease replica group size by 1
+    instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false,
+            null), null, true);
+
+    tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Try dry-run summary mode
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setSummary(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
+
+    // with minimize data movement, we should remove 1 server only
+    assertEquals(rebalanceServerInfo.getServersAdded().size(), 0);
+    assertEquals(rebalanceServerInfo.getServersRemoved().size(), 1);
+
+
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS);
+
+    _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
+  }
+
   @AfterClass
   public void tearDown() {
     stopFakeInstances();
