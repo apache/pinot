@@ -862,7 +862,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   @Test
   public void testRebalanceWithMinimizeDataMovementInstanceAssignments()
       throws Exception {
-    // TODO: try balanced (default) instance assignment
     int numServers = 6;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
