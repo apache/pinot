@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
 /**
  * DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
  * functionality.
+ *
+ * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
  */
 public abstract class DecoratorExecutorService implements ExecutorService {
   private final ExecutorService _executorService;
