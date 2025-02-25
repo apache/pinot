@@ -160,6 +160,12 @@ public class PinotTaskProgressResource {
       }
       Map<String, MinionTaskBaseObserverStats> progressStatsMap = new HashMap<>();
       MinionEventObserver observer = MinionEventObservers.getInstance().getMinionEventObserver(subtaskName);
+      if (observer == null) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("MinionEventObserver does not exist for subtask: {}", subtaskName);
+        }
+        return JsonUtils.objectToString(progressStatsMap);
+      }
       MinionTaskBaseObserverStats progressStats = observer.getProgressStats();
       if (progressStats != null) {
         progressStats.setProgressLogs(null);

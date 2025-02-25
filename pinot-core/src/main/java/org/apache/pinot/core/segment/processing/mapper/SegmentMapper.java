@@ -191,7 +191,7 @@ public class SegmentMapper {
         String logMessage = "Caught exception while reading data.";
         observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
             .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
-            .withStatus(logMessage + " Reason : " + e.getMessage())
+            .withStatus(logMessage + " Reason: " + e.getMessage())
             .build());
         if (!continueOnError) {
           throw new RuntimeException(logMessage, e);
