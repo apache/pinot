@@ -308,11 +308,13 @@ public class SegmentOperationsThrottlerTest {
               ? Integer.parseInt(
               CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
               : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      // Default is too high: Integer.MAX_VALUE, take a large number of permits to ensure we don't block
+      int numPermitsToTake = 10000;
       // We set isServingQueries to false when the server is not yet ready to server queries. In this scenario ideally
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
@@ -322,12 +324,11 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(),
-          initialPermits - defaultPermitsBeforeQuery);
+          initialPermits - numPermitsToTake);
 
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(),
-            (initialPermits - defaultPermitsBeforeQuery) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + i + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -340,11 +341,11 @@ public class SegmentOperationsThrottlerTest {
     int initialPermits = 4;
     List<BaseSegmentOperationsThrottler> segmentOperationsThrottlerList = new ArrayList<>();
     segmentOperationsThrottlerList.add(new SegmentAllIndexPreprocessThrottler(initialPermits, Integer.parseInt(
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(initialPermits, Integer.parseInt(
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
+        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
 
     for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
@@ -353,14 +354,16 @@ public class SegmentOperationsThrottlerTest {
               ? Integer.parseInt(
               CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
               : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      // Default is too high: Integer.MAX_VALUE, take a large number of permits to ensure we don't block
+      int numPermitsToTake = 10000;
       // We set isServingQueries to false when the server is not yet ready to server queries. In this scenario ideally
       // preprocessing more segments is acceptable and cannot affect the query performance
-      Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
-      Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
+      Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - 5);
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.acquire();
-        Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
+        Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
+        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1 - 5);
       }
 
       // Double the permits for before serving queries config
@@ -370,29 +373,29 @@ public class SegmentOperationsThrottlerTest {
               : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
                   ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
                   : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
-          String.valueOf(defaultPermitsBeforeQuery * 2));
+          String.valueOf(defaultPermitsBeforeQuery));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
-      Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery * 2);
-      // We doubled permits but took all of the previous ones
-      Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
+      Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
+      // We increased permits but took some before the increase
+      Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - numPermitsToTake);
 
-      // Take remaining permits
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      // Take more permits
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.acquire();
-        Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery * 2);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
+        Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
+        Assert.assertEquals(operationsThrottler.availablePermits(),
+            defaultPermitsBeforeQuery - numPermitsToTake - i - 1);
       }
 
       // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(),
-          initialPermits - (defaultPermitsBeforeQuery * 2));
+          initialPermits - (numPermitsToTake * 2));
 
-      for (int i = 0; i < defaultPermitsBeforeQuery * 2; i++) {
+      for (int i = 0; i < numPermitsToTake * 2; i++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(),
-            (initialPermits - defaultPermitsBeforeQuery * 2) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake * 2) + i + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -418,11 +421,13 @@ public class SegmentOperationsThrottlerTest {
               ? Integer.parseInt(
               CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
               : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      // Default is too high: Integer.MAX_VALUE, take a large number of permits to ensure we don't block
+      int numPermitsToTake = 10000;
       // We set isServingQueries to false when the server is not yet ready to server queries. In this scenario ideally
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
@@ -430,27 +435,26 @@ public class SegmentOperationsThrottlerTest {
 
       // Half the permits for before serving queries config
       Map<String, String> updatedClusterConfigs = new HashMap<>();
+      int newDefaultPermits = defaultPermitsBeforeQuery / 2;
       updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
               ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
               : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
                   ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
                   : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
-          String.valueOf(defaultPermitsBeforeQuery / 2));
+          String.valueOf(newDefaultPermits));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
-      Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery / 2);
+      Assert.assertEquals(operationsThrottler.totalPermits(), newDefaultPermits);
       // We doubled permits but took all of the previous ones
-      Assert.assertEquals(operationsThrottler.availablePermits(), -(defaultPermitsBeforeQuery / 2));
+      Assert.assertEquals(operationsThrottler.availablePermits(), newDefaultPermits - numPermitsToTake);
 
       // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
-      Assert.assertEquals(operationsThrottler.availablePermits(),
-          initialPermits - defaultPermitsBeforeQuery);
+      Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - numPermitsToTake);
 
-      for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
+      for (int i = 0; i < numPermitsToTake; i++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(),
-            (initialPermits - defaultPermitsBeforeQuery) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + i + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
