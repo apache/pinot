@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,6 +46,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
@@ -98,11 +99,11 @@ import org.slf4j.LoggerFactory;
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
+  private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -110,16 +111,20 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
+  private final FailureDetector _failureDetector;
 
-  public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null, false);
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
+    this(mailboxService, failureDetector, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig, boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
+    _failureDetector = failureDetector;
+
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
     } else {
@@ -211,6 +216,26 @@ public class QueryDispatcher {
     }
   }
 
+  public FailureDetector.ServerState checkConnectivityToInstance(String instanceId) {
+    String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
+
+    // Could occur if the cluster is only serving single-stage queries
+    if (hostnamePort == null) {
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
+  }
+
   private boolean isQueryCancellationEnabled() {
     return _serversByQuery != null;
   }
@@ -243,14 +268,16 @@ public class QueryDispatcher {
               serverInstance);
         }
       };
+      Worker.QueryRequest requestBuilder =
+          createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
+      DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
+
       try {
-        Worker.QueryRequest requestBuilder =
-            createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
-        DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
         sendRequest.send(dispatchClient, requestBuilder, serverInstance, deadline, callbackConsumer);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
       }
     }
 
@@ -261,6 +288,12 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
+          // subsequent query failures
+          if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
+              != ConnectivityState.READY) {
+            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+          }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
               resp.getThrowable());
@@ -409,8 +442,9 @@ public class QueryDispatcher {
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
-    String key = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(hostname, port, _tlsConfig));
+    String hostnamePort = String.format("%s_%d", hostname, port);
+    _instanceIdToHostnamePortMap.put(queryServerInstance.getInstanceId(), hostnamePort);
+    return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
@@ -530,6 +564,7 @@ public class QueryDispatcher {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
+    _instanceIdToHostnamePortMap.clear();
     _mailboxService.shutdown();
     _executorService.shutdown();
   }

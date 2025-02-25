@@ -51,15 +51,16 @@ public class PinotHintOptions {
      * down to leaf stage if possible. */
     public static final String IS_ENABLE_GROUP_TRIM = "is_enable_group_trim";
 
+    /** Minimum number of records that MSQE aggregation results, after sorting, should be retained. Non-positive value
+     *  disables trimming. */
+    public static final String MSE_MIN_GROUP_TRIM_SIZE = "mse_min_group_trim_size";
+
+    // TODO: Apply this to leaf stage as well
     /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
     public static final String ERROR_ON_NUM_GROUPS_LIMIT = "error_on_num_groups_limit";
 
     /** Max number of keys produced by MSQE aggregation. */
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
-
-    /** Number of records that MSQE aggregation results, after sorting, should be limited to.
-     *  Negative value disables trimming.   */
-    public static final String GROUP_TRIM_SIZE = "group_trim_size";
 
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max_initial_result_holder_capacity";
     public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mse_max_initial_result_holder_capacity";

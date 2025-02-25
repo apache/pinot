@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.failuredetector;
+package org.apache.pinot.common.failuredetector;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -34,19 +35,19 @@ public class NoOpFailureDetector implements FailureDetector {
   }
 
   @Override
-  public void register(Listener listener) {
+  public void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier) {
+  }
+
+  @Override
+  public void registerHealthyServerNotifier(Consumer<String> healthyServerNotifier) {
+  }
+
+  @Override
+  public void registerUnhealthyServerNotifier(Consumer<String> unhealthyServerNotifier) {
   }
 
   @Override
   public void start() {
-  }
-
-  @Override
-  public void notifyQuerySubmitted(QueryResponse queryResponse) {
-  }
-
-  @Override
-  public void notifyQueryFinished(QueryResponse queryResponse) {
   }
 
   @Override

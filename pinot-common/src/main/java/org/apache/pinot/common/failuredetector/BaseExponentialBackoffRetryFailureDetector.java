@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.failuredetector;
+package org.apache.pinot.common.failuredetector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -43,10 +45,12 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseExponentialBackoffRetryFailureDetector.class);
 
   protected final String _name = getClass().getSimpleName();
-  protected final List<Listener> _listeners = new ArrayList<>();
   protected final ConcurrentHashMap<String, RetryInfo> _unhealthyServerRetryInfoMap = new ConcurrentHashMap<>();
   protected final DelayQueue<RetryInfo> _retryInfoDelayQueue = new DelayQueue<>();
 
+  protected final List<Function<String, ServerState>> _unhealthyServerRetriers = new ArrayList<>();
+  protected Consumer<String> _healthyServerNotifier;
+  protected Consumer<String> _unhealthyServerNotifier;
   protected BrokerMetrics _brokerMetrics;
   protected long _retryInitialDelayNs;
   protected double _retryDelayFactor;
@@ -64,14 +68,24 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
     _retryDelayFactor = config.getProperty(Broker.FailureDetector.CONFIG_OF_RETRY_DELAY_FACTOR,
         Broker.FailureDetector.DEFAULT_RETRY_DELAY_FACTOR);
     _maxRetries =
-        config.getProperty(Broker.FailureDetector.CONFIG_OF_MAX_RETRIES, Broker.FailureDetector.DEFAULT_MAX_RETIRES);
+        config.getProperty(Broker.FailureDetector.CONFIG_OF_MAX_RETRIES, Broker.FailureDetector.DEFAULT_MAX_RETRIES);
     LOGGER.info("Initialized {} with retry initial delay: {}ms, exponential backoff factor: {}, max retries: {}", _name,
         retryInitialDelayMs, _retryDelayFactor, _maxRetries);
   }
 
   @Override
-  public void register(Listener listener) {
-    _listeners.add(listener);
+  public void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier) {
+    _unhealthyServerRetriers.add(unhealthyServerRetrier);
+  }
+
+  @Override
+  public void registerHealthyServerNotifier(Consumer<String> healthyServerNotifier) {
+    _healthyServerNotifier = healthyServerNotifier;
+  }
+
+  @Override
+  public void registerUnhealthyServerNotifier(Consumer<String> unhealthyServerNotifier) {
+    _unhealthyServerNotifier = unhealthyServerNotifier;
   }
 
   @Override
@@ -88,21 +102,30 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
             LOGGER.info("Server: {} has been marked healthy, skipping the retry", instanceId);
             continue;
           }
-          if (retryInfo._numRetires == _maxRetries) {
+          if (retryInfo._numRetries == _maxRetries) {
             LOGGER.warn("Unhealthy server: {} already reaches the max retries: {}, do not retry again and treat it "
                 + "as healthy so that the listeners do not lose track of the server", instanceId, _maxRetries);
             markServerHealthy(instanceId);
             continue;
           }
           LOGGER.info("Retry unhealthy server: {}", instanceId);
-          for (Listener listener : _listeners) {
-            listener.retryUnhealthyServer(instanceId, this);
+          boolean recovered = true;
+          for (Function<String, ServerState> unhealthyServerRetrier : _unhealthyServerRetriers) {
+            ServerState serverState = unhealthyServerRetrier.apply(instanceId);
+            if (serverState == ServerState.UNHEALTHY) {
+              recovered = false;
+              break;
+            }
           }
-          // Update the retry info and add it back to the delay queue
-          retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
-          retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
-          retryInfo._numRetires++;
-          _retryInfoDelayQueue.offer(retryInfo);
+          if (recovered) {
+            markServerHealthy(instanceId);
+          } else {
+            // Update the retry info and add it back to the delay queue
+            retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
+            retryInfo._retryTimeNs = System.nanoTime() + retryInfo._retryDelayNs;
+            retryInfo._numRetries++;
+            _retryInfoDelayQueue.offer(retryInfo);
+          }
         } catch (Exception e) {
           if (_running) {
             LOGGER.error("Caught exception in the retry thread, continuing with errors", e);
@@ -120,9 +143,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
     _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
       LOGGER.info("Mark server: {} as healthy", instanceId);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
-      for (Listener listener : _listeners) {
-        listener.notifyHealthyServer(instanceId, this);
-      }
+      _healthyServerNotifier.accept(instanceId);
       return null;
     });
   }
@@ -132,9 +153,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
     _unhealthyServerRetryInfoMap.computeIfAbsent(instanceId, id -> {
       LOGGER.warn("Mark server: {} as unhealthy", instanceId);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() + 1);
-      for (Listener listener : _listeners) {
-        listener.notifyUnhealthyServer(instanceId, this);
-      }
+      _unhealthyServerNotifier.accept(instanceId);
       RetryInfo retryInfo = new RetryInfo(id);
       _retryInfoDelayQueue.offer(retryInfo);
       return retryInfo;
@@ -167,13 +186,13 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
 
     long _retryTimeNs;
     long _retryDelayNs;
-    int _numRetires;
+    int _numRetries;
 
     RetryInfo(String instanceId) {
       _instanceId = instanceId;
       _retryTimeNs = System.nanoTime() + _retryInitialDelayNs;
       _retryDelayNs = _retryInitialDelayNs;
-      _numRetires = 0;
+      _numRetries = 0;
     }
 
     @Override

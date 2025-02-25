@@ -49,10 +49,11 @@ public class OpChainSchedulerService {
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
-        boolean isFinished = false;
         TransferableBlock returnedErrorBlock = null;
         Throwable thrown = null;
-        try {
+        // try-with-resources to ensure that the operator chain is closed
+        // TODO: Change the code so we ownership is expressed in the code in a better way
+        try (OpChain closeMe = operatorChain) {
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
@@ -62,7 +63,6 @@ public class OpChainSchedulerService {
           while (!result.isEndOfStreamBlock()) {
             result = operatorChain.getRoot().nextBlock();
           }
-          isFinished = true;
           if (result.isErrorBlock()) {
             returnedErrorBlock = result;
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, result.getQueryStats(),
@@ -80,8 +80,6 @@ public class OpChainSchedulerService {
               thrown = new RuntimeException("Error block " + returnedErrorBlock.getExceptions());
             }
             operatorChain.cancel(thrown);
-          } else if (isFinished) {
-            operatorChain.close();
           }
           Tracing.ThreadAccountantOps.clear();
         }

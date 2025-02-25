@@ -162,7 +162,7 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.6-10</zstd-jni.version>
+    <zstd-jni.version>1.5.7-1</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.24.3</log4j.version>
@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.16</aws.sdk.version>
+    <aws.sdk.version>2.30.25</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.19.0</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
@@ -202,7 +202,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.13.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
-    <commons-beanutils.version>1.10.0</commons-beanutils.version>
+    <commons-beanutils.version>1.10.1</commons-beanutils.version>
     <commons-io.version>2.18.0</commons-io.version>
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
@@ -270,14 +270,14 @@
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.10.2</c3p0.version>
+    <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
 
     <!-- Test Libraries -->
-    <testng.version>7.10.2</testng.version>
+    <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.15.2</mockito-core.version>
-    <equalsverifier.version>3.19</equalsverifier.version>
-    <testcontainers.version>1.20.4</testcontainers.version>
+    <equalsverifier.version>3.19.1</equalsverifier.version>
+    <testcontainers.version>1.20.5</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
@@ -990,7 +990,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.3</version>
+        <version>2.4</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.larray</groupId>
@@ -2075,7 +2075,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.44.2</version>
+          <version>2.44.3</version>
           <executions>
             <execution>
               <goals>

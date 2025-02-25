@@ -35,16 +35,14 @@ import javax.net.ssl.SSLException;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.proto.PinotQueryServerGrpc;
-import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class GrpcQueryClient implements Closeable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
+public abstract class BaseGrpcQueryClient<REQUEST, RESPONSE> implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseGrpcQueryClient.class);
 
   // the key is the hashCode of the TlsConfig, the value is the SslContext
   // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
@@ -52,14 +50,13 @@ public class GrpcQueryClient implements Closeable {
   private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final ManagedChannel _managedChannel;
-  private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
   private final int _channelShutdownTimeoutSeconds;
 
-  public GrpcQueryClient(String host, int port) {
+  public BaseGrpcQueryClient(String host, int port) {
     this(host, port, new GrpcConfig(Collections.emptyMap()));
   }
 
-  public GrpcQueryClient(String host, int port, GrpcConfig config) {
+  public BaseGrpcQueryClient(String host, int port, GrpcConfig config) {
     ManagedChannelBuilder<?> channelBuilder;
     if (config.isUsePlainText()) {
       channelBuilder = ManagedChannelBuilder
@@ -82,7 +79,6 @@ public class GrpcQueryClient implements Closeable {
     }
 
     _managedChannel = channelBuilder.build();
-    _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
     _channelShutdownTimeoutSeconds = config.getChannelShutdownTimeoutSecond();
   }
 
@@ -108,9 +104,11 @@ public class GrpcQueryClient implements Closeable {
     });
   }
 
-  public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {
-    return _blockingStub.submit(request);
+  public ManagedChannel getChannel() {
+    return _managedChannel;
   }
+
+  abstract Iterator<RESPONSE> submit(REQUEST request);
 
   @Override
   public void close() {

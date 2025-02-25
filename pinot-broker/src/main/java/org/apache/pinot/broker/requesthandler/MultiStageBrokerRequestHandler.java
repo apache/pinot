@@ -49,6 +49,7 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -65,6 +66,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
@@ -91,6 +93,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class serves as the broker entry-point for handling incoming multi-stage query requests and dispatching them
+ * to servers.
+ */
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
@@ -104,17 +110,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler) {
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _workerManager = new WorkerManager(hostname, port, _routingManager);
+    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
     TlsConfig tlsConfig = config.getProperty(
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
-    _queryDispatcher = new QueryDispatcher(
-        new MailboxService(hostname, port, config, tlsConfig), tlsConfig, this.isQueryCancellationEnabled());
+
+    failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
+    _queryDispatcher =
+        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
+            this.isQueryCancellationEnabled());
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -163,8 +172,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
           CommonConstants.Broker.DEFAULT_OF_SPOOLS);
-      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GROUP_TRIM,
-          CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM);
+      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
+          CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
 
       queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
@@ -534,5 +543,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static String toSizeLimitedString(Set<String> setOfStrings, int limit) {
     return setOfStrings.stream().limit(limit)
         .collect(Collectors.joining(", ", "[", setOfStrings.size() > limit ? "...]" : "]"));
+  }
+
+  /**
+   * Check if a server that was previously detected as unhealthy is now healthy.
+   */
+  public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
+    LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
+    ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+    if (serverInstance == null) {
+      LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
+
+    return _queryDispatcher.checkConnectivityToInstance(instanceId);
   }
 }

@@ -59,7 +59,7 @@ best to use JDK8 for all build and run operations in this manual.
 Inside ```pinot_directory/contrib/pinot-druid-benchmark``` run:
 
 ```
-mvn clean install
+./mvnw clean install
 ```
 
 Next, inside the same directory split the ```lineitem``` table:

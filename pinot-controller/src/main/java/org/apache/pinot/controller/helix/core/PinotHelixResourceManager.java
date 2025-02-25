@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -151,11 +152,14 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -237,10 +241,13 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
+  private final RebalancePreChecker _rebalancePreChecker;
+  private TableSizeReader _tableSizeReader;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
+      @Nullable ExecutorService executorService) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -263,13 +270,24 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _rebalancePreChecker = rebalancePreChecker;
+    _rebalancePreChecker.init(this, executorService);
+  }
+
+  public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
+        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
+        LineageManagerFactory.create(controllerConf),
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf),
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null);
   }
 
   /**
@@ -424,6 +442,24 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the rebalance pre-checker
+   *
+   * @return rebalance pre-checker
+   */
+  public RebalancePreChecker getRebalancePreChecker() {
+    return _rebalancePreChecker;
+  }
+
+  /**
+   * Get the table size reader.
+   *
+   * @return table size reader
+   */
+  public TableSizeReader getTableSizeReader() {
+    return _tableSizeReader;
+  }
+
+/**
    * Instance related APIs
    */
 
@@ -1634,12 +1670,14 @@ public class PinotHelixResourceManager {
     if (CollectionUtils.isEmpty(ZKMetadataProvider.getAllUserName(_propertyStore))) {
       String initUsername = controllerConf.getInitAccessControlUsername();
       String initPassword = controllerConf.getInitAccessControlPassword();
-      addUser(new UserConfig(initUsername, initPassword, ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), null,
-          null));
+      addUser(new UserConfig(initUsername, initPassword, ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(),
+          null, null, null));
       addUser(
-          new UserConfig(initUsername, initPassword, ComponentType.BROKER.name(), RoleType.ADMIN.name(), null, null));
+          new UserConfig(initUsername, initPassword, ComponentType.BROKER.name(), RoleType.ADMIN.name(),
+              null, null, null));
       addUser(
-          new UserConfig(initUsername, initPassword, ComponentType.SERVER.name(), RoleType.ADMIN.name(), null, null));
+          new UserConfig(initUsername, initPassword, ComponentType.SERVER.name(), RoleType.ADMIN.name(),
+              null, null, null));
     }
   }
 
@@ -1916,6 +1954,10 @@ public class PinotHelixResourceManager {
 
   public void registerPinotLLCRealtimeSegmentManager(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
+  }
+
+  public void registerTableSizeReader(TableSizeReader tableSizeReader) {
+    _tableSizeReader = tableSizeReader;
   }
 
   private void assignInstances(TableConfig tableConfig, boolean override) {
@@ -2373,7 +2415,7 @@ public class PinotHelixResourceManager {
         updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
 
         InstancePartitions tierInstancePartitions =
-            TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, segmentName, sortedTiers,
+            TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                 _helixZkManager);
         if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
           // Override instance partitions for offline table
@@ -2441,7 +2483,7 @@ public class PinotHelixResourceManager {
           // Update segment tier to support direct assignment for multiple data directories
           updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
           InstancePartitions tierInstancePartitions =
-              TierConfigUtils.getTieredInstancePartitionsForSegment(tableNameWithType, segmentName, sortedTiers,
+              TierConfigUtils.getTieredInstancePartitionsForSegment(tableConfig, segmentName, sortedTiers,
                   _helixZkManager);
           if (tierInstancePartitions != null && TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
             // Override instance partitions for offline table
@@ -3587,7 +3629,8 @@ public class PinotHelixResourceManager {
       tierToSegmentsMap = updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
+        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker,
+            _tableSizeReader);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 

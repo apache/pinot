@@ -34,6 +34,7 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -43,6 +44,11 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 public class HttpSegmentFetcher extends BaseSegmentFetcher {
   protected FileUploadDownloadClient _httpClient;
+  private static final String CONNECTION_REQUEST_TIMEOUT_CONFIG_KEY =
+      "http.request.connectionRequestTimeoutMs";
+  private static final String SOCKET_TIMEOUT_CONFIG_KEY = "http.request.socketTimeoutMs";
+  private int _connectionRequestTimeoutMs;
+  private int _socketTimeoutMs;
 
   @VisibleForTesting
   void setHttpClient(FileUploadDownloadClient httpClient) {
@@ -54,6 +60,9 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
     if (_httpClient == null) {
       _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build());
     }
+    _connectionRequestTimeoutMs =
+        config.getProperty(CONNECTION_REQUEST_TIMEOUT_CONFIG_KEY, HttpClient.DEFAULT_CONNECTION_REQUEST_TIMEOUT_MS);
+    _socketTimeoutMs = config.getProperty(SOCKET_TIMEOUT_CONFIG_KEY, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   @Override
@@ -79,7 +88,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
         if (!InetAddresses.isInetAddress(hostName)) {
           httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
         }
-        int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, httpHeaders);
+        int statusCode = _httpClient.downloadFile(uri, dest, _authProvider, httpHeaders, _connectionRequestTimeoutMs,
+            _socketTimeoutMs);
         _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest,
             dest.length(), statusCode);
         return true;
@@ -139,8 +149,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
               if (!InetAddresses.isInetAddress(hostName)) {
                 httpHeaders.add(new BasicHeader(HttpHeaders.HOST, hostName + ":" + port));
               }
-              ret.set(
-                  _httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte));
+              ret.set(_httpClient.downloadUntarFileStreamed(uri, dest, _authProvider, httpHeaders, maxStreamRateInByte,
+                  _connectionRequestTimeoutMs, _socketTimeoutMs));
 
               return true;
             } catch (HttpErrorStatusException e) {

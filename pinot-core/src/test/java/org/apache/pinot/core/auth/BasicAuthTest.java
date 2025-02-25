@@ -19,6 +19,7 @@
 package org.apache.pinot.core.auth;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -26,26 +27,40 @@ import org.testng.annotations.Test;
 public class BasicAuthTest {
 
   @Test
-  public void testBasicAuthPrincipal()
-      throws Exception {
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("READ"))
+  public void testBasicAuthPrincipal() {
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("READ"))
         .hasTable("myTable"));
-    Assert.assertTrue(
-        new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"), ImmutableSet.of("Read"))
-            .hasTable("myTable1"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("read"))
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
+        Collections.emptySet(), ImmutableSet.of("Read"))
         .hasTable("myTable1"));
-    Assert.assertFalse(
-        new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"), ImmutableSet.of("read"))
-            .hasTable("myTable2"));
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("read"))
+        .hasTable("myTable1"));
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable", "myTable1"),
+        Collections.emptySet(), ImmutableSet.of("read"))
+        .hasTable("myTable2"));
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable"),
+        ImmutableSet.of("read"))
+        .hasTable("myTable"));
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", Collections.emptySet(), ImmutableSet.of("myTable"),
+        ImmutableSet.of("read"))
+        .hasTable("myTable"));
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("myTable1"),
+        ImmutableSet.of("read"))
+        .hasTable("myTable"));
 
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("READ"))
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("READ"))
         .hasPermission("read"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("Read"))
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("Read"))
         .hasPermission("READ"));
-    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("read"))
+    Assert.assertTrue(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("read"))
         .hasPermission("Read"));
-    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), ImmutableSet.of("read"))
+    Assert.assertFalse(new BasicAuthPrincipal("name", "token", ImmutableSet.of("myTable"), Collections.emptySet(),
+        ImmutableSet.of("read"))
         .hasPermission("write"));
   }
 }

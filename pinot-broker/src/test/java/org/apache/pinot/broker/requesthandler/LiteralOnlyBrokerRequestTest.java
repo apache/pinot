@@ -23,6 +23,7 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -170,7 +171,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class));
 
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -194,7 +195,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class));
     long currentTsMin = System.currentTimeMillis();
     BrokerResponse brokerResponse = requestHandler.handleRequest(
         "SELECT now() AS currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') AS firstDayOf2020");
@@ -348,7 +349,7 @@ public class LiteralOnlyBrokerRequestTest {
       throws Exception {
     SingleConnectionBrokerRequestHandler requestHandler =
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
-            null, null, null, null, mock(ServerRoutingStatsManager.class));
+            null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class));
 
     // Test 1: select constant
     BrokerResponse brokerResponse = requestHandler.handleRequest("EXPLAIN PLAN FOR SELECT 1.5, 'test'");

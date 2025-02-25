@@ -35,7 +35,6 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -50,6 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -200,14 +200,14 @@ public class NoDictionaryGroupKeyGeneratorTest {
     if (numGroupByColumns == 1) {
       groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_projectOperator,
           ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[0])),
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false, null);
+          Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, false, null);
     } else {
       ExpressionContext[] groupByExpressions = new ExpressionContext[numGroupByColumns];
       for (int i = 0; i < numGroupByColumns; i++) {
         groupByExpressions[i] = ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[i]));
       }
       groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false, null);
+          Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT, false, null);
     }
     groupKeyGenerator.generateKeysForBlock(_valueBlock, new int[NUM_RECORDS]);
 

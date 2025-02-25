@@ -22,7 +22,7 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.config.GrpcConfig;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
@@ -47,7 +47,7 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
   }
 
   @Override
-  public GrpcQueryClient getGrpcQueryClient() {
+  public ServerGrpcQueryClient getGrpcQueryClient() {
     Map<String, Object> configMap = new HashMap<>();
     configMap.put("usePlainText", "false");
     configMap.put("tls.keystore.path", _tlsStoreJKS.getFile());
@@ -60,6 +60,6 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
     PinotConfiguration brokerConfig = new PinotConfiguration(configMap);
     // This mimics how pinot broker instantiates GRPCQueryClient.
     GrpcConfig config = GrpcConfig.buildGrpcQueryConfig(brokerConfig);
-    return new GrpcQueryClient("localhost", getServerGrpcPort(), config);
+    return new ServerGrpcQueryClient("localhost", getServerGrpcPort(), config);
   }
 }

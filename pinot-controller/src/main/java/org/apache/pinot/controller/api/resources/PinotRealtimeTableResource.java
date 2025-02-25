@@ -263,8 +263,9 @@ public class PinotRealtimeTableResource {
     }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
-    result.put("segmentsYetToBeCommitted", segmentsYetToBeCommitted);
-    result.put("numberOfSegmentsYetToBeCommitted", segmentsYetToBeCommitted.size());
+    result.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST, segmentsYetToBeCommitted);
+    result.put(CommonConstants.ControllerJob.NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED,
+        segmentsYetToBeCommitted.size());
     return JsonUtils.objectToJsonNode(result);
   }
 

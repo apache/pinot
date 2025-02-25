@@ -115,7 +115,7 @@ $ cd pinot
 # Build Pinot
 # -Pbin-dist is required to build the binary distribution
 # -Pbuild-shaded-jar is required to build the shaded jar, which is necessary for some features like spark connectors
-$ mvn clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
+$ ./mvnw clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
 
 # Run the Quick Demo
 $ cd build/
@@ -124,16 +124,16 @@ $ bin/quick-start-batch.sh
 
 For UI development setup refer this [doc](https://github.com/apache/pinot/blob/master/pinot-controller/src/main/resources/Readme.md).
 
-Normal Pinot builds are done using the `mvn clean install` command.
+Normal Pinot builds are done using the `./mvnw clean install` command.
 
 However this command can take a long time to run.
 
-For faster builds it is recommended to use `mvn verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
+For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
 ## Deploying Pinot to Kubernetes
-Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 
 ## Join the Community
  - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)

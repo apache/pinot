@@ -22,6 +22,7 @@ import com.google.common.base.Function;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -34,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
+import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.utils.Time;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -109,7 +111,40 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
           return null;
         }
       }
-    }, 1000L, 30000, "Kafka topic " + topic + " is not created yet");
+    }, 1000L, 300000, "Kafka topic " + topic + " is not created yet");
+  }
+
+  @Override
+  public void deleteTopic(String topic) {
+    try {
+      _adminClient.deleteTopics(Collections.singletonList(topic)).all().get();
+    } catch (Exception e) {
+      LOGGER.error("Could not delete topic: {}", topic);
+    }
+
+    waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return !_adminClient.listTopics().names().get().contains(topic);
+        } catch (Exception e) {
+          LOGGER.warn("Could not fetch Kafka topics", e);
+          return null;
+        }
+      }
+    }, 1000L, 300000, "Kafka topic " + topic + " is not deleted yet");
+  }
+
+  @Override
+  public void createPartitions(String topic, int numPartitions) {
+    try {
+      Map<String, NewPartitions> newPartitionMap = new HashMap<>();
+      newPartitionMap.put(topic, NewPartitions.increaseTo(numPartitions));
+      _adminClient.createPartitions(newPartitionMap).all().get();
+    } catch (Exception e) {
+      LOGGER.error("Failed to create partitions for topic: {}", topic, e);
+    }
   }
 
   @Override

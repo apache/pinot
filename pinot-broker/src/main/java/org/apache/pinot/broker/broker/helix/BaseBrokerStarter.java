@@ -58,6 +58,8 @@ import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
+import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.failuredetector.FailureDetectorFactory;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -144,6 +146,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
   protected AbstractResponseStore _responseStore;
+  protected FailureDetector _failureDetector;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -319,6 +322,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
 
+    // Initialize the failure detector that removes servers from the broker routing table if they are not healthy
+    _failureDetector = FailureDetectorFactory.getFailureDetector(_brokerConf, _brokerMetrics);
+    _failureDetector.registerHealthyServerNotifier(
+        instanceId -> _routingManager.includeServerToRouting(instanceId));
+    _failureDetector.registerUnhealthyServerNotifier(
+        instanceId -> _routingManager.excludeServerFromRouting(instanceId));
+    _failureDetector.start();
+
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     String brokerRequestHandlerType =
@@ -326,7 +337,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler = new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager,
-          _accessControlFactory, _queryQuotaManager, tableCache);
+          _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -337,7 +348,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
+              _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager,
+              _failureDetector);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
@@ -350,7 +362,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache, _multiStageQueryThrottler);
+              _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -489,7 +501,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(_brokerConf.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf));
+    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf), _failureDetector);
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
@@ -612,6 +624,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Stopping cluster change mediator");
     _clusterChangeMediator.stop();
+
+    _failureDetector.stop();
 
     // Delay shutdown of request handler so that the pending queries can be finished. The participant Helix manager has
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
