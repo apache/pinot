@@ -83,8 +83,9 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
 
-  // Whether to enforce Minimal Data Movement Algorithm. If set to false, the minimizeDataMovement flag in the table
-  // config will be used to determine whether to run the Minimal Data Movement Algorithm.
+  // Whether to enforce Minimal Data Movement Algorithm (only effective if instance assignment config is set, and if
+  // bootstrap is false). If set to false, the minimizeDataMovement flag in the table config will be used to determine
+  // whether to run the Minimal Data Movement Algorithm.
   @JsonProperty("minimizeDataMovement")
   @ApiModelProperty(example = "false")
   private boolean _minimizeDataMovement = false;
