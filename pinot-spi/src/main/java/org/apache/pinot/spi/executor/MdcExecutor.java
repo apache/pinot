@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.executor;
+package org.apache.pinot.spi.executor;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
  *
  */
-public abstract class MdcQueryExecutor extends DecoratorExecutorService {
+public abstract class MdcExecutor extends DecoratorExecutorService {
 
   /**
    * The logger for the class.
@@ -44,7 +43,7 @@ public abstract class MdcQueryExecutor extends DecoratorExecutorService {
    */
   private final Logger _logger = LoggerFactory.getLogger(this.getClass());
 
-  public MdcQueryExecutor(ExecutorService executorService) {
+  public MdcExecutor(ExecutorService executorService) {
     super(executorService);
   }
 
