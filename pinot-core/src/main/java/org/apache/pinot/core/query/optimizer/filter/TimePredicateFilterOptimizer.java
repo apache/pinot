@@ -65,6 +65,7 @@ import org.slf4j.LoggerFactory;
  *     is the largest value that truncates to be lower than the specified literal.
  *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
  *     not common on time column, and they cannot be optimized to a single range predicate.
+ *     <p>NOTE: Timezones are not yet supported for the datetrunc optimizer</p>
  *   </li>
  * </ul>
  *
@@ -477,6 +478,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
         lowerMillis = dateTruncFloor(operands);
         upperMillis = Long.MAX_VALUE;
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the equality portion
+        // of the filter is impossible and is converted to a regular greater than filter
         if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
           lowerInclusive = false;
           lowerMillis = dateTruncCeil(operands);
@@ -487,6 +491,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         lowerMillis = Long.MIN_VALUE;
         upperInclusive = false;
         upperMillis = dateTruncFloor(operands);
+        // If the roundFloor of the upperMillis does not equal upperMillis, this implies that upperMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the maximum value
+        // that will truncate to a value lower than the literal will be equal to the ceiling of the inverse
         if (upperMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(upperMillis)) {
           upperInclusive = true;
           upperMillis = dateTruncCeil(operands);
@@ -500,6 +507,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       case BETWEEN:
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
         lowerMillis = dateTruncFloor(operands);
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the lowerMillis must
+        // be equal to the ceiling (non-inclusive) of the inverse
         if (TimeUnit.valueOf(outputTimeUnit).convert(lowerMillis, TimeUnit.MILLISECONDS)
             != getLongValue(filterOperands.get(1))) {
           lowerInclusive = false;
@@ -511,6 +521,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       default:
         throw new IllegalStateException();
     }
+
+    // Convert values back into columnar unit
     lowerMillis = TimeUnit.valueOf(inputTimeUnit).convert(lowerMillis, TimeUnit.MILLISECONDS);
     upperMillis = TimeUnit.valueOf(inputTimeUnit).convert(upperMillis, TimeUnit.MILLISECONDS);
     String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
@@ -564,6 +576,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
   /**
    * Helper function to find the floor of acceptable values truncating to a specified value
+   * Computes floor inverse of date trunc function
    */
   private long dateTruncFloor(List<Expression> operands) {
     long timeValue = getLongValue(operands.get(1));
