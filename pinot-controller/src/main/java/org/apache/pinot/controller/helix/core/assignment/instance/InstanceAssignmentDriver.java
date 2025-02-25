@@ -109,6 +109,13 @@ public class InstanceAssignmentDriver {
     LOGGER.info("Starting {} instance assignment for table {}", instancePartitionsName, tableNameWithType);
 
     boolean minimizeDataMovement = forceMinimizeDataMovement || instanceAssignmentConfig.isMinimizeDataMovement();
+    if (forceMinimizeDataMovement) {
+      LOGGER.info("Table: {} is forced with minimizeDataMovement", tableNameWithType);
+    } else if (instanceAssignmentConfig.isMinimizeDataMovement()) {
+      LOGGER.info("Table: {} has configured minimizeDataMovement", tableNameWithType);
+    } else {
+      LOGGER.warn("Table: {} is being rebalanced without minimizeDataMovement", tableNameWithType);
+    }
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);
