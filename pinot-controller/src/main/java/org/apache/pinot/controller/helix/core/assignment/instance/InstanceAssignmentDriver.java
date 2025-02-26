@@ -107,7 +107,8 @@ public class InstanceAssignmentDriver {
       @Nullable InstancePartitions preConfiguredInstancePartitions, boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
 
-    // It is safe here to assume the table.
+    // minimizeDataMovement might be set back to false within InstanceTagPoolSelector and InstancePartitionSelector
+    // if existingInstancePartitions is null.
     boolean minimizeDataMovement = forceMinimizeDataMovement || instanceAssignmentConfig.isMinimizeDataMovement();
     LOGGER.info("Starting {} instance assignment for table {}, instanceAssignmentConfig.isMinimizeDataMovement()={}, "
         + "forceMinimizeDataMovement={}", instancePartitionsName, tableNameWithType,
