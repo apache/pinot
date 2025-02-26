@@ -51,10 +51,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class InstanceAssignmentTest {
@@ -524,9 +521,9 @@ public class InstanceAssignmentTest {
         .setNumReplicas(numReplicas)
         .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig))
         .build();
+    assertTrue(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE).isMinimizeDataMovement());
 
     InstanceAssignmentDriver driver = new InstanceAssignmentDriver(tableConfig);
-
     // Configs and driver that DO NOT minimize data movement
     InstanceAssignmentConfig instanceAssignmentConfigNotMinimized = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(TENANT_NAME), false, 0, null), null,
@@ -535,6 +532,7 @@ public class InstanceAssignmentTest {
 
     TableConfig tableConfigNotMinimized = new TableConfig(tableConfig);
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
+    assertFalse(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfigNotMinimized, InstancePartitionsType.OFFLINE).isMinimizeDataMovement());
     InstanceAssignmentDriver driverNotMinimized = new InstanceAssignmentDriver(tableConfigNotMinimized);
 
 
@@ -556,7 +554,7 @@ public class InstanceAssignmentTest {
     InstancePartitions instancePartitionsNotMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
 
-    // Assignment without existing InstancePartitions should be the same for all scenarios
+    // Initial assignment should be the same for all scenarios
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
     assertEquals(instancePartitionsForcedMinimize, instancePartitionsNotMinimize);
 
