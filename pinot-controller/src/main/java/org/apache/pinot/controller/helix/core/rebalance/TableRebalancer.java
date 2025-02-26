@@ -727,6 +727,11 @@ public class TableRebalancer {
    * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+      TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
+    return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, false);
+  }
+
+  public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun,
       boolean forceMinimizeDataMovement) {
     boolean instancePartitionsUnchanged;
