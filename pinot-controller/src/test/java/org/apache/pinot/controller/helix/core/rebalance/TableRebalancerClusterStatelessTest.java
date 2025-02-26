@@ -877,13 +877,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     long nowInDays = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
 
     for (int i = 0; i < numSegments; i++) {
-      _helixResourceManager.addNewSegment(OFFLINE_TIERED_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(TIERED_TABLE_NAME, SEGMENT_NAME_PREFIX + i,
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i,
               nowInDays), null);
     }
 
     Map<String, Map<String, String>> oldSegmentAssignment =
-        _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
 
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
 
@@ -947,7 +947,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Should see the added server in the instance assignment
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getInstances(0, 0).size(), numServers + 1);
-
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
 
   @Test
@@ -964,7 +964,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false,
             null), null, false);
 
-    // Create the table with default balanced segment assignment
+    // Create the table
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig)).build();
@@ -983,7 +983,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     Map<String, Map<String, String>> oldSegmentAssignment =
-        _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
 
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
 
@@ -1075,7 +1075,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS);
 
-    _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
 
   @AfterClass
