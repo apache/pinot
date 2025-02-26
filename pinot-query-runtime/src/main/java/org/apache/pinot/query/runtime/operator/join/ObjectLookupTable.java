@@ -33,7 +33,7 @@ public class ObjectLookupTable extends LookupTable {
 
   @Override
   public void addRow(Object key, Object[] row) {
-    _lookupTable.compute(key, (k, v) -> calculateValue(row, v));
+    _lookupTable.compute(key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override

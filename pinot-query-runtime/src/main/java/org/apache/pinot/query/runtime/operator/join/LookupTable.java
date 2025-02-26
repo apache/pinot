@@ -38,7 +38,7 @@ public abstract class LookupTable {
   public abstract void addRow(Object key, Object[] row);
 
   @SuppressWarnings("unchecked")
-  protected Object calculateValue(Object[] row, @Nullable Object currentValue) {
+  protected Object computeNewValue(Object[] row, @Nullable Object currentValue) {
     if (currentValue == null) {
       return row;
     } else {

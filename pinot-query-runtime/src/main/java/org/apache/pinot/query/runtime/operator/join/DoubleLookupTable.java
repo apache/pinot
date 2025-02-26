@@ -34,7 +34,7 @@ public class DoubleLookupTable extends LookupTable {
 
   @Override
   public void addRow(Object key, Object[] row) {
-    _lookupTable.compute((double) key, (k, v) -> calculateValue(row, v));
+    _lookupTable.compute((double) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
@@ -53,8 +53,8 @@ public class DoubleLookupTable extends LookupTable {
 
   @Nullable
   @Override
-  public Object[] lookup(Object key) {
-    return (Object[]) _lookupTable.get((double) key);
+  public Object lookup(Object key) {
+    return _lookupTable.get((double) key);
   }
 
   @SuppressWarnings("rawtypes")

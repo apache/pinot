@@ -34,7 +34,7 @@ public class FloatLookupTable extends LookupTable {
 
   @Override
   public void addRow(Object key, Object[] row) {
-    _lookupTable.compute((float) key, (k, v) -> calculateValue(row, v));
+    _lookupTable.compute((float) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
@@ -53,8 +53,8 @@ public class FloatLookupTable extends LookupTable {
 
   @Nullable
   @Override
-  public Object[] lookup(Object key) {
-    return (Object[]) _lookupTable.get((float) key);
+  public Object lookup(Object key) {
+    return _lookupTable.get((float) key);
   }
 
   @SuppressWarnings("rawtypes")

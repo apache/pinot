@@ -34,7 +34,7 @@ public class IntLookupTable extends LookupTable {
 
   @Override
   public void addRow(Object key, Object[] row) {
-    _lookupTable.compute((int) key, (k, v) -> calculateValue(row, v));
+    _lookupTable.compute((int) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
