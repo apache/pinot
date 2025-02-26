@@ -346,7 +346,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testExplainDropResults(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    final String resultTag = "resultTable";
+    String resultTag = "resultTable";
     String query = String.format("EXPLAIN PLAN FOR SELECT * FROM %s limit 10", getTableName());
 
     // dropResults=true - resultTable must be in the response (it is a query plan)
@@ -369,7 +369,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // dropResults=true - resultTable must be in the response (it is a query plan)
     jsonNode = postQueryWithOptions(query, "dropResults=true");
     Assert.assertTrue(jsonNode.has(resultTag));
-
   }
 
   @Test(dataProvider = "useBothQueryEngines")
