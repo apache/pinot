@@ -56,6 +56,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+<<<<<<< HEAD
+=======
+import org.apache.pinot.spi.executor.MdcExecutor;
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -106,19 +110,32 @@ public class ServerPlanRequestUtils {
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
       boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
+<<<<<<< HEAD
     MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
+=======
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
       }
 
       @Override
+<<<<<<< HEAD
       protected void registerOnMDC() {
         executionContext.registerOnMDC();
       }
 
       @Override
       protected void unregisterFromMDC() {
+=======
+      protected void registerInMdc() {
+        executionContext.registerInMdc();
+      }
+
+      @Override
+      protected void unregisterFromMdc() {
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
         executionContext.unregisterFromMDC();
       }
     };

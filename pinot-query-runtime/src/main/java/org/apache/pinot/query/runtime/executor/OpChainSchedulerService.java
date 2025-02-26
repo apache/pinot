@@ -55,6 +55,7 @@ public class OpChainSchedulerService {
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
+<<<<<<< HEAD
 =======
         // TODO: Now that request id, stage and worker is registered on MDC, we can remove the the OpChain text
         //   from the log messages.
@@ -62,6 +63,9 @@ public class OpChainSchedulerService {
           operatorChain.getContext().registerOnMDC();
 
 >>>>>>> b81170becd (Implement MdcExecutor to manage MDC context for query execution)
+=======
+          operatorChain.getContext().registerInMdc();
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
           ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
               ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,

@@ -83,6 +83,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
@@ -141,19 +142,32 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
+<<<<<<< HEAD
     MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
+=======
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
       }
 
       @Override
+<<<<<<< HEAD
       protected void registerOnMDC() {
         queryRequest.registerOnMdc();
       }
 
       @Override
       protected void unregisterFromMDC() {
+=======
+      protected void registerInMdc() {
+        queryRequest.registerInMdc();
+      }
+
+      @Override
+      protected void unregisterFromMdc() {
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
         queryRequest.unregisterFromMdc();
       }
     };

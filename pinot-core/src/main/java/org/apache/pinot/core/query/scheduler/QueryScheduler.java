@@ -135,7 +135,11 @@ public abstract class QueryScheduler {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
+<<<<<<< HEAD
     queryRequest.registerOnMdc();
+=======
+    queryRequest.registerInMdc();
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());

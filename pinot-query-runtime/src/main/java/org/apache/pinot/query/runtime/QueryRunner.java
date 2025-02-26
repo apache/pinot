@@ -224,9 +224,15 @@ public class QueryRunner {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     try {
+<<<<<<< HEAD
       LoggerConstants.QUERY_ID_KEY.registerOnMdc(Long.toString(requestId));
       LoggerConstants.STAGE_ID_KEY.registerOnMdc(Integer.toString(stagePlan.getStageMetadata().getStageId()));
       LoggerConstants.WORKER_ID_KEY.registerOnMdc(Integer.toString(workerMetadata.getWorkerId()));
+=======
+      LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(Long.toString(requestId));
+      LoggerConstants.STAGE_ID_KEY.registerInMdcIfNotSet(Integer.toString(stagePlan.getStageMetadata().getStageId()));
+      LoggerConstants.WORKER_ID_KEY.registerInMdcIfNotSet(Integer.toString(workerMetadata.getWorkerId()));
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
 
       StageMetadata stageMetadata = stagePlan.getStageMetadata();
       Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);

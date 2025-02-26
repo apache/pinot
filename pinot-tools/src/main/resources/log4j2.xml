@@ -28,7 +28,11 @@
       https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-not-empty
       and https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-thread-context-map
     -->
+<<<<<<< HEAD
     <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [qid=%X{pinot.query.id}%notEmpty{,stg=%X{pinot.mse.stageId}}]}%notEmpty{ On %X{pinot.component.type}:} %m%n</Property>
+=======
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [qid=%X{pinot.query.id}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
+>>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
     <Property name="PINOT_COMPONENT">all</Property>
   </Properties>
   <Appenders>
