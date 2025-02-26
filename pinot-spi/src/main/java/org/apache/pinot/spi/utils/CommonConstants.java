@@ -601,6 +601,10 @@ public class CommonConstants {
         // Use MSE compiler when trying to fill a response with no schema metadata
         // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
         public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
+
+        // Disable fast filtered count optimization for the query such as
+        // "select count(*) from table where invertedIndexCol = 'foo'"
+        public static final String DISABLE_FAST_FILTERED_COUNT = "disableFastFilteredCount";
       }
 
       public static class QueryOptionValue {

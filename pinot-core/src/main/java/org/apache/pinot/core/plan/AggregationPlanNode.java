@@ -21,6 +21,7 @@ package org.apache.pinot.core.plan;
 import java.util.EnumSet;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -103,7 +104,8 @@ public class AggregationPlanNode implements PlanNode {
 
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
-      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+      if (!QueryOptionsUtils.isDisableFastFilteredCount(_queryContext.getQueryOptions()) &&
+          canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
         return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
       }
 
