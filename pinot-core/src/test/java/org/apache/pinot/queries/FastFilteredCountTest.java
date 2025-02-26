@@ -49,6 +49,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertFalse;
 
 
 public class FastFilteredCountTest extends BaseQueriesTest {
@@ -316,5 +317,12 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
+  }
+
+  @Test(dataProvider = "testCases")
+  public void testDisable(String query, int unused) {
+    String flag = "SET disableFastFilteredCount=true;";
+    Operator<?> operator = getOperator(flag + query);
+    assertFalse(operator instanceof FastFilteredCountOperator);
   }
 }
