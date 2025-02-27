@@ -166,8 +166,8 @@
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
     <log4j.version>2.24.3</log4j.version>
-    <slf4j.version>2.0.16</slf4j.version>
-    <netty.version>4.1.118.Final</netty.version>
+    <slf4j.version>2.0.17</slf4j.version>
+    <netty.version>4.1.119.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.25</aws.sdk.version>
+    <aws.sdk.version>2.30.28</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
     <azure.msal4j.version>1.19.0</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
@@ -233,7 +233,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.70.0</grpc.version>
-    <google.cloud.libraries.version>26.54.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.55.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
@@ -249,7 +249,7 @@
     <jline.version>3.29.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.0.1</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.0.2</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
@@ -2454,7 +2454,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.2</version>
+            <version>10.21.3</version>
           </dependency>
         </dependencies>
         <executions>

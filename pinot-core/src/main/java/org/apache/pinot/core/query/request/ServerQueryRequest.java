@@ -174,8 +174,8 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
-  public void registerOnMdc() {
-    LoggerConstants.QUERY_ID_KEY.registerOnMdc(String.valueOf(_requestId));
+  public void registerInMdc() {
+    LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
   }
 
   public void unregisterFromMdc() {

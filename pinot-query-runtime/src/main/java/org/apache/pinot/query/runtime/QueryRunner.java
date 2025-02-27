@@ -224,9 +224,9 @@ public class QueryRunner {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     try {
-      LoggerConstants.QUERY_ID_KEY.registerOnMdc(Long.toString(requestId));
-      LoggerConstants.STAGE_ID_KEY.registerOnMdc(Integer.toString(stagePlan.getStageMetadata().getStageId()));
-      LoggerConstants.WORKER_ID_KEY.registerOnMdc(Integer.toString(workerMetadata.getWorkerId()));
+      LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(Long.toString(requestId));
+      LoggerConstants.STAGE_ID_KEY.registerInMdcIfNotSet(Integer.toString(stagePlan.getStageMetadata().getStageId()));
+      LoggerConstants.WORKER_ID_KEY.registerInMdcIfNotSet(Integer.toString(workerMetadata.getWorkerId()));
 
       StageMetadata stageMetadata = stagePlan.getStageMetadata();
       Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);

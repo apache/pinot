@@ -134,10 +134,10 @@ public class OpChainExecutionContext {
     return _parentContext;
   }
 
-  public void registerOnMDC() {
-    LoggerConstants.QUERY_ID_KEY.registerOnMdc(String.valueOf(_requestId));
-    LoggerConstants.WORKER_ID_KEY.registerOnMdc(String.valueOf(_workerMetadata.getWorkerId()));
-    LoggerConstants.STAGE_ID_KEY.registerOnMdc(String.valueOf(_stageMetadata.getStageId()));
+  public void registerInMdc() {
+    LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
+    LoggerConstants.WORKER_ID_KEY.registerInMdcIfNotSet(String.valueOf(_workerMetadata.getWorkerId()));
+    LoggerConstants.STAGE_ID_KEY.registerInMdcIfNotSet(String.valueOf(_stageMetadata.getStageId()));
   }
 
   public void unregisterFromMDC() {

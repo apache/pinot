@@ -135,7 +135,7 @@ public abstract class QueryScheduler {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
-    queryRequest.registerOnMdc();
+    queryRequest.registerInMdc();
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());

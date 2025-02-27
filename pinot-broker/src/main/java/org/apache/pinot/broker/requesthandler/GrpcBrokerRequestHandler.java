@@ -137,7 +137,6 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   public static class PinotServerStreamingQueryClient {
     private final Map<String, ServerGrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
-    private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
     private final GrpcConfig _config;
 
     public PinotServerStreamingQueryClient(GrpcConfig config) {
@@ -151,7 +150,6 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
     private ServerGrpcQueryClient getOrCreateGrpcQueryClient(ServerInstance serverInstance) {
       String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());
-      _instanceIdToHostnamePortMap.put(serverInstance.getInstanceId(), hostnamePort);
       return _grpcQueryClientMap.computeIfAbsent(hostnamePort,
           k -> new ServerGrpcQueryClient(serverInstance.getHostname(), serverInstance.getGrpcPort(), _config));
     }
@@ -174,14 +172,14 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    String hostnamePort = _streamingQueryClient._instanceIdToHostnamePortMap.get(instanceId);
+    String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());
+    ServerGrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
+
     // Could occur if the cluster is only serving multi-stage queries
-    if (hostnamePort == null) {
+    if (client == null) {
       LOGGER.debug("No GrpcQueryClient found for server with instanceId: {}", instanceId);
       return FailureDetector.ServerState.UNKNOWN;
     }
-
-    ServerGrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
 
     ConnectivityState connectivityState = client.getChannel().getState(true);
     if (connectivityState == ConnectivityState.READY) {

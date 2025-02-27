@@ -40,7 +40,6 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.executor.MdcQueryExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -56,6 +55,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -106,19 +106,19 @@ public class ServerPlanRequestUtils {
       BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
       boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
-    MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
       }
 
       @Override
-      protected void registerOnMDC() {
-        executionContext.registerOnMDC();
+      protected void registerInMdc() {
+        executionContext.registerInMdc();
       }
 
       @Override
-      protected void unregisterFromMDC() {
+      protected void unregisterFromMdc() {
         executionContext.unregisterFromMDC();
       }
     };
