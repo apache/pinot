@@ -104,11 +104,6 @@ public class AggregationPlanNode implements PlanNode {
 
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
-      if (!QueryOptionsUtils.isDisableFastFilteredCount(_queryContext.getQueryOptions()) &&
-          canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
-        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
-      }
-
       if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
@@ -119,6 +114,11 @@ public class AggregationPlanNode implements PlanNode {
           }
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+      }
+
+      if (!QueryOptionsUtils.isDisableFastFilteredCount(_queryContext.getQueryOptions()) &&
+          canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
       }
     }
 
