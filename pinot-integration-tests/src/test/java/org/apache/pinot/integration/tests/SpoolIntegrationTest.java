@@ -208,6 +208,15 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     assertNoError(jsonNode);
     DocumentContext parsed = JsonPath.parse(stats.toString());
 
+    /*
+     * Stages are like follows:
+     * 1 -> 2 (union)  ->  3 (aggr) ->  4 (leaf, spooled)
+     *                 ->  5 (join) ->  6 (aggr, spooled) ->  7 (aggr, spooled) -> 4 (leaf, spooled)
+     *                              ->  9 (aggr)          ->  4 (leaf, spooled)
+     *   -> 11 (union) -> 12 (aggr) ->  4 (leaf, spooled)
+     *                 -> 14 (join) ->  6 (aggr, spooled) ->  7 (aggr, spooled) -> 4 (leaf, spooled)
+     *                              -> 18 (aggr)          ->  4 (leaf, spooled)
+     */
     checkSpoolTimes(parsed, 6, 5, 1);
     checkSpoolTimes(parsed, 6, 14, 1);
     checkSpoolSame(parsed, 6, 5, 14);
