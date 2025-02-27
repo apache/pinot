@@ -128,11 +128,7 @@ public class DispatchableSubPlan {
   public int getEstimatedNumQueryThreads() {
     int estimatedNumQueryThreads = 0;
     // Skip broker reduce root stage
-    for (Map.Entry<Integer, DispatchablePlanFragment> entry : _queryStageMap.entrySet()) {
-      if (entry.getKey() == 0) {
-        continue;
-      }
-      DispatchablePlanFragment stage = entry.getValue();
+    for (DispatchablePlanFragment stage : getQueryStagesWithoutRoot()) {
       // Non-leaf stage
       if (stage.getWorkerIdToSegmentsMap().isEmpty()) {
         estimatedNumQueryThreads += stage.getWorkerMetadataList().size();
