@@ -34,4 +34,15 @@ public interface RetentionStrategy {
    * @return Whether the segment should be purged
    */
   boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata);
-}
+
+  /**
+   * Returns whether the segment should be purged based on end time.
+   *
+   * @param segmentName The name of the segment to check
+   * @param tableNameWithType Table name with type
+   * @param endTimeMs The end time of the segment in milliseconds
+   * @return Whether the segment should be purged
+   */
+  boolean isPurgeable(String segmentName, String tableNameWithType, long endTimeMs);
+
+  }

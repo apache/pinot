@@ -50,4 +50,17 @@ public class TimeRetentionStrategy implements RetentionStrategy {
 
     return System.currentTimeMillis() - endTimeMs > _retentionMs;
   }
+
+  @Override
+  public boolean isPurgeable(String segmentName, String tableNameWithType, long endTimeMs) {
+
+    // Check that the end time is between 1971 and 2071
+    if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+      LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}", segmentName,
+          tableNameWithType, endTimeMs);
+      return false;
+    }
+
+    return System.currentTimeMillis() - endTimeMs > _retentionMs;
+  }
 }
