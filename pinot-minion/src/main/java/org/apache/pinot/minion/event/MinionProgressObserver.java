@@ -172,6 +172,9 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     }
     String incomingStage = statusEntry.getStage();
     if (_taskProgressStats.getCurrentStage() == null) {
+      // typically incomingStage won't be null when current stage is also null as notifyTaskStart is the first
+      // that gets called during task execution.
+      // This handling is mostly for testing purpose
       _taskProgressStats.setCurrentStage(incomingStage != null ? incomingStage : MinionTaskState.UNKNOWN.name());
     }
     String currentStage = _taskProgressStats.getCurrentStage();
