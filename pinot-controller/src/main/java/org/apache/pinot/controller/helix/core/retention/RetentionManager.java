@@ -190,7 +190,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     String segmentName = filePath.substring(filePath.lastIndexOf("/") + 1);
     if (segmentName.endsWith(TAR_GZ_FILE_EXTENSION)) {
-      segmentName = segmentName.substring(0, segmentName.length() - TAR_COMPRESSED_FILE_EXTENSION.length());
+      segmentName = segmentName.substring(0, segmentName.length() - TAR_GZ_FILE_EXTENSION.length());
     }
     return segmentName;
   }
