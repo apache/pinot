@@ -222,8 +222,15 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     checkSpoolSame(parsed, 4, 3, 7, 9, 12, 18);
   }
 
+  /**
+   * Returns the nodes that have the given descendant id and also have the given parent id as one of their ancestors.
+   * @param parent the parent id
+   * @param descendant the descendant id
+   */
   private List<Map<String, Object>> findDescendantById(DocumentContext stats, int parent, int descendant) {
-    return stats.read(parentDescendantJsonPathExpression(parent, descendant));
+    @Language("jsonpath")
+    String jsonPath = "$..[?(@.stage == " + parent + ")]..[?(@.stage == " + descendant + ")]";
+    return stats.read(jsonPath);
   }
 
   private void checkSpoolTimes(DocumentContext stats, int spoolStageId, int parent, int times) {
@@ -256,11 +263,6 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
       Assert.fail("The descendant with id " + spoolStageId + " is not the same in all parent nodes "
           + spools);
     }
-  }
-
-  @Language("jsonpath")
-  private String parentDescendantJsonPathExpression(int parent, int child) {
-    return "$..[?(@.stage == " + parent + ")]..[?(@.stage == " + child + ")]";
   }
 
   @AfterClass
