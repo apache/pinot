@@ -1526,8 +1526,8 @@ public class CommonConstants {
    * The all configuration is the default configuration for both query and ingestion static analyzer.
    */
   public static class Groovy {
-    public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.all.groovy.static.analyzer";
-    public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.query.groovy.static.analyzer";
-    public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.ingestion.groovy.static.analyzer";
+    public static final String GROOVY_ALL_STATIC_ANALYZER_CONFIG = "pinot.groovy.all.static.analyzer";
+    public static final String GROOVY_QUERY_STATIC_ANALYZER_CONFIG = "pinot.groovy.query.static.analyzer";
+    public static final String GROOVY_INGESTION_STATIC_ANALYZER_CONFIG = "pinot.groovy.ingestion.static.analyzer";
   }
 }
