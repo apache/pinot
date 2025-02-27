@@ -165,6 +165,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
+    if (_isEarlyTerminated) {
+      return constructMetadataBlock();
+    }
     BaseResultsBlock resultsBlock =
         _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     if (resultsBlock == null) {
@@ -175,7 +178,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (exceptions != null) {
       return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
     }
-    if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+    if (resultsBlock == LAST_RESULTS_BLOCK) {
       return constructMetadataBlock();
     } else {
       // Regular data block
