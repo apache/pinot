@@ -28,14 +28,14 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 
 
 public class ExecutionStatsAggregator {
-  private final List<BrokerQueryErrorMessage> _processingExceptions = new ArrayList<>();
+  private final List<BrokerResponseErrorMessage> _processingExceptions = new ArrayList<>();
   private final Map<String, String> _traceInfo = new HashMap<>();
   private final boolean _enableTrace;
 
@@ -83,7 +83,7 @@ public class ExecutionStatsAggregator {
     // Reduce on exceptions.
     Map<Integer, String> exceptions = dataTable.getExceptions();
     for (Map.Entry<Integer, String> entry : exceptions.entrySet()) {
-      _processingExceptions.add(new BrokerQueryErrorMessage(entry.getKey(), entry.getValue()));
+      _processingExceptions.add(new BrokerResponseErrorMessage(entry.getKey(), entry.getValue()));
     }
 
     // Reduce on execution statistics.
@@ -204,7 +204,7 @@ public class ExecutionStatsAggregator {
 
   public void setStats(String rawTableName, BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
     // set exception
-    List<BrokerQueryErrorMessage> processingExceptions = brokerResponseNative.getExceptions();
+    List<BrokerResponseErrorMessage> processingExceptions = brokerResponseNative.getExceptions();
     processingExceptions.addAll(_processingExceptions);
 
     // add all trace.

@@ -47,7 +47,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -214,10 +214,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
     // TODO: Add partial result flag to RequestContext
-    List<BrokerQueryErrorMessage> exceptions = response.getExceptions();
+    List<BrokerResponseErrorMessage> exceptions = response.getExceptions();
     int numExceptions = exceptions.size();
     List<String> processingExceptions = new ArrayList<>(numExceptions);
-    for (BrokerQueryErrorMessage exception : exceptions) {
+    for (BrokerResponseErrorMessage exception : exceptions) {
       processingExceptions.add(exception.toString());
     }
     statistics.setProcessingExceptions(processingExceptions);

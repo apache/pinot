@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
@@ -249,7 +249,7 @@ public class QueryLoggerTest {
     BrokerResponseNative response = new BrokerResponseNative();
     response.setNumGroupsLimitReached(numGroupsLimitReached);
     for (int i = 0; i < numExceptions; i++) {
-      response.addException(new BrokerQueryErrorMessage(QueryErrorCode.INTERNAL, "message" + i));
+      response.addException(new BrokerResponseErrorMessage(QueryErrorCode.INTERNAL, "message" + i));
     }
     response.setTimeUsedMs(timeUsedMs);
     response.setNumDocsScanned(1);

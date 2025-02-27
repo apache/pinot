@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -76,11 +76,11 @@ public interface BrokerResponse {
   /**
    * Returns the processing exceptions encountered during the query execution.
    */
-  List<BrokerQueryErrorMessage> getExceptions();
+  List<BrokerResponseErrorMessage> getExceptions();
 
   @Deprecated
   @JsonIgnore
-  default List<BrokerQueryErrorMessage> getProcessingExceptions() {
+  default List<BrokerResponseErrorMessage> getProcessingExceptions() {
     return getExceptions();
   }
 

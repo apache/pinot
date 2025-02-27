@@ -30,25 +30,25 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
  * This is only used to serialize the error message and error code when a broker sends an error message to the client.
  * In other cases use {@link QueryErrorMessage} instead.
  */
-public class BrokerQueryErrorMessage {
+public class BrokerResponseErrorMessage {
   private int _errorCode;
   private String _message;
 
   @JsonCreator
-  public BrokerQueryErrorMessage(
+  public BrokerResponseErrorMessage(
       @JsonProperty("errorCode") int errorCode,
       @JsonProperty("message") String message) {
     _errorCode = errorCode;
     _message = message;
   }
 
-  public BrokerQueryErrorMessage(QueryErrorCode errorCode, String message) {
+  public BrokerResponseErrorMessage(QueryErrorCode errorCode, String message) {
     _errorCode = errorCode.getId();
     _message = message == null ? errorCode.getDefaultMessage() : message;
   }
 
-  public static BrokerQueryErrorMessage fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
-    return new BrokerQueryErrorMessage(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
+  public static BrokerResponseErrorMessage fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
+    return new BrokerResponseErrorMessage(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
   }
 
   @JsonProperty("errorCode")

@@ -71,7 +71,7 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -648,7 +648,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     int numPrunedSegmentsTotal = 0;
     boolean offlineTableDisabled = false;
     boolean realtimeTableDisabled = false;
-    List<BrokerQueryErrorMessage> errorMsgs = new ArrayList<>();
+    List<BrokerResponseErrorMessage> errorMsgs = new ArrayList<>();
     if (offlineBrokerRequest != null) {
       offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
       // NOTE: Routing table might be null if table is just removed
@@ -704,7 +704,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
         errorMessage = "Offline table is disabled in hybrid table";
       }
-      errorMsgs.add(new BrokerQueryErrorMessage(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
+      errorMsgs.add(new BrokerResponseErrorMessage(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
     }
 
     int numUnavailableSegments = unavailableSegments.size();
@@ -722,13 +722,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       String realtimeRoutingPolicy = realtimeBrokerRequest != null ? getRoutingPolicy(realtimeTableConfig) : null;
       String offlineRoutingPolicy = offlineBrokerRequest != null ? getRoutingPolicy(offlineTableConfig) : null;
       errorMessage = addRoutingPolicyInErrMsg(errorMessage, realtimeRoutingPolicy, offlineRoutingPolicy);
-      errorMsgs.add(new BrokerQueryErrorMessage(QueryErrorCode.BROKER_SEGMENT_UNAVAILABLE, errorMessage));
+      errorMsgs.add(new BrokerResponseErrorMessage(QueryErrorCode.BROKER_SEGMENT_UNAVAILABLE, errorMessage));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
     }
 
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       if (!errorMsgs.isEmpty()) {
-        BrokerQueryErrorMessage firstErrorMsg = errorMsgs.get(0);
+        BrokerResponseErrorMessage firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"
             : "1 exception found";
         LOGGER.info("No server found for request {}: {}. {}", requestId, query, logTail, firstErrorMsg);
@@ -766,7 +766,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       String errorMessage = e.getMessage();
       LOGGER.info("{} {}: {}", errorMessage, requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
-      errorMsgs.add(new BrokerQueryErrorMessage(QueryErrorCode.BROKER_TIMEOUT, errorMessage));
+      errorMsgs.add(new BrokerResponseErrorMessage(QueryErrorCode.BROKER_TIMEOUT, errorMessage));
       return BrokerResponseNative.fromBrokerErrors(errorMsgs);
     }
 
@@ -852,7 +852,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
-    for (BrokerQueryErrorMessage errorMsg : errorMsgs) {
+    for (BrokerResponseErrorMessage errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
     }
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
@@ -879,7 +879,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     brokerResponse.setTimeUsedMs(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
     // include both broker side errorMsgs and server side errorMsgs
-    List<BrokerQueryErrorMessage> brokerExceptions = brokerResponse.getExceptions();
+    List<BrokerResponseErrorMessage> brokerExceptions = brokerResponse.getExceptions();
     brokerExceptions.stream()
         .filter(exception -> exception.getErrorCode() == QueryErrorCode.QUERY_VALIDATION.getId())
         .findFirst()

@@ -52,7 +52,7 @@ import org.apache.pinot.common.response.ProcessingException;
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
-  private final List<BrokerQueryErrorMessage> _exceptions = new ArrayList<>();
+  private final List<BrokerResponseErrorMessage> _exceptions = new ArrayList<>();
 
   private ResultTable _resultTable;
   private int _numRowsResultSet;
@@ -108,16 +108,16 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public List<BrokerQueryErrorMessage> getExceptions() {
+  public List<BrokerResponseErrorMessage> getExceptions() {
     return _exceptions;
   }
 
-  public void addException(BrokerQueryErrorMessage exception) {
+  public void addException(BrokerResponseErrorMessage exception) {
     _exceptions.add(exception);
   }
 
   public void addException(ProcessingException exception) {
-    addException(new BrokerQueryErrorMessage(exception.getErrorCode(), exception.getMessage()));
+    addException(new BrokerResponseErrorMessage(exception.getErrorCode(), exception.getMessage()));
   }
 
   @Override

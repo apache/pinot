@@ -68,7 +68,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
-  private List<BrokerQueryErrorMessage> _exceptions = new ArrayList<>();
+  private List<BrokerResponseErrorMessage> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
@@ -108,14 +108,14 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   public BrokerResponseNative(QueryErrorCode errorCode, String errorMessage) {
-    _exceptions.add(new BrokerQueryErrorMessage(errorCode.getId(), errorMessage));
+    _exceptions.add(new BrokerResponseErrorMessage(errorCode.getId(), errorMessage));
   }
 
   public BrokerResponseNative(QueryErrorMessage errorMsg) {
-    _exceptions.add(BrokerQueryErrorMessage.fromQueryErrorMessage(errorMsg));
+    _exceptions.add(BrokerResponseErrorMessage.fromQueryErrorMessage(errorMsg));
   }
 
-  public static BrokerResponseNative fromBrokerErrors(List<BrokerQueryErrorMessage> exceptions) {
+  public static BrokerResponseNative fromBrokerErrors(List<BrokerResponseErrorMessage> exceptions) {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
     brokerResponse.setExceptions(exceptions);
     return brokerResponse;
@@ -176,15 +176,15 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public List<BrokerQueryErrorMessage> getExceptions() {
+  public List<BrokerResponseErrorMessage> getExceptions() {
     return _exceptions;
   }
 
-  public void setExceptions(List<BrokerQueryErrorMessage> exceptions) {
+  public void setExceptions(List<BrokerResponseErrorMessage> exceptions) {
     _exceptions = exceptions;
   }
 
-  public void addException(BrokerQueryErrorMessage exception) {
+  public void addException(BrokerResponseErrorMessage exception) {
     _exceptions.add(exception);
   }
 

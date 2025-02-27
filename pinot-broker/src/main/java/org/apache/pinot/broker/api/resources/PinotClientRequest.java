@@ -64,7 +64,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
-import org.apache.pinot.common.response.broker.BrokerQueryErrorMessage;
+import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -538,7 +538,7 @@ public class PinotClientRequest {
   public static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
-    List<BrokerQueryErrorMessage> exceptions = brokerResponse.getExceptions();
+    List<BrokerResponseErrorMessage> exceptions = brokerResponse.getExceptions();
     if (!exceptions.isEmpty()) {
       // set the header value as first exception error code value.
       queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
