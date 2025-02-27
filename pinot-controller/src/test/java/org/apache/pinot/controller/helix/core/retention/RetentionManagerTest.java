@@ -254,6 +254,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager =
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
@@ -286,6 +287,7 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager =
         setupSegmentMetadataForPausedTable(tableConfig, now, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
