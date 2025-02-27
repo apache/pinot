@@ -147,7 +147,7 @@ public class DispatchablePlanContext {
       int planFragmentId = planFragment.getFragmentId();
 
       if (result.containsKey(planFragmentId)) {
-        LOGGER.info("plan fragment {} found twice", planFragmentId);
+        LOGGER.debug("plan fragment {} found twice", planFragmentId);
         continue;
       }
       result.put(planFragmentId, new DispatchablePlanFragment(planFragment));
