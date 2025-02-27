@@ -44,5 +44,4 @@ public interface RetentionStrategy {
    * @return Whether the segment should be purged
    */
   boolean isPurgeable(String segmentName, String tableNameWithType, long endTimeMs);
-
   }
