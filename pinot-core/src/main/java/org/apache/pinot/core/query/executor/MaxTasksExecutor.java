@@ -5,7 +5,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 
-
 /**
  * An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
  */

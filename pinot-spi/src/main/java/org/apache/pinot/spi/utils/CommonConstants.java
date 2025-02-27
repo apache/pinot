@@ -1065,6 +1065,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
 
+    public static final String CONFIG_OF_MSE_THREADS_HARD_LIMIT = "pinot.server.mse.threads.hardLimit";
+    public static final int DEFAULT_MSE_THREADS_HARD_LIMIT = -1; // -1 = no hard limit
+
     // Environment Provider Configs
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =
         "pinot.server.environmentProvider.factory";

@@ -44,6 +44,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.executor.MaxTasksExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -177,6 +178,12 @@ public class QueryRunner {
     _executorService =
         ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
             Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
+
+    int maxThreads = config.getProperty(Server.CONFIG_OF_MSE_THREADS_HARD_LIMIT, Server.DEFAULT_MSE_THREADS_HARD_LIMIT);
+    if (maxThreads > 0) {
+      _executorService = new MaxTasksExecutor(maxThreads, _executorService);
+    }
+
     _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
