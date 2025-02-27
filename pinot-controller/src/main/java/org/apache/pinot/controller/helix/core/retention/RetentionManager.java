@@ -18,18 +18,25 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import javax.validation.constraints.Null;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -39,6 +46,9 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.filesystem.PinotFS;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -47,6 +57,9 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
+import static org.apache.pinot.common.utils.TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
 
 
 /**
@@ -77,6 +90,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return;
     }
 
+    // Did not understand
     // Manage normal table retention except segment lineage cleanup.
     // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
     // whereas the segment lineage cleanup needs to be handled.
@@ -124,8 +138,19 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
+    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+    List<String> segments =
+        segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
     List<String> segmentsToDelete = new ArrayList<>();
-    for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+    try {
+      segmentsToDelete = getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segments);
+    } catch (IOException e) {
+      LOGGER.warn("Unable to fetch segments to be deleted from the deepstore");
+    }
+    // An expensive ZK operation already happens here.
+    // we can reuse this in case we want to rely on the segmentDownloadUrl for any future cleanup
+
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
         segmentsToDelete.add(segmentZKMetadata.getSegmentName());
       }
@@ -136,10 +161,46 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  private List<String> getSegmentsToDeleteFromDeepstore(String offlineTableName, RetentionStrategy retentionStrategy,
+      List<String> segmentZKMetadataList)
+      throws IOException {
+    List<String> segmentsToDelete = new ArrayList<>();
+    String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+    URI plainFileUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
+    List<FileMetadata> deepstoreFileMetadataList = pinotFS.listFilesWithMetadata(plainFileUri, false);
+    for (FileMetadata deepstoreFileMetadata : deepstoreFileMetadataList) {
+      if (!deepstoreFileMetadata.isDirectory()) {
+        String segmentName = extractSegmentName(deepstoreFileMetadata.getFilePath());
+        if (segmentName != null && !segmentZKMetadataList.contains(segmentName)) {
+          if (retentionStrategy.isPurgeable(segmentName, offlineTableName,
+              deepstoreFileMetadata.getLastModifiedTime())) {
+            segmentsToDelete.add(segmentName);
+          }
+        }
+      }
+    }
+    return segmentsToDelete;
+  }
+
+  @Nullable
+  private String extractSegmentName(@Nullable String filePath) {
+    if (Strings.isEmpty(filePath)) {
+      return null;
+    }
+    String segmentName = filePath.substring(filePath.lastIndexOf("/") + 1);
+    if (segmentName.endsWith(TAR_GZ_FILE_EXTENSION)) {
+      segmentName = segmentName.substring(0, segmentName.length() - TAR_COMPRESSED_FILE_EXTENSION.length());
+    }
+    return segmentName;
+  }
+
   private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy) {
     List<String> segmentsToDelete = new ArrayList<>();
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
+    // An expensive ZK operation already happens here.
+    // we can reuse this in case we want to rely on the segmentDownloadUrl for any future cleanup
     for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
