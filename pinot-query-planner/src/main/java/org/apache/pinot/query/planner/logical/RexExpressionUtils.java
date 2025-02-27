@@ -238,16 +238,16 @@ public class RexExpressionUtils {
     // Convert the value to the internal representation of the data type.
     switch (dataType) {
       case INT:
-        value = ((BigDecimal) value).intValue();
+        value = ((Number) value).intValue();
         break;
       case LONG:
-        value = ((BigDecimal) value).longValue();
+        value = ((Number) value).longValue();
         break;
       case FLOAT:
-        value = ((BigDecimal) value).floatValue();
+        value = ((Number) value).floatValue();
         break;
       case DOUBLE:
-        value = ((BigDecimal) value).doubleValue();
+        value = ((Number) value).doubleValue();
         break;
       case BIG_DECIMAL:
         break;

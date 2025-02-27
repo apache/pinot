@@ -35,7 +35,7 @@ import org.apache.pinot.spi.data.Schema;
  * {@link RelDataType} of the table to the planner.
  */
 public class PinotTable extends AbstractTable implements ScannableTable {
-  private Schema _schema;
+  private final Schema _schema;
 
   public PinotTable(Schema schema) {
     _schema = schema;

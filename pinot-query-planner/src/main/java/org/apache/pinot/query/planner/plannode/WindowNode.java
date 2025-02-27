@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.plannode;
 import java.util.List;
 import java.util.Objects;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
@@ -35,11 +36,12 @@ public class WindowNode extends BasePlanNode {
   // Integer.MAX_VALUE represents UNBOUNDED FOLLOWING which is only allowed for the upper bound (ensured by Calcite).
   private final int _lowerBound;
   private final int _upperBound;
+  private final RexWindowExclusion _exclude;
   private final List<RexExpression.Literal> _constants;
 
   public WindowNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls, WindowFrameType windowFrameType,
-      int lowerBound, int upperBound, List<RexExpression.Literal> constants) {
+      int lowerBound, int upperBound, RexWindowExclusion exclude, List<RexExpression.Literal> constants) {
     super(stageId, dataSchema, nodeHint, inputs);
     _keys = keys;
     _collations = collations;
@@ -47,6 +49,7 @@ public class WindowNode extends BasePlanNode {
     _windowFrameType = windowFrameType;
     _lowerBound = lowerBound;
     _upperBound = upperBound;
+    _exclude = exclude;
     _constants = constants;
   }
 
@@ -74,6 +77,10 @@ public class WindowNode extends BasePlanNode {
     return _upperBound;
   }
 
+  public RexWindowExclusion getExclude() {
+    return _exclude;
+  }
+
   public List<RexExpression.Literal> getConstants() {
     return _constants;
   }
@@ -91,7 +98,7 @@ public class WindowNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new WindowNode(_stageId, _dataSchema, _nodeHint, inputs, _keys, _collations, _aggCalls, _windowFrameType,
-        _lowerBound, _upperBound, _constants);
+        _lowerBound, _upperBound, _exclude, _constants);
   }
 
   @Override
@@ -106,15 +113,15 @@ public class WindowNode extends BasePlanNode {
       return false;
     }
     WindowNode that = (WindowNode) o;
-    return _lowerBound == that._lowerBound && _upperBound == that._upperBound && Objects.equals(_aggCalls,
-        that._aggCalls) && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations)
-        && _windowFrameType == that._windowFrameType && Objects.equals(_constants, that._constants);
+    return _lowerBound == that._lowerBound && _upperBound == that._upperBound && _exclude == that._exclude
+        && Objects.equals(_aggCalls, that._aggCalls) && Objects.equals(_keys, that._keys) && Objects.equals(_collations,
+        that._collations) && _windowFrameType == that._windowFrameType && Objects.equals(_constants, that._constants);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _aggCalls, _keys, _collations, _windowFrameType, _lowerBound, _upperBound,
-        _constants);
+        _exclude, _constants);
   }
 
   /**

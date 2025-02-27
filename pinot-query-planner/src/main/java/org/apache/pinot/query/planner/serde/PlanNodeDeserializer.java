@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.proto.Expressions;
 import org.apache.pinot.common.proto.Plan;
@@ -172,7 +173,8 @@ public class PlanNodeDeserializer {
         extractInputs(protoNode), protoWindowNode.getKeysList(), convertCollations(protoWindowNode.getCollationsList()),
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
-        protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+        protoWindowNode.getUpperBound(), convertWindowExclusion(protoWindowNode.getExclude()),
+        convertLiterals(protoWindowNode.getConstantsList()));
   }
 
   private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
@@ -411,6 +413,21 @@ public class PlanNodeDeserializer {
         return WindowNode.WindowFrameType.RANGE;
       default:
         throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+    }
+  }
+
+  private static RexWindowExclusion convertWindowExclusion(Plan.WindowExclusion windowExclusion) {
+    switch (windowExclusion) {
+      case EXCLUDE_NO_OTHER:
+        return RexWindowExclusion.EXCLUDE_NO_OTHER;
+      case EXCLUDE_CURRENT_ROW:
+        return RexWindowExclusion.EXCLUDE_CURRENT_ROW;
+      case EXCLUDE_TIES:
+        return RexWindowExclusion.EXCLUDE_TIES;
+      case EXCLUDE_GROUP:
+        return RexWindowExclusion.EXCLUDE_GROUP;
+      default:
+        throw new IllegalStateException("Unsupported WindowExclusion: " + windowExclusion);
     }
   }
 }

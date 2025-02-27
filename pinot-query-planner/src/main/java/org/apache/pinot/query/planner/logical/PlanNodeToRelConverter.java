@@ -106,9 +106,10 @@ public final class PlanNodeToRelConverter {
         int[] groupKeyArr = node.getGroupKeys().stream().mapToInt(Integer::intValue).toArray();
         RelBuilder.GroupKey groupKey = _builder.groupKey(groupKeyArr);
 
-        List<RelBuilder.AggCall> aggCalls =
-            node.getAggCalls().stream().map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
-                .collect(Collectors.toList());
+        List<RelBuilder.AggCall> aggCalls = node.getAggCalls()
+            .stream()
+            .map(functionCall -> RexExpressionUtils.toAggCall(_builder, functionCall))
+            .collect(Collectors.toList());
 
         _builder.aggregate(groupKey, aggCalls);
       } catch (RuntimeException e) {
@@ -174,8 +175,9 @@ public final class PlanNodeToRelConverter {
 
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
-      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), "MailboxReceive",
-          attributes.build(), node.getDataSchema(), inputs);
+      PinotExplainedRelNode explained =
+          new PinotExplainedRelNode(_builder.getCluster(), "MailboxReceive", attributes.build(), node.getDataSchema(),
+              inputs);
       _builder.push(explained);
       return null;
     }
@@ -222,8 +224,8 @@ public final class PlanNodeToRelConverter {
       List<RelNode> inputs = readAlreadyPushedChildren(node);
 
       String type = node.isSort() ? "PinotLogicalSortExchange" : "PinotLogicalExchange";
-      PinotExplainedRelNode explained = new PinotExplainedRelNode(_builder.getCluster(), type, attributes.build(),
-          node.getDataSchema(), inputs);
+      PinotExplainedRelNode explained =
+          new PinotExplainedRelNode(_builder.getCluster(), type, attributes.build(), node.getDataSchema(), inputs);
       _builder.push(explained);
       return null;
     }
@@ -233,9 +235,10 @@ public final class PlanNodeToRelConverter {
       visitChildren(node);
 
       try {
-        List<RexNode> projects =
-            node.getProjects().stream().map(project -> RexExpressionUtils.toRexNode(_builder, project))
-                .collect(Collectors.toList());
+        List<RexNode> projects = node.getProjects()
+            .stream()
+            .map(project -> RexExpressionUtils.toRexNode(_builder, project))
+            .collect(Collectors.toList());
         _builder.project(projects);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert project node: {}", node, e);
@@ -330,13 +333,13 @@ public final class PlanNodeToRelConverter {
 
         Window.Group group =
             new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
-                orderKeys, aggCalls);
+                node.getExclude(), orderKeys, aggCalls);
 
-        List<RexLiteral> constants =
-            node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
-                .collect(Collectors.toList());
+        List<RexLiteral> constants = node.getConstants()
+            .stream()
+            .map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
+            .collect(Collectors.toList());
         RelDataType rowType = node.getDataSchema().toRelDataType(_builder.getTypeFactory());
-        ;
 
         LogicalWindow window = LogicalWindow.create(RelTraitSet.createEmpty(), input, constants, rowType,
             Collections.singletonList(group));
@@ -398,8 +401,9 @@ public final class PlanNodeToRelConverter {
       try {
         RelOptCluster cluster = _builder.getCluster();
         RelTraitSet empty = RelTraitSet.createEmpty();
-        PinotExplainedRelNode explainedNode = new PinotExplainedRelNode(cluster, empty, node.getTitle(),
-            node.getAttributes(), node.getDataSchema(), inputs);
+        PinotExplainedRelNode explainedNode =
+            new PinotExplainedRelNode(cluster, empty, node.getTitle(), node.getAttributes(), node.getDataSchema(),
+                inputs);
         _builder.push(explainedNode);
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert explained node: {}", node, e);

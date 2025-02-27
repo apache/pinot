@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
@@ -2891,7 +2892,7 @@ public class WindowAggregateOperatorTest {
       WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint) {
     return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema,
         new WindowNode(-1, resultSchema, nodeHint, List.of(), keys, collations, aggCalls, windowFrameType, lowerBound,
-            upperBound, List.of()));
+            upperBound, RexWindowExclusion.EXCLUDE_NO_OTHER, List.of()));
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
