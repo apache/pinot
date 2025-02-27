@@ -220,7 +220,6 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     checkSpoolTimes(parsed, 4, 12, 1);
     checkSpoolTimes(parsed, 4, 18, 1);
     checkSpoolSame(parsed, 4, 3, 7, 9, 12, 18);
-
   }
 
   private List<Map<String, Object>> findDescendantById(DocumentContext stats, int parent, int descendant) {

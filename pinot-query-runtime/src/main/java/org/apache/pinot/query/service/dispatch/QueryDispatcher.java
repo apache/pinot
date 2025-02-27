@@ -253,7 +253,8 @@ public class QueryDispatcher {
 
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
-    Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstancesOut, deadline);
+    Map<DispatchablePlanFragment, StageInfo> stageInfos =
+        serializePlanFragments(stagePlans, serverInstancesOut, deadline);
 
     if (serverInstancesOut.isEmpty()) {
       throw new RuntimeException("No server instances to dispatch query to");
