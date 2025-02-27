@@ -174,13 +174,8 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
-<<<<<<< HEAD
-  public void registerOnMdc() {
-    LoggerConstants.QUERY_ID_KEY.registerOnMdc(String.valueOf(_requestId));
-=======
   public void registerInMdc() {
     LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
   }
 
   public void unregisterFromMdc() {

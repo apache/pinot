@@ -31,8 +31,6 @@ import java.util.stream.Collectors;
 /**
  * DecoratorExecutorService is an abstract class that provides a way to decorate an ExecutorService with additional
  * functionality.
-<<<<<<< HEAD
-=======
  *
  * Specifically, all tasks submitted to the ExecutorService are decorated before they are executed.
  * This allows to add functionality before and after the task is executed without modifying the task itself.
@@ -43,7 +41,6 @@ import java.util.stream.Collectors;
  * decoration process.
  *
  * TODO: Convert this class and its usages into an Executor instead of an ExecutorService
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
  */
 public abstract class DecoratorExecutorService implements ExecutorService {
   private final ExecutorService _executorService;
@@ -52,12 +49,6 @@ public abstract class DecoratorExecutorService implements ExecutorService {
     _executorService = executorService;
   }
 
-<<<<<<< HEAD
-  protected abstract <T> Callable<T> decorate(Callable<T> task);
-
-  protected abstract Runnable decorate(Runnable task);
-
-=======
   /**
    * Decorates the callable task.
    *
@@ -96,7 +87,6 @@ public abstract class DecoratorExecutorService implements ExecutorService {
    * @return
    * @param <T>
    */
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
   protected <T> Collection<? extends Callable<T>> decorateTasks(Collection<? extends Callable<T>> tasks) {
     return tasks.stream().map(this::decorate).collect(Collectors.toList());
   }
@@ -184,11 +174,6 @@ public abstract class DecoratorExecutorService implements ExecutorService {
     public abstract void before();
 
     /**
-<<<<<<< HEAD
-     * Called after the runnable/callable is executed, even if it fails
-     */
-    public abstract void after();
-=======
      * Called after the runnable/callable is executed, only if it was successful
      */
     public abstract void afterSuccess();
@@ -199,18 +184,10 @@ public abstract class DecoratorExecutorService implements ExecutorService {
      * keyword in Java).
      */
     public abstract void afterAnything();
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
 
     @Override
     protected <T> Callable<T> decorate(Callable<T> task) {
       return () -> {
-<<<<<<< HEAD
-        before();
-        try {
-          return task.call();
-        } finally {
-          after();
-=======
         try {
           before();
           T result = task.call();
@@ -218,7 +195,6 @@ public abstract class DecoratorExecutorService implements ExecutorService {
           return result;
         } finally {
           afterAnything();
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
         }
       };
     }
@@ -226,20 +202,12 @@ public abstract class DecoratorExecutorService implements ExecutorService {
     @Override
     protected Runnable decorate(Runnable task) {
       return () -> {
-<<<<<<< HEAD
-        before();
-        try {
-          task.run();
-        } finally {
-          after();
-=======
         try {
           before();
           task.run();
           afterSuccess();
         } finally {
           afterAnything();
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
         }
       };
     }

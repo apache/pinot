@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.spi.trace;
 
-<<<<<<< HEAD
-=======
 import javax.annotation.Nullable;
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
 import org.slf4j.MDC;
 
 
@@ -47,18 +44,6 @@ public enum LoggerConstants {
     return _key;
   }
 
-<<<<<<< HEAD
-  public void registerOnMdc(String value) {
-    registerOnMdcIfNotSet(value, false);
-  }
-
-  public boolean registerOnMdcIfNotSet(String value, boolean override) {
-    if (override && MDC.get(_key) != null) {
-      return false;
-    }
-    MDC.put(_key, value);
-    return true;
-=======
   @Nullable
   public String registerInMdc(String value) {
     return registerInMdc(value, true);
@@ -76,7 +61,6 @@ public enum LoggerConstants {
   @Nullable
   public String registerInMdcIfNotSet(String value) {
     return registerInMdc(value, false);
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
   }
 
   public void unregisterFromMdc() {

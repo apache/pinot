@@ -106,6 +106,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker;
   private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
+  private int _maxThreads;
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
@@ -125,8 +126,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
-        _enablePrefetch);
+    _maxThreads = config.getProperty(Server.CONFIG_OF_MSE_THREADS_HARD_LIMIT, Server.DEFAULT_MSE_THREADS_HARD_LIMIT);
+    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}, maxThreads: {}",
+        _defaultTimeoutMs, _enablePrefetch, _maxThreads);
   }
 
   @Override
@@ -142,38 +144,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-<<<<<<< HEAD
-    MdcQueryExecutor mdcExecutor = new MdcQueryExecutor(executorService) {
-=======
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
-      @Override
-      protected boolean alreadyRegistered() {
-        return LoggerConstants.QUERY_ID_KEY.isRegistered();
-      }
-
-      @Override
-<<<<<<< HEAD
-      protected void registerOnMDC() {
-        queryRequest.registerOnMdc();
-      }
-
-      @Override
-      protected void unregisterFromMDC() {
-=======
-      protected void registerInMdc() {
-        queryRequest.registerInMdc();
-      }
-
-      @Override
-      protected void unregisterFromMdc() {
->>>>>>> ad7780d20e (Implement MdcExecutor to manage MDC context for query execution (#15072))
-        queryRequest.unregisterFromMdc();
-      }
-    };
+    ExecutorService decoratedExecutor = getExecutorService(queryRequest, executorService);
 
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, decoratedExecutor, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -182,10 +156,37 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, decoratedExecutor, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
+  }
+
+  private ExecutorService getExecutorService(ServerQueryRequest queryRequest, ExecutorService executorService) {
+    ExecutorService decoratedExecutor = executorService;
+
+    if (_maxThreads > 0) {
+      decoratedExecutor = new MaxTasksExecutor(_maxThreads, decoratedExecutor);
+    }
+
+    decoratedExecutor = new MdcExecutor(executorService) {
+      @Override
+      protected boolean alreadyRegistered() {
+        return LoggerConstants.QUERY_ID_KEY.isRegistered();
+      }
+
+      @Override
+      protected void registerInMdc() {
+        queryRequest.registerInMdc();
+      }
+
+      @Override
+      protected void unregisterFromMdc() {
+        queryRequest.unregisterFromMdc();
+      }
+    };
+
+    return decoratedExecutor;
   }
 
   private InstanceResponseBlock executeInternal(ServerQueryRequest queryRequest, ExecutorService executorService,
