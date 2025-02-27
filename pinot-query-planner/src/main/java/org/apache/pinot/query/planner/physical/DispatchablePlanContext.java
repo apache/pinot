@@ -146,8 +146,8 @@ public class DispatchablePlanContext {
       PlanFragment planFragment = pendingPlanFragmentIds.poll();
       int planFragmentId = planFragment.getFragmentId();
 
-      if (result.containsKey(planFragmentId)) {
-        LOGGER.debug("plan fragment {} found twice", planFragmentId);
+      if (result.containsKey(planFragmentId)) { // this can happen if some stage is spooled.
+        LOGGER.debug("Skipping already visited stage {}", planFragmentId);
         continue;
       }
       result.put(planFragmentId, new DispatchablePlanFragment(planFragment));
