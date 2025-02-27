@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
@@ -38,7 +37,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -53,7 +51,6 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
   static final int RECORDS_NO = 20;
   static final String I_COL = "i";
   static final String J_COL = "j";
-  static final String RESULT_TABLE = "resultTable";
   static final int SERVERS_NO = 2;
 
   @BeforeClass
@@ -472,8 +469,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode result = postV2Query(sql);
     JsonNode plan = postV2Query(option + " set explainAskingServers=true; explain plan for " + query);
 
-    Assert.assertEquals(toResultStr(result), expectedResult);
-    Assert.assertEquals(toExplainStr(plan), expectedPlan);
+    Assert.assertEquals(ITestUtils.toResultStr(result), expectedResult);
+    Assert.assertEquals(ITestUtils.toExplainStr(plan), expectedPlan);
   }
 
   @Test
@@ -529,7 +526,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     JsonNode result = postV2Query(query);
 
-    String errorMessage = toResultStr(result);
+    String errorMessage = ITestUtils.toResultStr(result);
 
     Assert.assertTrue(errorMessage.startsWith("QueryExecutionError:\n"
             + "Received error query execution result block: {1000=NUM_GROUPS_LIMIT has been reached at "),
@@ -550,73 +547,6 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), true), null,
         getExtraQueryProperties());
-  }
-
-  static @NotNull String toResultStr(JsonNode mainNode) {
-    if (mainNode == null) {
-      return "null";
-    }
-    JsonNode node = mainNode.get(RESULT_TABLE);
-    if (node == null) {
-      return toErrorString(mainNode.get("exceptions"));
-    }
-    return toString(node);
-  }
-
-  static @NotNull String toExplainStr(JsonNode mainNode) {
-    if (mainNode == null) {
-      return "null";
-    }
-    JsonNode node = mainNode.get(RESULT_TABLE);
-    if (node == null) {
-      return toErrorString(mainNode.get("exceptions"));
-    }
-    return toExplainString(node);
-  }
-
-  public static String toErrorString(JsonNode node) {
-    JsonNode jsonNode = node.get(0);
-    if (jsonNode != null) {
-      return jsonNode.get("message").textValue();
-    }
-    return "";
-  }
-
-  public static String toString(JsonNode node) {
-    StringBuilder buf = new StringBuilder();
-    ArrayNode columnNames = (ArrayNode) node.get("dataSchema").get("columnNames");
-    ArrayNode columnTypes = (ArrayNode) node.get("dataSchema").get("columnDataTypes");
-    ArrayNode rows = (ArrayNode) node.get("rows");
-
-    for (int i = 0; i < columnNames.size(); i++) {
-      JsonNode name = columnNames.get(i);
-      JsonNode type = columnTypes.get(i);
-
-      if (i > 0) {
-        buf.append(",\t");
-      }
-
-      buf.append(name).append('[').append(type).append(']');
-    }
-
-    for (int i = 0; i < rows.size(); i++) {
-      ArrayNode row = (ArrayNode) rows.get(i);
-
-      buf.append('\n');
-      for (int j = 0; j < row.size(); j++) {
-        if (j > 0) {
-          buf.append(",\t");
-        }
-
-        buf.append(row.get(j));
-      }
-    }
-
-    return buf.toString();
-  }
-
-  public static String toExplainString(JsonNode node) {
-    return node.get("rows").get(0).get(1).textValue();
   }
 
   @AfterClass
