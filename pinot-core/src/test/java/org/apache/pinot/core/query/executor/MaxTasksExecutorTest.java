@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.executor;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
 import static org.testng.AssertJUnit.*;
@@ -30,17 +31,18 @@ public class MaxTasksExecutorTest {
   private static final int MAX_TASKS = 5;
 
   @Test
-  public void testExecutor()
-      throws Exception {
+  public void testExecutor() {
     MaxTasksExecutor ex = new MaxTasksExecutor(MAX_TASKS, Executors.newCachedThreadPool());
 
     final Semaphore sem1 = new Semaphore(0);
     final Semaphore sem2 = new Semaphore(0);
+    final Semaphore sem3 = new Semaphore(0);
 
     for (int i = 1; i <= MAX_TASKS; i++) {
       ex.execute(() -> {
         sem2.release();
         sem1.acquireUninterruptibly();
+        sem3.release();
       });
     }
 
@@ -54,6 +56,12 @@ public class MaxTasksExecutorTest {
 
     for (int i = MAX_TASKS; i > 0; i--) {
       sem1.release();
+    }
+
+    try {
+      sem3.tryAcquire(MAX_TASKS, 10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      fail("Interrupted waiting for tasks to complete");
     }
 
     try {
