@@ -128,11 +128,14 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
   }
 
   /**
-   * Test a complex with nested spools. Don't try to understand it, just check that the spools are correct.
-   * The test name corresponds to the PR that fixed the issue.
+   * Test a complex with nested spools.
+   *
+   * Don't try to understand the query, just check that the spools are correct.
+   * This query is an actual simplification of a query used in production.
+   * It was the way we detected problems fixed in <a href="https://github.com/apache/pinot/pull/15135">#15135</a>.
    */
   @Test
-  public void test15135()
+  public void testNestedSpools()
       throws Exception {
     JsonNode jsonNode = postQuery("SET useSpools = true;\n"
         + "\n"
@@ -175,7 +178,7 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
         + "         SELECT s.userUUID,\n"
         + "                s.totalTrips,\n"
         + "                (s.totalTrips / o.frequency) AS reach,\n"
-        + "                'Traditional TV + OTT' AS deviceOS\n"
+        + "                'some fake device' AS deviceOS\n"
         + "         FROM q5 s\n"
         + "                  JOIN q3 o ON s.userUUID = o.userUUID\n"
         + "     ),\n"
