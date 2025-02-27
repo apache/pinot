@@ -139,14 +139,19 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
     List<String> segmentsPresentInZK =
         segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+
     List<String> segmentsToDelete = new ArrayList<>();
+
+    // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
+    // SegmentZkMetadata is missing for those segments
     try {
+      LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
+          offlineTableName);
       segmentsToDelete = getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentsPresentInZK);
     } catch (IOException e) {
-      LOGGER.warn("Unable to fetch segments to be deleted from the deepstore");
+      LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
+          offlineTableName);
     }
-    // An expensive ZK operation already happens here.
-    // we can reuse this in case we want to rely on the segmentDownloadUrl for any future cleanup
 
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
@@ -159,12 +164,26 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private List<String> getSegmentsToDeleteFromDeepstore(String offlineTableName, RetentionStrategy retentionStrategy,
+  /**
+   * Identifies segments in deepstore that are ready for deletion based on the retention strategy.
+   *
+   * This method finds segments that are beyond the retention period and are ready to be purged.
+   * It only considers segments that do not have entries in ZooKeeper metadata.
+   * The lastModified time of the file in deepstore is used to determine whether the segment
+   * should be retained or purged.
+   *
+   * @param tableNameWithType   Name of the offline table
+   * @param retentionStrategy  Strategy to determine if a segment should be purged
+   * @param segmentsToExclude  List of segment names that should be excluded from deletion
+   * @return List of segment names that should be deleted from deepstore
+   * @throws IOException If there's an error accessing the filesystem
+   */
+  private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       List<String> segmentsToExclude)
       throws IOException {
 
     List<String> segmentsToDelete = new ArrayList<>();
-    String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
 
@@ -176,13 +195,14 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
 
       String segmentName = extractSegmentName(fileMetadata.getFilePath());
-      if (segmentName == null || segmentsToExclude.contains(segmentName)) {
+      if (Strings.isEmpty(segmentName) || segmentsToExclude.contains(segmentName)) {
         continue;
       }
 
+      // determine whether the segment should be perged or not based on the last modified time of the file
       long lastModifiedTime = fileMetadata.getLastModifiedTime();
 
-      if (retentionStrategy.isPurgeable(segmentName, offlineTableName, lastModifiedTime)) {
+      if (retentionStrategy.isPurgeable(segmentName, tableNameWithType, lastModifiedTime)) {
         segmentsToDelete.add(segmentName);
       }
     }
@@ -203,10 +223,27 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy) {
+    List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    List<String> segmentsPresentInZK =
+        segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+
     List<String> segmentsToDelete = new ArrayList<>();
+
+    // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
+    // SegmentZkMetadata is missing for those segments
+    try {
+      LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
+          realtimeTableName);
+      segmentsToDelete = getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentsPresentInZK);
+    } catch (IOException e) {
+      LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
+          realtimeTableName);
+    }
+
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
-    for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
+
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
