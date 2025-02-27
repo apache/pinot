@@ -447,7 +447,7 @@ public class RetentionManagerTest {
   /**
    * Helper method to set file modification time
    */
-  private void setFileModificationTime(File file, long timestamp){
+  private void setFileModificationTime(File file, long timestamp) {
     FileTime fileTime = FileTime.fromMillis(timestamp);
     try {
       Files.setLastModifiedTime(file.toPath(), fileTime);

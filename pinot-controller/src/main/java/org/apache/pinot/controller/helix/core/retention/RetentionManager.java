@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.validation.constraints.Null;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
@@ -36,6 +35,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -58,8 +58,6 @@ import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
-import static org.apache.pinot.common.utils.TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
 
 
 /**
@@ -198,8 +196,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return null;
     }
     String segmentName = filePath.substring(filePath.lastIndexOf("/") + 1);
-    if (segmentName.endsWith(TAR_GZ_FILE_EXTENSION)) {
-      segmentName = segmentName.substring(0, segmentName.length() - TAR_GZ_FILE_EXTENSION.length());
+    if (segmentName.endsWith(TarCompressionUtils.TAR_GZ_FILE_EXTENSION)) {
+      segmentName = segmentName.substring(0, segmentName.length() - TarCompressionUtils.TAR_GZ_FILE_EXTENSION.length());
     }
     return segmentName;
   }
