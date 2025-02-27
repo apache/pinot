@@ -139,11 +139,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
-    List<String> segments =
+    List<String> segmentsPresentInZK =
         segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
     List<String> segmentsToDelete = new ArrayList<>();
     try {
-      segmentsToDelete = getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segments);
+      segmentsToDelete = getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentsPresentInZK);
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments to be deleted from the deepstore");
     }
@@ -162,24 +162,33 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private List<String> getSegmentsToDeleteFromDeepstore(String offlineTableName, RetentionStrategy retentionStrategy,
-      List<String> segmentZKMetadataList)
+      List<String> segmentsToExclude)
       throws IOException {
+
     List<String> segmentsToDelete = new ArrayList<>();
     String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
-    URI plainFileUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
-    PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
-    List<FileMetadata> deepstoreFileMetadataList = pinotFS.listFilesWithMetadata(plainFileUri, false);
-    for (FileMetadata deepstoreFileMetadata : deepstoreFileMetadataList) {
-      if (!deepstoreFileMetadata.isDirectory()) {
-        String segmentName = extractSegmentName(deepstoreFileMetadata.getFilePath());
-        if (segmentName != null && !segmentZKMetadataList.contains(segmentName)) {
-          if (retentionStrategy.isPurgeable(segmentName, offlineTableName,
-              deepstoreFileMetadata.getLastModifiedTime())) {
-            segmentsToDelete.add(segmentName);
-          }
-        }
+    URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
+
+    List<FileMetadata> deepstoreFiles = pinotFS.listFilesWithMetadata(tableDataUri, false);
+
+    for (FileMetadata fileMetadata : deepstoreFiles) {
+      if (fileMetadata.isDirectory()) {
+        continue;
+      }
+
+      String segmentName = extractSegmentName(fileMetadata.getFilePath());
+      if (segmentName == null || segmentsToExclude.contains(segmentName)) {
+        continue;
+      }
+
+      long lastModifiedTime = fileMetadata.getLastModifiedTime();
+
+      if (retentionStrategy.isPurgeable(segmentName, offlineTableName, lastModifiedTime)) {
+        segmentsToDelete.add(segmentName);
       }
     }
+
     return segmentsToDelete;
   }
 
@@ -199,8 +208,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     List<String> segmentsToDelete = new ArrayList<>();
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
-    // An expensive ZK operation already happens here.
-    // we can reuse this in case we want to rely on the segmentDownloadUrl for any future cleanup
     for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
