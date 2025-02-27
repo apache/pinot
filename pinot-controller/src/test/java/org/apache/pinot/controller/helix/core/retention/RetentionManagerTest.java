@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -42,6 +48,8 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyList;
@@ -56,6 +64,29 @@ public class RetentionManagerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
+
+  // Variables for real file test
+  private Path _tempDir;
+  private File _tableDir;
+
+  @BeforeMethod
+  public void setUp() throws Exception {
+    // Setup for real file test
+    _tempDir = Files.createTempDirectory("pinot-retention-test");
+    _tableDir = new File(_tempDir.toFile(), TEST_TABLE_NAME);
+    _tableDir.mkdirs();
+
+    final long pastMillisSinceEpoch = 1343001600000L;
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+  }
+
+  @AfterMethod
+  public void tearDown() throws Exception {
+    // Clean up the temporary directory after each test
+    if (_tempDir != null) {
+      FileUtils.deleteDirectory(_tempDir.toFile());
+    }
+  }
 
   private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp) {
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
@@ -73,6 +104,34 @@ public class RetentionManagerTest {
           mockSegmentZKMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       segmentsZKMetadata.add(segmentZKMetadata);
     }
+
+    // Create actual segment files with specific modification times
+
+    // 1. A file that should be kept (in ZK metadata)
+    File segment1File = new File(_tableDir, segmentsZKMetadata.get(0).getSegmentName());
+    createFileWithContent(segment1File, "segment1 data");
+    setFileModificationTime(segment1File, timeUnit.toMillis(pastTimeStamp));
+
+
+    // 2. A file that should be kept (in ZK metadata)
+    File segment2File = new File(_tableDir, segmentsZKMetadata.get(10).getSegmentName());
+    createFileWithContent(segment2File, "segment2 data");
+    setFileModificationTime(segment2File, timeUnit.toMillis(pastTimeStamp));
+
+
+    // 3. A file that should be deleted (not in ZK metadata and old)
+    File segment4File = new File(_tableDir, "segment3.tar.gz");
+    createFileWithContent(segment4File, "segment3 data");
+    // Set modification time to dayAfterTomorrow
+    setFileModificationTime(segment4File, timeUnit.toMillis(dayAfterTomorrowTimeStamp));
+
+    // 4. A file that should be kept (not in ZK metadata but recent)
+    File segment5File = new File(_tableDir, "segment4");
+    createFileWithContent(segment5File, "segment4 data");
+    setFileModificationTime(segment5File, timeUnit.toMillis(pastTimeStamp));
+    // add this segment to the removed segment list
+    removedSegments.add("segment4");
+
     final TableConfig tableConfig = createOfflineTableConfig();
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
@@ -81,6 +140,7 @@ public class RetentionManagerTest {
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
@@ -371,5 +431,28 @@ public class RetentionManagerTest {
     when(segmentZKMetadata.getStartTimeMs()).thenReturn(timeUnit.toMillis(startTime));
     when(segmentZKMetadata.getEndTimeMs()).thenReturn(timeUnit.toMillis(endTime));
     return segmentZKMetadata;
+  }
+
+  /**
+   * Helper method to create a file with content
+   */
+  private void createFileWithContent(File file, String content) {
+    try {
+      Files.write(file.toPath(), content.getBytes());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Helper method to set file modification time
+   */
+  private void setFileModificationTime(File file, long timestamp){
+    FileTime fileTime = FileTime.fromMillis(timestamp);
+    try {
+      Files.setLastModifiedTime(file.toPath(), fileTime);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
