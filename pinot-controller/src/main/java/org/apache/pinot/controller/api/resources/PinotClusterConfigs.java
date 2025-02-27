@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -193,11 +194,15 @@ public class PinotClusterConfigs {
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
         .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
     Map<String, String> configs = helixAdmin.getConfig(configScope, GROOVY_STATIC_ANALYZER_CONFIG_LIST);
-    if (configs != null) {
-      return JsonUtils.objectToString(configs);
-    } else {
+    if (configs == null) {
       return null;
     }
+
+    Map<String, GroovyStaticAnalyzerConfig> groovyStaticAnalyzerConfigMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : configs.entrySet()) {
+      groovyStaticAnalyzerConfigMap.put(entry.getKey(), GroovyStaticAnalyzerConfig.fromJson(entry.getValue()));
+    }
+    return JsonUtils.objectToString(groovyStaticAnalyzerConfigMap);
   }
 
   @POST
@@ -253,7 +258,7 @@ public class PinotClusterConfigs {
     return JsonUtils.objectToString(
         Map.of(
             CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG,
-            GroovyStaticAnalyzerConfig.createDefault().toJson())
+            GroovyStaticAnalyzerConfig.createDefault())
     );
   }
 }
