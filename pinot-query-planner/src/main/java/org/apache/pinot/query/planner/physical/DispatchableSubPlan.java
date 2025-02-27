@@ -43,6 +43,10 @@ import org.apache.pinot.core.util.QueryMultiThreadingUtils;
  */
 public class DispatchableSubPlan {
   private final PairList<Integer, String> _queryResultFields;
+
+  /**
+   * Map from stage id to stage plan.
+   */
   private final Map<Integer, DispatchablePlanFragment> _queryStageMap;
   private final Set<String> _tableNames;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
@@ -57,7 +61,7 @@ public class DispatchableSubPlan {
   }
 
   /**
-   * Get the list of stage plan root node.
+   * Get a map from stage id to stage plan.
    * @return stage plan map.
    */
   public Map<Integer, DispatchablePlanFragment> getQueryStageMap() {
