@@ -31,6 +31,7 @@ import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -199,7 +200,7 @@ public class RexExpressionUtils {
     if (rexNode instanceof RexInputRef) {
       return fromRexInputRef((RexInputRef) rexNode);
     } else if (rexNode instanceof RexLiteral) {
-      return fromRexLiteral((RexLiteral) rexNode);
+      return fromRexLiteral((RexLiteral) rexNode, false);
     } else if (rexNode instanceof RexCall) {
       return fromRexCall((RexCall) rexNode);
     } else {
@@ -219,21 +220,7 @@ public class RexExpressionUtils {
     return new RexExpression.InputRef(rexInputRef.getIndex());
   }
 
-  public static RexExpression.Literal fromRexLiteral(RexLiteral rexLiteral) {
-    // TODO: Handle SYMBOL in the planning phase.
-    if (rexLiteral.getTypeName() == SqlTypeName.SYMBOL) {
-      Comparable value = rexLiteral.getValue();
-      assert value instanceof Enum;
-      return new RexExpression.Literal(ColumnDataType.STRING, value.toString());
-    }
-    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
-    if (rexLiteral.isNull()) {
-      return new RexExpression.Literal(dataType, null);
-    } else {
-      return fromRexLiteralValue(dataType, rexLiteral.getValue());
-    }
-  }
-
+  // TODO: Move the usages to {@link #fromRexLiteral(RexLiteral, boolean)}.
   private static RexExpression.Literal fromRexLiteralValue(ColumnDataType dataType, Comparable value) {
     // Convert the value to the internal representation of the data type.
     switch (dataType) {
@@ -275,6 +262,73 @@ public class RexExpressionUtils {
         throw new IllegalStateException("Unsupported ColumnDataType: " + dataType);
     }
     return new RexExpression.Literal(dataType, value);
+  }
+
+  /**
+   * Read more about type mapping <a href="https://calcite.apache.org/docs/reference.html#scalar-types">here</a>.
+   */
+  public static RexExpression.Literal fromRexLiteral(RexLiteral rexLiteral, boolean exact) {
+    RelDataType type = rexLiteral.getType();
+    Preconditions.checkArgument(type.getComponentType() == null, "Unsupported collection type: " + type);
+    Comparable value = rexLiteral.getValue();
+    if (value == null) {
+      return new RexExpression.Literal(ColumnDataType.UNKNOWN, null);
+    }
+    SqlTypeName typeName = rexLiteral.getTypeName();
+    switch (typeName) {
+      case BOOLEAN:
+        return new RexExpression.Literal(ColumnDataType.BOOLEAN,
+            Boolean.TRUE.equals(value) ? BooleanUtils.INTERNAL_TRUE : BooleanUtils.INTERNAL_FALSE);
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+        return new RexExpression.Literal(ColumnDataType.INT, rexLiteral.getValueAs(Integer.class));
+      case BIGINT:
+        return new RexExpression.Literal(ColumnDataType.LONG, rexLiteral.getValueAs(Long.class));
+      case DECIMAL:
+        return fromDecimalLiteral((BigDecimal) value, exact);
+      case REAL:
+        return new RexExpression.Literal(ColumnDataType.FLOAT, rexLiteral.getValueAs(Float.class));
+      // Quirk: In Calcite, FLOAT is a synonym for DOUBLE
+      case FLOAT:
+      case DOUBLE:
+        return new RexExpression.Literal(ColumnDataType.DOUBLE, rexLiteral.getValueAs(Double.class));
+      case DATE:
+      case TIME:
+      case TIMESTAMP:
+        return new RexExpression.Literal(ColumnDataType.TIMESTAMP, ((Calendar) value).getTimeInMillis());
+      case CHAR:
+      case VARCHAR:
+        return new RexExpression.Literal(ColumnDataType.STRING, ((NlsString) value).getValue());
+      case BINARY:
+      case VARBINARY:
+        return new RexExpression.Literal(ColumnDataType.BYTES, new ByteArray(((ByteString) value).getBytes()));
+      case SYMBOL:
+        // TODO: Handle SYMBOL in the planning phase.
+        assert value instanceof Enum;
+        return new RexExpression.Literal(ColumnDataType.STRING, value.toString());
+      default:
+        throw new IllegalArgumentException("Unsupported SqlTypeName: " + typeName);
+    }
+  }
+
+  private static RexExpression.Literal fromDecimalLiteral(BigDecimal value, boolean exact) {
+    if (value.scale() == 0) {
+      long longValue;
+      try {
+        longValue = value.longValueExact();
+      } catch (ArithmeticException e) {
+        // The value is too large to fit in a long, so we need to use BigDecimal
+        return new RexExpression.Literal(ColumnDataType.BIG_DECIMAL, value);
+      }
+      if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
+        return new RexExpression.Literal(ColumnDataType.INT, (int) longValue);
+      } else {
+        return new RexExpression.Literal(ColumnDataType.LONG, longValue);
+      }
+    }
+    return exact ? new RexExpression.Literal(ColumnDataType.BIG_DECIMAL, value)
+        : new RexExpression.Literal(ColumnDataType.DOUBLE, value.doubleValue());
   }
 
   public static RexExpression fromRexCall(RexCall rexCall) {
