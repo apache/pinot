@@ -594,4 +594,17 @@ public class DataFetcher {
       }
     }
   }
+
+  /**
+   * Close the DataFetcher and release all resources (specifically, the ForwardIndexReaderContext off-heap buffers).
+   */
+  public void close() {
+    try {
+      for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
+        columnValueReader.close();
+      }
+    } catch (IOException e) {
+      // do nothing
+    }
+  }
 }
