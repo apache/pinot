@@ -34,6 +34,17 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _dryRun = false;
 
+  // Whether to return only dry-run summary instead of full dry-run output, can only be used in dry-run mode
+  @JsonProperty("summary")
+  @ApiModelProperty(example = "false")
+  private boolean _summary = false;
+
+  // Whether to perform pre-checks for rebalance. This only returns the status of each pre-check and does not fail
+  // rebalance
+  @JsonProperty("preChecks")
+  @ApiModelProperty(example = "false")
+  private boolean _preChecks = false;
+
   // Whether to reassign instances before reassigning segments
   @JsonProperty("reassignInstances")
   @ApiModelProperty(example = "false")
@@ -116,6 +127,22 @@ public class RebalanceConfig {
 
   public void setDryRun(boolean dryRun) {
     _dryRun = dryRun;
+  }
+
+  public boolean isSummary() {
+    return _summary;
+  }
+
+  public void setSummary(boolean summary) {
+    _summary = summary;
+  }
+
+  public boolean isPreChecks() {
+    return _preChecks;
+  }
+
+  public void setPreChecks(boolean preChecks) {
+    _preChecks = preChecks;
   }
 
   public boolean isReassignInstances() {
@@ -232,10 +259,10 @@ public class RebalanceConfig {
 
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
-        + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
-        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
-        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _summary=" + _summary + ", preChecks=" + _preChecks
+        + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _bootstrap="
+        + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas=" + _minAvailableReplicas
+        + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
         + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
         + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
@@ -245,6 +272,8 @@ public class RebalanceConfig {
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
+    rc._summary = cfg._summary;
+    rc._preChecks = cfg._preChecks;
     rc._reassignInstances = cfg._reassignInstances;
     rc._includeConsuming = cfg._includeConsuming;
     rc._bootstrap = cfg._bootstrap;

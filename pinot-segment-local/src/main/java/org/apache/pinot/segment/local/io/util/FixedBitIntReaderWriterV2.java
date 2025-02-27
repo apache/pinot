@@ -25,11 +25,13 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriterV2 implements Closeable {
-  private PinotDataBitSetV2 _dataBitSet;
+  private final PinotDataBitSetV2 _dataBitSet;
 
   public FixedBitIntReaderWriterV2(PinotDataBuffer dataBuffer, int numValues, int numBitsPerValue) {
-    Preconditions
-        .checkState(dataBuffer.size() == (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE));
+    long actualBufferSize = dataBuffer.size();
+    long expectedBufferSize = ((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
+    Preconditions.checkState(actualBufferSize == expectedBufferSize, "Buffer size mismatch: actual: %s, expected: %s",
+        actualBufferSize, expectedBufferSize);
     _dataBitSet = PinotDataBitSetV2.createBitSet(dataBuffer, numBitsPerValue);
   }
 

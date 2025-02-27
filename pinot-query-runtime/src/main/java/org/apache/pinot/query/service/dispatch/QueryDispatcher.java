@@ -55,6 +55,7 @@ import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -104,7 +105,6 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -112,15 +112,14 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
-  @Nullable
   private final FailureDetector _failureDetector;
 
-  public QueryDispatcher(MailboxService mailboxService) {
-    this(mailboxService, null, null, false);
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
+    this(mailboxService, failureDetector, null, false);
   }
 
-  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig,
-      @Nullable FailureDetector failureDetector, boolean enableCancellation) {
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
@@ -218,16 +217,27 @@ public class QueryDispatcher {
     }
   }
 
-  public boolean checkConnectivityToInstance(String instanceId) {
-    String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
-    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+  public FailureDetector.ServerState checkConnectivityToInstance(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    String hostnamePort = String.format("%s_%d", hostname, port);
 
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    // Could occur if the cluster is only serving single-stage queries
     if (client == null) {
-      LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
-      return false;
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", serverInstance.getInstanceId(),
+          connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 
   private boolean isQueryCancellationEnabled() {
@@ -271,9 +281,7 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
-        if (_failureDetector != null) {
-          _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
-        }
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
       }
     }
 
@@ -284,6 +292,12 @@ public class QueryDispatcher {
           dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
+          // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
+          // subsequent query failures
+          if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
+              != ConnectivityState.READY) {
+            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+          }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
               resp.getThrowable());
@@ -433,7 +447,6 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     String hostnamePort = String.format("%s_%d", hostname, port);
-    _instanceIdToHostnamePortMap.put(queryServerInstance.getInstanceId(), hostnamePort);
     return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
@@ -536,7 +549,6 @@ public class QueryDispatcher {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
-    _instanceIdToHostnamePortMap.clear();
     _mailboxService.shutdown();
     _executorService.shutdown();
   }

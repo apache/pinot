@@ -100,7 +100,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
   private final BlockingQueue<BaseResultsBlock> _blockingQueue;
 
-  private Future<Void> _executionFuture;
+  @Nullable
+  private volatile Future<Void> _executionFuture;
   private volatile Map<Integer, String> _exceptions;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
@@ -164,6 +165,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
+    if (_isEarlyTerminated) {
+      return constructMetadataBlock();
+    }
     BaseResultsBlock resultsBlock =
         _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     if (resultsBlock == null) {
@@ -174,11 +178,31 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (exceptions != null) {
       return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
     }
-    if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+    if (resultsBlock == LAST_RESULTS_BLOCK) {
       return constructMetadataBlock();
     } else {
       // Regular data block
       return composeTransferableBlock(resultsBlock, _dataSchema);
+    }
+  }
+
+  @Override
+  protected void earlyTerminate() {
+    super.earlyTerminate();
+    cancelSseTasks();
+  }
+
+  @Override
+  public void cancel(Throwable e) {
+    super.cancel(e);
+    cancelSseTasks();
+  }
+
+  @VisibleForTesting
+  protected void cancelSseTasks() {
+    Future<Void> executionFuture = _executionFuture;
+    if (executionFuture != null) {
+      executionFuture.cancel(true);
     }
   }
 
@@ -433,10 +457,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               mergeExecutionStats(stats);
             }
           } catch (TimeoutException e) {
-            // Cancel all the futures and throw the exception
-            for (Future<?> future : futures) {
-              future.cancel(true);
-            }
             throw new TimeoutException("Timed out waiting for leaf stage to finish");
           } finally {
             for (Future<?> future : futures) {
@@ -478,9 +498,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   @Override
   public void close() {
-    if (_executionFuture != null) {
-      _executionFuture.cancel(true);
-    }
+    cancelSseTasks();
   }
 
   /**
