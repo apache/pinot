@@ -124,8 +124,8 @@ public class QueryRoutingTest {
     queryServer.start();
 
     // OFFLINE only
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -138,8 +138,8 @@ public class QueryRoutingTest {
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // REALTIME only
-    asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
+    asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", null, null, BROKER_REQUEST, ROUTING_TABLE, 1_000L));
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(REALTIME_SERVER_ROUTING_INSTANCE));
@@ -151,9 +151,9 @@ public class QueryRoutingTest {
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
     // Hybrid
-    asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
-            1_000L);
+    asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
+            1_000L));
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -183,8 +183,8 @@ public class QueryRoutingTest {
     queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -221,8 +221,8 @@ public class QueryRoutingTest {
 
     // Send a query with ServerSide exception and check if the latency is set to timeout value.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -267,8 +267,8 @@ public class QueryRoutingTest {
     // Send a query with client side errors.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
 
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -314,8 +314,8 @@ public class QueryRoutingTest {
     // Send a query with multiple exceptions. Make sure that the latency is set to timeout value even if a single
     //server-side exception is seen.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -354,8 +354,8 @@ public class QueryRoutingTest {
 
     // Send a valid query and get latency
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -391,8 +391,8 @@ public class QueryRoutingTest {
     queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -428,8 +428,8 @@ public class QueryRoutingTest {
     queryServer.start();
 
     long startTimeMs = System.currentTimeMillis();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs));
 
     // Shut down the server before getting the response
     queryServer.shutDown();
@@ -451,8 +451,8 @@ public class QueryRoutingTest {
 
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
-    asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+    asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs));
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -505,8 +505,8 @@ public class QueryRoutingTest {
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.compileToBrokerRequest("SET skipUnavailableServers=true; SELECT * FROM testTable");
     long startTime = System.currentTimeMillis();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L));
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(serverRoutingInstance1));
@@ -529,8 +529,8 @@ public class QueryRoutingTest {
     // Submit the same query without skipUnavailableServers, the servers should not return any response
     brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
     startTime = System.currentTimeMillis();
-    asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+    asyncQueryResponse = _queryRouter.submitQuery(
+        new QueryRouteInfo(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L));
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(serverRoutingInstance1));

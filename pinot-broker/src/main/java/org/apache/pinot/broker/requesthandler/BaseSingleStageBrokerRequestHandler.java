@@ -1149,7 +1149,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
     if (brokerResponse.getNumRowsResultSet() == 0) {
-      ParserUtils.fillEmptyResponseSchema(brokerResponse, _tableCache, schema, database, query);
+      boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
+          pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
+      ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
     }
 
     // Set total query processing time

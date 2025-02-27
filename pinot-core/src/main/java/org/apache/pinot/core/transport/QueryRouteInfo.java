@@ -70,6 +70,15 @@ public class QueryRouteInfo {
     _requestContext = requestContext;
   }
 
+  public QueryRouteInfo(long requestId, String rawTableName,
+      BrokerRequest offlineBrokerRequest,
+      Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      BrokerRequest realtimeBrokerRequest,
+      Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
+    this(null, requestId, rawTableName, null, null, null, offlineBrokerRequest, offlineRoutingTable, null,
+        realtimeBrokerRequest, realtimeRoutingTable, 0, timeoutMs, null);
+  }
+
   // Getters and setters for each member variable
   public long getRequestId() {
     return _requestId;
