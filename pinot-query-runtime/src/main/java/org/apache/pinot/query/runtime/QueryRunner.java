@@ -175,13 +175,12 @@ public class QueryRunner {
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
     int hardLimit = ExecutorServiceUtils.getMultiStageExecutorHardLimit(config);
+    String executorType = Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
     if (hardLimit > 0) {
-      _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
-          "query-runner-with-hardlimit-on-" + port, "hardlimit");
-    } else {
-      _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
-          "query-runner-on-" + port, Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
+      executorType = "hardlimit";
     }
+    _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
+          "query-runner-on-" + port, executorType);
 
     _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
