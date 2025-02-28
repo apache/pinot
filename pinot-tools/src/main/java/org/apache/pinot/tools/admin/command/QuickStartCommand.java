@@ -133,7 +133,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       }
     }
     throw new UnsupportedOperationException("Unsupported QuickStart type: " + type + ". "
-        + "Valid types are: " + errroMessageFor(quickStarts));
+        + "Valid types are: " + errorMessageFor(quickStarts));
   }
 
   @Override
@@ -145,7 +145,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       Set<Class<? extends QuickStartBase>> quickStarts = allQuickStarts();
 
       throw new UnsupportedOperationException("No QuickStart type provided. "
-          + "Valid types are: " + errroMessageFor(quickStarts));
+          + "Valid types are: " + errorMessageFor(quickStarts));
     }
 
     QuickStartBase quickstart = selectQuickStart(_type);
@@ -170,7 +170,7 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
     return true;
   }
 
-  private static List<String> errroMessageFor(Set<Class<? extends QuickStartBase>> quickStarts)
+  private static List<String> errorMessageFor(Set<Class<? extends QuickStartBase>> quickStarts)
       throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
     List<String> validTypes = new ArrayList<>();
     for (Class<? extends QuickStartBase> quickStart : quickStarts) {
