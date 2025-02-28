@@ -44,6 +44,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,11 +118,16 @@ public abstract class QueryScheduler {
    * @param queryRequest incoming query request
    * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
-   * should be executed on a different executor service than {@code e} to avoid deadlock.
+   * should be executed on a different executor service than {@code executorService} to avoid deadlock.
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
-    return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
+    return ListenableFutureTask.create(() -> {
+      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
+        queryRequest.registerOnQueryThreadLocal();
+        return processQueryAndSerialize(queryRequest, executorService);
+      }
+    });
   }
 
   /**
@@ -135,7 +141,6 @@ public abstract class QueryScheduler {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
-    queryRequest.registerInMdc();
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());
@@ -180,7 +185,6 @@ public abstract class QueryScheduler {
 
       return responseBytes;
     } finally {
-      queryRequest.unregisterFromMdc();
       Tracing.ThreadAccountantOps.clear();
     }
   }

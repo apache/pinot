@@ -83,9 +83,8 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.trace.LoggerConstants;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -142,25 +141,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
-      @Override
-      protected boolean alreadyRegistered() {
-        return LoggerConstants.QUERY_ID_KEY.isRegistered();
-      }
-
-      @Override
-      protected void registerInMdc() {
-        queryRequest.registerInMdc();
-      }
-
-      @Override
-      protected void unregisterFromMdc() {
-        queryRequest.unregisterFromMdc();
-      }
-    };
+    ExecutorService contextAwareExecutorService = QueryThreadContext.contextAwareExecutorService(executorService);
 
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, contextAwareExecutorService, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -169,7 +153,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, mdcExecutor, streamer);
+      return executeInternal(queryRequest, contextAwareExecutorService, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
