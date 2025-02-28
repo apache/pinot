@@ -76,6 +76,7 @@ public interface BrokerResponse {
   /**
    * Returns the processing exceptions encountered during the query execution.
    */
+  // TODO: Rename this method
   List<BrokerResponseErrorMessage> getExceptions();
 
   @Deprecated
