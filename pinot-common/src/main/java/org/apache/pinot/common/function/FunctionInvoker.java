@@ -116,7 +116,8 @@ public class FunctionInvoker {
       try {
         arguments[i] = parameterType.convert(argument, argumentType);
       } catch (Exception e) {
-        throw QueryErrorCode.QUERY_EXECUTION.asException("Invalid conversion: " + e.getMessage(), e);
+        String errorMsg = "Invalid conversion when calling " + _method + ": " + e.getMessage();
+        throw QueryErrorCode.QUERY_EXECUTION.asException(errorMsg, e);
       }
     }
   }
