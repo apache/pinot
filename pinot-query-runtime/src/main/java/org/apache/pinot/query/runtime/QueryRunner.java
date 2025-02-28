@@ -44,7 +44,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.query.executor.MaxTasksExecutor;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -175,13 +174,13 @@ public class QueryRunner {
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    _executorService =
-        ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
-            Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
-
-    int hardLimit = getMultiStageExecutorHardLimit(config);
+    int hardLimit = ExecutorServiceUtils.getMultiStageExecutorHardLimit(config);
     if (hardLimit > 0) {
-      _executorService = new MaxTasksExecutor(hardLimit, _executorService);
+      _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
+          "query-runner-with-hardlimit-on-" + port, "hardlimit");
+    } else {
+      _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
+          "query-runner-on-" + port, Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService);
@@ -200,11 +199,6 @@ public class QueryRunner {
     }
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
-  }
-
-  private int getMultiStageExecutorHardLimit(PinotConfiguration config) {
-    return config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, 0)
-        * CommonConstants.Helix.MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR;
   }
 
   @VisibleForTesting

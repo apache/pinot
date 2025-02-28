@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.executor;
+package org.apache.pinot.spi.executor;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.spi.executor.DecoratorExecutorService;
+
 
 /**
  * An Executor that allows a maximum of tasks running at the same time, rejecting immediately any excess.
  */
-public class MaxTasksExecutor extends DecoratorExecutorService {
+public class HardLimitExecutor extends DecoratorExecutorService {
 
   private final AtomicInteger _running;
   private final int _max;
 
-  public MaxTasksExecutor(int max, ExecutorService executorService) {
+  public HardLimitExecutor(int max, ExecutorService executorService) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
@@ -39,7 +39,7 @@ public class MaxTasksExecutor extends DecoratorExecutorService {
 
   protected void checkTaskAllowed() {
     if (_running.get() >= _max) {
-      throw new IllegalStateException("Exceeded maximum number of tasks");
+      throw new IllegalStateException("Tasks limit exceeded.");
     }
   }
 

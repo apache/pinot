@@ -83,11 +83,12 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -127,7 +128,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    _maxThreads = getMultiStageExecutorHardLimit(config);
+    _maxThreads = ExecutorServiceUtils.getMultiStageExecutorHardLimit(config);
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}, maxThreads: {}",
         _defaultTimeoutMs, _enablePrefetch, _maxThreads);
   }
@@ -145,10 +146,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    ExecutorService decoratedExecutor = getExecutorService(queryRequest, executorService);
-
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, decoratedExecutor, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -157,7 +156,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, decoratedExecutor, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
@@ -167,7 +166,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     ExecutorService decoratedExecutor = executorService;
 
     if (_maxThreads > 0) {
-      decoratedExecutor = new MaxTasksExecutor(_maxThreads, decoratedExecutor);
+      decoratedExecutor = new HardLimitExecutor(_maxThreads, decoratedExecutor);
     }
 
     decoratedExecutor = new MdcExecutor(decoratedExecutor) {
@@ -821,10 +820,5 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);
     planExecTimer.stopAndRecord();
     return result;
-  }
-
-  private int getMultiStageExecutorHardLimit(PinotConfiguration config) {
-    return config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, 0)
-        * CommonConstants.Helix.MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR;
   }
 }
