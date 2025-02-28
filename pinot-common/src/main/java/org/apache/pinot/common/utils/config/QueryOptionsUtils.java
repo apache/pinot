@@ -367,10 +367,6 @@ public class QueryOptionsUtils {
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
-  public static Boolean isDisableFastFilteredCount(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.DISABLE_FAST_FILTERED_COUNT));
-  }
-
   @Nullable
   private static Integer uncheckedParseInt(String optionName, @Nullable String optionValue) {
     if (optionValue == null) {
