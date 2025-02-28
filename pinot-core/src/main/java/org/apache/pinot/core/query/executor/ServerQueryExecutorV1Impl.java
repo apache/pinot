@@ -169,7 +169,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       decoratedExecutor = new MaxTasksExecutor(_maxThreads, decoratedExecutor);
     }
 
-    decoratedExecutor = new MdcExecutor(executorService) {
+    decoratedExecutor = new MdcExecutor(decoratedExecutor) {
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
@@ -185,7 +185,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         queryRequest.unregisterFromMdc();
       }
     };
-
     return decoratedExecutor;
   }
 

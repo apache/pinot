@@ -44,7 +44,6 @@ public class MaxTasksExecutorTest {
         sem1.acquireUninterruptibly();
         sem3.release();
       });
-      sem2.acquire();
     }
 
     try {
