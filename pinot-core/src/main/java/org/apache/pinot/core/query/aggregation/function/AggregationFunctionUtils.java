@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -285,9 +286,17 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfo(SegmentContext segmentContext, QueryContext queryContext,
       AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
-    BaseProjectOperator<?> projectOperator = null;
-
     // TODO: Create a short-circuit ProjectOperator when filter result is empty
+    AggregationInfo aggregationInfo = buildAggregationInfoWithStarTree(segmentContext, queryContext,
+        aggregationFunctions, filter, filterOperator, predicateEvaluators);
+    return Objects.requireNonNullElseGet(aggregationInfo,
+        () -> buildAggregationInfoWithoutStarTree(segmentContext, queryContext, aggregationFunctions, filterOperator));
+  }
+
+  public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext, QueryContext queryContext,
+      AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    BaseProjectOperator<?> projectOperator = null;
     if (!filterOperator.isResultEmpty()) {
       projectOperator = StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
           aggregationFunctions, filter, predicateEvaluators);
@@ -295,15 +304,19 @@ public class AggregationFunctionUtils {
 
     if (projectOperator != null) {
       return new AggregationInfo(aggregationFunctions, projectOperator, true);
-    } else {
-      Set<ExpressionContext> expressionsToTransform =
-          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
-              queryContext.getGroupByExpressions());
-      projectOperator =
-          new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              filterOperator).run();
-      return new AggregationInfo(aggregationFunctions, projectOperator, false);
     }
+    return null;
+  }
+
+  public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext, QueryContext queryContext,
+      AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator) {
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
+            queryContext.getGroupByExpressions());
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
+    return new AggregationInfo(aggregationFunctions, projectOperator, false);
   }
 
   /**
