@@ -45,7 +45,8 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(actual.getExceptions().get(0).getErrorCode(),
         QueryErrorCode.BROKER_RESOURCE_MISSING.getId());
-    Assert.assertEquals(actual.getExceptions().get(0).getMessage(), "BrokerResourceMissingError");
+    Assert.assertEquals(actual.getExceptions().get(0).getMessage(),
+        QueryErrorCode.BROKER_RESOURCE_MISSING.getDefaultMessage());
   }
 
   @Test
@@ -58,7 +59,8 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(),
         QueryErrorCode.BROKER_RESOURCE_MISSING.getId());
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "BrokerResourceMissingError");
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(),
+        QueryErrorCode.BROKER_RESOURCE_MISSING.getDefaultMessage());
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
   }

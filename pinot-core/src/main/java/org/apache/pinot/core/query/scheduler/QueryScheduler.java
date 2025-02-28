@@ -247,18 +247,18 @@ public abstract class QueryScheduler {
    * query can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
-      QueryErrorCode errorCode, String message) {
+      QueryErrorCode errorCode) {
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-    instanceResponse.addException(errorCode, message);
+    instanceResponse.addException(errorCode, errorCode.getDefaultMessage());
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
   }
 
   protected ListenableFuture<byte[]> shuttingDown(ServerQueryRequest queryRequest) {
-    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_SHUTTING_DOWN, "ServerShuttingDown");
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_SHUTTING_DOWN);
   }
 
   protected ListenableFuture<byte[]> outOfCapacity(ServerQueryRequest queryRequest) {
-    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_OUT_OF_CAPACITY, "ServerOutOfCapacity");
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_OUT_OF_CAPACITY);
   }
 }

@@ -121,12 +121,13 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
-      String errorMessage = "MergeResponseError: responses for table: " + tableName
+      QueryErrorCode errorCode = QueryErrorCode.MERGE_RESPONSE;
+      String errorMessage = errorCode.getDefaultMessage() + ": responses for table: " + tableName
           + " from servers: " + serversWithConflictingDataSchema + " got dropped due to data schema inconsistency.";
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
       brokerResponseNative.addException(
-          new BrokerResponseErrorMessage(QueryErrorCode.MERGE_RESPONSE, errorMessage));
+          new BrokerResponseErrorMessage(errorCode, errorMessage));
     }
 
     // NOTE: When there is no cached data schema, that means all servers encountered exception. In such case, return the

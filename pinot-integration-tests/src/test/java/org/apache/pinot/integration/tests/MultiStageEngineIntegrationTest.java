@@ -1559,7 +1559,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(exIterator.hasNext(), "Expected a timeout exception but did not find one");
     ObjectNode exception = (ObjectNode) exIterator.next();
     assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.BROKER_TIMEOUT.getId());
-    assertEquals(exception.get("message").asText(), "BrokerTimeoutError");
+    assertEquals(exception.get("message").asText(), QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
   }
 
   @Test

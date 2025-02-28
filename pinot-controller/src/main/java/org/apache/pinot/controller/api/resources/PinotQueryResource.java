@@ -288,7 +288,7 @@ public class PinotQueryResource {
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
     if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-      throw QueryErrorCode.ACCESS_DENIED.asException("AccessDenied");
+      throw QueryErrorCode.ACCESS_DENIED.asException();
     }
 
     // Get brokers for the resource table.
@@ -354,7 +354,7 @@ public class PinotQueryResource {
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
     if (instanceConfig == null) {
       LOGGER.error("Instance {} not found", instanceId);
-      throw QueryErrorCode.INTERNAL.asException("InternalError");
+      throw QueryErrorCode.INTERNAL.asException();
     }
 
     String hostName = instanceConfig.getHostName();
