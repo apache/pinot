@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -41,12 +40,6 @@ public interface DataBlock {
   int getNumberOfRows();
 
   int getNumberOfColumns();
-
-  /**
-   * @deprecated Use {@link #addException(int, String)} instead.
-   */
-  @Deprecated
-  void addException(ProcessingException processingException);
 
   void addException(int errCode, String errMsg);
 
