@@ -160,8 +160,8 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
         + _queryContext + ")";
     LOGGER.error(logMsg);
     QueryErrorCode errCode = QueryErrorCode.EXECUTION_TIMEOUT;
-    QueryErrorMessage errMSg = new QueryErrorMessage(errCode, "Timed out while polling results block", logMsg);
-    return new ExceptionResultsBlock(errMSg);
+    QueryErrorMessage errMsg = new QueryErrorMessage(errCode, "Timed out while polling results block", logMsg);
+    return new ExceptionResultsBlock(errMsg);
   }
 
   @Override
