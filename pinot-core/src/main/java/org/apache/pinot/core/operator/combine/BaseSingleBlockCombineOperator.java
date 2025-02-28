@@ -66,7 +66,8 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
       throw new EarlyTerminationException("Interrupted while merging results blocks", e);
     } catch (Exception e) {
       LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
-      mergedBlock = new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, e.getMessage()));
+      mergedBlock = new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL,
+          "Caught exception while merging results blocks: " + e.getMessage()));
     } finally {
       stopProcess();
     }
