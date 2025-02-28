@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,15 +131,5 @@ public class ExecutorServiceUtils {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  /**
-   * Returns the hard limit of the number of threads that can be used by the multi-stage executor.
-   * @param config Pinot configuration
-   * @return hard limit of the number of threads that can be used by the multi-stage executor (no hard limit if <= 0)
-   */
-  public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
-    return config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, 0)
-        * CommonConstants.Helix.MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR;
   }
 }

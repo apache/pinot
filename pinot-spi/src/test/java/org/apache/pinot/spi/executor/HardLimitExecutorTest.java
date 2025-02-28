@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.executor;
 
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.testng.annotations.Test;
 
@@ -28,18 +30,21 @@ import static org.testng.AssertJUnit.fail;
 public class HardLimitExecutorTest {
 
   @Test
-  public void testHardLimit() {
+  public void testHardLimit() throws Exception {
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool());
+    CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {
       ex.execute(() -> {
         try {
+          barrier.await();
           Thread.sleep(Long.MAX_VALUE);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | BrokenBarrierException e) {
           // do nothing
         }
       });
 
+      barrier.await();
       try {
         ex.execute(() -> {
           // do nothing

@@ -159,7 +159,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     };
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -168,7 +168,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }

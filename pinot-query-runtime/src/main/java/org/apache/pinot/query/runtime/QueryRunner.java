@@ -73,6 +73,7 @@ import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -174,13 +175,13 @@ public class QueryRunner {
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    int hardLimit = ExecutorServiceUtils.getMultiStageExecutorHardLimit(config);
-    String executorType = Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
-    if (hardLimit > 0) {
-      executorType = "hardlimit";
-    }
     _executorService = ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
-          "query-runner-on-" + port, executorType);
+          "query-runner-on-" + port, Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
+
+    int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(config);
+    if (hardLimit > 0) {
+      _executorService = new HardLimitExecutor(hardLimit, _executorService);
+    }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);

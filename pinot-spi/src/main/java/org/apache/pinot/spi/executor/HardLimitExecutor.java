@@ -21,6 +21,8 @@ package org.apache.pinot.spi.executor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -35,6 +37,25 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
+  }
+
+  /**
+   * Returns the hard limit of the number of threads that can be used by the multi-stage executor.
+   * @param config Pinot configuration
+   * @return hard limit of the number of threads that can be used by the multi-stage executor (no hard limit if <= 0)
+   */
+  public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
+    try {
+      return Integer.parseInt(config.getProperty(
+          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
+          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
+      )) * Integer.parseInt(config.getProperty(
+          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
+          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
+      ));
+    } catch (NumberFormatException e) {
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS);
+    }
   }
 
   protected void checkTaskAllowed() {
