@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,9 +35,6 @@ import org.roaringbitmap.RoaringBitmap;
  * Data table is used to transfer data from server to broker.
  */
 public interface DataTable {
-
-  @Deprecated
-  void addException(ProcessingException processingException);
 
   void addException(int exceptionCode, String exceptionMsg);
 
