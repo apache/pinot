@@ -59,11 +59,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
-      new BrokerResponseNative(QueryErrorCode.BROKER_RESOURCE_MISSING, "BrokerResourceMissingError");
+      new BrokerResponseNative(QueryErrorCode.BROKER_RESOURCE_MISSING);
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
-      new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST, "TableDoesNotExistError");
+      new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST);
   public static final BrokerResponseNative TABLE_IS_DISABLED =
-      new BrokerResponseNative(QueryErrorCode.TABLE_IS_DISABLED, "TableIsDisabledError");
+      new BrokerResponseNative(QueryErrorCode.TABLE_IS_DISABLED);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
@@ -109,6 +109,10 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public BrokerResponseNative(QueryErrorCode errorCode, String errorMessage) {
     _exceptions.add(new BrokerResponseErrorMessage(errorCode.getId(), errorMessage));
+  }
+
+  public BrokerResponseNative(QueryErrorCode errorCode) {
+    _exceptions.add(new BrokerResponseErrorMessage(errorCode.getId(), errorCode.getDefaultMessage()));
   }
 
   public BrokerResponseNative(QueryErrorMessage errorMsg) {

@@ -224,7 +224,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
                 queryTimer.getRemainingTime());
           } catch (TimeoutException | InterruptedException e) {
             requestContext.setErrorCode(QueryErrorCode.BROKER_TIMEOUT);
-            return new BrokerResponseNative(QueryErrorCode.BROKER_TIMEOUT, "BrokerTimeoutError");
+            return new BrokerResponseNative(QueryErrorCode.BROKER_TIMEOUT);
           }
           break;
       }
@@ -300,12 +300,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
-        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT, "ExecutionTimeoutError");
+        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       }
     } catch (InterruptedException e) {
       LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
-      return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT, "ExecutionTimeoutError");
+      return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
     String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
@@ -326,7 +326,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
         LOGGER.warn("Timed out executing request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
-        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT, "ExecutionTimeoutError");
+        return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       } catch (Throwable t) {
         QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
         if (t instanceof QueryException && ((QueryException) t).getErrorCode() == QueryErrorCode.QUERY_VALIDATION) {
