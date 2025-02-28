@@ -141,8 +141,7 @@ public class HybridQuickstart extends Quickstart {
     printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
     runSampleQueries(runner);
 
-    printStatus(Color.GREEN,
-        String.format("You can always go to http://localhost:%d to play around in the query console",
-            QuickstartRunner.DEFAULT_CONTROLLER_PORT));
+    printStatus(Color.GREEN, "You can always go to http://localhost:" + QuickstartRunner.DEFAULT_CONTROLLER_PORT
+        + " to play around in the query console");
   }
 }

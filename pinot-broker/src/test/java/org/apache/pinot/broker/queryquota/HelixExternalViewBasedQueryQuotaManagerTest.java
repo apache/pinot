@@ -338,7 +338,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   @Test
-  public void tesCreateAndUpdateAppRateLimiterChangesRateLimiterMap() {
+  public void testCreateAndUpdateAppRateLimiterChangesRateLimiterMap() {
     Map<String, Double> apps = new HashMap<>();
     apps.put("app1", null);
     apps.put("app2", 1d);

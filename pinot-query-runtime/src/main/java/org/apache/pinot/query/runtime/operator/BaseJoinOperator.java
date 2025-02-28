@@ -228,6 +228,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
 
   protected abstract List<Object[]> buildNonMatchRightRows();
 
+  // TODO: Optimize this to avoid unnecessary object copy.
   protected Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultColumnSize];
     if (leftRow != null) {

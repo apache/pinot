@@ -122,7 +122,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
     _queryDispatcher =
-        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tlsConfig, failureDetector,
+        new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), failureDetector, tlsConfig,
             this.isQueryCancellationEnabled());
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
@@ -172,8 +172,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
           CommonConstants.Broker.DEFAULT_OF_SPOOLS);
-      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GROUP_TRIM,
-          CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM);
+      boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
+          CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
 
       queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
@@ -551,14 +551,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /**
    * Check if a server that was previously detected as unhealthy is now healthy.
    */
-  public boolean retryUnhealthyServer(String instanceId) {
+  public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    return _queryDispatcher.checkConnectivityToInstance(instanceId);
+    return _queryDispatcher.checkConnectivityToInstance(serverInstance);
   }
 }
