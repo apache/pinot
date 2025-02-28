@@ -544,8 +544,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(
-        String.format("Time out while waiting segments become ONLINE. (tableNameWithType = %s)", tableNameWithType));
+    throw new TimeoutException("Time out while waiting segments become ONLINE. (tableNameWithType = "
+        + tableNameWithType + ")");
   }
 
   @Test(dependsOnMethods = "testRangeIndexTriggering")
@@ -596,8 +596,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // with only one segment being reloaded with force download and dropping the inverted index.
     long tableSizeAfterReloadSegment = getTableSize(getTableName());
     assertTrue(tableSizeAfterReloadSegment > _tableSize && tableSizeAfterReloadSegment < tableSizeWithNewIndex,
-        String.format("Table size: %d should be between %d and %d after dropping inverted index from segment: %s",
-            tableSizeAfterReloadSegment, _tableSize, tableSizeWithNewIndex, segmentName));
+        "Table size: " + tableSizeAfterReloadSegment + " should be between " + _tableSize + " and "
+            + tableSizeWithNewIndex + " after dropping inverted index from segment: " + segmentName);
 
     // Add inverted index back to check if reloading whole table with force download works.
     // Note that because we have force downloaded a segment above, it's important to reset the table state by adding

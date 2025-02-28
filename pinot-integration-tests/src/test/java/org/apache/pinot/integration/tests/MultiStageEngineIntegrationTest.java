@@ -261,7 +261,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
     for (int i = 0; i < numericResultFunctions.length; i++) {
-      String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
+      String pinotQuery = "SELECT " + numericResultFunctions[i] + "(DaysSinceEpoch) FROM mytable";
       JsonNode jsonNode = postQuery(pinotQuery);
       Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
     }
@@ -274,7 +274,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         3904
     };
     for (int i = 0; i < binaryResultFunctions.length; i++) {
-      String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
+      String pinotQuery = "SELECT " + binaryResultFunctions[i] + "(DaysSinceEpoch) FROM mytable";
       JsonNode jsonNode = postQuery(pinotQuery);
       Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
           expectedBinarySizeResults[i]);
