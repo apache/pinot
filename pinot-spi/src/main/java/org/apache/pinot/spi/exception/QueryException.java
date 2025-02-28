@@ -24,10 +24,9 @@ package org.apache.pinot.spi.exception;
  * This exception is captured by the query engine and converted to a user-friendly message in a standardized format
  * (ie converted into a JSON payload in an HTTP response).
  *
- * Contrary to {@code org.apache.pinot.common.response.ProcessingException}, which is usually designed to be thrown by
- * {@code org.apache.pinot.common.exception.QueryException} in a non-allocating, non-throwing and stack-trace-less
- * exception, this exception is designed to be thrown and caught by the query engine as any other standard Java
- * exception.
+ * Contrary to {@code org.apache.pinot.common.response.ProcessingException}, which is static and originally allocated
+ * in a non-throwing and stack-trace-less exception, this exception is designed to be thrown and caught by the query
+ * engine as any other standard Java exception. It also doesn't include any thrift-specific boilerplate.
  */
 public class QueryException extends PinotRuntimeException {
 
