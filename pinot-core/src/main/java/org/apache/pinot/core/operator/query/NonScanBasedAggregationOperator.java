@@ -38,6 +38,7 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLPlusAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountHighCardinalityAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
@@ -111,6 +112,10 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case DISTINCTAVGMV:
           result = getDistinctValueSet(Objects.requireNonNull(dataSource.getDictionary()));
           break;
+        case DISTINCTCOUNTHIGHCARDINALITY:
+          result = ((DistinctCountHighCardinalityAggregationFunction) aggregationFunction).extractAggregationResult(
+              dataSource.getDictionary());
+          break;
         case DISTINCTCOUNTHLL:
         case DISTINCTCOUNTHLLMV:
           result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
@@ -176,7 +181,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
   }
 
-  private static Set getDistinctValueSet(Dictionary dictionary) {
+  public static Set getDistinctValueSet(Dictionary dictionary) {
     int dictionarySize = dictionary.length();
     switch (dictionary.getValueType()) {
       case INT:
