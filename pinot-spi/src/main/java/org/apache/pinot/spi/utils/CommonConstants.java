@@ -1357,6 +1357,7 @@ public class CommonConstants {
     public static class Request {
       public static class MetadataKeys {
         public static final String REQUEST_ID = "requestId";
+        public static final String CORRELATION_ID = "correlationId";
         public static final String BROKER_ID = "brokerId";
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";

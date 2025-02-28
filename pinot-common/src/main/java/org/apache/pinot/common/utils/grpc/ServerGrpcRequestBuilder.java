@@ -34,6 +34,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 public class ServerGrpcRequestBuilder {
   private long _requestId;
+  private long _cid;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
   private boolean _enableStreaming;
@@ -44,6 +45,11 @@ public class ServerGrpcRequestBuilder {
 
   public ServerGrpcRequestBuilder setRequestId(long requestId) {
     _requestId = requestId;
+    return this;
+  }
+
+  public ServerGrpcRequestBuilder setCorrelationId(long cid) {
+    _cid = cid;
     return this;
   }
 
@@ -83,8 +89,10 @@ public class ServerGrpcRequestBuilder {
     Preconditions.checkState(_payloadType != null && CollectionUtils.isNotEmpty(_segments),
         "Query and segmentsToQuery must be set");
 
+    long cid = _cid > 0 ? _cid : _requestId;
     Map<String, String> metadata = new HashMap<>();
     metadata.put(Request.MetadataKeys.REQUEST_ID, Long.toString(_requestId));
+    metadata.put(Request.MetadataKeys.CORRELATION_ID, Long.toString(cid));
     metadata.put(Request.MetadataKeys.BROKER_ID, _brokerId);
     metadata.put(Request.MetadataKeys.ENABLE_TRACE, Boolean.toString(_enableTrace));
     metadata.put(Request.MetadataKeys.ENABLE_STREAMING, Boolean.toString(_enableStreaming));

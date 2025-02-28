@@ -45,6 +45,12 @@ import org.apache.thrift.protocol.TCompactProtocol;
  */
 public class ServerQueryRequest {
   private final long _requestId;
+  /**
+   * The query correlation or client id. See {@link LoggerConstants#CORRELATION_ID_KEY}.
+   *
+   * Defaults to the request id if not set.
+   */
+  private final long _cid;
   private final String _brokerId;
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
@@ -66,6 +72,7 @@ public class ServerQueryRequest {
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
       boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
+    _cid = instanceRequest.getCid() > 0 ? instanceRequest.getCid() : _requestId;
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = enableStreaming;
@@ -83,6 +90,7 @@ public class ServerQueryRequest {
 
     Map<String, String> metadata = serverRequest.getMetadataMap();
     _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
+    _cid = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.CORRELATION_ID, Long.toString(_requestId)));
     _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
     _enableTrace = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_TRACE));
     _enableStreaming = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_STREAMING));
@@ -118,6 +126,7 @@ public class ServerQueryRequest {
 
     // Initialize metadata
     _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
+    _cid = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.CORRELATION_ID, Long.toString(_requestId)));
     _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
     _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
     _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
@@ -175,10 +184,13 @@ public class ServerQueryRequest {
   }
 
   public void registerInMdc() {
+    // notice we are concientiously not registering the query id but the request id here
     LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
+    LoggerConstants.CORRELATION_ID_KEY.registerInMdcIfNotSet(String.valueOf(_cid));
   }
 
   public void unregisterFromMdc() {
     LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
+    LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
   }
 }

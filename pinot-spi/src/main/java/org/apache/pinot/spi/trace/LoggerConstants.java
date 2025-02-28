@@ -24,7 +24,24 @@ import org.slf4j.MDC;
 
 public enum LoggerConstants {
 
+  /**
+   * The query id of the query.
+   *
+   * This value is set by the broker and is kept consistent across all the phases of the query.
+   *
+   * Note: This is usually the same as the request id concept, but in MSE work associated with the same logical query
+   * can have different request ids given the leaf operations use a different id. In SSE, the request is also changes
+   * between the real-time and offline parts (one is the negative of the other). Therefore query id and request id
+   * start to diverge in these cases.
+   */
   QUERY_ID_KEY("pinot.query.id"),
+  /**
+   * The correlation or query id of the query.
+   *
+   * Contrary to {@link #QUERY_ID_KEY}, this key is optionally supplied by the client, who may decide to use the same
+   * value for multiple queries. This is useful for tracking a single logical query across multiple physical queries.
+   */
+  CORRELATION_ID_KEY("pinot.query.cid"),
   /**
    * The MSE worker id of the query.
    */
