@@ -262,7 +262,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
     Set<QueryServerInstance> servers = new HashSet<>();
-    for (DispatchablePlanFragment planFragment: dispatchableSubPlan.getQueryStageList()) {
+    for (DispatchablePlanFragment planFragment: dispatchableSubPlan.getQueryStageMap().values()) {
       servers.addAll(planFragment.getServerInstances());
     }
 
@@ -441,9 +441,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
     try {
-      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+      Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
 
-      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stagePlans, queryStats);
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats

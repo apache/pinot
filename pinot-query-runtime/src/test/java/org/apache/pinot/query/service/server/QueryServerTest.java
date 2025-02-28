@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
@@ -119,10 +120,10 @@ public class QueryServerTest extends QueryTestSet {
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
     DispatchableSubPlan queryPlan = _queryEnvironment.planQuery(sql);
-    List<DispatchablePlanFragment> stagePlans = queryPlan.getQueryStageList();
-    int numStages = stagePlans.size();
+    Set<DispatchablePlanFragment> stagePlans = queryPlan.getQueryStagesWithoutRoot();
     // Ignore reduce stage (stage 0)
-    for (int stageId = 1; stageId < numStages; stageId++) {
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
       // only get one worker request out.
       Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, stageId);
       Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
@@ -131,10 +132,8 @@ public class QueryServerTest extends QueryTestSet {
       Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
       assertTrue(resp.getMetadataMap().containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
 
-      DispatchablePlanFragment dispatchableStagePlan = stagePlans.get(stageId);
-      List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
-      StageMetadata stageMetadata =
-          new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
+      List<WorkerMetadata> workerMetadataList = stagePlan.getWorkerMetadataList();
+      StageMetadata stageMetadata = new StageMetadata(stageId, workerMetadataList, stagePlan.getCustomProperties());
 
       // ensure mock query runner received correctly deserialized payload.
       QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
@@ -143,10 +142,10 @@ public class QueryServerTest extends QueryTestSet {
       // since submitRequest is async, we need to wait for the mockRunner to receive the query payload.
       TestUtils.waitForCondition(aVoid -> {
         try {
-          verify(mockRunner, times(workerMetadataList.size())).processQuery(any(), argThat(stagePlan -> {
-            PlanNode planNode = dispatchableStagePlan.getPlanFragment().getFragmentRoot();
-            return planNode.equals(stagePlan.getRootNode()) && isStageMetadataEqual(stageMetadata,
-                stagePlan.getStageMetadata());
+          verify(mockRunner, times(workerMetadataList.size())).processQuery(any(), argThat(stagePlanArg -> {
+            PlanNode planNode = stagePlan.getPlanFragment().getFragmentRoot();
+            return planNode.equals(stagePlanArg.getRootNode()) && isStageMetadataEqual(stageMetadata,
+                stagePlanArg.getStageMetadata());
           }), argThat(requestMetadataMap -> requestId.equals(
               requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))), any());
           return true;
@@ -206,7 +205,7 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan queryPlan, int stageId) {
-    DispatchablePlanFragment stagePlan = queryPlan.getQueryStageList().get(stageId);
+    DispatchablePlanFragment stagePlan = queryPlan.getQueryStageMap().get(stageId);
     Plan.PlanNode rootNode = PlanNodeSerializer.process(stagePlan.getPlanFragment().getFragmentRoot());
     List<Worker.WorkerMetadata> workerMetadataList =
         QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan.getWorkerMetadataList());

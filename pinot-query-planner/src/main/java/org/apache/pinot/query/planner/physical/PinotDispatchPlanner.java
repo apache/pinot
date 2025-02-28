@@ -100,7 +100,7 @@ public class PinotDispatchPlanner {
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.constructDispatchablePlanFragmentList(subPlanRoot),
+        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
         dispatchablePlanContext.getTableNames(),
         populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
   }

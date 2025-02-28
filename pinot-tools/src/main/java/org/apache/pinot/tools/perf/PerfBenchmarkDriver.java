@@ -321,8 +321,7 @@ public class PerfBenchmarkDriver {
       helixManager.connect();
       return helixManager;
     } catch (Exception e) {
-      String errorMsg =
-          String.format("Exception when connecting the instance %s as Spectator role to Helix.", instanceId);
+      String errorMsg = "Exception when connecting the instance " + instanceId + " as Spectator role to Helix.";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }

@@ -38,6 +38,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -132,13 +133,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
 
     // Submission Stub logic are mimic {@link QueryServer}
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    Set<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStagesWithoutRoot();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
-    for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
-      if (stageId != 0) {
-        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
-            requestMetadataMap));
-      }
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
+      submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
+          requestMetadataMap));
     }
     try {
       CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
@@ -162,7 +162,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
       long requestId, int stageId, Map<String, String> requestMetadataMap) {
-    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(stageId);
+    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageMap().get(stageId);
     List<WorkerMetadata> stageWorkerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
