@@ -247,7 +247,7 @@ public class QueryEnvironment {
               onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
           RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
-              dispatchableSubPlan.getQueryStageList(), nodeTracker, serversExplainer);
+              dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
 
           String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
 
