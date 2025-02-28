@@ -42,6 +42,9 @@ public interface DataBlock {
 
   int getNumberOfColumns();
 
+  /**
+   * @deprecated Use {@link #addException(int, String)} instead.
+   */
   @Deprecated
   void addException(ProcessingException processingException);
 
