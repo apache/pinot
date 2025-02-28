@@ -103,7 +103,8 @@ public class AggregationPlanNode implements PlanNode {
 
     // Priority 1: Check if star-tree based aggregation is feasible
     AggregationInfo aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithStarTree(_segmentContext,
-        _queryContext, aggregationFunctions, _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+        _queryContext, aggregationFunctions, _queryContext.getFilter(), filterOperator,
+        filterPlanNode.getPredicateEvaluators());
     if (aggregationInfo != null) {
       return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
     }
@@ -130,9 +131,8 @@ public class AggregationPlanNode implements PlanNode {
     }
 
     // Default:
-    aggregationInfo =
-        AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext, aggregationFunctions,
-            filterOperator);
+    aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
+        aggregationFunctions, filterOperator);
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 

@@ -293,9 +293,9 @@ public class AggregationFunctionUtils {
         () -> buildAggregationInfoWithoutStarTree(segmentContext, queryContext, aggregationFunctions, filterOperator));
   }
 
-  public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext, QueryContext queryContext,
-      AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+  public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
+      QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
+      BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
     BaseProjectOperator<?> projectOperator = null;
     if (!filterOperator.isResultEmpty()) {
       projectOperator = StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
@@ -308,8 +308,8 @@ public class AggregationFunctionUtils {
     return null;
   }
 
-  public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext, QueryContext queryContext,
-      AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator) {
+  public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
+      QueryContext queryContext, AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator) {
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
             queryContext.getGroupByExpressions());
