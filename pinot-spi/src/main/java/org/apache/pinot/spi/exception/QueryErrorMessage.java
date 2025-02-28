@@ -48,9 +48,9 @@ public class QueryErrorMessage {
 
   @JsonCreator
   public QueryErrorMessage(
-      @JsonProperty("e") QueryErrorCode errCode,
-      @JsonProperty("u") @Nullable String usrMsg,
-      @JsonProperty("l") @Nullable String logMsg) {
+      @JsonProperty("code") QueryErrorCode errCode,
+      @JsonProperty("usr") @Nullable String usrMsg,
+      @JsonProperty("log") @Nullable String logMsg) {
     _errCode = errCode;
     _usrMsg = usrMsg != null ? usrMsg : errCode.getDefaultMessage();
     _logMsg = logMsg != null ? logMsg : errCode.getDefaultMessage();
@@ -65,17 +65,17 @@ public class QueryErrorMessage {
     return new QueryErrorMessage(errorCode, safeMessage, safeMessage);
   }
 
-  @JsonProperty("e")
+  @JsonProperty("code")
   public QueryErrorCode getErrCode() {
     return _errCode;
   }
 
-  @JsonProperty("u")
+  @JsonProperty("usr")
   public String getUsrMsg() {
     return _usrMsg;
   }
 
-  @JsonProperty("l")
+  @JsonProperty("log")
   public String getLogMsg() {
     return _logMsg;
   }
@@ -83,8 +83,8 @@ public class QueryErrorMessage {
   @Override
   public String toString() {
     ObjectNode object = JsonUtils.newObjectNode()
-        .put("e", _errCode.name())
-        .put("logMsg", _logMsg);
+        .put("code", _errCode.name())
+        .put("log", _logMsg);
     try {
       return JsonUtils.objectToString(object);
     } catch (JsonProcessingException e) {
