@@ -199,8 +199,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
                 () -> finalQueryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode),
                 queryTimer.getRemainingTime());
           } catch (TimeoutException | InterruptedException e) {
-            requestContext.setErrorCode(QueryErrorCode.BROKER_TIMEOUT);
-            return new BrokerResponseNative(QueryErrorCode.BROKER_TIMEOUT, "BrokerTimeoutError");
+            QueryErrorCode errorCode = QueryErrorCode.BROKER_TIMEOUT;
+            requestContext.setErrorCode(errorCode);
+            return new BrokerResponseNative(errorCode, errorCode.getDefaultMessage());
           }
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
