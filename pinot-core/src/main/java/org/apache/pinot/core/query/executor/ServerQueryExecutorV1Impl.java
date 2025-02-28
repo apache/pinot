@@ -83,11 +83,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
-import org.apache.pinot.spi.executor.ExecutorServiceUtils;
-import org.apache.pinot.spi.executor.HardLimitExecutor;
-import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -108,7 +104,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker;
   private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
-  private int _maxThreads;
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
@@ -128,9 +123,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    _maxThreads = ExecutorServiceUtils.getMultiStageExecutorHardLimit(config);
-    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}, maxThreads: {}",
-        _defaultTimeoutMs, _enablePrefetch, _maxThreads);
+    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}",
+        _defaultTimeoutMs, _enablePrefetch);
   }
 
   @Override
@@ -160,32 +154,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     } finally {
       Tracing.getTracer().unregister();
     }
-  }
-
-  private ExecutorService getExecutorService(ServerQueryRequest queryRequest, ExecutorService executorService) {
-    ExecutorService decoratedExecutor = executorService;
-
-    if (_maxThreads > 0) {
-      decoratedExecutor = new HardLimitExecutor(_maxThreads, decoratedExecutor);
-    }
-
-    decoratedExecutor = new MdcExecutor(decoratedExecutor) {
-      @Override
-      protected boolean alreadyRegistered() {
-        return LoggerConstants.QUERY_ID_KEY.isRegistered();
-      }
-
-      @Override
-      protected void registerInMdc() {
-        queryRequest.registerInMdc();
-      }
-
-      @Override
-      protected void unregisterFromMdc() {
-        queryRequest.unregisterFromMdc();
-      }
-    };
-    return decoratedExecutor;
   }
 
   private InstanceResponseBlock executeInternal(ServerQueryRequest queryRequest, ExecutorService executorService,
