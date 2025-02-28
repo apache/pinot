@@ -34,6 +34,8 @@ import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingInstanceResponseOperator.class);
 
   private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
   private final ResultsBlockStreamer _streamer;
@@ -94,6 +97,7 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       return new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
     } catch (Exception e) {
       QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, e.getMessage());
+      LOGGER.warn("Caught exception while streaming results", e);
       return new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
     } finally {
       if (_streamingCombineOperator != null) {
