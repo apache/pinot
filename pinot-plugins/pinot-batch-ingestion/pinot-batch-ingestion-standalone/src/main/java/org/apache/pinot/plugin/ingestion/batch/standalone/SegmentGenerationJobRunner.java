@@ -127,7 +127,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
       if (!_outputDirFS.exists(_outputDirURI)) {
         _outputDirFS.mkdir(_outputDirURI);
       } else if (!_outputDirFS.isDirectory(_outputDirURI)) {
-        throw new RuntimeException(String.format("Output Directory URI: %s is not a directory", _outputDirURI));
+        throw new RuntimeException("Output Directory URI: " + _outputDirURI + " is not a directory");
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to validate output 'outputDirURI': " + _outputDirURI, e);
