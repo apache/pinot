@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -94,9 +95,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableSubPlan, boolean shouldRewrite) {
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageMap().size(); stageId++) {
       if (dispatchableSubPlan.getTableNames().size() == 0 && !PlannerUtils.isRootPlanFragment(stageId)) {
-        PlanNode node = dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot();
+        PlanNode node = dispatchableSubPlan.getQueryStageMap().get(stageId).getPlanFragment().getFragmentRoot();
         while (node != null) {
           if (node instanceof JoinNode) {
             // JOIN is exchanged with hash distribution (data shuffle)
@@ -126,11 +127,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryAndAssertStageContentForJoin() {
     String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    Set<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStages();
     int numStages = stagePlans.size();
     assertEquals(numStages, 4);
-    for (int stageId = 0; stageId < numStages; stageId++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
       Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = stagePlan.getServerInstanceToWorkerIdMap();
       int numServers = serverToWorkerIdsMap.size();
       String tableName = stagePlan.getTableName();
@@ -166,9 +167,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query = "SELECT a.col1, a.ts, b.col2, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
         + "WHERE a.col3 >= 0 AND a.col2 IN ('b') AND b.col3 < 0";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    List<DispatchablePlanFragment> intermediateStages =
-        dispatchableSubPlan.getQueryStageList().stream().filter(q -> q.getTableName() == null)
-            .collect(Collectors.toList());
+    List<DispatchablePlanFragment> intermediateStages = dispatchableSubPlan.getQueryStageMap().values().stream()
+        .filter(q -> q.getTableName() == null)
+        .collect(Collectors.toList());
     // Assert that no project of filter node for any intermediate stage because all should've been pushed down.
     for (DispatchablePlanFragment dispatchablePlanFragment : intermediateStages) {
       PlanNode roots = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
@@ -180,25 +181,25 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   public void testQueryRoutingManagerCompilation() {
     String query = "SELECT * FROM d_OFFLINE";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    List<DispatchablePlanFragment> tableScanMetadataList =
-        dispatchableSubPlan.getQueryStageList().stream().filter(stageMetadata -> stageMetadata.getTableName() != null)
-            .collect(Collectors.toList());
+    List<DispatchablePlanFragment> tableScanMetadataList = dispatchableSubPlan.getQueryStageMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getTableName() != null)
+        .collect(Collectors.toList());
     assertEquals(tableScanMetadataList.size(), 1);
     assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
 
     query = "SELECT * FROM d_REALTIME";
     dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList =
-        dispatchableSubPlan.getQueryStageList().stream().filter(stageMetadata -> stageMetadata.getTableName() != null)
-            .collect(Collectors.toList());
+    tableScanMetadataList = dispatchableSubPlan.getQueryStageMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getTableName() != null)
+        .collect(Collectors.toList());
     assertEquals(tableScanMetadataList.size(), 1);
     assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 1);
 
     query = "SELECT * FROM d";
     dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    tableScanMetadataList =
-        dispatchableSubPlan.getQueryStageList().stream().filter(stageMetadata -> stageMetadata.getTableName() != null)
-            .collect(Collectors.toList());
+    tableScanMetadataList = dispatchableSubPlan.getQueryStageMap().values().stream()
+        .filter(stageMetadata -> stageMetadata.getTableName() != null)
+        .collect(Collectors.toList());
     assertEquals(tableScanMetadataList.size(), 1);
     assertEquals(tableScanMetadataList.get(0).getServerInstanceToWorkerIdMap().size(), 2);
   }
@@ -260,11 +261,11 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String query =
         "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM b GROUP BY col1";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    Set<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStages();
     int numStages = stagePlans.size();
     assertEquals(numStages, 2);
-    for (int stageId = 0; stageId < numStages; stageId++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
+    for (DispatchablePlanFragment stagePlan : stagePlans) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
       Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = stagePlan.getServerInstanceToWorkerIdMap();
       int numServers = serverToWorkerIdsMap.size();
       String tableName = stagePlan.getTableName();
