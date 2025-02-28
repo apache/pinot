@@ -731,7 +731,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         BrokerResponseErrorMessage firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"
             : "1 exception found";
-        LOGGER.info("No server found for request {}: {}. {}", requestId, query, logTail, firstErrorMsg);
+        LOGGER.info("No server found for request {}: {}. {} {}", requestId, query, logTail, firstErrorMsg);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
         return BrokerResponseNative.fromBrokerErrors(errorMsgs);
       } else {
