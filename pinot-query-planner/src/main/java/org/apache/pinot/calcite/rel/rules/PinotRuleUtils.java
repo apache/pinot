@@ -46,10 +46,12 @@ public class PinotRuleUtils {
   public static final RelBuilderFactory PINOT_REL_FACTORY =
       RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, PINOT_REL_CONFIG));
 
-  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG =
-      SqlToRelConverter.config().withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
-          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE)
-          .withRelBuilderFactory(PINOT_REL_FACTORY);
+  public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG = SqlToRelConverter.config()
+      .withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
+      .withTrimUnusedFields(true)
+      .withExpand(true)
+      .withInSubQueryThreshold(0)
+      .withRelBuilderFactory(PINOT_REL_FACTORY);
 
   public static RelNode unboxRel(RelNode rel) {
     if (rel instanceof HepRelVertex) {

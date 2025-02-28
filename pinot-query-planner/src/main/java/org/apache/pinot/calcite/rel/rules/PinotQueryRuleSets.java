@@ -91,7 +91,11 @@ public class PinotQueryRuleSets {
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
-      CoreRules.AGGREGATE_CASE_TO_FILTER
+      CoreRules.AGGREGATE_CASE_TO_FILTER,
+
+      // Convert IN and NOT IN back to their original form
+      PinotSemiJoinToInClauseRule.INSTANCE,
+      PinotLeftJoinToNotInClauseRule.INSTANCE
   );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
