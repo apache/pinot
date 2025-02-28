@@ -22,7 +22,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * A number of functions used for testing, e.g. crashes during query compilation or processing.
+ * A number  of functions used for testing, e.g. crashes during query compilation or processing.
  * They're not meant for production use.
  */
 public class TestFunctions {
