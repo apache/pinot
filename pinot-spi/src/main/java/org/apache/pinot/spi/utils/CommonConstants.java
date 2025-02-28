@@ -248,6 +248,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =
         "pinot.beta.multistage.engine.max.server.query.threads";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS = "-1";
+    public static final int MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR = 4;
 
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
@@ -1064,9 +1065,6 @@ public class CommonConstants {
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
 
     public static final String CONFIG_OF_CURRENT_DATA_TABLE_VERSION = "pinot.server.instance.currentDataTableVersion";
-
-    public static final String CONFIG_OF_MSE_THREADS_HARD_LIMIT = "pinot.server.mse.threads.hardLimit";
-    public static final int DEFAULT_MSE_THREADS_HARD_LIMIT = -1; // -1 = no hard limit
 
     // Environment Provider Configs
     public static final String PREFIX_OF_CONFIG_OF_ENVIRONMENT_PROVIDER_FACTORY =

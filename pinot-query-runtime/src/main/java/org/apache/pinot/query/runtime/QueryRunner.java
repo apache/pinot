@@ -179,9 +179,9 @@ public class QueryRunner {
         ExecutorServiceUtils.create(config, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
             Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
 
-    int maxThreads = config.getProperty(Server.CONFIG_OF_MSE_THREADS_HARD_LIMIT, Server.DEFAULT_MSE_THREADS_HARD_LIMIT);
-    if (maxThreads > 0) {
-      _executorService = new MaxTasksExecutor(maxThreads, _executorService);
+    int hardLimit = getMultiStageExecutorHardLimit(config);
+    if (hardLimit > 0) {
+      _executorService = new MaxTasksExecutor(hardLimit, _executorService);
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService);
@@ -200,6 +200,11 @@ public class QueryRunner {
     }
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
+  }
+
+  private int getMultiStageExecutorHardLimit(PinotConfiguration config) {
+    return config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, 0)
+        * CommonConstants.Helix.MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR;
   }
 
   @VisibleForTesting

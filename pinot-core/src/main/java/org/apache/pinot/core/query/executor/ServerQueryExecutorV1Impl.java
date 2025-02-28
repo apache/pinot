@@ -87,6 +87,7 @@ import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -126,7 +127,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    _maxThreads = config.getProperty(Server.CONFIG_OF_MSE_THREADS_HARD_LIMIT, Server.DEFAULT_MSE_THREADS_HARD_LIMIT);
+    _maxThreads = getMultiStageExecutorHardLimit(config);
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}, maxThreads: {}",
         _defaultTimeoutMs, _enablePrefetch, _maxThreads);
   }
@@ -820,5 +821,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);
     planExecTimer.stopAndRecord();
     return result;
+  }
+
+  private int getMultiStageExecutorHardLimit(PinotConfiguration config) {
+    return config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, 0)
+        * CommonConstants.Helix.MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS_HARDLIMIT_FACTOR;
   }
 }
