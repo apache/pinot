@@ -105,9 +105,15 @@ public interface ExplainIntegrationTestTrait {
   default void explainAskingServers(@Language("sql") String query, String expected) {
     try {
       JsonNode jsonNode = postQuery("set explainAskingServers=true; explain plan for " + query);
-      JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+      JsonNode resultTable = jsonNode.get("resultTable");
 
-      Assert.assertEquals(plan.asText(), expected);
+      if (resultTable != null) {
+        JsonNode plan = resultTable.get("rows").get(0).get(1);
+        Assert.assertEquals(plan.asText(), expected);
+      } else {
+        String error = ITestUtils.toErrorString(jsonNode);
+        Assert.assertEquals(error, expected);
+      }
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {

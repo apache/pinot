@@ -147,10 +147,8 @@ public class QueryDispatcher {
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
-    } catch (Throwable e) {
-      // TODO: Consider always cancel when it returns (early terminate)
+    } finally {
       cancel(requestId, servers);
-      throw e;
     }
   }
 
