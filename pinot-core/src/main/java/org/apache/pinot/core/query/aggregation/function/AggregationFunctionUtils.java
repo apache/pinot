@@ -41,7 +41,6 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -142,10 +141,10 @@ public class AggregationFunctionUtils {
 
   /**
    * Reads the intermediate result from the {@link DataTable}.
-   *
-   * TODO: Move ser/de into AggregationFunction interface
    */
-  public static Object getIntermediateResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
+  @Nullable
+  public static Object getIntermediateResult(AggregationFunction aggregationFunction, DataTable dataTable,
+      ColumnDataType columnDataType, int rowId, int colId) {
     switch (columnDataType.getStoredType()) {
       case INT:
         return dataTable.getInt(rowId, colId);
@@ -155,7 +154,7 @@ public class AggregationFunctionUtils {
         return dataTable.getDouble(rowId, colId);
       case OBJECT:
         CustomObject customObject = dataTable.getCustomObject(rowId, colId);
-        return customObject != null ? ObjectSerDeUtils.deserialize(customObject) : null;
+        return customObject != null ? aggregationFunction.deserializeIntermediateResult(customObject) : null;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
     }
