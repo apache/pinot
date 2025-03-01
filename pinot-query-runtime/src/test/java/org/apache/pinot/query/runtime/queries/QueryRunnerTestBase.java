@@ -41,12 +41,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -66,6 +66,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -141,9 +142,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     try {
       CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException e) {
+      throw QueryErrorCode.BROKER_TIMEOUT.asException("Error occurred during stage submission: Timeout");
     } catch (Exception e) {
       // wrap and throw the exception here is for assert purpose on dispatch-time error
-      throw new RuntimeException("Error occurred during stage submission: " + QueryException.getTruncatedStackTrace(e));
+      throw new RuntimeException("Error occurred during stage submission: " + e.getMessage(), e);
     } finally {
       // Cancel all ongoing submission
       for (CompletableFuture<?> future : submissionStubs) {

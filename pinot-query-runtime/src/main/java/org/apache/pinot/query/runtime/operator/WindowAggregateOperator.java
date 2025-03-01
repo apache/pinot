@@ -28,8 +28,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -44,6 +42,7 @@ import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,8 +199,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
-      throws ProcessingException {
+  protected TransferableBlock getNextBlock() {
     if (_hasReturnedWindowAggregateBlock) {
       return _eosBlock;
     }
@@ -211,20 +209,16 @@ public class WindowAggregateOperator extends MultiStageOperator {
   /**
    * @return the final block, which must be either an end of stream or an error.
    */
-  private TransferableBlock computeBlocks()
-      throws ProcessingException {
+  private TransferableBlock computeBlocks() {
     TransferableBlock block = _input.nextBlock();
     while (block.isDataBlock()) {
       List<Object[]> container = block.getContainer();
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
         if (_windowOverflowMode == WindowOverFlowMode.THROW) {
-          ProcessingException resourceLimitExceededException =
-              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-          resourceLimitExceededException.setMessage(
+          throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
               "Cannot build in memory window cache for WINDOW operator, reach number of rows limit: "
                   + _maxRowsInWindowCache);
-          throw resourceLimitExceededException;
         } else {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInWindowCache - _numRows;

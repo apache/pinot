@@ -388,6 +388,7 @@ public abstract class BaseDataBlock implements DataBlock {
   }
 
   @Override
+  @Deprecated
   public void addException(ProcessingException processingException) {
     _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
   }
