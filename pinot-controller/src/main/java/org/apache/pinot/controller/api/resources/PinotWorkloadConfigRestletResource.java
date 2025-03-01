@@ -97,11 +97,14 @@ public class PinotWorkloadConfigRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_WORKLOAD_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update workload config", notes = "Update workload config for the workload name")
-  public void updateWorkloadConfig(String requestString, @Context HttpHeaders httpHeaders) {
+  public Response updateWorkloadConfig(String requestString, @Context HttpHeaders httpHeaders) {
     try {
       WorkloadConfig workloadConfig = JsonUtils.stringToObject(requestString, WorkloadConfig.class);
-      LOGGER.info("Received request to update workload config for workload: {}", workloadConfig.getWorkloadName());
       _pinotHelixResourceManager.setWorkloadConfig(workloadConfig);
+      String successMessage = String.format("Workload config updated successfully for workload: %s",
+          workloadConfig.getWorkloadName());
+      LOGGER.info(successMessage);
+      return Response.ok().entity(successMessage).build();
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating workload config for request: {}", requestString, e);
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -114,10 +117,12 @@ public class PinotWorkloadConfigRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_WORKLOAD_CONFIG)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete workload config", notes = "Delete workload config for the workload name")
-  public void deleteWorkloadConfig(@PathParam("workloadName") String workloadName, @Context HttpHeaders httpHeaders) {
+  public Response deleteWorkloadConfig(@PathParam("workloadName") String workloadName, @Context HttpHeaders httpHeaders) {
     try {
-      LOGGER.info("Received request to delete workload config for workload: {}", workloadName);
       _pinotHelixResourceManager.deleteWorkloadConfig(workloadName);
+      String successMessage = String.format("Workload config deleted successfully for workload: %s", workloadName);
+      LOGGER.info(successMessage);
+      return Response.ok().entity(successMessage).build();
     } catch (Exception e) {
       LOGGER.error("Caught exception while deleting workload config for workload: {}", workloadName, e);
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);

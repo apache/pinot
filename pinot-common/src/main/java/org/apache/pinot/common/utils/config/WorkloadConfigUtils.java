@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.WorkloadConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class WorkloadConfigUtils {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private WorkloadConfigUtils() {
   }
 
@@ -40,9 +38,11 @@ public class WorkloadConfigUtils {
   public static WorkloadConfig fromZNRecord(ZNRecord znRecord) throws Exception {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
     String workloadId = znRecord.getId();
-    String enforcementProfileJson = znRecord.getSimpleField("enforcementProfile");
-    Preconditions.checkArgument(enforcementProfileJson != null, "enforcementProfile field is missing");
-    EnforcementProfile enforcementProfile = OBJECT_MAPPER.readValue(enforcementProfileJson, EnforcementProfile.class);
+
+    String enforcementProfileStringJson = znRecord.getSimpleField("enforcementProfile");
+    Preconditions.checkArgument(enforcementProfileStringJson != null, "enforcementProfile field is missing");
+
+    EnforcementProfile enforcementProfile = JsonUtils.stringToObject(enforcementProfileStringJson, EnforcementProfile.class);
     return new WorkloadConfig(workloadId, enforcementProfile);
   }
 
@@ -52,11 +52,12 @@ public class WorkloadConfigUtils {
    * @param workloadConfig The WorkloadConfig object to convert.
    * @param znRecord The ZNRecord to update.
    */
-  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, WorkloadConfig workloadConfig)
-      throws Exception {
+  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, WorkloadConfig workloadConfig) {
     Preconditions.checkNotNull(workloadConfig, "WorkloadConfig cannot be null");
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    String enforcementProfileJson = OBJECT_MAPPER.writeValueAsString(workloadConfig.getEnforcementProfile());
-    znRecord.setSimpleField("enforcementProfile", enforcementProfileJson);
+    Preconditions.checkNotNull(workloadConfig.getEnforcementProfile(), "EnforcementProfile cannot be null");
+
+    String enforcementProfileStringJson = workloadConfig.getEnforcementProfile().toJsonString();
+    znRecord.setSimpleField("enforcementProfile", enforcementProfileStringJson);
   }
 }

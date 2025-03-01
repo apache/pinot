@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -31,7 +30,6 @@ import org.testng.annotations.Test;
 
 
 public class WorkloadConfigUtilsTest {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test(dataProvider = "fromZNRecordDataProvider")
   public void testFromZNRecord(ZNRecord znRecord, WorkloadConfig expectedWorkloadConfig, boolean shouldFail) {
@@ -58,7 +56,7 @@ public class WorkloadConfigUtilsTest {
 
     // Valid case
     ZNRecord validZnRecord = new ZNRecord("workloadId");
-    validZnRecord.setSimpleField("enforcementProfile", convertToJson(validEnforcementProfile));
+    validZnRecord.setSimpleField("enforcementProfile", validEnforcementProfile.toJsonString());
     data.add(new Object[]{validZnRecord, validWorkloadConfig, false});
 
     // Case: Missing `enforcementProfile`
@@ -77,39 +75,78 @@ public class WorkloadConfigUtilsTest {
     ZNRecord emptyZnRecord = new ZNRecord("");
     data.add(new Object[]{emptyZnRecord, null, true});
 
-    // Case: Negative workload costs
-    WorkloadCost negativeWorkloadCost = new WorkloadCost(-100.0, -200.0);
-    EnforcementProfile negativeEnforcementProfile = new EnforcementProfile(negativeWorkloadCost, negativeWorkloadCost);
-    WorkloadConfig negativeWorkloadConfig = new WorkloadConfig("negativeWorkload", negativeEnforcementProfile);
-
-    ZNRecord negativeZnRecord = new ZNRecord("negativeWorkload");
-    negativeZnRecord.setSimpleField("enforcementProfile", convertToJson(negativeEnforcementProfile));
-    data.add(new Object[]{negativeZnRecord, negativeWorkloadConfig, false});
-
     // Case: Zero workload costs
     WorkloadCost zeroWorkloadCost = new WorkloadCost(0.0, 0.0);
     EnforcementProfile zeroEnforcementProfile = new EnforcementProfile(zeroWorkloadCost, zeroWorkloadCost);
     WorkloadConfig zeroWorkloadConfig = new WorkloadConfig("zeroWorkload", zeroEnforcementProfile);
 
     ZNRecord zeroZnRecord = new ZNRecord("zeroWorkload");
-    zeroZnRecord.setSimpleField("enforcementProfile", convertToJson(zeroEnforcementProfile));
+    zeroZnRecord.setSimpleField("enforcementProfile", zeroEnforcementProfile.toJsonString());
     data.add(new Object[]{zeroZnRecord, zeroWorkloadConfig, false});
 
     // Case: Unexpected additional fields
     ZNRecord extraFieldsRecord = new ZNRecord("workloadId");
-    extraFieldsRecord.setSimpleField("enforcementProfile", convertToJson(validEnforcementProfile));
+    extraFieldsRecord.setSimpleField("enforcementProfile", validEnforcementProfile.toJsonString());
     extraFieldsRecord.setSimpleField("extraField", "extraValue");
     data.add(new Object[]{extraFieldsRecord, validWorkloadConfig, false});
 
     return data.toArray(new Object[0][]);
   }
 
-  private static String convertToJson(EnforcementProfile enforcementProfile) {
+  @Test(dataProvider = "updateZNRecordDataProvider")
+  public void testUpdateZNRecordWithWorkloadConfig(WorkloadConfig workloadConfig, ZNRecord znRecord,
+      ZNRecord expectedZnRecord, boolean shouldFail) {
     try {
-      return OBJECT_MAPPER.writeValueAsString(enforcementProfile);
+      WorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, workloadConfig);
+      if (shouldFail) {
+        Assert.fail("Expected an exception but none was thrown");
+      }
+      Assert.assertEquals(znRecord, expectedZnRecord);
     } catch (Exception e) {
-      Assert.fail("Caught exception while converting enforcementProfile to JSON", e);
-      return null;
+      if (!shouldFail) {
+        Assert.fail("Caught unexpected exception: " + e.getMessage(), e);
+      }
     }
+  }
+
+  @DataProvider(name = "updateZNRecordDataProvider")
+  public Object[][] updateZNRecordDataProvider() {
+    List<Object[]> data = new ArrayList<>();
+
+    // Valid WorkloadConfig with positive workload costs
+    WorkloadCost validWorkloadCost = new WorkloadCost(100.0, 200.0);
+    EnforcementProfile validEnforcementProfile = new EnforcementProfile(validWorkloadCost, validWorkloadCost);
+    WorkloadConfig validWorkloadConfig = new WorkloadConfig("workloadId", validEnforcementProfile);
+
+    ZNRecord validZnRecord = new ZNRecord("workloadId");
+    ZNRecord expectedValidZnRecord = new ZNRecord("workloadId");
+    expectedValidZnRecord.setSimpleField("enforcementProfile", validEnforcementProfile.toJsonString());
+
+    data.add(new Object[]{validWorkloadConfig, validZnRecord, expectedValidZnRecord, false}); // should not fail
+
+    // Case: WorkloadConfig with zero workload costs
+    WorkloadCost zeroWorkloadCost = new WorkloadCost(0.0, 0.0);
+    EnforcementProfile zeroEnforcementProfile = new EnforcementProfile(zeroWorkloadCost, zeroWorkloadCost);
+    WorkloadConfig zeroWorkloadConfig = new WorkloadConfig("zeroWorkload", zeroEnforcementProfile);
+
+    ZNRecord zeroZnRecord = new ZNRecord("zeroWorkload");
+    ZNRecord expectedZeroZnRecord = new ZNRecord("zeroWorkload");
+    expectedZeroZnRecord.setSimpleField("enforcementProfile", zeroEnforcementProfile.toJsonString());
+
+    data.add(new Object[]{zeroWorkloadConfig, zeroZnRecord, expectedZeroZnRecord, false}); // should not fail
+
+    // Case: Null WorkloadConfig (should fail)
+    ZNRecord znRecordWithNullWorkload = new ZNRecord("nullWorkload");
+    data.add(new Object[]{null, znRecordWithNullWorkload, null, true}); // should fail
+
+    // Case: Null ZNRecord (should fail)
+    data.add(new Object[]{validWorkloadConfig, null, null, true}); // should fail
+
+    // Case: Empty WorkloadConfig
+    WorkloadConfig emptyWorkloadConfig = new WorkloadConfig("emptyWorkload", null);
+    ZNRecord emptyZnRecord = new ZNRecord("emptyWorkload");
+    data.add(new Object[]{emptyWorkloadConfig, emptyZnRecord, null, true}); // should fail
+
+    return data.toArray(new Object[0][]);
   }
 }

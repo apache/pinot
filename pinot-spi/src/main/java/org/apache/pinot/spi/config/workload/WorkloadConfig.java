@@ -21,9 +21,7 @@ package org.apache.pinot.spi.config.workload;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class WorkloadConfig extends BaseJsonConfig {
@@ -58,14 +56,5 @@ public class WorkloadConfig extends BaseJsonConfig {
 
   public void setEnforcementProfile(EnforcementProfile enforcementProfile) {
     _enforcementProfile = enforcementProfile;
-  }
-
-  @Override
-  public String toJsonString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
   }
 }
