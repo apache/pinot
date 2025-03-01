@@ -99,6 +99,9 @@ public class Actions {
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
     public static final String GET_RESPONSE_STORE = "GetResponseStore";
     public static final String DELETE_RESPONSE_STORE = "DeleteResponseStore";
+    public static final String GET_WORKLOAD_CONFIG = "GetWorkloadConfig";
+    public static final String UPDATE_WORKLOAD_CONFIG = "UpdateWorkloadConfig";
+    public static final String DELETE_WORKLOAD_CONFIG = "DeleteWorkloadConfig";
   }
 
   // Action names for table
