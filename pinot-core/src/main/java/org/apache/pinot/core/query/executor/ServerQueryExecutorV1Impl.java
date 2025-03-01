@@ -125,8 +125,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
-        _enablePrefetch);
+    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}",
+        _defaultTimeoutMs, _enablePrefetch);
   }
 
   @Override
@@ -142,7 +142,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+      MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
       @Override
       protected boolean alreadyRegistered() {
         return LoggerConstants.QUERY_ID_KEY.isRegistered();
@@ -158,7 +158,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         queryRequest.unregisterFromMdc();
       }
     };
-
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, mdcExecutor, streamer);
     }
