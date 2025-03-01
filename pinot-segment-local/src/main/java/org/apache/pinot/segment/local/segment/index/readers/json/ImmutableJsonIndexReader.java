@@ -98,7 +98,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   public ImmutableJsonIndexReader(PinotDataBuffer dataBuffer, int numDocs) {
     _numDocs = numDocs;
     _version = dataBuffer.getInt(0);
-    Preconditions.checkState(_version == BaseJsonIndexCreator.VERSION_1 || _version == BaseJsonIndexCreator.VERSION_2,
+    Preconditions.checkState(_version <= BaseJsonIndexCreator.VERSION_3,
         "Unsupported json index version: %s", _version);
 
     int maxValueLength = dataBuffer.getInt(4);
@@ -115,8 +115,54 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     _invertedIndex = new BitmapInvertedIndexReader(
         dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());
     long docIdMappingEndOffset = invertedIndexEndOffset + docIdMappingLength;
-    _numFlattenedDocs = (docIdMappingLength / Integer.BYTES);
     _docIdMapping = dataBuffer.view(invertedIndexEndOffset, docIdMappingEndOffset, ByteOrder.LITTLE_ENDIAN);
+    if (_version <= BaseJsonIndexCreator.VERSION_2) {
+      _numFlattenedDocs = (docIdMappingLength / Integer.BYTES);
+    } else {
+      _numFlattenedDocs = _docIdMapping.getInt(_numDocs * Integer.BYTES) - 1;
+    }
+  }
+
+  public MutableRoaringBitmap getMatchingDocIds(String filterString, String countPredicate) {
+    if (countPredicate == null) {
+      return getMatchingDocIds(filterString);
+    }
+    FilterContext filter;
+    Map<Integer, Integer> docMatchCountMap = new HashMap<>();
+    try {
+      filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      Preconditions.checkArgument(!filter.isConstant());
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+    }
+    FlattenedDocIdToDocIdProvider provider = getFlattenedDocIdToDocIdProvider();
+
+    if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+      //TODO: need to handle this separately
+      // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
+      // to get the correct result, and it cannot be nested
+      ImmutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      matchingFlattenedDocIds.forEach(
+          (IntConsumer) flattenedDocId -> matchingDocIds.add(provider.getDocId(flattenedDocId)));
+      matchingDocIds.flip(0, _numDocs);
+      return matchingDocIds;
+    } else {
+      int threshold = Integer.parseInt(countPredicate);
+      ImmutableRoaringBitmap matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+      for (int flattenedDocId : matchingFlattenedDocIds) {
+        int docId = provider.getDocId(flattenedDocId);
+        docMatchCountMap.merge(docId, 1, Integer::sum);
+      }
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      for (int docId : docMatchCountMap.keySet()) {
+        int count = docMatchCountMap.get(docId);
+        if (count >= threshold) {
+          matchingDocIds.add(docId);
+        }
+      }
+      return matchingDocIds;
+    }
   }
 
   @Override
@@ -128,21 +174,45 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
+    FlattenedDocIdToDocIdProvider provider = getFlattenedDocIdToDocIdProvider();
 
     if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
       // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
       // to get the correct result, and it cannot be nested
       ImmutableRoaringBitmap flattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
-      MutableRoaringBitmap resultDocIds = new MutableRoaringBitmap();
-      flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(getDocId(flattenedDocId)));
+      MutableRoaringBitmap resultDocIds;
+      if (provider instanceof V1V2FlattenedDocIdToDocIdProvider) {
+        resultDocIds = new MutableRoaringBitmap();
+        flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(provider.getDocId(flattenedDocId)));
+      } else {
+        resultDocIds = setResultDocIds(flattenedDocIds, provider);
+      }
       resultDocIds.flip(0, _numDocs);
       return resultDocIds;
     } else {
       ImmutableRoaringBitmap flattenedDocIds = getMatchingFlattenedDocIds(filter);
-      MutableRoaringBitmap resultDocIds = new MutableRoaringBitmap();
-      flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(getDocId(flattenedDocId)));
+      MutableRoaringBitmap resultDocIds;
+      if (provider instanceof V1V2FlattenedDocIdToDocIdProvider) {
+        resultDocIds = new MutableRoaringBitmap();
+        flattenedDocIds.forEach((IntConsumer) flattenedDocId -> resultDocIds.add(provider.getDocId(flattenedDocId)));
+      } else {
+        resultDocIds = setResultDocIds(flattenedDocIds, provider);
+      }
       return resultDocIds;
     }
+  }
+
+  private MutableRoaringBitmap setResultDocIds(ImmutableRoaringBitmap flattenedDocIds,
+      FlattenedDocIdToDocIdProvider provider) {
+    MutableRoaringBitmap resultDocIds = new MutableRoaringBitmap();
+    long flattenedDocId = flattenedDocIds.nextValue(0);
+    int docId = provider.getDocId((int) flattenedDocId);
+    while (flattenedDocId >= 0 && docId >= 0) {
+      resultDocIds.add(docId);
+      flattenedDocId = flattenedDocIds.nextValue((int) provider.getFlattenedDocId(docId + 1));
+      docId = provider.getDocId((int) flattenedDocId);
+    }
+    return resultDocIds;
   }
 
   /**
@@ -272,7 +342,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     // Support 2 formats:
     // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
     // - Legacy format (e.g. "a[1].b"='abc')
-    if (_version == BaseJsonIndexCreator.VERSION_2) {
+    if (_version >= BaseJsonIndexCreator.VERSION_2) {
       if (key.startsWith("$")) {
         key = key.substring(1);
       } else {
@@ -501,16 +571,27 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  private int getDocId(int flattenedDocId) {
-    return _docIdMapping.getInt((long) flattenedDocId << 2);
-  }
-
   public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
+    FlattenedDocIdToDocIdProvider provider = getFlattenedDocIdToDocIdProvider();
     valueToFlattenedDocIds.replaceAll((key, value) -> {
       RoaringBitmap docIds = new RoaringBitmap();
-      value.forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
+      value.forEach((IntConsumer) flattenedDocId -> docIds.add(provider.getDocId(flattenedDocId)));
       return docIds;
     });
+  }
+
+  private FlattenedDocIdToDocIdProvider getFlattenedDocIdToDocIdProvider() {
+    FlattenedDocIdToDocIdProvider provider;
+    if (_version <= BaseJsonIndexCreator.VERSION_2) {
+      provider = new V1V2FlattenedDocIdToDocIdProvider(getDocIdMapping());
+    } else {
+      provider = new V3FlattenedDocIdToDocIdProvider(_docIdMapping, (int) _numDocs);
+    }
+    return provider;
+  }
+
+  private PinotDataBuffer getDocIdMapping() {
+    return _docIdMapping;
   }
 
   @Override
@@ -585,6 +666,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   @Override
   public String[][] getValuesMV(int[] docIds, int length,
       Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+    FlattenedDocIdToDocIdProvider provider = getFlattenedDocIdToDocIdProvider();
+
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
     for (int i = 0; i < length; i++) {
@@ -600,7 +683,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       String value = entry.getKey();
       RoaringBitmap matchingFlattenedDocIds = entry.getValue();
       matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
-        int docId = getDocId(flattenedDocId);
+        int docId = provider.getDocId(flattenedDocId);
         if (docIdToPos.containsKey(docId)) {
           docIdToFlattenedDocIdsAndValues.get(docIdToPos.get(docId)).add(Pair.of(value, flattenedDocId));
         }
@@ -622,6 +705,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   @Override
   public String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingDocs,
       boolean isFlattenedDocIds) {
+    FlattenedDocIdToDocIdProvider provider = getFlattenedDocIdToDocIdProvider();
+
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
 
@@ -630,7 +715,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       RoaringBitmap matchingDocIds = entry.getValue();
       if (isFlattenedDocIds) {
         matchingDocIds.forEach((IntConsumer) flattenedDocId -> {
-          int docId = getDocId(flattenedDocId);
+          int docId = provider.getDocId(flattenedDocId);
           if (docIdMask.contains(docId)) {
             docIdToValues.put(docId, value);
           }
@@ -685,7 +770,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   private Pair<String, ImmutableRoaringBitmap> getKeyAndFlattenedDocIds(String key) {
     ImmutableRoaringBitmap matchingDocIds = null;
 
-    if (_version == BaseJsonIndexCreator.VERSION_2) {
+    if (_version >= BaseJsonIndexCreator.VERSION_2) {
       // Process the array index within the key if exists
       // E.g. "[*]"=1 -> "."='1'
       // E.g. "[0]"=1 -> ".$index"='0' && "."='1'
@@ -706,7 +791,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           // "[0]"=1 -> ".$index"='0' && "."='1'
           // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
           String searchKey =
-                  leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -738,7 +823,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
           // "foo[1].bar"='abc' -> "foo.$index"=1 && "foo.bar"='abc'
           String searchKey =
-                  leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -767,5 +852,70 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
+  }
+
+  interface FlattenedDocIdToDocIdProvider {
+    int getDocId(int flattenedDocId);
+
+    long getFlattenedDocId(int docId);
+  }
+
+  static class V1V2FlattenedDocIdToDocIdProvider implements FlattenedDocIdToDocIdProvider {
+    private final PinotDataBuffer _docIdMappingBuffer;
+
+    public V1V2FlattenedDocIdToDocIdProvider(PinotDataBuffer docIdMappingBuffer) {
+      _docIdMappingBuffer = docIdMappingBuffer;
+    }
+
+    public int getDocId(int flattenedDocId) {
+      return _docIdMappingBuffer.getInt(flattenedDocId << 2);
+    }
+
+    @Override
+    public long getFlattenedDocId(int docId) {
+      throw new RuntimeException("Not supported for V1/V2 index");
+    }
+  }
+
+  static class V3FlattenedDocIdToDocIdProvider implements FlattenedDocIdToDocIdProvider {
+    private final PinotDataBuffer _docIdMappingBuffer;
+    private final int _numDocs;
+    private final int _numFlattenedDocs;
+
+    public V3FlattenedDocIdToDocIdProvider(PinotDataBuffer docIdMappingBuffer, int numDocs) {
+      _docIdMappingBuffer = docIdMappingBuffer;
+      _numDocs = numDocs;
+      _numFlattenedDocs = docIdMappingBuffer.getInt(_numDocs * 4) - 1;
+    }
+
+    public int getDocId(int target) {
+      if (target < 0 || target > _numFlattenedDocs) {
+        return -1;
+      }
+      int left = 0;
+      int right = _numDocs - 1;
+      int result = -1;
+
+      while (left <= right) {
+        int mid = left + (right - left) / 2;
+
+        int midValue = _docIdMappingBuffer.getInt(mid * 4);
+        if (midValue == target) {
+          result = mid;       // Record last occurrence of target
+          left = mid + 1;     // Continue searching right
+        } else if (midValue < target) {
+          result = mid;       // Update floor candidate
+          left = mid + 1;     // Search right for better floor
+        } else {
+          right = mid - 1;    // Search left
+        }
+      }
+      return result;
+    }
+
+    @Override
+    public long getFlattenedDocId(int docId) {
+      return _docIdMappingBuffer.getInt(4 * docId);
+    }
   }
 }

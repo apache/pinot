@@ -287,8 +287,14 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
     assertEquals(getSelectedIds("'\"$.country\" < ''Romania'' '"), Set.of(25, 26, 27));
   }
 
-  protected Set<Integer> getSelectedIds(String jsonMatchExpression) {
-    String query = String.format("SELECT id FROM testTable WHERE JSON_MATCH(json, %s) LIMIT 100", jsonMatchExpression);
+  private Set<Integer> getSelectedIds(String jsonMatchExpression, String countPredicateExpression) {
+    String query;
+    if (countPredicateExpression != null) {
+      query = String.format("SELECT id FROM testTable WHERE JSON_MATCH(json, %s, %s) LIMIT 100", jsonMatchExpression,
+          countPredicateExpression);
+    } else {
+      query = String.format("SELECT id FROM testTable WHERE JSON_MATCH(json, %s) LIMIT 100", jsonMatchExpression);
+    }
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     List<Object[]> rows = brokerResponse.getResultTable().getRows();
     Set<Integer> selectedIds = new TreeSet<>();
@@ -296,6 +302,10 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
       selectedIds.add((Integer) row[0]);
     }
     return selectedIds;
+  }
+
+  public Set<Integer> getSelectedIds(String jsonMatchExpression) {
+    return getSelectedIds(jsonMatchExpression, null);
   }
 
   @AfterClass
