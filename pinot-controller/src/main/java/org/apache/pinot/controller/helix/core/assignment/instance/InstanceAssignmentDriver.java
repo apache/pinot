@@ -55,40 +55,64 @@ public class InstanceAssignmentDriver {
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
+    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions, false);
+  }
+
+  public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
+      List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
+      boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
     return getInstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
-        assignmentConfig, instanceConfigs, existingInstancePartitions, null);
+        assignmentConfig, instanceConfigs, existingInstancePartitions, null, forceMinimizeDataMovement);
   }
 
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
       @Nullable InstancePartitions preConfiguredInstancePartitions) {
+    return assignInstances(instancePartitionsType, instanceConfigs, existingInstancePartitions,
+        preConfiguredInstancePartitions, false);
+  }
+
+  public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
+      List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions,
+      @Nullable InstancePartitions preConfiguredInstancePartitions, boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
     return getInstancePartitions(
         instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
-        assignmentConfig, instanceConfigs, existingInstancePartitions, preConfiguredInstancePartitions);
+        assignmentConfig, instanceConfigs, existingInstancePartitions, preConfiguredInstancePartitions,
+        forceMinimizeDataMovement);
   }
 
   public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
+    return assignInstances(tierName, instanceConfigs, existingInstancePartitions, instanceAssignmentConfig, false);
+  }
+
+  public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig,
+      boolean forceMinimizeDataMovement) {
     return getInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableConfig.getTableName(), tierName),
-        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions, null);
+        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions, null, forceMinimizeDataMovement);
   }
 
   private InstancePartitions getInstancePartitions(String instancePartitionsName,
       InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions,
-      @Nullable InstancePartitions preConfiguredInstancePartitions) {
+      @Nullable InstancePartitions preConfiguredInstancePartitions, boolean forceMinimizeDataMovement) {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting {} instance assignment for table {}", instancePartitionsName, tableNameWithType);
 
-    boolean minimizeDataMovement = instanceAssignmentConfig.isMinimizeDataMovement();
+    // minimizeDataMovement might be set back to false within InstanceTagPoolSelector and InstancePartitionSelector
+    // if existingInstancePartitions is null.
+    boolean minimizeDataMovement = forceMinimizeDataMovement || instanceAssignmentConfig.isMinimizeDataMovement();
+    LOGGER.info("Starting {} instance assignment for table {}, instanceAssignmentConfig.isMinimizeDataMovement()={}, "
+        + "forceMinimizeDataMovement={}", instancePartitionsName, tableNameWithType,
+        instanceAssignmentConfig.isMinimizeDataMovement(), forceMinimizeDataMovement);
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);

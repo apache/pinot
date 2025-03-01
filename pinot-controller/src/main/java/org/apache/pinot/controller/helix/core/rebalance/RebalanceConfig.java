@@ -88,6 +88,13 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
 
+  // Whether to enforce Minimal Data Movement Algorithm (only effective if instance assignment config is set, and if
+  // bootstrap is false). If set to false, the minimizeDataMovement flag in the table config will be used to determine
+  // whether to run the Minimal Data Movement Algorithm.
+  @JsonProperty("minimizeDataMovement")
+  @ApiModelProperty(example = "false")
+  private boolean _minimizeDataMovement = false;
+
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
   // check less frequently and bail out sooner to rebalance at best effort if configured so.
@@ -256,6 +263,10 @@ public class RebalanceConfig {
   public void setRetryInitialDelayInMs(long retryInitialDelayInMs) {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
+
+  public boolean isMinimizeDataMovement() { return _minimizeDataMovement; }
+
+  public void setMinimizeDataMovement(boolean minimizeDataMovement) { _minimizeDataMovement = minimizeDataMovement; }
 
   @Override
   public String toString() {
