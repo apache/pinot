@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class QueryCancelledException extends RuntimeException {
+public class QueryCancelledException extends PinotRuntimeException {
   public QueryCancelledException(String message) {
     super(message);
   }
