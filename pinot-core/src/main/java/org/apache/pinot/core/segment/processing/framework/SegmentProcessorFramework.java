@@ -43,6 +43,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,9 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
+  public static final String MAP_STAGE = "MAP";
+  public static final String REDUCE_STAGE = "REDUCE";
+  public static final String GENERATE_STAGE = "GENERATE_SEGMENT";
 
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final List<RecordTransformer> _customRecordTransformers;
@@ -157,9 +161,9 @@ public class SegmentProcessorFramework {
     int numRecordReaders = _recordReaderFileConfigs.size();
     int nextRecordReaderIndexToBeProcessed = 0;
     int iterationCount = 1;
-    Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     boolean isMapperOutputSizeThresholdEnabled =
         _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE;
+    String logMessage;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
@@ -168,34 +172,42 @@ public class SegmentProcessorFramework {
 
       // Log start of iteration details only if intermediate file size threshold is set.
       if (isMapperOutputSizeThresholdEnabled) {
-        String logMessage =
+        logMessage =
             String.format("Starting iteration %d with %d record readers. Starting index = %d, end index = %d",
                 iterationCount,
                 _recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders).size(),
                 nextRecordReaderIndexToBeProcessed + 1, numRecordReaders);
         LOGGER.info(logMessage);
-        observer.accept(logMessage);
+        logToObserver(MAP_STAGE, logMessage);
       }
 
       // Map phase.
       long mapStartTimeInMs = System.currentTimeMillis();
+      logToObserver(MAP_STAGE, "Starting Map phase for iteration " + iterationCount);
       Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
 
       // Log the time taken to map.
-      LOGGER.info("Finished iteration {} in {}ms", iterationCount, System.currentTimeMillis() - mapStartTimeInMs);
+      logMessage = "Finished Map phase for iteration " + iterationCount + " in "
+          + (System.currentTimeMillis() - mapStartTimeInMs) + "ms";
+      LOGGER.info(logMessage);
+      logToObserver(MAP_STAGE, logMessage);
 
       // Check for mapper output files, if no files are generated, skip the reducer phase and move on to the next
       // iteration.
       if (partitionToFileManagerMap.isEmpty()) {
-        LOGGER.info("No mapper output files generated, skipping reduce phase");
+        logMessage = "No mapper output files generated, skipping reduce phase";
+        LOGGER.info(logMessage);
+        logToObserver(MAP_STAGE, logMessage);
         nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
         continue;
       }
 
       // Reduce phase.
+      logToObserver(REDUCE_STAGE, "Starting Reduce phase for iteration " + iterationCount);
       doReduce(partitionToFileManagerMap);
 
       // Segment creation phase. Add the created segments to the final list.
+      logToObserver(GENERATE_STAGE, "Generating segments for iteration " + iterationCount);
       outputSegmentDirs.addAll(generateSegment(partitionToFileManagerMap));
 
       // Store the starting index of the record readers that were processed in this iteration for logging purposes.
@@ -213,7 +225,6 @@ public class SegmentProcessorFramework {
 
         // We are sure that the last RecordReader is completely processed in the last iteration else it may or may not
         // have completed processing. Log it accordingly.
-        String logMessage;
         if (nextRecordReaderIndexToBeProcessed == numRecordReaders) {
           logMessage = String.format("Finished processing all of %d RecordReaders", numRecordReaders);
         } else {
@@ -222,14 +233,20 @@ public class SegmentProcessorFramework {
                   + "iteration %d", startingProcessedRecordReaderIndex + 1, boundaryIndexToLog,
               nextRecordReaderIndexToBeProcessed + 1, numRecordReaders, iterationCount);
         }
-
-        observer.accept(logMessage);
         LOGGER.info(logMessage);
+        logToObserver(GENERATE_STAGE, logMessage);
       }
-
       iterationCount++;
     }
     return outputSegmentDirs;
+  }
+
+  private void logToObserver(String stage, String logMessage) {
+    _segmentProcessorConfig.getProgressObserver()
+        .accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withStage(stage)
+            .withStatus(logMessage)
+            .build());
   }
 
   protected SegmentMapper getSegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs) {
