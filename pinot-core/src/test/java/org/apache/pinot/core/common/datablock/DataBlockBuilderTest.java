@@ -106,11 +106,6 @@ public class DataBlockBuilderTest {
           result.add(new Object[]{BigDecimal.valueOf(r.nextInt())});
         }
         break;
-      case OBJECT:
-        for (int i = 0; i < numRows; i++) {
-          result.add(new Object[]{r.nextLong()}); // longs are valid object types
-        }
-        break;
       case MAP:
         for (int i = 0; i < numRows; i++) {
           Map<String, String> map = new HashMap<>();
@@ -146,6 +141,7 @@ public class DataBlockBuilderTest {
         }
         break;
       case BYTES_ARRAY:
+      case OBJECT:
       case UNKNOWN:
         throw new SkipException(type + " not supported yet");
       default:
@@ -218,11 +214,6 @@ public class DataBlockBuilderTest {
           result[i] = BigDecimal.valueOf(r.nextInt());
         }
         break;
-      case OBJECT:
-        for (int i = 0; i < numRows; i++) {
-          result[i] = r.nextLong(); // longs are valid object types
-        }
-        break;
       case INT_ARRAY:
         for (int i = 0; i < numRows; i++) {
           result[i] = new int[]{r.nextInt(), r.nextInt()};
@@ -249,6 +240,7 @@ public class DataBlockBuilderTest {
         }
         break;
       case BYTES_ARRAY:
+      case OBJECT:
       case UNKNOWN:
         throw new SkipException(type + " not supported yet");
       default:

@@ -34,6 +34,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -157,7 +158,6 @@ public class DataTableSerDeTest {
 
   private void testEmptyValues(DataSchema dataSchema, int numRows, Object[] emptyValues)
       throws IOException {
-
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     for (int rowId = 0; rowId < numRows; rowId++) {
       dataTableBuilder.startRow();
@@ -178,7 +178,7 @@ public class DataTableSerDeTest {
         } else if (emptyValue instanceof ByteArray) {
           dataTableBuilder.setColumn(columnId, (ByteArray) emptyValue);
         } else {
-          dataTableBuilder.setColumn(columnId, emptyValue);
+          Assert.fail();
         }
       }
       dataTableBuilder.finishRow();
@@ -368,8 +368,15 @@ public class DataTableSerDeTest {
             break;
           // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
           case OBJECT:
-            OBJECTS[rowId] = isNull ? null : RANDOM.nextDouble();
-            dataTableBuilder.setColumn(colId, OBJECTS[rowId]);
+            if (isNull) {
+              dataTableBuilder.setNull(colId);
+            } else {
+              double value = RANDOM.nextDouble();
+              OBJECTS[rowId] = value;
+              dataTableBuilder.setColumn(colId,
+                  new AggregationFunction.SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Double.getValue(),
+                      ObjectSerDeUtils.DOUBLE_SER_DE.serialize(value)));
+            }
             break;
           case INT_ARRAY:
             int length = RANDOM.nextInt(20);
@@ -446,7 +453,7 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, map);
             break;
           case UNKNOWN:
-            dataTableBuilder.setColumn(colId, (Object) null);
+            dataTableBuilder.setNull(colId);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);

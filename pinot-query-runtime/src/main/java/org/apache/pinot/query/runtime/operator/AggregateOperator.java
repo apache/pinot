@@ -64,7 +64,6 @@ import org.slf4j.LoggerFactory;
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
 public class AggregateOperator extends MultiStageOperator {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
@@ -72,6 +71,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   private final MultiStageOperator _input;
   private final DataSchema _resultSchema;
+  private final AggregationFunction<?, ?>[] _aggFunctions;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
 
@@ -96,10 +96,8 @@ public class AggregateOperator extends MultiStageOperator {
     super(context);
     _input = input;
     _resultSchema = node.getDataSchema();
-
-    // Initialize the aggregation functions
-    AggregationFunction<?, ?>[] aggFunctions = getAggFunctions(node.getAggCalls());
-    int numFunctions = aggFunctions.length;
+    _aggFunctions = getAggFunctions(node.getAggCalls());
+    int numFunctions = _aggFunctions.length;
 
     // Process the filter argument indices
     List<Integer> filterArgs = node.getFilterArgs();
@@ -141,11 +139,11 @@ public class AggregateOperator extends MultiStageOperator {
     boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     if (groupKeys.isEmpty()) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
+          new MultistageAggregationExecutor(_aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
       _groupByExecutor = null;
     } else {
       _groupByExecutor =
-          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), aggFunctions, filterArgIds, maxFilterArgId, aggType,
+          new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), _aggFunctions, filterArgIds, maxFilterArgId, aggType,
               leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
@@ -216,7 +214,7 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock produceAggregatedBlock() {
     _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
-      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
+      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW, _aggFunctions);
     } else {
       List<Object[]> rows;
       if (_comparator != null) {
@@ -228,7 +226,7 @@ public class AggregateOperator extends MultiStageOperator {
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
-        TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+        TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW, _aggFunctions);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           if (_errorOnNumGroupsLimit) {
             _input.earlyTerminate();
@@ -356,6 +354,7 @@ public class AggregateOperator extends MultiStageOperator {
       return Collections.emptyMap();
     }
     DataSchema dataSchema = block.getDataSchema();
+    assert dataSchema != null;
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     if (block.isContainerConstructed()) {
       List<Object[]> rows = block.getContainer();
@@ -388,6 +387,7 @@ public class AggregateOperator extends MultiStageOperator {
       return Collections.emptyMap();
     }
     DataSchema dataSchema = block.getDataSchema();
+    assert dataSchema != null;
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     if (block.isContainerConstructed()) {
       List<Object[]> rows = block.getContainer();
@@ -415,8 +415,8 @@ public class AggregateOperator extends MultiStageOperator {
     return blockValSetMap;
   }
 
-  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunctions, TransferableBlock block) {
-    ExpressionContext firstArgument = aggFunctions.getInputExpressions().get(0);
+  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunction, TransferableBlock block) {
+    ExpressionContext firstArgument = aggFunction.getInputExpressions().get(0);
     Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
         "Expected the first argument to be IDENTIFIER, got: %s", firstArgument.getType());
     int colId = fromIdentifierToColId(firstArgument.getIdentifier());
@@ -429,7 +429,7 @@ public class AggregateOperator extends MultiStageOperator {
       }
       return values;
     } else {
-      return DataBlockExtractUtils.extractColumn(block.getDataBlock(), colId);
+      return DataBlockExtractUtils.extractAggResult(block.getDataBlock(), colId, aggFunction);
     }
   }
 

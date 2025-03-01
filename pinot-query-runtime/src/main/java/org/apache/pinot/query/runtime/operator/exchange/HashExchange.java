@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.EmptyKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -50,6 +51,7 @@ class HashExchange extends BlockExchange {
     this(sendingMailboxes, keySelector, splitter, RANDOM_INDEX_CHOOSER);
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws IOException, TimeoutException {
@@ -59,7 +61,6 @@ class HashExchange extends BlockExchange {
       return;
     }
 
-    //noinspection unchecked
     List<Object[]>[] mailboxIdToRowsMap = new List[numMailboxes];
     for (int i = 0; i < numMailboxes; i++) {
       mailboxIdToRowsMap[i] = new ArrayList<>();
@@ -69,10 +70,11 @@ class HashExchange extends BlockExchange {
       int mailboxId = _keySelector.computeHash(row) % numMailboxes;
       mailboxIdToRowsMap[mailboxId].add(row);
     }
+    AggregationFunction[] aggFunctions = block.getAggFunctions();
     for (int i = 0; i < numMailboxes; i++) {
       if (!mailboxIdToRowsMap[i].isEmpty()) {
         sendBlock(destinations.get(i),
-            new TransferableBlock(mailboxIdToRowsMap[i], block.getDataSchema(), block.getType()));
+            new TransferableBlock(mailboxIdToRowsMap[i], block.getDataSchema(), block.getType(), aggFunctions));
       }
     }
   }

@@ -93,9 +93,11 @@ public class LeafStageTransferableBlockOperatorTest {
   }
 
   private List<ServerQueryRequest> mockQueryRequests(int numRequests) {
+    ServerQueryRequest queryRequest = mock(ServerQueryRequest.class);
+    when(queryRequest.getQueryContext()).thenReturn(mock(QueryContext.class));
     List<ServerQueryRequest> queryRequests = new ArrayList<>(numRequests);
     for (int i = 0; i < numRequests; i++) {
-      queryRequests.add(mock(ServerQueryRequest.class));
+      queryRequests.add(queryRequest);
     }
     return queryRequests;
   }

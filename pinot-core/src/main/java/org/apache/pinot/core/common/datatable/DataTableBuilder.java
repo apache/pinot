@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -40,6 +41,8 @@ import org.roaringbitmap.RoaringBitmap;
  * into objects like Integer etc. This will waste cpu resource and increase the payload size. We optimize the data
  * format for Pinot use case. We can also support lazy construction of objects. In fact we retain the bytes as it is and
  * will be able to look up a field directly within a byte buffer.
+ *
+ * TODO: Consider skipping seeking for the column offsets and directly write to the byte buffer
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -66,10 +69,6 @@ public interface DataTableBuilder {
   void setColumn(int colId, @Nullable Map<String, Object> value)
       throws IOException;
 
-  // TODO: Move ser/de into AggregationFunction interface
-  void setColumn(int colId, @Nullable Object value)
-      throws IOException;
-
   void setColumn(int colId, int[] values)
       throws IOException;
 
@@ -86,6 +85,12 @@ public interface DataTableBuilder {
       throws IOException;
 
   // TODO: Support MV BYTES
+
+  void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
+      throws IOException;
+
+  void setNull(int colId)
+      throws IOException;
 
   void finishRow()
       throws IOException;
