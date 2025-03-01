@@ -221,6 +221,8 @@ public class AggregationFunctionFactory {
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
+          case AVGPRECISION:
+            return new AvgPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
             return new ModeAggregationFunction(arguments, nullHandlingEnabled);
           case FIRSTWITHTIME: {
