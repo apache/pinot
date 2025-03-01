@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -207,7 +208,8 @@ public class MultiStageAccountingTest implements ITest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), input, inputSchema,
         new WindowNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), keys, List.of(), aggCalls,
-            WindowNode.WindowFrameType.RANGE, Integer.MIN_VALUE, Integer.MAX_VALUE, List.of()));
+            WindowNode.WindowFrameType.RANGE, Integer.MIN_VALUE, Integer.MAX_VALUE, RexWindowExclusion.EXCLUDE_NO_OTHER,
+            List.of()));
   }
 
   private static MultiStageOperator getIntersectOperator() {
