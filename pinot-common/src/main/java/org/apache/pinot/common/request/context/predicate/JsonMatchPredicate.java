@@ -27,15 +27,33 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  */
 public class JsonMatchPredicate extends BasePredicate {
   private final String _value;
+  private final String _countPredicate;
+  private final int _threshold;
+//  public JsonMatchPredicate(ExpressionContext lhs, String value) {
+//    super(lhs);
+//    _countPredicate = null;
+//    _value = value;
+//    _threshold = 0;
+//  }
 
-  public JsonMatchPredicate(ExpressionContext lhs, String value) {
+  public JsonMatchPredicate(ExpressionContext lhs, String value, String countPredicate) {
     super(lhs);
+    _countPredicate = countPredicate;
     _value = value;
+    if(countPredicate != null) {
+      _threshold = Integer.parseInt(countPredicate);
+    } else {
+      _threshold = -1;
+    }
   }
 
   @Override
   public Type getType() {
     return Type.JSON_MATCH;
+  }
+
+  public String getCountPredicate() {
+    return _countPredicate;
   }
 
   public String getValue() {

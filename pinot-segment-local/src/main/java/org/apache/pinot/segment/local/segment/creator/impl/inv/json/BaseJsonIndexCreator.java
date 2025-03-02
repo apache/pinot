@@ -56,6 +56,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   // NOTE: V1 is deprecated because it does not support top-level value, top-level array and nested array
   public static final int VERSION_1 = 1;
   public static final int VERSION_2 = 2;
+  public static final int VERSION_3 = 3;
   public static final int HEADER_LENGTH = 32;
 
   static final String TEMP_DIR_SUFFIX = ".json.idx.tmp";
@@ -133,12 +134,21 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
    */
   void generateIndexFile()
       throws IOException {
+    int version = VERSION_3;
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
-    headerBuffer.putInt(VERSION_2);
+    headerBuffer.putInt(version);
     headerBuffer.putInt(_maxValueLength);
     long dictionaryFileLength = _dictionaryFile.length();
     long invertedIndexFileLength = _invertedIndexFile.length();
-    long docIdMappingFileLength = (long) _nextFlattenedDocId << 2;
+    int numDocs = _numFlattenedRecordsList.size();
+    //for each doc write the start and end
+
+    long docIdMappingFileLength;
+    if (version == VERSION_3) {
+      docIdMappingFileLength = (long) numDocs * 4 + 4;
+    } else {
+      docIdMappingFileLength = (long) _nextFlattenedDocId << 2;
+    }
     headerBuffer.putLong(dictionaryFileLength);
     headerBuffer.putLong(invertedIndexFileLength);
     headerBuffer.putLong(docIdMappingFileLength);
@@ -157,11 +167,22 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
       ByteBuffer docIdMappingBuffer =
           indexFileChannel.map(FileChannel.MapMode.READ_WRITE, indexFileChannel.position(), docIdMappingFileLength)
               .order(ByteOrder.LITTLE_ENDIAN);
-      int numDocs = _numFlattenedRecordsList.size();
-      for (int i = 0; i < numDocs; i++) {
-        int numRecords = _numFlattenedRecordsList.getInt(i);
-        for (int j = 0; j < numRecords; j++) {
-          docIdMappingBuffer.putInt(i);
+
+      if (version == VERSION_3) {
+        int currentFlattenedDocId = 0;
+        for (int i = 0; i < numDocs; i++) {
+          int numRecords = _numFlattenedRecordsList.getInt(i);
+          docIdMappingBuffer.putInt(currentFlattenedDocId);
+          currentFlattenedDocId = currentFlattenedDocId + numRecords;
+        }
+        // Put last end offset
+        docIdMappingBuffer.putInt(currentFlattenedDocId);
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          int numRecords = _numFlattenedRecordsList.getInt(i);
+          for (int j = 0; j < numRecords; j++) {
+            docIdMappingBuffer.putInt(i);
+          }
         }
       }
       if (CleanerUtil.UNMAP_SUPPORTED) {
