@@ -86,7 +86,6 @@ public class JsonUtils {
   // For querying
   public static final String WILDCARD = "*";
 
-
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
