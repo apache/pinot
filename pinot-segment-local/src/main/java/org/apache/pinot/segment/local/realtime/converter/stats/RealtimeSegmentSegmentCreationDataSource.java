@@ -42,7 +42,7 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
 
   @Override
   public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
-    return new RealtimeSegmentStatsContainer(_mutableSegment, _recordReader.getSortedDocIds());
+    return new RealtimeSegmentStatsContainer(_mutableSegment, _recordReader.getSortedDocIds(), statsCollectorConfig);
   }
 
   @Override

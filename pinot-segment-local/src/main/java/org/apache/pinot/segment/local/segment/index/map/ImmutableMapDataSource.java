@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.segment.index.map;
 
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.column.MapColumnIndexContainer;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -41,7 +43,11 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
 
   public ImmutableMapDataSource(ColumnMetadata columnMetadata, ColumnIndexContainer columnIndexContainer) {
     super(new ImmutableMapDataSourceMetadata(columnMetadata), columnIndexContainer);
-    MapIndexReader mapIndexReader = getMapIndex();
+    MapIndexReader mapIndexReader = null;
+    if (!columnMetadata.getChildColumns().isEmpty()) {
+      MapColumnIndexContainer mapColumnIndexContainer = (MapColumnIndexContainer) columnIndexContainer;
+      mapIndexReader = mapColumnIndexContainer.getMapIndexReader();
+    }
     if (mapIndexReader == null) {
       // Fallback to use forward index
       ForwardIndexReader<?> forwardIndex = getForwardIndex();
@@ -153,5 +159,13 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
     public int getMaxRowLengthInBytes() {
       throw new UnsupportedOperationException();
     }
+  }
+
+  @Override
+  public ForwardIndexReader<?> getForwardIndex() {
+    if (_mapIndexReader == null) {
+      return getIndex(StandardIndexes.forward());
+    }
+    return getMapIndexReader();
   }
 }

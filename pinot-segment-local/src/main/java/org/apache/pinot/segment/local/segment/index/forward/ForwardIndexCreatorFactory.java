@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
@@ -52,7 +53,17 @@ public class ForwardIndexCreatorFactory {
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
 
-    if (context.hasDictionary()) {
+    if (fieldSpec.getDataType().getStoredType() == DataType.MAP && indexConfig.getMapEncodingConfigs() != null) {
+      if (indexConfig.getMapEncodingConfigs().containsKey("mapIndexCreatorClassName")) {
+        String className = indexConfig.getMapEncodingConfigs().get("mapIndexCreatorClassName").toString();
+        Preconditions.checkNotNull(className, "MapIndexCreator class name must be provided");
+        return (ForwardIndexCreator) Class.forName(className)
+            .getConstructor(File.class, String.class, IndexCreationContext.class, ForwardIndexConfig.class)
+            .newInstance(context.getIndexDir(), context.getFieldSpec().getName(), context, indexConfig);
+      } else {
+        throw new IllegalArgumentException("MapIndexCreator class name must be provided");
+      }
+    } else if (context.hasDictionary()) {
       // Dictionary enabled columns
       int cardinality = context.getCardinality();
       if (fieldSpec.isSingleValueField()) {

@@ -93,6 +93,9 @@ public class MapKeyIndexReader implements ForwardIndexReader {
 
   private Object extractMapValue(int docId, ForwardIndexReaderContext context, String key) {
     Map map = _forwardIndexReader.getMap(docId, context);
+    if (map == null) {
+      return _defaultNullValue;
+    }
     Object object = map.get(key);
     if (object == null) {
       return _defaultNullValue;
