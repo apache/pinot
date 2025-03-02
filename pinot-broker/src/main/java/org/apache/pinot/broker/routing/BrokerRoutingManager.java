@@ -61,6 +61,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -387,6 +388,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     LOGGER.info("Including server: {} to routing", instanceId);
     if (!_excludedServers.remove(instanceId)) {
       LOGGER.info("Server: {} is not previously excluded, skipping updating the routing", instanceId);
+      return;
     }
     if (!_enabledServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);
@@ -635,15 +637,15 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
-  private Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap(String tableNameWithType,
+  private Map<ServerInstance, ServerRouteInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
-    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    Map<ServerInstance, ServerRouteInfo> merged = new HashMap<>();
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair =
-            merged.computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), new ArrayList<>()));
-        pair.getLeft().add(entry.getKey());
+        ServerRouteInfo serverRouteInfoInfo =
+            merged.computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), new ArrayList<>()));
+        serverRouteInfoInfo.getSegments().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
@@ -652,17 +654,25 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        Pair<List<String>, List<String>> pair = merged.get(serverInstance);
+        ServerRouteInfo serverRouteInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
         // to process, to be backward compatible.
         // TODO: allow servers only with optional segments
-        if (pair != null) {
-          pair.getRight().add(entry.getKey());
+        if (serverRouteInfo != null) {
+          serverRouteInfo.getOptionalSegments().add(entry.getKey());
         }
       }
       // TODO: Report missing server metrics when we allow servers only with optional segments.
     }
     return merged;
+  }
+
+  @Nullable
+  @Override
+  public List<String> getSegments(BrokerRequest brokerRequest) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    return routingEntry != null ? routingEntry.getSegments(brokerRequest) : null;
   }
 
   @Override
@@ -847,6 +857,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
             Collections.emptyList(), numPrunedSegments);
       }
+    }
+
+    List<String> getSegments(BrokerRequest brokerRequest) {
+      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+        }
+      }
+      return new ArrayList<>(selectedSegments);
     }
   }
 }

@@ -35,10 +35,10 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -120,8 +120,8 @@ public class BenchmarkCombineGroupBy {
     // make 1 concurrent table
     IndexedTable concurrentIndexedTable =
         new ConcurrentIndexedTable(_dataSchema, false, _queryContext, trimSize, trimSize,
-            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD,
-            InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
+            Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD,
+            Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY, _executorService);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

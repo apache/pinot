@@ -38,6 +38,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -190,11 +191,15 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     // Otherwise, try to get the segment name to help locate the segment when debugging query errors.
     // Not all operators have associated segment, so do this at best effort.
     IndexSegment segment = operator.getIndexSegment();
-    if (segment == null) {
-      return e;
+    String errorMessage = null;
+    if (segment != null) {
+      errorMessage = "Caught exception while doing operator: " + operator.getClass()
+          + " on segment: " + segment.getSegmentName();
     }
-    throw new RuntimeException(
-        "Caught exception while doing operator: " + operator.getClass() + " on segment: " + segment.getSegmentName(),
-        e);
+
+    if (e instanceof IllegalArgumentException || e instanceof BadQueryRequestException) {
+      throw new BadQueryRequestException(errorMessage, e);
+    }
+    throw new RuntimeException(errorMessage, e);
   }
 }

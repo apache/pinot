@@ -43,6 +43,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -71,6 +72,7 @@ public class SegmentDeletionManager {
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+  private static final String DELIMITER = "/";
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
@@ -235,7 +237,11 @@ public class SegmentDeletionManager {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
+      if (fileToDeleteURI == null) {
+        LOGGER.warn("No segment file found for segment: {} in deep store, skipping deletion", segmentId);
+        return;
+      }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
       // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
       // This is catch all clean up to ensure that metadata is removed from deep store.
@@ -283,6 +289,43 @@ public class SegmentDeletionManager {
   }
 
   /**
+   * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
+   * Looks for the segment file in two formats:
+   * - Without extension (conventional naming)
+   * - With .tar.gz extension (used by minions in BaseMultipleSegmentsConversionExecutor)
+   *
+   * @param rawTableName name of the table containing the segment
+   * @param segmentId name of the segment
+   * @return URI of the existing segment file if found in either format, null if segment doesn't exist in either format
+   *         or if there are filesystem access errors
+   */
+  @Nullable
+  private URI getFileToDeleteURI(String rawTableName, String segmentId) {
+    try {
+      URI plainFileUri = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      PinotFS pinotFS = PinotFSFactory.create(plainFileUri.getScheme());
+
+      // Check for plain segment file first
+      if (pinotFS.exists(plainFileUri)) {
+        return plainFileUri;
+      }
+
+      URI tarGzFileUri = URIUtils.getUri(_dataDir, rawTableName,
+          URIUtils.encode(segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+
+      // Check for .tar.gz segment file
+      if (pinotFS.exists(tarGzFileUri)) {
+        return tarGzFileUri;
+      }
+      LOGGER.error("No file found for segment: {} in deep store", segmentId);
+      return null;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while trying to find file for segment: {} in deep store", segmentId);
+      return null;
+    }
+  }
+
+  /**
    * Removes aged deleted segments from the deleted directory
    */
   public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager) {
@@ -307,6 +350,14 @@ public class SegmentDeletionManager {
           return;
         }
 
+        // Clean the array of tableNameDirs by removing trailing slashes
+        // This is crucial to fetch the right tableName from the uri
+        for (int i = 0; i < tableNameDirs.length; i++) {
+          if (tableNameDirs[i].endsWith(DELIMITER)) {
+            tableNameDirs[i] = tableNameDirs[i].substring(0, tableNameDirs[i].length() - 1);
+          }
+        }
+
         for (String tableNameDir : tableNameDirs) {
           String tableName = URIUtils.getLastPart(tableNameDir);
           if (leadControllerManager.isLeaderForTable(tableName)) {
@@ -314,16 +365,21 @@ public class SegmentDeletionManager {
             // Get files that are aged
             final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
             int numFilesDeleted = 0;
+            URI targetURI = null;
             for (String targetFile : targetFiles) {
-              URI targetURI =
-                  URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
-              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
-              if (System.currentTimeMillis() >= deletionTimeMs) {
-                if (!pinotFS.delete(targetURI, true)) {
-                  LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
-                } else {
-                  numFilesDeleted++;
+              try {
+                targetURI =
+                    URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
+                long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
+                if (System.currentTimeMillis() >= deletionTimeMs) {
+                  if (!pinotFS.delete(targetURI, true)) {
+                    LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
+                  } else {
+                    numFilesDeleted++;
+                  }
                 }
+              } catch (Exception e) {
+                LOGGER.warn("Failed to delete uri: {} for table: {}", targetURI, tableName, e);
               }
             }
 

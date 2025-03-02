@@ -215,9 +215,8 @@ public class MinionTaskUtils {
             serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
                 validDocIdsType, 60_000);
       } catch (Exception e) {
-        LOGGER.warn(
-            String.format("Unable to retrieve validDocIds bitmap for segment: %s from endpoint: %s", segmentName,
-                endpoint), e);
+        LOGGER.warn("Unable to retrieve validDocIds bitmap for segment: " + segmentName + " from endpoint: "
+            + endpoint, e);
         continue;
       }
 
@@ -231,9 +230,9 @@ public class MinionTaskUtils {
       if (!expectedCrc.equals(crcFromValidDocIdsBitmap)) {
         // In this scenario, we are hitting the other replica of the segment which did not commit to ZK or deepstore.
         // We will skip processing this bitmap to query other server to confirm if there is a valid matching CRC.
-        String message = String.format("CRC mismatch for segment: %s, expected value based on task generator: %s, "
-                + "actual crc from validDocIdsBitmapResponse from endpoint %s: %s", segmentName, expectedCrc, endpoint,
-            crcFromValidDocIdsBitmap);
+        String message = "CRC mismatch for segment: " + segmentName + ", expected value based on task generator: "
+            + expectedCrc + ", actual crc from validDocIdsBitmapResponse from endpoint " + endpoint + ": "
+            + crcFromValidDocIdsBitmap;
         LOGGER.warn(message);
         continue;
       }

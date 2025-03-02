@@ -29,12 +29,15 @@ public class BasicAuthPrincipal {
   private final String _name;
   private final String _token;
   private final Set<String> _tables;
+  private final Set<String> _excludeTables;
   private final Set<String> _permissions;
 
-  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> permissions) {
+  public BasicAuthPrincipal(String name, String token, Set<String> tables, Set<String> excludeTables,
+      Set<String> permissions) {
     _name = name;
     _token = token;
     _tables = tables;
+    _excludeTables = excludeTables;
     _permissions = permissions.stream().map(s -> s.toLowerCase()).collect(Collectors.toSet());
   }
 
@@ -47,7 +50,15 @@ public class BasicAuthPrincipal {
   }
 
   public boolean hasTable(String tableName) {
+    return isTableIncluded(tableName) && isTableNotExcluded(tableName);
+  }
+
+  private boolean isTableIncluded(String tableName) {
     return _tables.isEmpty() || _tables.contains(tableName);
+  }
+
+  private boolean isTableNotExcluded(String tableName) {
+    return !_excludeTables.contains(tableName);
   }
 
   public boolean hasPermission(String permission) {

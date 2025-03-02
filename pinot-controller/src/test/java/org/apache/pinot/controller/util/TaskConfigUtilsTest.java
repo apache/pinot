@@ -30,6 +30,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -64,7 +65,7 @@ public class TaskConfigUtilsTest {
       }
 
       @Override
-      public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+      public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
         throw new RuntimeException("TableConfig validation failed");
       }
     };
@@ -73,22 +74,22 @@ public class TaskConfigUtilsTest {
     when(_mockTaskManager.getTaskGeneratorRegistry()).thenReturn(_mockTaskRegistry);
   }
 
-  @Test (expectedExceptions = RuntimeException.class)
+  @Test(expectedExceptions = RuntimeException.class)
   public void testValidateTableTaskConfigsValidationException() {
     TableTaskConfig tableTaskConfig =
         new TableTaskConfig(ImmutableMap.of(TEST_TASK_TYPE, ImmutableMap.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
-    TaskConfigUtils.validateTaskConfigs(tableConfig, _mockTaskManager, null);
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
   }
 
-  @Test (expectedExceptions = RuntimeException.class)
+  @Test(expectedExceptions = RuntimeException.class)
   public void testValidateTableTaskConfigsUnknownTaskType() {
     TableTaskConfig tableTaskConfig =
         new TableTaskConfig(ImmutableMap.of("otherTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
-    TaskConfigUtils.validateTaskConfigs(tableConfig, _mockTaskManager, null);
+    TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
   }
 
   @Test

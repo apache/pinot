@@ -64,11 +64,15 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE("TimeMsSinceLastMinionTaskMetadataUpdate", false),
   TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION("TimeMsSinceLastSuccessfulMinionTaskGeneration", false),
   LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR("LastMinionTaskGenerationEncountersError", false),
+  // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
+  NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
+  NUM_MINION_SUBTASKS_TIMED_OUT("NumMinionSubtasksTimedOut", true),
+  NUM_MINION_SUBTASKS_ABORTED("NumMinionSubtasksAborted", true),
   PERCENT_MINION_SUBTASKS_IN_QUEUE("PercentMinionSubtasksInQueue", true),
   PERCENT_MINION_SUBTASKS_IN_ERROR("PercentMinionSubtasksInError", true),
   TIER_BACKEND_TABLE_COUNT("TierBackendTableCount", true),
@@ -170,13 +174,23 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // any partition in the realtime table. This metric is emitted from the segment size based threshold
   // computer.
   NUM_ROWS_THRESHOLD("numRowsThreshold", false),
+  // Added to preserve backwards compatibility of the above metric
+  NUM_ROWS_THRESHOLD_WITH_TOPIC("numRowsThresholdWithTopic", false),
 
   // The actual segment size for committing segments. These may be shorter than expected when the administrator
   // issues a force-commit, or zero when new partitions are detected in the stream (since there is no completing
   // segment when the partition is first detected).
   COMMITTING_SEGMENT_SIZE("committingSegmentSize", false),
+  // Added to preserve backwards compatibility of the above metric
+  COMMITTING_SEGMENT_SIZE_WITH_TOPIC("committingSegmentSizeWithTopic", false),
 
-  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
+
+  // Number of reingested segments getting uploaded
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
+
+  // Resource utilization is within limits or not for a table
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false);
 
   private final String _gaugeName;
   private final String _unit;

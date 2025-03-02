@@ -20,9 +20,11 @@ package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
@@ -62,8 +64,10 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -126,9 +130,11 @@ public class PinotAggregateExchangeNodeInsertRule {
       }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
+
+      if (!isGroupTrimmingEnabled(call, hintOptions)) {
         return;
+      } else if (hintOptions == null) {
+        hintOptions = Collections.emptyMap();
       }
 
       Sort sortRel = call.rel(0);
@@ -175,11 +181,14 @@ public class PinotAggregateExchangeNodeInsertRule {
       if (aggRel.getGroupSet().isEmpty()) {
         return;
       }
+
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
+
+      if (!isGroupTrimmingEnabled(call, hintOptions)) {
         return;
+      } else if (hintOptions == null) {
+        hintOptions = Collections.emptyMap();
       }
 
       Sort sortRel = call.rel(0);
@@ -465,5 +474,24 @@ public class PinotAggregateExchangeNodeInsertRule {
       return findImmediateProjects(relNode.getInput(0));
     }
     return null;
+  }
+
+  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, Map<String, String> hintOptions) {
+    if (hintOptions != null) {
+      String option = hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM);
+      if (option != null) {
+        return Boolean.parseBoolean(option);
+      }
+    }
+
+    Context genericContext = call.getPlanner().getContext();
+    if (genericContext != null) {
+      QueryEnvironment.Config context = genericContext.unwrap(QueryEnvironment.Config.class);
+      if (context != null) {
+        return context.defaultEnableGroupTrim();
+      }
+    }
+
+    return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
   }
 }

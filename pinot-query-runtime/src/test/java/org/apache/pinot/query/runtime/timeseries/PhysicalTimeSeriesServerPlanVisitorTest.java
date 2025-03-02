@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
+import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -27,6 +29,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -43,6 +46,8 @@ import static org.testng.Assert.assertTrue;
 public class PhysicalTimeSeriesServerPlanVisitorTest {
   private static final String LANGUAGE = "m3ql";
   private static final int DUMMY_DEADLINE_MS = 10_000;
+  private static final int SERIES_LIMIT = 1000;
+  private static final Map<String, String> QUERY_OPTIONS = Collections.emptyMap();
 
   @BeforeClass
   public void setUp() {
@@ -65,38 +70,34 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
               DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
-              filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
+              filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"), SERIES_LIMIT,
+              QUERY_OPTIONS);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
-      assertNotNull(queryContext.getTimeSeriesContext());
-      assertEquals(queryContext.getTimeSeriesContext().getLanguage(), LANGUAGE);
-      assertEquals(queryContext.getTimeSeriesContext().getOffsetSeconds(), 0L);
-      assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
-      assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
       assertTrue(isNumber(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
+      assertEquals(queryContext.getLimit(), SERIES_LIMIT);
     }
-    // Case-2: With offset, complex group-by expression, complex value, and non-empty filter
+    // Case-2: With offset, complex group-by expression, complex value, non-empty filter, 0 limit, query options.
     {
+      Map<String, String> queryOptions = ImmutableMap.of("numGroupsLimit", "1000");
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(LANGUAGE, TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
               DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
-              filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"));
+              filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"),
+              0 /* limit */, queryOptions);
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertNotNull(queryContext);
       assertNotNull(queryContext.getGroupByExpressions());
       assertEquals("concat(cityName,stateName,'-')", queryContext.getGroupByExpressions().get(0).toString());
-      assertNotNull(queryContext.getTimeSeriesContext());
-      assertEquals(queryContext.getTimeSeriesContext().getLanguage(), LANGUAGE);
-      assertEquals(queryContext.getTimeSeriesContext().getOffsetSeconds(), 10L);
-      assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
-      assertEquals(queryContext.getTimeSeriesContext().getValueExpression().toString(), "times(orderCount,'2')");
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
       assertTrue(isNumber(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
+      assertEquals(queryContext.getLimit(), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT);
+      assertEquals(queryContext.getQueryOptions().get("numGroupsLimit"), "1000");
     }
   }
 

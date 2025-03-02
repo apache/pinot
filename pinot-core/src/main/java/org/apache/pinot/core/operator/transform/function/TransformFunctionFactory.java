@@ -164,6 +164,7 @@ public class TransformFunctionFactory {
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
@@ -250,6 +251,9 @@ public class TransformFunctionFactory {
 
     // Item functions
     typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
+
+    // Time Series functions
+    typeToImplementation.put(TransformFunctionType.TIME_SERIES_BUCKET, TimeSeriesBucketTransformFunction.class);
 
     Map<String, Class<? extends TransformFunction>> registry =
         new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));

@@ -20,9 +20,11 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -31,7 +33,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -42,12 +43,13 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGenerator;
 import org.apache.pinot.query.runtime.operator.groupby.GroupIdGeneratorFactory;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Class that executes the group by aggregations for the multistage AggregateOperator.
+ * Class that executes the keyed group by aggregations for the multistage AggregateOperator.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
@@ -69,9 +71,16 @@ public class MultistageGroupByExecutor {
   // because they use the zero based integer indexes to store results.
   private final GroupIdGenerator _groupIdGenerator;
 
-  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
-      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
-      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+  public MultistageGroupByExecutor(
+      int[] groupKeyIds,
+      AggregationFunction[] aggFunctions,
+      int[] filterArgIds,
+      int maxFilterArgId,
+      AggType aggType,
+      boolean leafReturnFinalResult,
+      DataSchema resultSchema,
+      Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -79,7 +88,9 @@ public class MultistageGroupByExecutor {
     _aggType = aggType;
     _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
-    int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+
+    int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
@@ -101,7 +112,7 @@ public class MultistageGroupByExecutor {
 
     _groupIdGenerator =
         GroupIdGeneratorFactory.getGroupIdGenerator(_resultSchema.getStoredColumnDataTypes(), groupKeyIds.length,
-            _numGroupsLimit);
+            _numGroupsLimit, maxInitialResultHolderCapacity);
   }
 
   private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
@@ -115,7 +126,14 @@ public class MultistageGroupByExecutor {
       }
     }
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
-    return numGroupsLimit != null ? numGroupsLimit : InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
+    return numGroupsLimit != null ? numGroupsLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  }
+
+  private int getResolvedMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
+    Integer mseMaxInitialResultHolderCapacity = getMSEMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    return (mseMaxInitialResultHolderCapacity != null) ? mseMaxInitialResultHolderCapacity
+        : getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
   }
 
   private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
@@ -132,7 +150,23 @@ public class MultistageGroupByExecutor {
     }
     Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
     return maxInitialResultHolderCapacity != null ? maxInitialResultHolderCapacity
-        : InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+        : Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  }
+
+  private Integer getMSEMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> aggregateOptions = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (aggregateOptions != null) {
+        String maxInitialMSEResultHolderCapacityStr =
+            aggregateOptions.get(PinotHintOptions.AggregateOptions.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+        if (maxInitialMSEResultHolderCapacityStr != null) {
+          return Integer.parseInt(maxInitialMSEResultHolderCapacityStr);
+        }
+      }
+    }
+    // Don't return default value since null value means we need to fallback to MaxInitialResultHolderCapacity
+    return QueryOptionsUtils.getMSEMaxInitialResultHolderCapacity(opChainMetadata);
   }
 
   public int getNumGroupsLimit() {
@@ -151,32 +185,84 @@ public class MultistageGroupByExecutor {
   }
 
   /**
-   * Fetches the result.
+   * Get aggregation result limited to first {@code maxRows} rows, ordered with {@code comparator}.
    */
-  public List<Object[]> getResult() {
-    int numGroups = _groupIdGenerator.getNumGroups();
+  public List<Object[]> getResult(Comparator<Object[]> comparator, int maxRows) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
       return Collections.emptyList();
     }
+
+    // TODO: Change it to use top-K algorithm
+    PriorityQueue<Object[]> sortedRows = new PriorityQueue<>(numGroups, comparator);
+    int numKeys = _groupKeyIds.length;
+    int numFunctions = _aggFunctions.length;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
+    Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
+        _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
+
+    int idx = 0;
+    while (idx++ < numGroups && groupKeyIterator.hasNext()) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      sortedRows.add(row);
+    }
+
+    while (groupKeyIterator.hasNext()) {
+      // TODO: allocate new array row only if row enters set
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      if (comparator.compare(sortedRows.peek(), row) < 0) {
+        sortedRows.poll();
+        sortedRows.offer(row);
+      }
+    }
+
+    int resultSize = sortedRows.size();
+    ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
+    for (int i = resultSize - 1; i >= 0; i--) {
+      result.add(sortedRows.poll());
+    }
+    // reverse priority queue order because comparators are reversed
+    Collections.reverse(result);
+    return result;
+  }
+
+  /**  Get aggregation result limited to {@code maxRows} rows. */
+  public List<Object[]> getResult(int maxRows) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
+    if (numGroups == 0) {
+      return Collections.emptyList();
+    }
+
     List<Object[]> rows = new ArrayList<>(numGroups);
     int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
-    while (groupKeyIterator.hasNext()) {
-      GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int groupId = groupKey._groupId;
-      Object[] row = groupKey._row;
-      int columnId = numKeys;
-      for (int i = 0; i < numFunctions; i++) {
-        row[columnId++] = getResultValue(i, groupId);
-      }
-      // Convert the results from AggregationFunction to the desired type
-      TypeUtils.convertRow(row, resultStoredTypes);
+
+    int idx = 0;
+    while (groupKeyIterator.hasNext() && idx++ < numGroups) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       rows.add(row);
     }
     return rows;
+  }
+
+  private Object[] getRow(
+      Iterator<GroupIdGenerator.GroupKey> groupKeyIterator,
+      int numKeys,
+      int numFunctions,
+      ColumnDataType[] resultStoredTypes) {
+    GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
+    int groupId = groupKey._groupId;
+    Object[] row = groupKey._row;
+    int columnId = numKeys;
+    for (int i = 0; i < numFunctions; i++) {
+      row[columnId++] = getResultValue(i, groupId);
+    }
+    // Convert the results from AggregationFunction to the desired type
+    TypeUtils.convertRow(row, resultStoredTypes);
+    return row;
   }
 
   private Object getResultValue(int functionId, int groupId) {

@@ -25,10 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
-import org.apache.pinot.broker.failuredetector.FailureDetector;
-import org.apache.pinot.broker.failuredetector.FailureDetectorFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.NettyConfig;
@@ -36,6 +33,7 @@ import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -43,6 +41,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
@@ -63,8 +62,7 @@ import org.slf4j.LoggerFactory;
  * connection per server to route the queries.
  */
 @ThreadSafe
-public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler
-    implements FailureDetector.Listener {
+public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(SingleConnectionBrokerRequestHandler.class);
 
   private final BrokerReduceService _brokerReduceService;
@@ -74,24 +72,22 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
       QueryQuotaManager queryQuotaManager, TableCache tableCache, NettyConfig nettyConfig, TlsConfig tlsConfig,
-      ServerRoutingStatsManager serverRoutingStatsManager) {
+      ServerRoutingStatsManager serverRoutingStatsManager, FailureDetector failureDetector) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, _brokerMetrics, nettyConfig, tlsConfig, serverRoutingStatsManager);
-    _failureDetector = FailureDetectorFactory.getFailureDetector(config, _brokerMetrics);
+    _failureDetector = failureDetector;
+    _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
   }
 
   @Override
   public void start() {
     super.start();
-    _failureDetector.register(this);
-    _failureDetector.start();
   }
 
   @Override
   public void shutDown() {
     super.shutDown();
-    _failureDetector.stop();
     _queryRouter.shutDown();
     _brokerReduceService.shutDown();
   }
@@ -99,9 +95,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -114,14 +110,15 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
             realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
-    _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
           ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
       _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
-    _failureDetector.notifyQueryFinished(asyncQueryResponse);
+    if (asyncQueryResponse.getFailedServer() != null) {
+      _failureDetector.markServerUnhealthy(asyncQueryResponse.getFailedServer().getInstanceId());
+    }
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
@@ -179,29 +176,29 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     return brokerResponse;
   }
 
-  @Override
-  public void notifyUnhealthyServer(String instanceId, FailureDetector failureDetector) {
-    _routingManager.excludeServerFromRouting(instanceId);
-  }
-
-  @Override
-  public void retryUnhealthyServer(String instanceId, FailureDetector failureDetector) {
+  /**
+   * Check if a server that was previously detected as unhealthy is now healthy.
+   */
+  public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
+
+    // Could occur if the cluster is only serving multi-stage queries
+    if (!_queryRouter.hasChannel(serverInstance)) {
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+
     if (_queryRouter.connect(serverInstance)) {
       LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
-      failureDetector.markServerHealthy(instanceId);
+      return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);
+      return FailureDetector.ServerState.UNHEALTHY;
     }
-  }
-
-  @Override
-  public void notifyHealthyServer(String instanceId, FailureDetector failureDetector) {
-    _routingManager.includeServerToRouting(instanceId);
   }
 }

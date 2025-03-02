@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.table;
 
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -36,8 +37,9 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
 
   public UnboundedConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
-      int resultSize, int initialCapacity) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity);
+      int resultSize, int initialCapacity, ExecutorService executorService) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity,
+        executorService);
   }
 
   @Override

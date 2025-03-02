@@ -429,6 +429,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
+  public String forServersToSegmentsMap(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "servers?type=" + tableType);
+  }
+
   public String forSegmentListAPI(String tableName) {
     return forSegmentListAPI(tableName, null, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
@@ -609,5 +613,17 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentUpload() {
     return StringUtil.join("/", _baseUrl, "v2/segments");
+  }
+
+  public String forCancelQueryByClientId(String clientRequestId) {
+    return StringUtil.join("/", _baseUrl, "clientQuery", clientRequestId);
+  }
+
+  public String forExternalView(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
+  }
+
+  public String forIdealState(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "idealstate");
   }
 }

@@ -58,6 +58,7 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
@@ -92,9 +93,12 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+  private final TableCache _tableCache;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      TableCache tableCache) {
     _tracker = tracker;
+    _tableCache = tableCache;
   }
 
   /**
@@ -143,34 +147,42 @@ public final class RelToPlanNodeConverter {
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
+    RelDistribution distribution = node.getDistribution();
+    RelDistribution.Type distributionType = distribution.getType();
     PinotRelExchangeType exchangeType;
+    List<Integer> keys;
+    Boolean prePartitioned;
     List<RelFieldCollation> collations;
     boolean sortOnSender;
     boolean sortOnReceiver;
     if (node instanceof PinotLogicalSortExchange) {
       PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
       exchangeType = sortExchange.getExchangeType();
+      keys = distribution.getKeys();
+      prePartitioned = null;
       collations = sortExchange.getCollation().getFieldCollations();
       sortOnSender = sortExchange.isSortOnSender();
       sortOnReceiver = sortExchange.isSortOnReceiver();
     } else {
       assert node instanceof PinotLogicalExchange;
-      exchangeType = ((PinotLogicalExchange) node).getExchangeType();
+      PinotLogicalExchange exchange = (PinotLogicalExchange) node;
+      exchangeType = exchange.getExchangeType();
+      keys = exchange.getKeys();
+      prePartitioned = exchange.getPrePartitioned();
       collations = null;
       sortOnSender = false;
       sortOnReceiver = false;
     }
-    RelDistribution distribution = node.getDistribution();
-    RelDistribution.Type distributionType = distribution.getType();
-    List<Integer> keys;
-    boolean prePartitioned;
-    if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
-      keys = distribution.getKeys();
-      RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-      prePartitioned = distribution.equals(inputDistributionTrait);
-    } else {
+    if (keys.isEmpty()) {
       keys = null;
-      prePartitioned = false;
+    }
+    if (prePartitioned == null) {
+      if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
+        RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
+        prePartitioned = distribution.equals(inputDistributionTrait);
+      } else {
+        prePartitioned = false;
+      }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
         exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null);
@@ -278,7 +290,7 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
-    String tableName = getTableNameFromTableScan(node);
+    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {

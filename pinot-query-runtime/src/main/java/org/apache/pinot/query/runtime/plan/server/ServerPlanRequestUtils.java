@@ -55,6 +55,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.executor.MdcExecutor;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -76,8 +78,12 @@ public class ServerPlanRequestUtils {
       new ArrayList<>(QueryRewriterFactory.getQueryRewriters(QUERY_REWRITERS_CLASS_NAMES));
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
-  public static OpChain compileLeafStage(OpChainExecutionContext executionContext, StagePlan stagePlan,
-      HelixManager helixManager, ServerMetrics serverMetrics, QueryExecutor leafQueryExecutor,
+  public static OpChain compileLeafStage(
+      OpChainExecutionContext executionContext,
+      StagePlan stagePlan,
+      HelixManager helixManager,
+      ServerMetrics serverMetrics,
+      QueryExecutor leafQueryExecutor,
       ExecutorService executorService) {
     return compileLeafStage(executionContext, stagePlan, helixManager, serverMetrics, leafQueryExecutor,
         executorService, (planNode, multiStageOperator) -> {
@@ -91,11 +97,33 @@ public class ServerPlanRequestUtils {
    * @param stagePlan the distribute stage plan on the leaf.
    * @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
    */
-  public static OpChain compileLeafStage(OpChainExecutionContext executionContext, StagePlan stagePlan,
-      HelixManager helixManager, ServerMetrics serverMetrics, QueryExecutor leafQueryExecutor,
-      ExecutorService executorService, BiConsumer<PlanNode, MultiStageOperator> relationConsumer, boolean explain) {
+  public static OpChain compileLeafStage(OpChainExecutionContext executionContext,
+      StagePlan stagePlan,
+      HelixManager helixManager,
+      ServerMetrics serverMetrics,
+      QueryExecutor leafQueryExecutor,
+      ExecutorService executorService,
+      BiConsumer<PlanNode, MultiStageOperator> relationConsumer,
+      boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
-    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, executorService,
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+      @Override
+      protected boolean alreadyRegistered() {
+        return LoggerConstants.QUERY_ID_KEY.isRegistered();
+      }
+
+      @Override
+      protected void registerInMdc() {
+        executionContext.registerInMdc();
+      }
+
+      @Override
+      protected void unregisterFromMdc() {
+        executionContext.unregisterFromMDC();
+      }
+    };
+
+    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor, mdcExecutor,
         executionContext.getPipelineBreakerResult());
     // 1. Compile the PinotQuery
     constructPinotQueryPlan(serverContext, executionContext.getOpChainMetadata());

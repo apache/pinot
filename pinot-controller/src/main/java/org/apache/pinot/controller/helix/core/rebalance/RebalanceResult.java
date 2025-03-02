@@ -40,6 +40,10 @@ public class RebalanceResult {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final Map<String, String> _preChecksResult;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final RebalanceSummaryResult _rebalanceSummaryResult;
 
   @JsonCreator
   public RebalanceResult(@JsonProperty(value = "jobId", required = true) String jobId,
@@ -47,13 +51,17 @@ public class RebalanceResult {
       @JsonProperty(value = "description", required = true) String description,
       @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
       @JsonProperty("tierInstanceAssignment") @Nullable Map<String, InstancePartitions> tierInstanceAssignment,
-      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment) {
+      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment,
+      @JsonProperty("preChecksResult") @Nullable Map<String, String> preChecksResult,
+      @JsonProperty("rebalanceSummaryResult") @Nullable RebalanceSummaryResult rebalanceSummaryResult) {
     _jobId = jobId;
     _status = status;
     _description = description;
     _instanceAssignment = instanceAssignment;
     _tierInstanceAssignment = tierInstanceAssignment;
     _segmentAssignment = segmentAssignment;
+    _preChecksResult = preChecksResult;
+    _rebalanceSummaryResult = rebalanceSummaryResult;
   }
 
   @JsonProperty
@@ -84,6 +92,16 @@ public class RebalanceResult {
   @JsonProperty
   public Map<String, Map<String, String>> getSegmentAssignment() {
     return _segmentAssignment;
+  }
+
+  @JsonProperty
+  public Map<String, String> getPreChecksResult() {
+    return _preChecksResult;
+  }
+
+  @JsonProperty
+  public RebalanceSummaryResult getRebalanceSummaryResult() {
+    return _rebalanceSummaryResult;
   }
 
   public enum Status {

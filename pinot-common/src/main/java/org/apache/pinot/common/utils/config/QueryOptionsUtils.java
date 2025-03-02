@@ -235,10 +235,30 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMSEMinGroupTrimSize(Map<String, String> queryOptions) {
+    String mseMinGroupTrimSizeString = queryOptions.get(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the intermediate stage trim
+    return uncheckedParseInt(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, mseMinGroupTrimSizeString);
+  }
+
+  @Nullable
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     // NOTE: Non-positive value means turning off the on-the-fly trim before all groups are added
     return uncheckedParseInt(QueryOptionKey.GROUP_TRIM_THRESHOLD, groupByTrimThreshold);
+  }
+
+  @Nullable
+  public static Integer getNumThreadsExtractFinalResult(Map<String, String> queryOptions) {
+    String numThreadsExtractFinalResultString = queryOptions.get(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT);
+    return checkedParseInt(QueryOptionKey.NUM_THREADS_EXTRACT_FINAL_RESULT, numThreadsExtractFinalResultString, 1);
+  }
+
+  @Nullable
+  public static Integer getChunkSizeExtractFinalResult(Map<String, String> queryOptions) {
+    String chunkSizeExtractFinalResultString =
+        queryOptions.get(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT);
+    return checkedParseInt(QueryOptionKey.CHUNK_SIZE_EXTRACT_FINAL_RESULT, chunkSizeExtractFinalResultString, 1);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
@@ -268,6 +288,10 @@ public class QueryOptionsUtils {
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
   }
 
+  public static boolean getErrorOnNumGroupsLimit(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT));
+  }
+
   @Nullable
   public static Integer getNumGroupsLimit(Map<String, String> queryOptions) {
     String maxNumGroupLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_LIMIT);
@@ -282,6 +306,12 @@ public class QueryOptionsUtils {
 
   public static boolean optimizeMaxInitialResultHolderCapacityEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY));
+  }
+
+  @Nullable
+  public static Integer getMSEMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
+    String maxInitialCapacity = queryOptions.get(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    return checkedParseIntPositive(QueryOptionKey.MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitialCapacity);
   }
 
   @Nullable
@@ -330,6 +360,11 @@ public class QueryOptionsUtils {
 
   public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
+  }
+
+  public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+    String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
+    return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
   @Nullable

@@ -198,6 +198,10 @@ public class ServerRoutingStatsManager {
     }
   }
 
+  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats() {
+    return _serverQueryStatsMap;
+  }
+
   /**
    * Returns ServerRoutingStatsStr for debugging/logging.
    */

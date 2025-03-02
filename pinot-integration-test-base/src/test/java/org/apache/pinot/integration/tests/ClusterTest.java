@@ -185,11 +185,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    for (int i = 0; i < numBrokers; i++) {
-      BaseBrokerStarter brokerStarter = startOneBroker(i);
-      _brokerStarters.add(brokerStarter);
-    }
-    assertEquals(System.getProperty("user.timezone"), "UTC");
+    runWithHelixMock(() -> {
+      for (int i = 0; i < numBrokers; i++) {
+        BaseBrokerStarter brokerStarter = startOneBroker(i);
+        _brokerStarters.add(brokerStarter);
+      }
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+    });
   }
 
   protected BaseBrokerStarter startOneBroker(int brokerId)
@@ -257,11 +259,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers)
       throws Exception {
-    FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
-    for (int i = 0; i < numServers; i++) {
-      _serverStarters.add(startOneServer(i));
-    }
-    assertEquals(System.getProperty("user.timezone"), "UTC");
+    runWithHelixMock(() -> {
+      FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
+      for (int i = 0; i < numServers; i++) {
+        _serverStarters.add(startOneServer(i));
+      }
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+    });
   }
 
   protected BaseServerStarter startOneServer(int serverId)
@@ -444,8 +448,8 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
-                URIUtils.encode(segmentTarFile.getName()))),
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+                + URIUtils.encode(segmentTarFile.getName())),
         new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
             FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name and table type as request parameters
@@ -509,7 +513,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query)
+  public JsonNode postQuery(String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
@@ -559,6 +563,13 @@ public abstract class ClusterTest extends ControllerTest {
   public JsonNode postQueryToController(String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
+  }
+
+  public JsonNode cancelQuery(String clientQueryId)
+    throws Exception {
+    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
+    Object o = _httpClient.sendDeleteRequest(cancelURI);
+    return null; // TODO
   }
 
   private Map<String, String> getExtraQueryPropertiesForController() {

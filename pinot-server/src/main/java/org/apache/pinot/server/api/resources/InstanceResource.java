@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +36,15 @@ import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
@@ -96,5 +102,23 @@ public class InstanceResource {
     }
     Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
     return pools == null ? Collections.emptyMap() : pools;
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/diskUtilization")
+  @ApiOperation(value = "Show disk utilization", notes = "Disk capacity and usage shown in bytes")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request – Invalid disk utilization path in header")
+  })
+  public String getDiskUsageInfo(@Context HttpHeaders headers)
+      throws WebApplicationException, IOException {
+    String pathStr = headers.getHeaderString("diskUtilizationPath");
+    if (StringUtils.isEmpty(pathStr)) {
+      throw new WebApplicationException("Invalid disk utilization path in header", 400);
+    }
+    DiskUsageInfo diskUsageInfo = DiskUtilization.computeDiskUsage(_instanceId, pathStr);
+    return ResourceUtils.convertToJsonString(diskUsageInfo);
   }
 }

@@ -93,7 +93,7 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
     // Aggregation function parameters
     segmentProcessorConfigBuilder.setAggregationFunctionParameters(
-        MergeTaskUtils.getAggregationFunctionParameters(configs));
+        MergeRollupTaskUtils.getAggregationFunctionParameters(configs));
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
@@ -106,8 +106,8 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
     int count = 1;
     for (File segmentDir : segmentDirs) {
-      _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
+      _eventObserver.notifyProgress(_pinotTaskConfig, "Creating RecordReader for: " + segmentDir + " (" + (count++)
+          + " out of " + numInputSegments + ")");
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
       recordReader.init(segmentDir, null, null, true);

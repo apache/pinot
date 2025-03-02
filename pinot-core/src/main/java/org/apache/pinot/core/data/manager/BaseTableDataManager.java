@@ -71,7 +71,9 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -125,7 +127,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _peerDownloadScheme;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
-  // Semaphore to restrict the maximum number of parallel segment downloads for a table
+  protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  // Semaphore to restrict the maximum number of parallel segment downloads from deep store for a table
   private Semaphore _segmentDownloadSemaphore;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
@@ -138,7 +141,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -166,6 +170,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           + "Please check for available space and write-permissions for this directory.", _resourceTmpDir);
     }
     _errorCache = errorCache;
+    _segmentOperationsThrottler = segmentOperationsThrottler;
     _recentlyDeletedSegments =
         CacheBuilder.newBuilder().maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
             .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES).build();
@@ -403,7 +408,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
     File indexDir = downloadSegment(zkMetadata);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler));
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
@@ -639,10 +644,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      // Download segment from deep store if CRC changes or forced to download;
-      // otherwise, copy backup directory back to the original index directory.
-      // And then continue to load the segment from the index directory.
-      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      /*
+      Determines if a segment should be downloaded from deep storage based on:
+      1. A forced download flag.
+      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+         between ZK metadata and local metadata CRC.
+         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+           and the segment is available in deep storage or with a peer before discarding
+           the local copy.
+
+      Otherwise:
+      - Copy the backup directory back to the original index directory.
+      - Continue loading the segment from the index directory.
+      */
+      boolean shouldDownload =
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(
+              zkMetadata, localMetadata));
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -683,7 +700,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
       _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
           TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema,
+          _segmentOperationsThrottler);
       addSegment(segment);
 
       // Remove backup directory to mark the completion of segment reloading.
@@ -703,6 +721,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentLock.unlock();
     }
     _logger.info("Reloaded segment: {}", segmentName);
+  }
+
+  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+    return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
+        || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
   private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
@@ -777,7 +800,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
@@ -785,49 +808,65 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     if (_segmentDownloadSemaphore != null) {
       long startTime = System.currentTimeMillis();
-      _logger.info("Acquiring segment download semaphore for segment: {}, queue-length: {} ", segmentName,
+      _logger.info("Acquiring table level segment download semaphore for segment: {}, queue-length: {} ", segmentName,
           _segmentDownloadSemaphore.getQueueLength());
       _segmentDownloadSemaphore.acquire();
-      _logger.info("Acquired segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
+      _logger.info("Acquired table level segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
           segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
     try {
-      File untarredSegmentDir;
-      if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
-        _logger.info("Downloading segment: {} using streamed download-untar with maxStreamRateInByte: {}", segmentName,
-            _streamSegmentDownloadUntarRateLimitBytesPerSec);
-        AtomicInteger failedAttempts = new AtomicInteger(0);
-        try {
-          untarredSegmentDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(downloadUrl, tempRootDir,
-              _streamSegmentDownloadUntarRateLimitBytesPerSec, failedAttempts);
-          _logger.info("Downloaded and untarred segment: {} from: {}, failed attempts: {}", segmentName, downloadUrl,
-              failedAttempts.get());
-        } finally {
-          _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
-              failedAttempts.get());
-        }
-      } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
-        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
-        _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
-            segmentTarFile, segmentTarFile.length());
-        untarredSegmentDir = untarSegment(segmentName, segmentTarFile, tempRootDir);
+      if (_segmentOperationsThrottler != null) {
+        long startTime = System.currentTimeMillis();
+        SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+        _logger.info("Acquiring instance level segment download semaphore for segment: {}, queue-length: {} ",
+            segmentName, segmentDownloadThrottler.getQueueLength());
+        segmentDownloadThrottler.acquire();
+        _logger.info("Acquired instance level segment download semaphore for segment: {} (lock-time={}ms, "
+                + "queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
+            segmentDownloadThrottler.getQueueLength());
       }
-      File indexDir = moveSegment(segmentName, untarredSegmentDir);
-      _logger.info("Downloaded segment: {} from: {} to: {}", segmentName, downloadUrl, indexDir);
-      return indexDir;
-    } catch (Exception e) {
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
-      throw e;
+      try {
+        File untarredSegmentDir;
+        if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
+          _logger.info("Downloading segment: {} using streamed download-untar with maxStreamRateInByte: {}",
+              segmentName, _streamSegmentDownloadUntarRateLimitBytesPerSec);
+          AtomicInteger failedAttempts = new AtomicInteger(0);
+          try {
+            untarredSegmentDir = SegmentFetcherFactory.fetchAndStreamUntarToLocal(downloadUrl, tempRootDir,
+                _streamSegmentDownloadUntarRateLimitBytesPerSec, failedAttempts);
+            _logger.info("Downloaded and untarred segment: {} from: {}, failed attempts: {}", segmentName, downloadUrl,
+                failedAttempts.get());
+          } finally {
+            _serverMetrics.addMeteredTableValue(_tableNameWithType,
+                ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, failedAttempts.get());
+          }
+        } else {
+          File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+          SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
+          _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
+              segmentTarFile, segmentTarFile.length());
+          untarredSegmentDir = untarSegment(segmentName, segmentTarFile, tempRootDir);
+        }
+        File indexDir = moveSegment(segmentName, untarredSegmentDir);
+        _logger.info("Downloaded segment: {} from: {} to: {}", segmentName, downloadUrl, indexDir);
+        return indexDir;
+      } catch (Exception e) {
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
+        throw e;
+      } finally {
+        if (_segmentOperationsThrottler != null) {
+          _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
+        }
+        FileUtils.deleteQuietly(tempRootDir);
+      }
     } finally {
       if (_segmentDownloadSemaphore != null) {
         _segmentDownloadSemaphore.release();
       }
-      FileUtils.deleteQuietly(tempRootDir);
     }
   }
 
-  private File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(_peerDownloadScheme != null, "Peer download is not enabled for table: %s",
@@ -835,6 +874,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
     File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    if (_segmentOperationsThrottler != null) {
+      long startTime = System.currentTimeMillis();
+      SegmentDownloadThrottler segmentDownloadThrottler = _segmentOperationsThrottler.getSegmentDownloadThrottler();
+      _logger.info("Acquiring instance level segment download semaphore for peer downloading segment: {}, "
+              + "queue-length: {} ", segmentName, segmentDownloadThrottler.getQueueLength());
+      segmentDownloadThrottler.acquire();
+      _logger.info("Acquired instance level segment download semaphore for peer downloading segment: {} "
+              + "(lock-time={}ms, queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
+          segmentDownloadThrottler.getQueueLength());
+    }
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -852,6 +901,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1);
       throw e;
     } finally {
+      if (_segmentOperationsThrottler != null) {
+        _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
+      }
       FileUtils.deleteQuietly(tempRootDir);
     }
   }
@@ -987,9 +1039,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
-    // If the segment doesn't exist on server or its CRC has changed, then we
-    // need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null || !hasSameCRC(zkMetadata, segmentMetadata)) {
+    /*
+    If:
+    1. The segment doesn't exist on the server, or
+    2. The segment status is marked as "DONE" in ZK metadata but there's a CRC mismatch
+       between the ZK metadata and the local metadata CRC.
+       - The "DONE" status confirms the COMMIT_END_METADATA call succeeded,
+         and the segment is available either in deep storage or with a peer
+         before discarding the local copy.
+
+    Then:
+    We need to fall back to downloading the segment from deep storage to load it.
+    */
+    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
       if (segmentMetadata == null) {
         _logger.info("Segment: {} does not exist", segmentName);
       } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
@@ -1012,7 +1074,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDirectory.copyTo(indexDir);
         // Close the stale SegmentDirectory object and recreate it with reprocessed segment.
         closeSegmentDirectoryQuietly(segmentDirectory);
-        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema);
+        ImmutableSegmentLoader.preprocess(indexDir, indexLoadingConfig, schema, _segmentOperationsThrottler);
         segmentDirectory = initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
       }
       ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig, schema);

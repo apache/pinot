@@ -20,6 +20,9 @@ package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,17 +36,20 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
+import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -54,6 +60,7 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForSegment;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -298,6 +305,47 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
+  public void testRemoveDeletedSegmentsForGcsPinotFS()
+      throws URISyntaxException, IOException {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+
+    FakeDeletionManager deletionManager1 = new FakeDeletionManager(
+        "fake://bucket/sc/managed/pinot", helixAdmin, propertyStore, 7);
+
+    PinotFSFactory.register("fake", FakePinotFs.class.getName(), null);
+    PinotFS pinotFS = PinotFSFactory.create("fake");
+
+    URI tableUri1 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_1/");
+    URI segment1ForTable1 = new URI(tableUri1.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201901010000");
+    URI segment2ForTable1 = new URI(tableUri1.getPath() + "segment2" + RETENTION_UNTIL_SEPARATOR + "210001010000");
+    pinotFS.mkdir(tableUri1);
+    pinotFS.mkdir(segment1ForTable1);
+    pinotFS.mkdir(segment2ForTable1);
+    // Create dummy files
+
+    URI tableUri2 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_2/");
+    URI segment1ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201901010000");
+    URI segment2ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201801010000");
+    pinotFS.mkdir(tableUri2);
+    pinotFS.mkdir(segment1ForTable2);
+    pinotFS.mkdir(segment2ForTable2);
+
+    deletionManager1.removeAgedDeletedSegments(leadControllerManager);
+    // all files should get deleted
+    Assert.assertFalse(pinotFS.exists(tableUri2));
+    // only one file that is beyond retention should exist
+    Assert.assertEquals(pinotFS.listFiles(tableUri1, false).length, 1);
+  }
+
+  @Test
   public void testSegmentDeletionLogic()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
@@ -352,6 +400,76 @@ public class SegmentDeletionManagerTest {
     }, 2000L, 10_000L, "Unable to verify table deletion with retention");
   }
 
+
+  @Test
+  public void testSegmentDeletionLogicWithFileWithGZExtension()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    File tempDir = Files.createTempDir();
+    tempDir.deleteOnExit();
+    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+
+    // create table segment files.
+    Set<String> segments = new HashSet<>(segmentsThatShouldBeDeleted());
+    createTableAndSegmentFilesWithGZExtension(tempDir, segmentsThatShouldBeDeleted());
+    final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+        + File.separator + TABLE_NAME);
+
+    // mock returning ZK Metadata for segment url
+    ZNRecord znRecord1 = mock(org.apache.helix.ZNRecord.class);
+    ZNRecord znRecord2 = mock(org.apache.helix.ZNRecord.class);
+    ZNRecord znRecord3 = mock(org.apache.helix.ZNRecord.class);
+    List<ZNRecord> znRecordList = List.of(znRecord1, znRecord2, znRecord3);
+    for (int i = 0; i < 3; i++) {
+      when(znRecordList.get(i).getSimpleFields()).thenReturn(Map.of(CommonConstants.Segment.DOWNLOAD_URL,
+          tableDir.getAbsolutePath() + File.separator + segmentsThatShouldBeDeleted().get(i)
+              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+      when(propertyStore.get(constructPropertyStorePathForSegment(TABLE_NAME, segmentsThatShouldBeDeleted().get(i)),
+          null, AccessOption.PERSISTENT)).thenReturn(znRecordList.get(i));
+    }
+
+    // delete the segments instantly.
+    SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(mockValidationConfig.getDeletedSegmentsRetentionPeriod()).thenReturn("0d");
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    deletionManager.deleteSegments(TABLE_NAME, segments, mockTableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+
+    // create table segment files again to test default retention.
+    createTableAndSegmentFilesWithGZExtension(tempDir, segmentsThatShouldBeDeleted());
+    // delete the segments with default retention
+    deletionManager.deleteSegments(TABLE_NAME, segments);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertEquals(deletedTableDir.listFiles().length, segments.size());
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+  }
+
+
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
       throws Exception {
     File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
@@ -363,6 +481,20 @@ public class SegmentDeletionManagerTest {
           tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
     }
   }
+
+  public void createTableAndSegmentFilesWithGZExtension(File tempDir, List<String> segmentIds)
+      throws Exception {
+    File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    tableDir.mkdir();
+    for (String segmentId : segmentIds) {
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, 0);
+      // Create segment metadata file
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
+    }
+  }
+
 
   public String genDeletedSegmentName(String fileName, int age, int retentionInDays) {
     // adding one more hours to the deletion time just to make sure the test goes pass the retention period because
@@ -408,6 +540,64 @@ public class SegmentDeletionManagerTest {
     protected void deleteSegmentsWithDelay(String tableName, Collection<String> segmentIds,
         @Nullable Long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
       _segmentsToRetry.addAll(segmentIds);
+    }
+  }
+
+  public static class FakePinotFs extends LocalPinotFS {
+
+    private Map<String, Set<String>> _tableDirs;
+
+    @Override
+    public void init(PinotConfiguration configuration) {
+      _tableDirs = new HashMap<>();
+    }
+
+    @Override
+    public boolean mkdir(URI uri)
+        throws IOException {
+      // create a new table Dir if the path ends with /
+      if (uri.getPath().endsWith("/")) {
+        _tableDirs.put(uri.getPath(), new HashSet<>());
+        return true;
+      }
+      // add the segment to the table dir
+      // we are including / in the table path to replicate responses of GcsPinotFs
+      String tableName = uri.getPath().substring(0, uri.getPath().lastIndexOf("/") + 1);
+      return _tableDirs.get(tableName).add(uri.getPath());
+    }
+
+    @Override
+    public boolean delete(URI uri, boolean forceDelete)
+        throws IOException {
+      // delete the key if it's a table
+      if (_tableDirs.containsKey(uri.getPath() + "/")) {
+        _tableDirs.remove(uri.getPath() + "/");
+        return true;
+      }
+      // remote the segment
+      String tableName = uri.getPath().substring(0, uri.getPath().lastIndexOf("/") + 1);
+      return _tableDirs.get(tableName).remove(uri.getPath());
+    }
+
+    @Override
+    public boolean exists(URI fileUri) {
+      return fileUri.getPath().endsWith("Deleted_Segments") || _tableDirs.containsKey(fileUri.getPath() + "/");
+    }
+
+    @Override
+    public String[] listFiles(URI fileUri, boolean recursive)
+        throws IOException {
+      if (fileUri.getPath().endsWith("Deleted_Segments")) {
+        return _tableDirs.keySet().toArray(new String[0]);
+      }
+      // the call to list segments will come without the delimiter after the table name
+      String tableName = fileUri.getPath().endsWith("/") ? fileUri.getPath() : fileUri.getPath() + "/";
+      return _tableDirs.get(tableName).toArray(new String[0]);
+    }
+
+    @Override
+    public boolean isDirectory(URI uri) {
+      return true;
     }
   }
 }

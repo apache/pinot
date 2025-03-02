@@ -50,6 +50,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -845,6 +846,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                // For tables with pauseless consumption enabled we want to start the commit protocol that
+                // 1. Updates the endOffset in the ZK metadata for the committing segment
+                // 2. Creates ZK metadata for the new consuming segment
+                // 3. Updates the IdealState for committing and new consuming segment to ONLINE and CONSUMING
+                // respectively.
+                // Refer to the PR for the new commit protocol: https://github.com/apache/pinot/pull/14741
+                if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+                  if (!startSegmentCommit()) {
+                    // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                    // Change the state to HOLDING before looping around.
+                    _state = State.HOLDING;
+                    _segmentLogger.info("Could not commit segment: {}. Retrying after hold", _segmentNameStr);
+                    hold();
+                    break;
+                  }
+                }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
                 if (_segmentBuildDescriptor == null) {
@@ -873,17 +890,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               break;
           }
         }
-      } catch (Exception e) {
+      } catch (Throwable e) {
         if (_shouldStop) {
           _segmentLogger.info("Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
               e.toString());
         } else {
           String errorMessage = "Exception while in work";
           _segmentLogger.error(errorMessage, e);
-          postStopConsumedMsg(e.getClass().getName());
           _state = State.ERROR;
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
           _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+          postStopConsumedMsg(e.getClass().getName());
           return;
         }
       }
@@ -905,6 +922,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
+  }
+
+  private boolean startSegmentCommit() {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    if (!segmentCommitStartResponse.getStatus()
+        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+      return false;
+    }
+    return true;
   }
 
   @VisibleForTesting
@@ -1023,7 +1056,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
-  SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
     // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
     // complete.
@@ -1619,7 +1652,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupConsumerSemaphore.acquire();
+      long startTimeMs = System.currentTimeMillis();
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
+        _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
+            System.currentTimeMillis() - startTimeMs);
+      }
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
@@ -1649,17 +1686,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
       _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
           : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
-    } catch (Exception e) {
+    } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
       _partitionGroupConsumerSemaphore.release();
+      _acquiredConsumerSemaphore.set(false);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
-          "Failed to initialize segment data manager", e));
+          "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
            + " to initialization error: '{}'",
-          e.getMessage());
+          t.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
       // invoke controller API mark it OFFLINE in the idealstate.
@@ -1677,7 +1715,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
       }).start();
-      throw e;
+      throw t;
     }
   }
 

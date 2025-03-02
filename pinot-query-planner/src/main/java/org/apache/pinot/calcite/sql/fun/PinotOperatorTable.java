@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -33,7 +34,10 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
+import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
+import org.apache.calcite.sql.fun.SqlNtileAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeFamily;
@@ -68,6 +72,30 @@ public class PinotOperatorTable implements SqlOperatorTable {
   public static PinotOperatorTable instance() {
     return INSTANCE.get();
   }
+
+  // The standard Calcite + and - operators don't support operations on TIMESTAMP types. However, Pinot supports these
+  // operations, so we need to define our own operators. Note that Postgres supports - on TIMESTAMP types, but not +.
+  // Calcite only supports such operations if the second operand is an interval (similar to Postgres for the +
+  // operator).
+  public static final SqlBinaryOperator PINOT_PLUS =
+      new SqlMonotonicBinaryOperator(
+          "+",
+          SqlKind.PLUS,
+          40,
+          true,
+          ReturnTypes.NULLABLE_SUM,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.PLUS_OPERATOR.or(OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP)));
+
+  public static final SqlBinaryOperator PINOT_MINUS =
+      new SqlMonotonicBinaryOperator(
+          "-",
+          SqlKind.MINUS,
+          40,
+          true,
+          ReturnTypes.NULLABLE_SUM,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.MINUS_OPERATOR.or(OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP)));
 
   /**
    * This list includes the supported standard {@link SqlOperator}s defined in {@link SqlStdOperatorTable}.
@@ -105,12 +133,12 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.SEARCH,
       SqlStdOperatorTable.LESS_THAN,
       SqlStdOperatorTable.LESS_THAN_OR_EQUAL,
-      SqlStdOperatorTable.MINUS,
       SqlStdOperatorTable.MULTIPLY,
       SqlStdOperatorTable.NOT_EQUALS,
       SqlStdOperatorTable.OR,
-      SqlStdOperatorTable.PLUS,
       SqlStdOperatorTable.INTERVAL,
+      PINOT_MINUS,
+      PINOT_PLUS,
 
       // POSTFIX OPERATORS
       SqlStdOperatorTable.DESC,
@@ -148,6 +176,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.DENSE_RANK,
       SqlStdOperatorTable.RANK,
       SqlStdOperatorTable.ROW_NUMBER,
+      // The Calcite standard NTILE operator doesn't override the allowsFraming method, so we need to define our own.
+      // The NTILE operator doesn't allow custom window frames in other SQL databases as well, so this is probably a
+      // mistake in Calcite.
+      PinotNtileWindowFunction.INSTANCE,
 
       // WINDOW Functions (non-aggregate)
       SqlStdOperatorTable.LAST_VALUE,
@@ -202,21 +234,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.TIMESTAMP_ADD,
       SqlStdOperatorTable.TIMESTAMP_DIFF,
       SqlStdOperatorTable.CAST,
-
       SqlStdOperatorTable.EXTRACT,
-      // TODO: The following operators are all rewritten to EXTRACT. Consider removing them because they are all
-      //       supported without rewrite.
-      SqlStdOperatorTable.YEAR,
-      SqlStdOperatorTable.QUARTER,
-      SqlStdOperatorTable.MONTH,
-      SqlStdOperatorTable.WEEK,
-      SqlStdOperatorTable.DAYOFYEAR,
-      SqlStdOperatorTable.DAYOFMONTH,
-      SqlStdOperatorTable.DAYOFWEEK,
-      SqlStdOperatorTable.HOUR,
-      SqlStdOperatorTable.MINUTE,
-      SqlStdOperatorTable.SECOND,
-
       SqlStdOperatorTable.ITEM,
       SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
       SqlStdOperatorTable.LISTAGG
@@ -231,8 +249,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       Pair.of(SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, List.of("GREATER_THAN_OR_EQUAL")),
       Pair.of(SqlStdOperatorTable.LESS_THAN, List.of("LESS_THAN")),
       Pair.of(SqlStdOperatorTable.LESS_THAN_OR_EQUAL, List.of("LESS_THAN_OR_EQUAL")),
-      Pair.of(SqlStdOperatorTable.MINUS, List.of("SUB", "MINUS")),
-      Pair.of(SqlStdOperatorTable.PLUS, List.of("ADD", "PLUS")),
+      Pair.of(PINOT_MINUS, List.of("SUB", "MINUS")),
+      Pair.of(PINOT_PLUS, List.of("ADD", "PLUS")),
       Pair.of(SqlStdOperatorTable.MULTIPLY, List.of("MULT", "TIMES"))
   );
 
@@ -241,7 +259,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
    */
   private static final List<SqlOperator> PINOT_OPERATORS = List.of(
       // Placeholder for special predicates
-      new PinotSqlFunction("TEXT_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("TEXT_CONTAINS", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("JSON_MATCH", ReturnTypes.BOOLEAN, OperandTypes.CHARACTER_CHARACTER),
       new PinotSqlFunction("VECTOR_SIMILARITY", ReturnTypes.BOOLEAN,
@@ -404,6 +421,15 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
     @Override
     public boolean allowsNullTreatment() {
+      return false;
+    }
+  }
+
+  private static final class PinotNtileWindowFunction extends SqlNtileAggFunction {
+    static final SqlOperator INSTANCE = new PinotNtileWindowFunction();
+
+    @Override
+    public boolean allowsFraming() {
       return false;
     }
   }

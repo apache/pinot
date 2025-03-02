@@ -99,28 +99,28 @@ import org.slf4j.LoggerFactory;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
-  private static final CalciteConnectionConfig CONNECTION_CONFIG;
-
-  static {
-    Properties connectionConfigProperties = new Properties();
-    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    CONNECTION_CONFIG = new CalciteConnectionConfigImpl(connectionConfigProperties);
-  }
 
   private final TypeFactory _typeFactory = new TypeFactory();
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
   private final Config _envConfig;
+  private final PinotCatalog _catalog;
 
   public QueryEnvironment(Config config) {
     _envConfig = config;
     String database = config.getDatabase();
-    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
+    _catalog = new PinotCatalog(config.getTableCache(), database);
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
+    Properties connectionConfigProperties = new Properties();
+    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
+        config.getTableCache() == null
+            ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+            : !config.getTableCache().isIgnoreCase()));
+    CalciteConnectionConfig connectionConfig = new CalciteConnectionConfigImpl(connectionConfigProperties);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
-    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
+    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, connectionConfig);
     _optProgram = getOptProgram();
   }
 
@@ -138,7 +138,12 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     HepProgram traitProgram = getTraitProgram(workerManager);
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
+        sqlNodeAndOptions.getOptions(), _envConfig);
+  }
+
+  public Set<String> getResolvedTables() {
+    return _catalog.getResolvedTables();
   }
 
   @Nullable
@@ -152,7 +157,9 @@ public class QueryEnvironment {
     }
     switch (inferPartitionHint.toLowerCase()) {
       case "true":
-        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint");
+        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint. "
+            + "Please enable it using broker config"
+            + CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER + "=true");
         return workerManager;
       case "false":
         return null;
@@ -161,14 +168,6 @@ public class QueryEnvironment {
             + CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT + "': "
             + inferPartitionHint);
     }
-  }
-
-  /**
-   * Returns the planner context that should be used only for parsing queries.
-   */
-  private PlannerContext getParsingPlannerContext() {
-    HepProgram traitProgram = getTraitProgram(null);
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
   }
 
   /**
@@ -185,7 +184,6 @@ public class QueryEnvironment {
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
-      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
@@ -209,8 +207,7 @@ public class QueryEnvironment {
    *
    * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions, long)}, this API runs the query
    * compilation. But it doesn't run the distributed {@link DispatchableSubPlan} generation, instead it only
-   * returns the
-   * explained logical plan.
+   * returns the explained logical plan.
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
@@ -221,7 +218,6 @@ public class QueryEnvironment {
       @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
     try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
-      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
@@ -251,7 +247,7 @@ public class QueryEnvironment {
               onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
           RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
-              dispatchableSubPlan.getQueryStageList(), nodeTracker, serversExplainer);
+              dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
 
           String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
 
@@ -271,8 +267,9 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    try (PlannerContext plannerContext = getParsingPlannerContext()) {
-      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
+    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
@@ -288,17 +285,27 @@ public class QueryEnvironment {
    * Returns whether the query can be successfully compiled in this query environment
    */
   public boolean canCompileQuery(String query) {
-    try (PlannerContext plannerContext = getParsingPlannerContext()) {
-      SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
+    return getRelRootIfCanCompile(query) != null;
+  }
+
+  /**
+   * Returns the RelRoot node if the query can be compiled, null otherwise.
+   */
+  @Nullable
+  public RelRoot getRelRootIfCanCompile(String query) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions);
+      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      compileQuery(sqlNode, plannerContext);
+      RelRoot node = compileQuery(sqlNode, plannerContext);
       LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
-      return true;
-    } catch (Exception e) {
-      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
-      return false;
+      return node;
+    } catch (Throwable t) {
+      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, t);
+      return null;
     }
   }
 
@@ -400,7 +407,8 @@ public class QueryEnvironment {
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker);
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
+        _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
@@ -465,6 +473,14 @@ public class QueryEnvironment {
     return ImmutableQueryEnvironment.Config.builder();
   }
 
+  public boolean useSpools(Map<String, String> options) {
+    String optionValue = options.get(CommonConstants.Broker.Request.QueryOptionKey.USE_SPOOLS);
+    if (optionValue == null) {
+      return _envConfig.defaultUseSpools();
+    }
+    return Boolean.parseBoolean(optionValue);
+  }
+
   @Value.Immutable
   public interface Config {
     String getDatabase();
@@ -482,6 +498,23 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultInferPartitionHint() {
       return CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT;
+    }
+
+    /**
+     * Whether to use spools or not.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_SPOOLS}.
+     */
+    @Value.Default
+    default boolean defaultUseSpools() {
+      return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
+    }
+
+    @Value.Default
+    default boolean defaultEnableGroupTrim() {
+      return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
     }
 
     /**

@@ -65,6 +65,7 @@ import static org.testng.Assert.*;
 @Test(groups = "stateless")
 public class PinotTaskManagerStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "myTable";
+  public static final String TABLE_NAME_WITH_TYPE = "myTable_OFFLINE";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final long TIMEOUT_IN_MS = 10_000L;
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManagerStatelessTest.class);
@@ -192,9 +193,15 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   public void testPinotTaskManagerScheduleTaskWithStoppedTaskQueue()
       throws Exception {
     testValidateTaskGeneration(taskManager -> {
+      String taskName = "SegmentGenerationAndPushTask";
+      TaskSchedulingContext context = new TaskSchedulingContext()
+          .setTablesToSchedule(Collections.singleton(TABLE_NAME_WITH_TYPE))
+          .setTasksToSchedule(Collections.singleton(taskName));
       // Validate schedule tasks for table when task queue is in stopped state
-      List<String> taskIDs = taskManager.scheduleTaskForTable("SegmentGenerationAndPushTask", "myTable", null);
-      assertNull(taskIDs);
+      TaskSchedulingInfo info = taskManager.scheduleTasks(context).get(taskName);
+      assertNotNull(info);
+      assertNull(info.getScheduledTaskNames());
+      assertFalse(info.getSchedulingErrors().isEmpty());
       return null;
     });
   }

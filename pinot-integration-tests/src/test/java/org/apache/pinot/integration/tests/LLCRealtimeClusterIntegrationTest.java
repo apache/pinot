@@ -41,9 +41,9 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
@@ -68,7 +68,6 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.junit.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -425,34 +424,69 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Test
   public void testForceCommit()
       throws Exception {
-    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
-    String jobId = forceCommit(getTableName());
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(realtimeTableName);
+    if (RANDOM.nextBoolean()) {
+      // Regular force commit without batch
+      String jobId = forceCommit(realtimeTableName);
+      testForceCommitInternal(realtimeTableName, jobId, consumingSegments, 60000L);
+    } else {
+      // Force commit with batch
+      String jobId = forceCommit(realtimeTableName, 1, 1, 120);
+      testForceCommitInternal(realtimeTableName, jobId, consumingSegments, 120000L);
+    }
+  }
+
+  public Set<String> getConsumingSegmentsFromIdealState(String realtimeTableName) {
+    IdealState idealState = _helixResourceManager.getTableIdealState(realtimeTableName);
+    assertNotNull(idealState);
+    Set<String> consumingSegments = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      if (entry.getValue().containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+        consumingSegments.add(entry.getKey());
+      }
+    }
+    return consumingSegments;
+  }
+
+  private String forceCommit(String tableName)
+      throws Exception {
+    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
+    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+  }
+
+  private String forceCommit(String tableName, int batchSize, int batchIntervalSec, int batchTimeoutSec)
+      throws Exception {
+    String response = sendPostRequest(
+        _controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize
+            + "&batchStatusCheckIntervalSec=" + batchIntervalSec + "&batchStatusCheckTimeoutSec=" + batchTimeoutSec,
+        null);
+    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+  }
+
+  private void testForceCommitInternal(String realtimeTableName, String jobId, Set<String> consumingSegments,
+      long timeoutMs) {
+    Map<String, String> jobMetadata =
+        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
+    assertNotNull(jobMetadata);
+    assertNotNull(jobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST));
 
     TestUtils.waitForCondition(aVoid -> {
       try {
         if (isForceCommitJobCompleted(jobId)) {
-          assertTrue(_controllerStarter.getHelixResourceManager()
-              .getOnlineSegmentsFromIdealState(getTableName() + "_REALTIME", false).containsAll(consumingSegments));
+          for (String segmentName : consumingSegments) {
+            SegmentZKMetadata segmentZKMetadata =
+                _helixResourceManager.getSegmentZKMetadata(realtimeTableName, segmentName);
+            assertNotNull(segmentZKMetadata);
+            assertEquals(segmentZKMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
+          }
           return true;
         }
         return false;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
-    }, 60000L, "Error verifying force commit operation on table!");
-  }
-
-  public Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
-    IdealState tableIdealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
-    Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
-    Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
-    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      Map<String, String> instanceStateMap = entry.getValue();
-      if (instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-        matchingSegments.add(entry.getKey());
-      }
-    }
-    return matchingSegments;
+    }, timeoutMs, "Error verifying force commit operation on table!");
   }
 
   public boolean isForceCommitJobCompleted(String forceCommitJobId)
@@ -462,13 +496,19 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
     assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);
     assertEquals(jobStatus.get("jobType").asText(), "FORCE_COMMIT");
-    return jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == 0;
-  }
 
-  private String forceCommit(String tableName)
-      throws Exception {
-    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
-    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+    Set<String> allSegments = JsonUtils.stringToObject(
+        jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST).asText(), HashSet.class);
+    Set<String> pendingSegments = new HashSet<>();
+    for (JsonNode element : jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST)) {
+      pendingSegments.add(element.asText());
+    }
+
+    assertTrue(pendingSegments.size() <= allSegments.size());
+    assertEquals(jobStatus.get(CommonConstants.ControllerJob.NUM_CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED).asInt(-1),
+        pendingSegments.size());
+
+    return pendingSegments.isEmpty();
   }
 
   @Test
@@ -536,7 +576,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
           }
         }
       });
-      Assert.assertTrue("No consuming segment found in partition " + partition, seqNum.get() >= 0);
+      assertTrue(seqNum.get() >= 0, "No consuming segment found in partition: " + partition);
       return seqNum.get();
     }
 

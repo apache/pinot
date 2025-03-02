@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -149,8 +151,8 @@ public class BlockExchangeTest {
     TransferableBlock outBlockTwo =
         new TransferableBlock(ImmutableList.of(new Object[]{"two"}), schema, DataBlock.Type.ROW);
 
-    BlockExchange exchange = new TestBlockExchange(destinations,
-        (block, type, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator());
+    BlockExchange exchange =
+        new TestBlockExchange(destinations, (block, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator());
 
     // When:
     exchange.send(inBlock);
@@ -167,16 +169,16 @@ public class BlockExchangeTest {
 
   private static class TestBlockExchange extends BlockExchange {
     protected TestBlockExchange(List<SendingMailbox> destinations) {
-      this(destinations, (block, type, size) -> Iterators.singletonIterator(block));
+      this(destinations, (block, size) -> Iterators.singletonIterator(block));
     }
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(destinations, splitter);
+      super(destinations, splitter, BlockExchange.RANDOM_INDEX_CHOOSER);
     }
 
     @Override
     protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-        throws Exception {
+        throws IOException, TimeoutException {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }

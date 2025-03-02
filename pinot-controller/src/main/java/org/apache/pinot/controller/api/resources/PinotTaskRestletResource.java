@@ -81,12 +81,15 @@ import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -142,6 +145,8 @@ public class PinotTaskRestletResource {
 
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
+  public static final String GENERATION_ERRORS_KEY = "generationErrors";
+  public static final String SCHEDULING_ERRORS_KEY = "schedulingErrors";
 
   @Inject
   PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
@@ -642,21 +647,32 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on") @QueryParam("minionInstanceTag")
       @Nullable String minionInstanceTag, @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
+    Map<String, String> response = new HashMap<>();
+    List<String> generationErrors = new ArrayList<>();
+    List<String> schedulingErrors = new ArrayList<>();
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTriggeredBy(CommonConstants.TaskTriggers.MANUAL_TRIGGER.name())
+        .setMinionInstanceTag(minionInstanceTag)
+        .setLeader(false);
     if (taskType != null) {
-      // Schedule task for the given task type
-      List<String> taskNames = tableName != null ? _pinotTaskManager.scheduleTaskForTable(taskType,
-          DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
-          : _pinotTaskManager.scheduleTaskForDatabase(taskType, database, minionInstanceTag);
-      return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
-    } else {
-      // Schedule tasks for all task types
-      Map<String, List<String>> allTaskNames = tableName != null ? _pinotTaskManager.scheduleAllTasksForTable(
-          DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
-          : _pinotTaskManager.scheduleAllTasksForDatabase(database, minionInstanceTag);
-      Map<String, String> result = allTaskNames.entrySet().stream().filter(entry -> entry.getValue() != null)
-          .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
-      return result.isEmpty() ? null : result;
+      context.setTasksToSchedule(Collections.singleton(taskType));
     }
+    if (tableName != null) {
+      context.setTablesToSchedule(Collections.singleton(DatabaseUtils.translateTableName(tableName, headers)));
+    } else {
+      context.setDatabasesToSchedule(Collections.singleton(database));
+    }
+    Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
+    allTaskInfos.forEach((key, value) -> {
+      if (value.getScheduledTaskNames() != null) {
+        response.put(key, String.join(",", value.getScheduledTaskNames()));
+      }
+      generationErrors.addAll(value.getGenerationErrors());
+      schedulingErrors.addAll(value.getSchedulingErrors());
+    });
+    response.put(GENERATION_ERRORS_KEY, String.join(",", generationErrors));
+    response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
+    return response;
   }
 
   @POST

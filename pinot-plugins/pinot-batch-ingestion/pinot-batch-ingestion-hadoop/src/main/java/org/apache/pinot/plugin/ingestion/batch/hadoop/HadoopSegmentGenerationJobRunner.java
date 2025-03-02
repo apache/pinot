@@ -22,10 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -280,8 +278,8 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
 
       LOGGER.info("Moving segment tars from staging directory [{}] to output directory [{}]", stagingDirURI,
           outputDirURI);
-      moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(), outputDirURI,
-          _spec.isOverwriteOutput());
+      SegmentGenerationJobUtils.moveFiles(outputDirFS, new Path(stagingDir, SEGMENT_TAR_SUBDIR_NAME).toUri(),
+          outputDirURI, _spec.isOverwriteOutput());
     } finally {
       LOGGER.info("Trying to clean up staging directory: [{}]", stagingDirURI);
       outputDirFS.delete(stagingDirURI, true);
@@ -297,35 +295,6 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       dataOutputStream.write((inputFileURI + " " + seqId).getBytes(UTF_8));
       dataOutputStream.flush();
       outputDirFS.copyFromLocalFile(localFile, new Path(stagingInputDir, Integer.toString(seqId)).toUri());
-    }
-  }
-
-  /**
-   * Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
-   * If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
-   * log a warning and continue. We assume that source and destination directories are on the same filesystem,
-   * so that move() can be used.
-   *
-   * @param fs
-   * @param sourceDir
-   * @param destDir
-   * @param overwrite
-   * @throws IOException
-   * @throws URISyntaxException
-   */
-  private void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite)
-      throws IOException, URISyntaxException {
-    for (String sourcePath : fs.listFiles(sourceDir, true)) {
-      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
-      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
-      URI destFileUri =
-          SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
-
-      if (!overwrite && fs.exists(destFileUri)) {
-        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
-      } else {
-        fs.move(sourceFileUri, destFileUri, true);
-      }
     }
   }
 

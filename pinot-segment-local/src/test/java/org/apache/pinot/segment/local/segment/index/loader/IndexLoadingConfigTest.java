@@ -183,9 +183,9 @@ public class IndexLoadingConfigTest {
     assertTrue(forwardIndexConfig.isEnabled());
     assertNull(forwardIndexConfig.getCompressionCodec());
     assertFalse(forwardIndexConfig.isDeriveNumDocsPerChunk());
-    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
-    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
-    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
+    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
 
     // Check custom settings
     //@formatter:off
@@ -242,8 +242,8 @@ public class IndexLoadingConfigTest {
     assertFalse(forwardIndexConfig.isEnabled());
     assertNull(forwardIndexConfig.getCompressionCodec());
     assertFalse(forwardIndexConfig.isDeriveNumDocsPerChunk());
-    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
-    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE);
-    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+    assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
+    assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
+    assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 }

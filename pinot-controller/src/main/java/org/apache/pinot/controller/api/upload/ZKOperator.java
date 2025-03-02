@@ -33,6 +33,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -40,9 +41,9 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,6 +169,44 @@ public class ZKOperator {
 
     // process existing segments
     processExistingSegments(tableNameWithType, uploadType, enableParallelPushProtection, headers, existingSegmentsList);
+  }
+
+  public void completeReingestedSegmentOperations(String realtimeTableName, SegmentMetadata segmentMetadata,
+      URI finalSegmentLocationURI, String sourceDownloadURIStr, String segmentDownloadURIStr, long segmentSizeInBytes)
+      throws Exception {
+    String segmentName = segmentMetadata.getName();
+    ZNRecord segmentMetadataZNRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(realtimeTableName, segmentName);
+    if (segmentMetadataZNRecord == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find segment ZK metadata for segment: " + segmentName,
+          Response.Status.NOT_FOUND);
+    }
+    int expectedVersion = segmentMetadataZNRecord.getVersion();
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadataZNRecord);
+    if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.COMMITTING) {
+      throw new ControllerApplicationException(LOGGER,
+          "Reingested segment: " + segmentName + " must be in COMMITTING status, but found: "
+              + segmentZKMetadata.getStatus(), Response.Status.CONFLICT);
+    }
+
+    // Copy the segment to the final location
+    copyFromSegmentURIToDeepStore(new URI(sourceDownloadURIStr), finalSegmentLocationURI);
+    LOGGER.info("Copied reingested segment: {} of table: {} to final location: {}", segmentName, realtimeTableName,
+        finalSegmentLocationURI);
+
+    // Update the ZK metadata
+    segmentZKMetadata.setCustomMap(segmentMetadata.getCustomMap());
+    SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata,
+        segmentDownloadURIStr, segmentSizeInBytes, segmentZKMetadata.getEndOffset());
+    if (!_pinotHelixResourceManager.updateZkMetadata(realtimeTableName, segmentZKMetadata, expectedVersion)) {
+      throw new RuntimeException(
+          String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d", segmentName,
+              realtimeTableName, expectedVersion));
+    }
+    LOGGER.info("Updated reingested segment: {} of table: {} to property store", segmentName, realtimeTableName);
+
+    // Send a message to servers hosting the table to reset the segment
+    _pinotHelixResourceManager.resetSegment(realtimeTableName, segmentName, null);
   }
 
   /**
@@ -309,11 +348,11 @@ public class ZKOperator {
         if (customMapModifier == null) {
           // If no modifier is provided, use the custom map from the segment metadata
           segmentZKMetadata.setCustomMap(null);
-          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+          SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
               segmentDownloadURIStr, crypterName, segmentSizeInBytes);
         } else {
           // If modifier is provided, first set the custom map from the segment metadata, then apply the modifier
-          ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+          SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
               segmentDownloadURIStr, crypterName, segmentSizeInBytes);
           segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
         }
@@ -446,11 +485,11 @@ public class ZKOperator {
           if (customMapModifier == null) {
             // If no modifier is provided, use the custom map from the segment metadata
             segmentZKMetadata.setCustomMap(null);
-            ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+            SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
                 segmentDownloadURIStr, crypterName, segmentSizeInBytes);
           } else {
             // If modifier is provided, first set the custom map from the segment metadata, then apply the modifier
-            ZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
+            SegmentZKMetadataUtils.refreshSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata,
                 segmentDownloadURIStr, crypterName, segmentSizeInBytes);
             segmentZKMetadata.setCustomMap(customMapModifier.modifyMap(segmentZKMetadata.getCustomMap()));
           }
@@ -502,7 +541,7 @@ public class ZKOperator {
     SegmentZKMetadata newSegmentZKMetadata;
     try {
       newSegmentZKMetadata =
-          ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, segmentDownloadURIStr,
+          SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata, segmentDownloadURIStr,
               crypterName, segmentSizeInBytes);
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER,
@@ -590,7 +629,7 @@ public class ZKOperator {
       long segmentSizeInBytes = segmentUploadMetadata.getSegmentSizeInBytes();
       File segmentFile = segmentUploadMetadata.getEncryptionInfo().getRight();
       try {
-        newSegmentZKMetadata = ZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata,
+        newSegmentZKMetadata = SegmentZKMetadataUtils.createSegmentZKMetadata(tableNameWithType, segmentMetadata,
             segmentDownloadURIStr, crypterName, segmentSizeInBytes);
         segmentZKMetadataMap.put(segmentName, newSegmentZKMetadata);
         segmentNames.add(segmentName);

@@ -182,7 +182,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     File indexDir = createSegment(tableConfig, schema, segmentName, rows);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+        BaseTableDataManagerTest.SEGMENT_OPERATIONS_THROTTLER);
     when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
     return segmentDataManager;
   }

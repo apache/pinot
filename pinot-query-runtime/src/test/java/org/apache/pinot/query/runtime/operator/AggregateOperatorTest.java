@@ -20,6 +20,8 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
@@ -33,6 +35,9 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -263,6 +268,46 @@ public class AggregateOperatorTest {
     StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
     assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");
+  }
+
+  @Test
+  public void testDefaultGroupTrimSize() {
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
+
+    assertEquals(getAggregateOperator(context, null, 0, null).getGroupTrimSize(), Integer.MAX_VALUE);
+    assertEquals(getAggregateOperator(context, null, 10, null).getGroupTrimSize(), 10);
+
+    List<RelFieldCollation> collations = List.of(new RelFieldCollation(1));
+    assertEquals(getAggregateOperator(context, null, 0, collations).getGroupTrimSize(), Integer.MAX_VALUE);
+    assertEquals(getAggregateOperator(context, null, 10, collations).getGroupTrimSize(),
+        Server.DEFAULT_MSE_MIN_GROUP_TRIM_SIZE);
+  }
+
+  @Test
+  public void testGroupTrimSizeDependsOnContextValue() {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
+    assertEquals(getAggregateOperator(context, null, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 100);
+  }
+
+  @Test
+  public void testGroupTrimHintOverridesContextValue() {
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        Map.of(PinotHintOptions.AggregateOptions.MSE_MIN_GROUP_TRIM_SIZE, "30")));
+    OpChainExecutionContext context =
+        OperatorTestUtil.getContext(Map.of(QueryOptionKey.MSE_MIN_GROUP_TRIM_SIZE, "100"));
+    assertEquals(getAggregateOperator(context, nodeHint, 5, List.of(new RelFieldCollation(1))).getGroupTrimSize(), 30);
+  }
+
+  private AggregateOperator getAggregateOperator(OpChainExecutionContext context, PlanNode.NodeHint nodeHint, int limit,
+      @Nullable List<RelFieldCollation> collations) {
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1);
+    List<Integer> groupKeys = List.of(0);
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    return new AggregateOperator(context, _input,
+        new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT, false,
+            collations, limit));
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

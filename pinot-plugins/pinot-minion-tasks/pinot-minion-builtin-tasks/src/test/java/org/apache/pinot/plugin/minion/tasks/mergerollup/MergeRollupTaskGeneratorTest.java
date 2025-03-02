@@ -50,6 +50,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -61,10 +65,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -111,6 +112,127 @@ public class MergeRollupTaskGeneratorTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
             .setDedupConfig(new DedupConfig(true, HashFunction.MD5)).build();
     assertFalse(MergeRollupTaskGenerator.validate(tableConfig, MinionConstants.MergeRollupTask.TASK_TYPE));
+  }
+
+  @Test
+  public void testValidMergeLevelTaskConfig() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("a", FieldSpec.DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec("b", FieldSpec.DataType.STRING, false));
+    schema.addField(new MetricFieldSpec("c", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> validConfig = new HashMap<>();
+    validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    validConfig.put(mergeLevel + ".eraseDimensionValues", "a,b");
+    validConfig.put(prefix + "c.nominalEntries", "8092");
+    validConfig.put(prefix + "c.samplingProbability", "0.9");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
+        .build();
+    taskGenerator.validateTaskConfigs(offlineTableConfig, schema, validConfig);
+  }
+
+  @Test
+  public void testInvalidDimensionsToErase() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("a", FieldSpec.DataType.STRING, false));
+
+    String mergeLevel = "hourly";
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(mergeLevel + ".eraseDimensionValues", "b");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
+  }
+
+  @Test
+  public void testInvalidAggregationFunctionFieldName() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(prefix + "b.nominalEntries", "8092");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
+  }
+
+  @Test
+  public void testInvalidSamplingProbability() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(prefix + "a.samplingProbability", "-1.01");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
+  }
+
+  @Test
+  public void testInvalidNominalEntries() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(prefix + "a.nominalEntries", "0");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
+  }
+
+  @Test
+  public void testInvalidLgK() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(prefix + "a.lgK", "0");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
   }
 
   /**

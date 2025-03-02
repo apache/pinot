@@ -160,7 +160,7 @@ public class MinionConstants {
             DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
             SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
             DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
-            DISTINCTCOUNTRAWULL);
+            DISTINCTCOUNTRAWULL, PERCENTILEKLL, PERCENTILERAWKLL);
   }
 
   // Generate segment and push to controller based on batch ingestion configs
@@ -281,6 +281,11 @@ public class MinionConstants {
      * maximum number of segments to process in a single task
      */
     public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
+
+    /**
+     * maximum size of output segments to produce
+     */
+    public static final String OUTPUT_SEGMENT_MAX_SIZE_KEY = "outputSegmentMaxSize";
 
     /**
      * default maximum number of segments to process in a single task

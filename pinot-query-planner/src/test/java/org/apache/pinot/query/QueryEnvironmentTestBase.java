@@ -253,7 +253,16 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp BETWEEN TIMESTAMP '2016-01-01 00:00:00' AND "
             + "TIMESTAMP '2016-01-01 10:00:00'"},
         new Object[]{"SELECT ts_timestamp FROM a WHERE ts_timestamp >= CAST(1454284798000 AS TIMESTAMP)"},
-        new Object[]{"SELECT TIMESTAMPADD(day, 10, NOW()) FROM a"}
+        new Object[]{"SELECT TIMESTAMPADD(day, 10, NOW()) FROM a"},
+        new Object[]{"SELECT ts_timestamp - CAST(123456789 AS TIMESTAMP) FROM a"},
+        new Object[]{"SELECT SUB(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"},
+        new Object[]{"SELECT ts_timestamp + CAST(123456789 AS TIMESTAMP) FROM a"},
+        new Object[]{"SELECT ADD(ts_timestamp, CAST(123456789 AS TIMESTAMP)) FROM a"},
+        new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1, 512) FROM a"},
+        new Object[]{"SELECT FREQUENT_STRINGS_SKETCH(col1) FROM a"},
+        new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3, 1024) FROM a"},
+        new Object[]{"SELECT FREQUENT_LONGS_SKETCH(col3) FROM a"},
+        new Object[]{"SELECT DAY_OF_WEEK(ts_timestamp, 'UTC') FROM a"}
     };
   }
 
@@ -298,7 +307,7 @@ public class QueryEnvironmentTestBase {
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
-        new WorkerManager("localhost", reducerPort, routingManager));
+        new WorkerManager("Broker_localhost", "localhost", reducerPort, routingManager));
   }
 
   /**

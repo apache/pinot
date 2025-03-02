@@ -35,7 +35,6 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -43,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 /**
@@ -75,7 +75,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 public class QueryContext {
   private final String _tableName;
   private final QueryContext _subquery;
-  private final TimeSeriesContext _timeSeriesContext;
   private final List<ExpressionContext> _selectExpressions;
   private final boolean _distinct;
   private final List<String> _aliasList;
@@ -110,20 +109,24 @@ public class QueryContext {
   // Whether to skip reordering scan filters for the query
   private boolean _skipScanFilterReorder;
   // Maximum number of threads used to execute the query
-  private int _maxExecutionThreads = InstancePlanMakerImplV2.DEFAULT_MAX_EXECUTION_THREADS;
+  private int _maxExecutionThreads = Server.DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS;
   // The following properties apply to group-by queries
   // Maximum initial capacity of the group-by result holder
-  private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  private int _maxInitialResultHolderCapacity = Server.DEFAULT_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
   // Initial capacity of the indexed table
-  private int _minInitialIndexedTableCapacity = InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
+  private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
-  private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
+  private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
-  private int _minSegmentGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE;
+  private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   // Minimum number of groups to keep across segments when trimming groups for SQL GROUP BY
-  private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
+  private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
-  private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
+  private int _groupTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  // Number of threads to use for final reduce
+  private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
+  // Parallel chunk size for final reduce
+  private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -134,14 +137,13 @@ public class QueryContext {
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
-      @Nullable TimeSeriesContext timeSeriesContext, List<ExpressionContext> selectExpressions, boolean distinct,
-      List<String> aliasList, @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
+      List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
+      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions,
       @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
-    _timeSeriesContext = timeSeriesContext;
     _selectExpressions = selectExpressions;
     _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
@@ -170,11 +172,6 @@ public class QueryContext {
   @Nullable
   public QueryContext getSubquery() {
     return _subquery;
-  }
-
-  @Nullable
-  public TimeSeriesContext getTimeSeriesContext() {
-    return _timeSeriesContext;
   }
 
   /**
@@ -207,7 +204,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns a list of expressions in the GROUP-BY clause, or {@code null} if there is no GROUP-BY clause.
+   * Returns a list of expressions in the GROUP-BY clause (aggregation keys), or {@code null} if there is no GROUP-BY
+   * clause.
    */
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {
@@ -410,6 +408,22 @@ public class QueryContext {
     _groupTrimThreshold = groupTrimThreshold;
   }
 
+  public int getNumThreadsExtractFinalResult() {
+    return _numThreadsExtractFinalResult;
+  }
+
+  public void setNumThreadsExtractFinalResult(int numThreadsExtractFinalResult) {
+    _numThreadsExtractFinalResult = numThreadsExtractFinalResult;
+  }
+
+  public int getChunkSizeExtractFinalResult() {
+    return _chunkSizeExtractFinalResult;
+  }
+
+  public void setChunkSizeExtractFinalResult(int chunkSizeExtractFinalResult) {
+    _chunkSizeExtractFinalResult = chunkSizeExtractFinalResult;
+  }
+
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }
@@ -478,7 +492,6 @@ public class QueryContext {
   public static class Builder {
     private String _tableName;
     private QueryContext _subquery;
-    private TimeSeriesContext _timeSeriesContext;
     private List<ExpressionContext> _selectExpressions;
     private boolean _distinct;
     private List<String> _aliasList;
@@ -499,11 +512,6 @@ public class QueryContext {
 
     public Builder setSubquery(QueryContext subquery) {
       _subquery = subquery;
-      return this;
-    }
-
-    public Builder setTimeSeriesContext(TimeSeriesContext timeSeriesContext) {
-      _timeSeriesContext = timeSeriesContext;
       return this;
     }
 
@@ -583,7 +591,7 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _subquery, _timeSeriesContext, _selectExpressions, _distinct, _aliasList,
+          new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList,
               _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
               _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));

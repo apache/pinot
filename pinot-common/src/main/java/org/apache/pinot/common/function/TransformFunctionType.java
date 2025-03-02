@@ -94,6 +94,7 @@ public enum TransformFunctionType {
 
   // CASE WHEN function parsed as 'CASE_WHEN'
   CASE("case"),
+  TEXT_MATCH("textMatch", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
 
   // date type conversion functions
   CAST("cast"),
@@ -126,18 +127,30 @@ public enum TransformFunctionType {
   DATE_TRUNC("dateTrunc", ReturnTypes.BIGINT, OperandTypes.family(
       List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER), i -> i > 1)),
-  YEAR("year"),
-  YEAR_OF_WEEK("yearOfWeek", "yow"),
-  QUARTER("quarter"),
-  MONTH_OF_YEAR("monthOfYear", "month"),
-  WEEK_OF_YEAR("weekOfYear", "week"),
-  DAY_OF_YEAR("dayOfYear", "doy"),
-  DAY_OF_MONTH("dayOfMonth", "day"),
-  DAY_OF_WEEK("dayOfWeek", "dow"),
-  HOUR("hour"),
-  MINUTE("minute"),
-  SECOND("second"),
-  MILLISECOND("millisecond"),
+  YEAR("year", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  YEAR_OF_WEEK("yearOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "yow"),
+  QUARTER("quarter", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MONTH_OF_YEAR("monthOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "month"),
+  WEEK_OF_YEAR("weekOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "week"),
+  DAY_OF_YEAR("dayOfYear", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "doy"),
+  DAY_OF_MONTH("dayOfMonth", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "day"),
+  DAY_OF_WEEK("dayOfWeek", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1), "dow"),
+  HOUR("hour", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MINUTE("minute", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  SECOND("second", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
+  MILLISECOND("millisecond", ReturnTypes.BIGINT_NULLABLE, OperandTypes.family(
+      List.of(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER), i -> i == 1)),
   EXTRACT("extract"),
 
   // Array functions
@@ -232,9 +245,10 @@ public enum TransformFunctionType {
   TANH("tanh"),
   DEGREES("degrees"),
   RADIANS("radians"),
-
   // Complex type handling
-  ITEM("item");
+  ITEM("item"),
+  // Time series functions
+  TIME_SERIES_BUCKET("timeSeriesBucket");
 
   private final String _name;
   private final List<String> _names;

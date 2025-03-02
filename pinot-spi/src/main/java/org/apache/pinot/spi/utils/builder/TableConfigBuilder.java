@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +56,9 @@ public class TableConfigBuilder {
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
-  private static final String DEFAULT_LOAD_MODE = "HEAP";
   private static final String MMAP_LOAD_MODE = "MMAP";
+  private static final String HEAP_LOAD_MODE = "HEAP";
+  private static final String DEFAULT_LOAD_MODE = MMAP_LOAD_MODE;
 
   private final TableType _tableType;
   private String _tableName;
@@ -143,6 +145,14 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setIsDimTable(boolean isDimTable) {
     _isDimTable = isDimTable;
+    return this;
+  }
+
+  public TableConfigBuilder addFieldConfig(FieldConfig config) {
+    if (_fieldConfigList == null) {
+      _fieldConfigList = new ArrayList<>();
+    }
+    _fieldConfigList.add(config);
     return this;
   }
 
@@ -240,8 +250,8 @@ public class TableConfigBuilder {
   }
 
   public TableConfigBuilder setLoadMode(String loadMode) {
-    if (MMAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
-      _loadMode = MMAP_LOAD_MODE;
+    if (HEAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
+      _loadMode = HEAP_LOAD_MODE;
     } else {
       _loadMode = DEFAULT_LOAD_MODE;
     }

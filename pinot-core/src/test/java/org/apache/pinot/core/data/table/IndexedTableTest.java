@@ -31,9 +31,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -46,7 +46,7 @@ import org.testng.annotations.Test;
 public class IndexedTableTest {
   private static final int TRIM_SIZE = 10;
   private static final int TRIM_THRESHOLD = 20;
-  private static final int INITIAL_CAPACITY = InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
+  private static final int INITIAL_CAPACITY = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
 
   @Test
   public void testConcurrentIndexedTable()
@@ -57,7 +57,8 @@ public class IndexedTableTest {
         ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
     });
     IndexedTable indexedTable =
-        new ConcurrentIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY);
+        new ConcurrentIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+            Executors.newCachedThreadPool());
 
     // 3 threads upsert together
     // a inserted 6 times (60), b inserted 5 times (50), d inserted 2 times (20)
@@ -131,18 +132,22 @@ public class IndexedTableTest {
 
     // Test SimpleIndexedTable
     IndexedTable indexedTable =
-        new SimpleIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY);
+        new SimpleIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+            Executors.newCachedThreadPool());
     IndexedTable mergeTable =
-        new SimpleIndexedTable(dataSchema, false, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY);
+        new SimpleIndexedTable(dataSchema, false, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+            Executors.newCachedThreadPool());
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
 
     // Test ConcurrentIndexedTable
     indexedTable =
-        new ConcurrentIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY);
+        new ConcurrentIndexedTable(dataSchema, false, queryContext, 5, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+            Executors.newCachedThreadPool());
     mergeTable =
-        new SimpleIndexedTable(dataSchema, false, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY);
+        new SimpleIndexedTable(dataSchema, false, queryContext, 10, TRIM_SIZE, TRIM_THRESHOLD, INITIAL_CAPACITY,
+            Executors.newCachedThreadPool());
     testNonConcurrent(indexedTable, mergeTable);
     indexedTable.finish(true);
     checkSurvivors(indexedTable, survivors);
@@ -260,11 +265,11 @@ public class IndexedTableTest {
 
     IndexedTable indexedTable =
         new SimpleIndexedTable(dataSchema, false, queryContext, 5, Integer.MAX_VALUE, Integer.MAX_VALUE,
-            INITIAL_CAPACITY);
+            INITIAL_CAPACITY, Executors.newCachedThreadPool());
     testNoMoreNewRecordsInTable(indexedTable);
 
     indexedTable = new ConcurrentIndexedTable(dataSchema, false, queryContext, 5, Integer.MAX_VALUE, Integer.MAX_VALUE,
-        INITIAL_CAPACITY);
+        INITIAL_CAPACITY, Executors.newCachedThreadPool());
     testNoMoreNewRecordsInTable(indexedTable);
   }
 

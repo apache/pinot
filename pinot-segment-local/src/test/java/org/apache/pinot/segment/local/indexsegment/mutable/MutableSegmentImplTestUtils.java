@@ -109,16 +109,24 @@ public class MutableSegmentImplTestUtils {
     String upsertOutOfOrderRecordColumn = upsertConfig == null ? null : upsertConfig.getOutOfOrderRecordColumn();
     String dedupTimeColumn = dedupConfig == null ? null : dedupConfig.getDedupTimeColumn();
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
+
     RealtimeSegmentConfig.Builder segmentConfBuilder = new RealtimeSegmentConfig.Builder()
-        .setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
-        .setStreamName(STREAM_NAME).setSchema(schema).setTimeColumnName(timeColumnName).setCapacity(100000)
+        .setTableNameWithType(TABLE_NAME_WITH_TYPE)
+        .setSegmentName(SEGMENT_NAME)
+        .setStreamName(STREAM_NAME)
+        .setSchema(schema)
+        .setTimeColumnName(timeColumnName)
+        .setCapacity(100000)
         .setAvgNumMultiValues(2)
         .setIndex(noDictionaryColumns, StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
         .setIndex(varLengthDictionaryColumns, StandardIndexes.dictionary(), varLengthDictConf)
         .setIndex(invertedIndexColumns, StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(new SegmentZKMetadata(SEGMENT_NAME))
-        .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME)).setStatsHistory(statsHistory)
-        .setAggregateMetrics(aggregateMetrics).setNullHandlingEnabled(nullHandlingEnabled).setUpsertMode(upsertMode)
+        .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME))
+        .setStatsHistory(statsHistory)
+        .setAggregateMetrics(aggregateMetrics)
+        .setNullHandlingEnabled(nullHandlingEnabled)
+        .setUpsertMode(upsertMode)
         .setUpsertComparisonColumns(comparisonColumns)
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setIngestionAggregationConfigs(aggregationConfigs)
@@ -127,9 +135,11 @@ public class MutableSegmentImplTestUtils {
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setDedupTimeColumn(dedupTimeColumn)
         .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir");
+
     for (Map.Entry<String, JsonIndexConfig> entry : jsonIndexConfigs.entrySet()) {
       segmentConfBuilder.setIndex(entry.getKey(), StandardIndexes.json(), entry.getValue());
     }
+
     RealtimeSegmentConfig realtimeSegmentConfig = segmentConfBuilder.build();
     return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
   }

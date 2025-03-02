@@ -187,12 +187,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            pathAndIdxList.add(String.format("%s %d", siblingFiles.get(i), i));
+            pathAndIdxList.add(siblingFiles.get(i) + " " + i);
           }
         }
       } else {
         for (int i = 0; i < filteredFiles.size(); i++) {
-          pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+          pathAndIdxList.add(filteredFiles.get(i) + " " + i);
         }
       }
       int numDataFiles = pathAndIdxList.size();
@@ -318,9 +318,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
       });
       if (stagingDirURI != null) {
-        LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
-            outputDirURI);
-        outputDirFS.copyDir(stagingDirURI, outputDirURI);
+        LOGGER.info("Trying to move segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+                outputDirURI);
+        SegmentGenerationJobUtils.moveFiles(outputDirFS, stagingDirURI, outputDirURI, true);
       }
     } finally {
       if (stagingDirURI != null) {

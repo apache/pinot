@@ -93,10 +93,11 @@ public class TimeSegmentPruner implements SegmentPruner {
       return DEFAULT_INTERVAL;
     }
 
+    // Validate time interval
     long startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     long endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
     if (startTime < 0 || endTime < 0 || startTime > endTime) {
-      LOGGER.warn("Failed to find valid time interval for segment: {}, table: {}", segment, _tableNameWithType);
+      // Consuming and committing segments don't have time interval
       return DEFAULT_INTERVAL;
     }
 

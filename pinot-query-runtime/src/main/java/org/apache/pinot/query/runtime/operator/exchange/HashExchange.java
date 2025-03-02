@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.EmptyKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -35,14 +39,20 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 class HashExchange extends BlockExchange {
   private final KeySelector<?> _keySelector;
 
-  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter) {
-    super(sendingMailboxes, splitter);
+  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+    super(sendingMailboxes, splitter, statsIndexChooser);
     _keySelector = keySelector;
+  }
+
+  @VisibleForTesting
+  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter) {
+    this(sendingMailboxes, keySelector, splitter, RANDOM_INDEX_CHOOSER);
   }
 
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-      throws Exception {
+      throws IOException, TimeoutException {
     int numMailboxes = destinations.size();
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
       sendBlock(destinations.get(0), block);

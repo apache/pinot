@@ -876,6 +876,11 @@ public class PinotHelixTaskResourceManager {
       if (jobFinishTimeMs > 0) {
         taskDebugInfo.setFinishTime(DateTimeUtils.epochToDefaultDateFormat(jobFinishTimeMs));
       }
+      String triggeredBy = jobConfig.getTaskConfigMap().values().stream().findFirst()
+          .map(TaskConfig::getConfigMap)
+          .map(taskConfigs -> taskConfigs.get(PinotTaskManager.TRIGGERED_BY))
+          .orElse("");
+      taskDebugInfo.setTriggeredBy(triggeredBy);
       Set<Integer> partitionSet = jobContext.getPartitionSet();
       TaskCount subtaskCount = new TaskCount();
       for (int partition : partitionSet) {
@@ -890,6 +895,7 @@ public class PinotHelixTaskResourceManager {
         String taskIdForPartition = jobContext.getTaskIdForPartition(partition);
         subtaskDebugInfo.setTaskId(taskIdForPartition);
         subtaskDebugInfo.setState(partitionState);
+        subtaskDebugInfo.setTriggeredBy(triggeredBy);
         long subtaskStartTimeMs = jobContext.getPartitionStartTime(partition);
         if (subtaskStartTimeMs > 0) {
           subtaskDebugInfo.setStartTime(DateTimeUtils.epochToDefaultDateFormat(subtaskStartTimeMs));
@@ -987,7 +993,8 @@ public class PinotHelixTaskResourceManager {
     return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
   }
 
-  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "subtaskInfos"})
+  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "triggeredBy",
+      "subtaskInfos"})
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class TaskDebugInfo {
     // Time at which the task (which may have multiple subtasks) got created.
@@ -998,6 +1005,7 @@ public class PinotHelixTaskResourceManager {
     private String _finishTime;
     private TaskState _taskState;
     private TaskCount _subtaskCount;
+    private String _triggeredBy;
     private List<SubtaskDebugInfo> _subtaskInfos;
 
     public TaskDebugInfo() {
@@ -1046,6 +1054,15 @@ public class PinotHelixTaskResourceManager {
       return _taskState;
     }
 
+    public String getTriggeredBy() {
+      return _triggeredBy;
+    }
+
+    public TaskDebugInfo setTriggeredBy(String triggeredBy) {
+      _triggeredBy = triggeredBy;
+      return this;
+    }
+
     public TaskCount getSubtaskCount() {
       return _subtaskCount;
     }
@@ -1055,7 +1072,7 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  @JsonPropertyOrder({"taskId", "state", "startTime", "finishTime", "participant", "info", "taskConfig"})
+  @JsonPropertyOrder({"taskId", "state", "startTime", "finishTime", "participant", "info", "triggeredBy", "taskConfig"})
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class SubtaskDebugInfo {
     private String _taskId;
@@ -1064,6 +1081,7 @@ public class PinotHelixTaskResourceManager {
     private String _finishTime;
     private String _participant;
     private String _info;
+    private String _triggeredBy;
     private PinotTaskConfig _taskConfig;
 
     public SubtaskDebugInfo() {
@@ -1121,12 +1139,21 @@ public class PinotHelixTaskResourceManager {
       return _info;
     }
 
+    public String getTriggeredBy() {
+      return _triggeredBy;
+    }
+
+    public SubtaskDebugInfo setTriggeredBy(String triggeredBy) {
+      _triggeredBy = triggeredBy;
+      return this;
+    }
+
     public PinotTaskConfig getTaskConfig() {
       return _taskConfig;
     }
   }
 
-  @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown"})
+  @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown", "dropped", "timedOut", "aborted"})
   public static class TaskCount {
     private int _waiting;   // Number of tasks waiting to be scheduled on minions
     private int _error;     // Number of tasks in error
@@ -1134,6 +1161,10 @@ public class PinotHelixTaskResourceManager {
     private int _completed; // Number of tasks completed normally
     private int _unknown;   // Number of tasks with all other states
     private int _total;     // Total number of tasks in the batch
+    private int _dropped;   // Total number of tasks dropped
+    // (Task can be dropped due to no available assigned instance, etc.)
+    private int _timedOut;  // Total number of tasks timed out
+    private int _aborted;   // Total number of tasks aborted
 
     public TaskCount() {
     }
@@ -1156,6 +1187,15 @@ public class PinotHelixTaskResourceManager {
             break;
           case COMPLETED:
             _completed++;
+            break;
+          case DROPPED:
+            _dropped++;
+            break;
+          case TIMED_OUT:
+            _timedOut++;
+            break;
+          case TASK_ABORTED:
+            _aborted++;
             break;
           default:
             _unknown++;
@@ -1188,6 +1228,18 @@ public class PinotHelixTaskResourceManager {
       return _unknown;
     }
 
+    public int getDropped() {
+      return _dropped;
+    }
+
+    public int getTimedOut() {
+      return _timedOut;
+    }
+
+    public int getAborted() {
+      return _aborted;
+    }
+
     public void accumulate(TaskCount other) {
       _waiting += other.getWaiting();
       _running += other.getRunning();
@@ -1195,6 +1247,9 @@ public class PinotHelixTaskResourceManager {
       _completed += other.getCompleted();
       _unknown += other.getUnknown();
       _total += other.getTotal();
+      _dropped += other.getDropped();
+      _timedOut += other.getTimedOut();
+      _aborted += other.getAborted();
     }
   }
 }
