@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -36,23 +35,20 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
-import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
-import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
+import org.apache.pinot.core.transport.QueryRouteInfo;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,33 +89,28 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+  protected BrokerResponseNative processBrokerRequest(QueryRouteInfo routeInfo, ServerStats serverStats)
       throws Exception {
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
-    if (requestContext.isSampledRequest()) {
-      serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
+    assert routeInfo.getOfflineBrokerRequest() != null || routeInfo.getRealtimeBrokerRequest() != null;
+    if (routeInfo.getRequestContext().isSampledRequest()) {
+      routeInfo.getServerBrokerRequest().getPinotQuery()
+          .putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
 
-    String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
-            realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(routeInfo);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
-      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+      BrokerMeter meter =
+          QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
+              ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS
+              : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
+      _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), meter, 1);
     }
     if (asyncQueryResponse.getFailedServer() != null) {
       _failureDetector.markServerUnhealthy(asyncQueryResponse.getFailedServer().getInstanceId());
     }
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
+    _brokerMetrics.addPhaseTiming(routeInfo.getRawTableName(), BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getServerStats());
@@ -141,12 +132,13 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     int numServersResponded = dataTableMap.size();
 
     long reduceStartTimeNs = System.nanoTime();
-    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
+    long reduceTimeoutMs =
+        routeInfo.getTimeoutMs() - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
     BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
+        _brokerReduceService.reduceOnDataTable(routeInfo.getOriginalBrokerRequest(), routeInfo.getServerBrokerRequest(),
+            dataTableMap, reduceTimeoutMs, _brokerMetrics);
     long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
+    _brokerMetrics.addPhaseTiming(routeInfo.getRawTableName(), BrokerQueryPhase.REDUCE, reduceTimeNanos);
 
     brokerResponse.setNumServersQueried(numServersQueried);
     brokerResponse.setNumServersResponded(numServersResponded);
@@ -163,15 +155,18 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       brokerResponse.addException(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
 
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
-          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
-      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+      BrokerMeter meter =
+          QueryOptionsUtils.isSecondaryWorkload(routeInfo.getServerBrokerRequest().getPinotQuery().getQueryOptions())
+              ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
+              : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
+      _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), meter, 1);
     }
     if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(),
+          BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
+    _brokerMetrics.addMeteredTableValue(routeInfo.getRawTableName(), BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+        totalResponseSize);
 
     return brokerResponse;
   }
