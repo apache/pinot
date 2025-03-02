@@ -245,7 +245,14 @@ const QueryPage = () => {
     if (modifiedEnabled && event.keyCode == 220) {
       handleFormatSQL(editor.getValue());
     }
-  }
+  };
+
+  const handleQueryInterfaceKeyDownRef = React.useRef(handleQueryInterfaceKeyDown);
+
+  useEffect(() => {
+    handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
+  }, [handleQueryInterfaceKeyDown]);
+  
 
   const handleComment = (cm: NativeCodeMirror.Editor) => {
     const selections = cm.listSelections();
@@ -511,7 +518,9 @@ const QueryPage = () => {
                   }}
                   value={inputQuery}
                   onChange={handleOutputDataChange}
-                  onKeyDown={handleQueryInterfaceKeyDown}
+                  // Ensures the latest function is always called, preventing stale state issues due to closures.
+                  // Directly passing handleQueryInterfaceKeyDown may result in outdated state references.
+                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)} 
                   className={classes.codeMirror}
                   autoCursor={false}
                 />
