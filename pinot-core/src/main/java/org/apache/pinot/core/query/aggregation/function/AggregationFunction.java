@@ -20,10 +20,13 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -90,27 +93,75 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
   /**
    * Extracts the intermediate result from the aggregation result holder (aggregation only).
-   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
+  @Nullable
   IntermediateResult extractAggregationResult(AggregationResultHolder aggregationResultHolder);
 
   /**
    * Extracts the intermediate result from the group-by result holder for the given group key (aggregation group-by).
-   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
+  @Nullable
   IntermediateResult extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey);
 
   /**
    * Merges two intermediate results.
-   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
-  IntermediateResult merge(IntermediateResult intermediateResult1, IntermediateResult intermediateResult2);
+  @Nullable
+  IntermediateResult merge(@Nullable IntermediateResult intermediateResult1,
+      @Nullable IntermediateResult intermediateResult2);
 
   /**
    * Returns the {@link ColumnDataType} of the intermediate result.
    * <p>This column data type is used for transferring data in data table.
    */
   ColumnDataType getIntermediateResultColumnType();
+
+  /**
+   * Serializes the intermediate result into a custom object. This method should be implemented if the intermediate
+   * result type is OBJECT.
+   *
+   * TODO: Override this method in the aggregation functions that return OBJECT type intermediate results to reduce the
+   *       overhead of instanceof checks in the default implementation.
+   */
+  default SerializedIntermediateResult serializeIntermediateResult(IntermediateResult intermediateResult) {
+    assert getIntermediateResultColumnType() == ColumnDataType.OBJECT;
+    int type = ObjectSerDeUtils.ObjectType.getObjectType(intermediateResult).getValue();
+    byte[] bytes = ObjectSerDeUtils.serialize(intermediateResult, type);
+    return new SerializedIntermediateResult(type, bytes);
+  }
+
+  /**
+   * Serialized intermediate result. Type can be used to identify the intermediate result type when deserializing it.
+   */
+  class SerializedIntermediateResult {
+    private final int _type;
+    private final byte[] _bytes;
+
+    public SerializedIntermediateResult(int type, byte[] buffer) {
+      _type = type;
+      _bytes = buffer;
+    }
+
+    public int getType() {
+      return _type;
+    }
+
+    public byte[] getBytes() {
+      return _bytes;
+    }
+  }
+
+  /**
+   * Deserializes the intermediate result from the custom object. This method should be implemented if the intermediate
+   * result type is OBJECT.
+   *
+   * TODO: Override this method in the aggregation functions that return OBJECT type intermediate results to not rely
+   *       on the type to decouple this from ObjectSerDeUtils.
+   */
+  default IntermediateResult deserializeIntermediateResult(CustomObject customObject) {
+    assert getIntermediateResultColumnType() == ColumnDataType.OBJECT;
+    return ObjectSerDeUtils.deserialize(customObject);
+  }
 
   /**
    * Returns the {@link ColumnDataType} of the final result.
@@ -120,15 +171,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
 
   /**
    * Extracts the final result used in the broker response from the given intermediate result.
-   * TODO: Support serializing/deserializing null values in DataTable and use null as the empty intermediate result
    */
-  FinalResult extractFinalResult(IntermediateResult intermediateResult);
+  @Nullable
+  FinalResult extractFinalResult(@Nullable IntermediateResult intermediateResult);
 
   /**
    * Merges two final results. This can be used to optimized certain functions (e.g. DISTINCT_COUNT) when data is
    * partitioned on each server, where we may directly request servers to return final result and merge them on broker.
    */
-  default FinalResult mergeFinalResult(FinalResult finalResult1, FinalResult finalResult2) {
+  @Nullable
+  default FinalResult mergeFinalResult(@Nullable FinalResult finalResult1, @Nullable FinalResult finalResult2) {
     throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 

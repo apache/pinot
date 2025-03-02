@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -198,6 +199,17 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(AvgPair avgPair) {
+    // ObjectSerDeUtils.ObjectType.AvgPair.getValue() == 4
+    return new SerializedIntermediateResult(4, avgPair.toBytes());
+  }
+
+  @Override
+  public AvgPair deserializeIntermediateResult(CustomObject customObject) {
+    return AvgPair.fromByteBuffer(customObject.getBuffer());
   }
 
   @Override

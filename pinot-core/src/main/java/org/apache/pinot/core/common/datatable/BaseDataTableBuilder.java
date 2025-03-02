@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
 
@@ -113,23 +113,6 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   }
 
   @Override
-  public void setColumn(int colId, @Nullable Object value)
-      throws IOException {
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    if (value == null) {
-      _currentRowDataByteBuffer.putInt(0);
-      _variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
-    } else {
-      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-      byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-      _currentRowDataByteBuffer.putInt(bytes.length);
-      _variableSizeDataOutputStream.writeInt(objectTypeValue);
-      _variableSizeDataByteArrayOutputStream.write(bytes);
-    }
-  }
-
-  @Override
   public void setColumn(int colId, int[] values)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
@@ -171,6 +154,27 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     for (double value : values) {
       _variableSizeDataOutputStream.writeDouble(value);
     }
+  }
+
+  @Override
+  public void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    int type = value.getType();
+    byte[] bytes = value.getBytes();
+    _currentRowDataByteBuffer.putInt(bytes.length);
+    _variableSizeDataOutputStream.writeInt(type);
+    _variableSizeDataByteArrayOutputStream.write(bytes);
+  }
+
+  @Override
+  public void setNull(int colId)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    _currentRowDataByteBuffer.putInt(0);
+    _variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
   }
 
   @Override

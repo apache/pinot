@@ -419,7 +419,7 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (Map) columnValue);
             break;
           case UNKNOWN:
-            dataTableBuilder.setColumn(i, (Object) null);
+            dataTableBuilder.setNull(i);
             break;
 
           // Multi-value column

@@ -94,7 +94,8 @@ public final class TransferableBlockUtils {
       List<TransferableBlock> blockChunks = new ArrayList<>(numChunks);
       for (int fromIndex = 0; fromIndex < numRows; fromIndex += numRowsPerChunk) {
         int toIndex = Math.min(fromIndex + numRowsPerChunk, numRows);
-        blockChunks.add(new TransferableBlock(rows.subList(fromIndex, toIndex), dataSchema, DataBlock.Type.ROW));
+        blockChunks.add(new TransferableBlock(rows.subList(fromIndex, toIndex), dataSchema, DataBlock.Type.ROW,
+            block.getAggFunctions()));
       }
       return blockChunks.iterator();
     } else {
