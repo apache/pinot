@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.hash.Hashing;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 /**
@@ -79,5 +82,104 @@ public class HashFunctions {
   @ScalarFunction
   public static String md5(byte[] input) {
     return DigestUtils.md5Hex(input);
+  }
+
+  /**
+   * Return MD2 digest as hex string.
+   *
+   * @param input the byte array representing the data
+   * @return hash string in hex format
+   */
+  @ScalarFunction
+  public static String md2(byte[] input) {
+    return DigestUtils.md2Hex(input);
+  }
+
+  /**
+   * Computes 32-bit MurmurHash2 of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int murmurHash2(byte[] input) {
+    return MurmurHashFunctions.murmurHash2(input);
+  }
+
+  /**
+   * Computes 32-bit MurmurHash2 of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int murmurHash2UTF8(String input) {
+    return MurmurHashFunctions.murmurHash2(input.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Computes 32-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int murmurHash3Bit32(byte[] input, int seed) {
+    return Hashing.murmur3_32_fixed(seed).hashBytes(input).asInt();
+  }
+
+  /**
+   * Computes 64-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long murmurHash3Bit64(byte[] input, int seed) {
+    return Hashing.murmur3_32_fixed(seed).hashBytes(input).asLong();
+  }
+
+  /**
+   * Computes 128-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return byte array
+   */
+  @ScalarFunction
+  public static byte[] murmurHash3Bit128(byte[] input, int seed) {
+    return Hashing.murmur3_32_fixed(seed).hashBytes(input).asBytes();
+  }
+
+  /**
+   * Computes 32-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 32-bit hash
+   */
+  @ScalarFunction
+  public static int murmurHash3X64Bit32(byte[] input, int seed) {
+    return MurmurHashFunctions.murmurHash3X64Bit32(input, seed);
+  }
+
+  /**
+   * Computes 64-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return 64-bit hash
+   */
+  @ScalarFunction
+  public static long murmurHash3X64Bit64(byte[] input, int seed) {
+    return MurmurHashFunctions.murmurHash3X64Bit32(input, seed);
+  }
+
+  /**
+   * Computes 128-bit Murmur3 Hash of the given byte array.
+   *
+   * @param input the byte array to hash
+   * @return byte array
+   */
+  @ScalarFunction
+  public static byte[] murmurHash3X64Bit128(byte[] input, int seed) {
+    return MurmurHashFunctions.murmurHash3X64Bit128(input, seed);
   }
 }
