@@ -178,13 +178,18 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     entries.add(new Object[]{
         "select * from testTable where daysSinceEpoch > 100", SelectionOnlyOperator.class, SelectionOnlyOperator.class
     });
-    // COUNT from metadata (via fast filtered count which knows the number of docs in the segment)
+    // COUNT from metadata (via non-scan-based aggregation because it is an all-match)
     entries.add(new Object[]{
-        "select count(*) from testTable", FastFilteredCountOperator.class, FastFilteredCountOperator.class
+        "select count(*) from testTable", NonScanBasedAggregationOperator.class, FastFilteredCountOperator.class
+    });
+    // COUNT from metadata with a non-match-all filter, fast filtered count is to be used
+    entries.add(new Object[]{
+        "select count(*) from testTable where column1 <= 10", FastFilteredCountOperator.class,
+        FastFilteredCountOperator.class
     });
     // COUNT from metadata with match all filter
     entries.add(new Object[]{
-        "select count(*) from testTable where column1 > 10", FastFilteredCountOperator.class,
+        "select count(*) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
         FastFilteredCountOperator.class
     });
     // MIN/MAX from dictionary
