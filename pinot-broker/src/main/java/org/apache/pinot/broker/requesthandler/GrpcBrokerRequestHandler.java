@@ -124,9 +124,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       // TODO: enable throttling on per host bases.
       try {
         Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverInstance,
-            new ServerGrpcRequestBuilder()
-                .setRequestId(requestId)
-                .setCorrelationId(cid)
+            ServerGrpcRequestBuilder.fromThreadContext()
                 .setBrokerId(_brokerId)
                 .setEnableTrace(trace)
                 .setEnableStreaming(true)
