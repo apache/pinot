@@ -144,9 +144,14 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
-    } finally {
+      QueryResult queryResult = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      if (queryResult.isEarlyTerminated()) {
+        cancel(requestId, servers);
+      }
+      return queryResult;
+    } catch (Throwable e) {
       cancel(requestId, servers);
+      throw e;
     }
   }
 
@@ -631,6 +636,17 @@ public class QueryDispatcher {
 
     public long getBrokerReduceTimeMs() {
       return _brokerReduceTimeMs;
+    }
+
+    public boolean isEarlyTerminated() {
+      for (MultiStageQueryStats.StageStats.Closed queryStat : _queryStats) {
+        for (MultiStageQueryStats.Entry entry : queryStat) {
+          if (entry.getType().isEarlyTerminated(entry.getStats())) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
   }
 
