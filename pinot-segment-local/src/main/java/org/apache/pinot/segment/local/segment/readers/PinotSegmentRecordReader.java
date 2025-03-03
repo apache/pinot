@@ -241,16 +241,15 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   public Object[] getRecordValues(int docId, int[] columnIndexes) {
-    int idx = 0;
     Object[] values = new Object[columnIndexes.length];
     for (int i = 0, n = columnIndexes.length; i < n; i++) {
       int columnIndex = columnIndexes[i];
-      if (columnIndex > 0) {
+      if (columnIndex > -1) {
         PinotSegmentColumnReader columnReader = _columnReaders.get(columnIndex);
         if (!columnReader.isNull(docId)) {
-          values[idx++] = columnReader.getValue(docId);
+          values[i] = columnReader.getValue(docId);
         } else if (!_skipDefaultNullValues) {
-          values[idx++] = columnReader.getValue(docId);
+          values[i] = columnReader.getValue(docId);
         } // else null value is kept
       } // else keep null value
     }

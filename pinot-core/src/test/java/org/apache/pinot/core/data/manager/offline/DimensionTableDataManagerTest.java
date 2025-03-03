@@ -129,21 +129,28 @@ public class DimensionTableDataManagerTest {
   }
 
   private Schema getSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
+    return new Schema.SchemaBuilder()
+        .setSchemaName("dimBaseballTeams")
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .build();
   }
 
   private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
     DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
-        .setDimensionTableConfig(dimensionTableConfig).build();
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("dimBaseballTeams")
+        .setDimensionTableConfig(dimensionTableConfig)
+        .build();
   }
 
   private Schema getSchemaWithExtraColumn() {
     return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .addSingleValueDimension("teamCity", DataType.STRING).setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .addSingleValueDimension("teamCity", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
         .build();
   }
 
