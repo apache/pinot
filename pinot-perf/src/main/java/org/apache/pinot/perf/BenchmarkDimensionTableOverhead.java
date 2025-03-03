@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.perf;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -70,13 +72,12 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-// Tests creation of eagerly-loaded dimension table
+// Tests initialization of dimension tables
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
@@ -89,8 +90,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder()
         .include(BenchmarkDimensionTableOverhead.class.getSimpleName())
-        .shouldDoGC(false)
-        .addProfiler(GCProfiler.class);
+        .shouldDoGC(true);
     new Runner(opt.build()).run();
   }
 
@@ -131,8 +131,8 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
   @Param("3000000")
   private int _numRows;
 
-  @Param({"EXP(0.001)"})
-  String _scenario;
+  @Param({"true", "false"})
+  boolean _disablePreload;
 
   private static int _iteration = 0;
 
@@ -144,7 +144,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
   @Setup(Level.Iteration)
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, "EXP(0.001)");
     FileUtils.deleteQuietly(INDEX_DIR);
 
     _indexSegments = new ArrayList<>();
@@ -161,18 +161,24 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
   }
 
   @Benchmark
-  public DimensionTableDataManager benchmarkFastTableManager() {
+  public DimensionTableDataManager benchmark()
+      throws JsonProcessingException {
+    TableConfig tableConfig = getTableConfig(_disablePreload);
+
     HelixManager helixManager = Mockito.mock(HelixManager.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = Mockito.mock(ZkHelixPropertyStore.class);
-    Mockito.when(propertyStore.get("/SCHEMAS/" + TABLE_NAME, null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(SCHEMA));
+
+    Mockito.when(propertyStore.get("/SCHEMAS/" + TABLE_NAME, null, AccessOption.PERSISTENT))
+        .thenReturn(SchemaUtils.toZNRecord(SCHEMA));
+
+    Mockito.when(propertyStore.get("/CONFIGS/TABLE/MyTable_OFFLINE", null, AccessOption.PERSISTENT))
+        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+
     Mockito.when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
     InstanceDataManagerConfig instanceDataManagerConfig = Mockito.mock(InstanceDataManagerConfig.class);
     Mockito.when(instanceDataManagerConfig.getInstanceDataDir())
         .thenReturn(INDEX_DIR.getParentFile().getAbsolutePath());
-
-    TableConfig tableConfig = getTableConfig(false);
 
     String tableName = TABLE_NAME + "_" + _iteration;
     _tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableName);
@@ -232,7 +238,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
         row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
         row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
         row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
-        long rawStrKey = (_supplier.getAsLong() % 100000);
+        long rawStrKey = (_supplier.getAsLong());
         row.putValue(RAW_STRING_COL_NAME,
             _strings.computeIfAbsent((int) rawStrKey, k -> UUID.randomUUID()).toString());
         row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
