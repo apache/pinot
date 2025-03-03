@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.ArrayList;
@@ -18,10 +36,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class LogicalQueryRouteInfo extends QueryRouteInfo {
-  private final List<QueryRouteInfo> _routeInfos;
+  private final List<LogicalTableRequests> _routeInfos;
 
   public LogicalQueryRouteInfo(String brokerId, long requestId, String rawTableName,
-      BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest, List<QueryRouteInfo> routeInfos,
+      BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+      List<LogicalTableRequests> routeInfos,
       int numPrunedSegments, long timeoutMs, RequestContext requestContext) {
     super(brokerId, requestId, rawTableName, originalBrokerRequest, serverBrokerRequest, rawTableName,
         serverBrokerRequest, null, rawTableName, serverBrokerRequest, null, numPrunedSegments, timeoutMs,
@@ -35,11 +54,11 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
     Map<ServerInstance, List<TableRouteInfo>> offlineTableRouteInfo = new HashMap<>();
     Map<ServerInstance, List<TableRouteInfo>> realtimeTableRouteInfo = new HashMap<>();
 
-    for (QueryRouteInfo routeInfo : _routeInfos) {
-      if (routeInfo.getOfflineRoutingTable() != null) {
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo.getOfflineRoutingTable().entrySet()) {
+    for (LogicalTableRequests routeInfo : _routeInfos) {
+      if (routeInfo._offlineRoutingTable != null) {
+        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo._offlineRoutingTable.entrySet()) {
           TableRouteInfo tableRouteInfo = new TableRouteInfo();
-          tableRouteInfo.setTableName(routeInfo.getOfflineTableName());
+          tableRouteInfo.setTableName(routeInfo._hybridTableName.getOfflineTableName());
           tableRouteInfo.setSegments(entry.getValue().getSegments());
           if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
             tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
@@ -49,10 +68,10 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
         }
       }
 
-      if (routeInfo.getRealtimeRoutingTable() != null) {
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo.getRealtimeRoutingTable().entrySet()) {
+      if (routeInfo._realtimeRoutingTable != null) {
+        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo._realtimeRoutingTable.entrySet()) {
           TableRouteInfo tableRouteInfo = new TableRouteInfo();
-          tableRouteInfo.setTableName(routeInfo.getRealtimeTableName());
+          tableRouteInfo.setTableName(routeInfo._hybridTableName.getRealtimeTableName());
           tableRouteInfo.setSegments(entry.getValue().getSegments());
           if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
             tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
@@ -62,7 +81,7 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
         }
       }
 
-      _numPrunedSegments += routeInfo.getNumPrunedSegments();
+      _numPrunedSegments += routeInfo._numPrunedSegmentsTotal;
     }
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
 
