@@ -30,7 +30,8 @@ import static org.testng.AssertJUnit.fail;
 public class HardLimitExecutorTest {
 
   @Test
-  public void testHardLimit() throws Exception {
+  public void testHardLimit()
+      throws Exception {
     HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool());
     CyclicBarrier barrier = new CyclicBarrier(2);
 
