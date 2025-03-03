@@ -72,6 +72,7 @@ public class SegmentDeletionManager {
   private static final String RETENTION_UNTIL_SEPARATOR = "__RETENTION_UNTIL__";
   private static final String RETENTION_DATE_FORMAT_STR = "yyyyMMddHHmm";
   private static final SimpleDateFormat RETENTION_DATE_FORMAT;
+  private static final String DELIMITER = "/";
 
   static {
     RETENTION_DATE_FORMAT = new SimpleDateFormat(RETENTION_DATE_FORMAT_STR);
@@ -349,6 +350,14 @@ public class SegmentDeletionManager {
           return;
         }
 
+        // Clean the array of tableNameDirs by removing trailing slashes
+        // This is crucial to fetch the right tableName from the uri
+        for (int i = 0; i < tableNameDirs.length; i++) {
+          if (tableNameDirs[i].endsWith(DELIMITER)) {
+            tableNameDirs[i] = tableNameDirs[i].substring(0, tableNameDirs[i].length() - 1);
+          }
+        }
+
         for (String tableNameDir : tableNameDirs) {
           String tableName = URIUtils.getLastPart(tableNameDir);
           if (leadControllerManager.isLeaderForTable(tableName)) {
@@ -356,16 +365,21 @@ public class SegmentDeletionManager {
             // Get files that are aged
             final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
             int numFilesDeleted = 0;
+            URI targetURI = null;
             for (String targetFile : targetFiles) {
-              URI targetURI =
-                  URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
-              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
-              if (System.currentTimeMillis() >= deletionTimeMs) {
-                if (!pinotFS.delete(targetURI, true)) {
-                  LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
-                } else {
-                  numFilesDeleted++;
+              try {
+                targetURI =
+                    URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
+                long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
+                if (System.currentTimeMillis() >= deletionTimeMs) {
+                  if (!pinotFS.delete(targetURI, true)) {
+                    LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
+                  } else {
+                    numFilesDeleted++;
+                  }
                 }
+              } catch (Exception e) {
+                LOGGER.warn("Failed to delete uri: {} for table: {}", targetURI, tableName, e);
               }
             }
 

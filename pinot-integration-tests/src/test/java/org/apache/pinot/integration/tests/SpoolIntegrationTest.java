@@ -22,13 +22,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -117,13 +121,160 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     JsonNode stats = jsonNode.get("stageStats");
     assertNoError(jsonNode);
     DocumentContext parsed = JsonPath.parse(stats.toString());
-    List<Map<String, Object>> stage4On3 = parsed.read("$..[?(@.stage == 3)]..[?(@.stage == 4)]");
-    Assert.assertEquals(stage4On3.size(), 1, "Stage 4 should be descended from stage 3 exactly once");
 
-    List<Map<String, Object>> stage4On7 = parsed.read("$..[?(@.stage == 7)]..[?(@.stage == 4)]");
-    Assert.assertEquals(stage4On3.size(), 1, "Stage 4 should be descended from stage 7 exactly once");
+    checkSpoolTimes(parsed, 4, 3, 1);
+    checkSpoolTimes(parsed, 4, 7, 1);
+    checkSpoolSame(parsed, 4, 3, 7);
+  }
 
-    Assert.assertEquals(stage4On3, stage4On7, "Stage 4 should be the same in both stage 3 and stage 7");
+  /**
+   * Test a complex with nested spools.
+   *
+   * Don't try to understand the query, just check that the spools are correct.
+   * This query is an actual simplification of a query used in production.
+   * It was the way we detected problems fixed in <a href="https://github.com/apache/pinot/pull/15135">#15135</a>.
+   */
+  @Test
+  public void testNestedSpools()
+      throws Exception {
+    JsonNode jsonNode = postQuery("SET useSpools = true;\n"
+        + "\n"
+        + "WITH\n"
+        + "    q1 AS (\n"
+        + "        SELECT ArrTimeBlk as userUUID,\n"
+        + "               Dest as deviceOS,\n"
+        + "               SUM(ArrTime) AS totalTrips\n"
+        + "        FROM mytable\n"
+        + "        GROUP BY ArrTimeBlk, Dest\n"
+        + "    ),\n"
+        + "     q2 AS (\n"
+        + "         SELECT userUUID,\n"
+        + "                deviceOS,\n"
+        + "                SUM(totalTrips) AS totalTrips,\n"
+        + "                COUNT(DISTINCT userUUID) AS reach\n"
+        + "         FROM q1\n"
+        + "         GROUP BY userUUID,\n"
+        + "                  deviceOS\n"
+        + "     ),\n"
+        + "     q3 AS (\n"
+        + "         SELECT userUUID,\n"
+        + "                (totalTrips / reach) AS frequency\n"
+        + "         FROM q2\n"
+        + "     ),\n"
+        + "     q4 AS (\n"
+        + "         SELECT rd.userUUID,\n"
+        + "                rd.deviceOS,\n"
+        + "                rd.totalTrips as totalTrips,\n"
+        + "                rd.reach AS reach\n"
+        + "         FROM q2 rd\n"
+        + "     ),\n"
+        + "     q5 AS (\n"
+        + "         SELECT userUUID,\n"
+        + "                SUM(totalTrips) AS totalTrips\n"
+        + "         FROM q4\n"
+        + "         GROUP BY userUUID\n"
+        + "     ),\n"
+        + "     q6 AS (\n"
+        + "         SELECT s.userUUID,\n"
+        + "                s.totalTrips,\n"
+        + "                (s.totalTrips / o.frequency) AS reach,\n"
+        + "                'some fake device' AS deviceOS\n"
+        + "         FROM q5 s\n"
+        + "                  JOIN q3 o ON s.userUUID = o.userUUID\n"
+        + "     ),\n"
+        + "     q7 AS (\n"
+        + "         SELECT rd.userUUID,\n"
+        + "                rd.totalTrips,\n"
+        + "                rd.reach,\n"
+        + "                rd.deviceOS\n"
+        + "         FROM q4 rd\n"
+        + "         UNION ALL\n"
+        + "         SELECT f.userUUID,\n"
+        + "                f.totalTrips,\n"
+        + "                f.reach,\n"
+        + "                f.deviceOS\n"
+        + "         FROM q6 f\n"
+        + "     ),\n"
+        + "     q8 AS (\n"
+        + "         SELECT sd.*\n"
+        + "         FROM q7 sd\n"
+        + "                  JOIN (\n"
+        + "             SELECT deviceOS,\n"
+        + "                    PERCENTILETDigest(totalTrips, 20) AS p20\n"
+        + "             FROM q7\n"
+        + "             GROUP BY deviceOS\n"
+        + "         ) q ON sd.deviceOS = q.deviceOS\n"
+        + "     )\n"
+        + "SELECT *\n"
+        + "FROM q8");
+    JsonNode stats = jsonNode.get("stageStats");
+    assertNoError(jsonNode);
+    DocumentContext parsed = JsonPath.parse(stats.toString());
+
+    /*
+     * Stages are like follows:
+     * 1 -> 2 (union)  ->  3 (aggr) ->  4 (leaf, spooled)
+     *                 ->  5 (join) ->  6 (aggr, spooled) ->  7 (aggr, spooled) -> 4 (leaf, spooled)
+     *                              ->  9 (aggr)          ->  4 (leaf, spooled)
+     *   -> 11 (union) -> 12 (aggr) ->  4 (leaf, spooled)
+     *                 -> 14 (join) ->  6 (aggr, spooled) ->  7 (aggr, spooled) -> 4 (leaf, spooled)
+     *                              -> 18 (aggr)          ->  4 (leaf, spooled)
+     */
+    checkSpoolTimes(parsed, 6, 5, 1);
+    checkSpoolTimes(parsed, 6, 14, 1);
+    checkSpoolSame(parsed, 6, 5, 14);
+
+    checkSpoolTimes(parsed, 7, 6, 2);
+
+    checkSpoolTimes(parsed, 4, 3, 1);
+    checkSpoolTimes(parsed, 4, 7, 2); // because there are 2 copies of 7 as well
+    checkSpoolTimes(parsed, 4, 9, 1);
+    checkSpoolTimes(parsed, 4, 12, 1);
+    checkSpoolTimes(parsed, 4, 18, 1);
+    checkSpoolSame(parsed, 4, 3, 7, 9, 12, 18);
+  }
+
+  /**
+   * Returns the nodes that have the given descendant id and also have the given parent id as one of their ancestors.
+   * @param parent the parent id
+   * @param descendant the descendant id
+   */
+  private List<Map<String, Object>> findDescendantById(DocumentContext stats, int parent, int descendant) {
+    @Language("jsonpath")
+    String jsonPath = "$..[?(@.stage == " + parent + ")]..[?(@.stage == " + descendant + ")]";
+    return stats.read(jsonPath);
+  }
+
+  private void checkSpoolTimes(DocumentContext stats, int spoolStageId, int parent, int times) {
+    List<Map<String, Object>> descendants = findDescendantById(stats, parent, spoolStageId);
+    Assert.assertEquals(descendants.size(), times, "Stage " + spoolStageId + " should be descended from stage "
+        + parent + " exactly " + times + " times");
+    Map<String, Object> firstSpool = descendants.get(0);
+    for (int i = 1; i < descendants.size(); i++) {
+      Assert.assertEquals(descendants.get(i), firstSpool, "Stage " + spoolStageId + " should be the same in "
+          + "all " + times + " descendants");
+    }
+  }
+
+  private void checkSpoolSame(DocumentContext stats, int spoolStageId, int... parents) {
+    List<Pair<Integer, List<Map<String, Object>>>> spools = Arrays.stream(parents)
+        .mapToObj(parent -> Pair.of(parent, findDescendantById(stats, parent, spoolStageId)))
+        .collect(Collectors.toList());
+    Pair<Integer, List<Map<String, Object>>> notEmpty = spools.stream()
+        .filter(s -> !s.getValue().isEmpty())
+        .findFirst()
+        .orElse(null);
+    if (notEmpty == null) {
+      Assert.fail("None of the parent nodes " + Arrays.toString(parents) + " have a descendant with id "
+          + spoolStageId);
+    }
+    List<Pair<Integer, List<Map<String, Object>>>> allNotEqual = spools.stream()
+        .filter(s -> !s.getValue().get(0).equals(notEmpty.getValue().get(0)))
+        .collect(Collectors.toList());
+    if (!allNotEqual.isEmpty()) {
+      Assert.fail("The descendant with id " + spoolStageId + " is not the same in all parent nodes "
+          + spools);
+    }
   }
 
   @AfterClass

@@ -155,7 +155,6 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     String twoBuckets = Arrays.toString(new int[] {0, 7})
         .replace('[', '(').replace(']', ')');
     return new Object[][] {
-        {"select count(*) from " + RAW_TABLE_NAME, NUM_RECORDS},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where " + CLASSIFICATION_COLUMN + " = 1", bucketCount},
         {"select count(*) from " + RAW_TABLE_NAME
@@ -251,9 +250,6 @@ public class FastFilteredCountTest extends BaseQueriesTest {
         {"select count(*) from " + RAW_TABLE_NAME
             + " where not TEXT_MATCH(" + TEXT_COLUMN + ", 'text0')"
             + " or " + CLASSIFICATION_COLUMN + " <> 0", bucketCountComplement},
-        {"select count(*) from " + RAW_TABLE_NAME
-            + " where " + SORTED_COLUMN + " >= 0"
-            + " or " + CLASSIFICATION_COLUMN + " <> 0", NUM_RECORDS},
         {"select count(*) from " + RAW_TABLE_NAME
             + " where TEXT_MATCH(" + TEXT_COLUMN + ",  'text0')"
             + " and " + SORTED_COLUMN + " <> 1", bucketCount},

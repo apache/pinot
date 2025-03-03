@@ -448,8 +448,8 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
-                URIUtils.encode(segmentTarFile.getName()))),
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+                + URIUtils.encode(segmentTarFile.getName())),
         new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
             FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name and table type as request parameters

@@ -101,12 +101,17 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
+    // Priority 1: Check if star-tree based aggregation is feasible
+    AggregationInfo aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithStarTree(_segmentContext,
+        _queryContext, aggregationFunctions, _queryContext.getFilter(), filterOperator,
+        filterPlanNode.getPredicateEvaluators());
+    if (aggregationInfo != null) {
+      return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
+    }
+
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
-      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
-        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
-      }
-
+      // Priority 2: Check if non-scan based aggregation is feasible
       if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
@@ -118,11 +123,16 @@ public class AggregationPlanNode implements PlanNode {
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
+
+      // Priority 3: Check if fast filtered count can be used
+      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
+      }
     }
 
-    AggregationInfo aggregationInfo =
-        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext, aggregationFunctions,
-            _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+    // Default:
+    aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
+        aggregationFunctions, filterOperator);
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 

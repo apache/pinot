@@ -66,9 +66,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     boolean ignoreCrcMismatch = Boolean.parseBoolean(configs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
         String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
     if (!ignoreCrcMismatch && !originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
-      String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
-              + "from ZK: %s, crc from deepstore: %s", segmentName, originalSegmentCrcFromTaskGenerator,
-          crcFromDeepStorageSegment);
+      String message = "Crc mismatched between ZK and deepstore copy of segment: " + segmentName
+          + ". Expected crc from ZK: " + originalSegmentCrcFromTaskGenerator + ", crc from deepstore: "
+          + crcFromDeepStorageSegment;
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
@@ -78,9 +78,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     if (validDocIds == null) {
       // no valid crc match found or no validDocIds obtained from all servers
       // error out the task instead of silently failing so that we can track it via task-error metrics
-      String message = String.format("No validDocIds found from all servers. They either failed to download "
-              + "or did not match crc from segment copy obtained from deepstore / servers. " + "Expected crc: %s",
-          originalSegmentCrcFromTaskGenerator);
+      String message = "No validDocIds found from all servers. They either failed to download or did not match crc from"
+          + " segment copy obtained from deepstore / servers. Expected crc: " + originalSegmentCrcFromTaskGenerator;
       LOGGER.error(message);
       throw new IllegalStateException(message);
     }
