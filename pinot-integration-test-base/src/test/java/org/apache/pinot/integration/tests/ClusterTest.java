@@ -34,6 +34,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -90,15 +92,18 @@ import static org.testng.Assert.assertTrue;
  */
 @Listeners(NettyTestNGListener.class)
 public abstract class ClusterTest extends ControllerTest {
-  protected static final String TEMP_DIR =
-      FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis();
-  protected static final String TEMP_SERVER_DIR = TEMP_DIR + File.separator + "PinotServer";
-  protected static final String TEMP_MINION_DIR = TEMP_DIR + File.separator + "PinotMinion";
+  protected final String TEMP_DIR =
+      FileUtils.getTempDirectoryPath() + File.separator + getClass().getSimpleName() + File.separator + System.currentTimeMillis();
+  protected final String TEMP_SERVER_DIR = TEMP_DIR + File.separator + "PinotServer";
+  protected final String TEMP_MINION_DIR = TEMP_DIR + File.separator + "PinotMinion";
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
   protected final List<BaseBrokerStarter> _brokerStarters = new ArrayList<>();
   protected final List<Integer> _brokerPorts = new ArrayList<>();
   protected String _brokerBaseApiUrl;
+  private static Lock brokerStarterLock = new ReentrantLock();
+  private static Lock serverStarterLock = new ReentrantLock();
+  private static Lock minionStarterLock = new ReentrantLock();
 
   protected final List<BaseServerStarter> _serverStarters = new ArrayList<>();
   protected int _serverGrpcPort;
@@ -196,10 +201,15 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected BaseBrokerStarter startOneBroker(int brokerId)
       throws Exception {
-    BaseBrokerStarter brokerStarter = createBrokerStarter();
-    brokerStarter.init(getBrokerConf(brokerId));
-    brokerStarter.start();
-    return brokerStarter;
+    brokerStarterLock.lock();
+    try {
+      BaseBrokerStarter brokerStarter = createBrokerStarter();
+      brokerStarter.init(getBrokerConf(brokerId));
+      brokerStarter.start();
+      return brokerStarter;
+    } finally {
+      brokerStarterLock.unlock();
+    }
   }
 
   protected int getRandomBrokerPort() {
@@ -270,7 +280,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected BaseServerStarter startOneServer(int serverId)
       throws Exception {
-    return startOneServer(getServerConf(serverId));
+    serverStarterLock.lock();
+    try {
+      return startOneServer(getServerConf(serverId));
+    } finally {
+      serverStarterLock.unlock();
+    }
   }
 
   protected BaseServerStarter startOneServer(PinotConfiguration serverConfig)
@@ -316,9 +331,14 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startMinion()
       throws Exception {
     FileUtils.deleteQuietly(new File(TEMP_MINION_DIR));
-    _minionStarter = createMinionStarter();
-    _minionStarter.init(getMinionConf());
-    _minionStarter.start();
+    minionStarterLock.lock();
+    try {
+      _minionStarter = createMinionStarter();
+      _minionStarter.init(getMinionConf());
+      _minionStarter.start();
+    } finally {
+      minionStarterLock.unlock();
+    }
     assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 

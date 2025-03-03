@@ -156,6 +156,7 @@
               <skipTests>false</skipTests>
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+                <suiteXmlFile>src/test/resources/cluster-integration-test-suite.xml</suiteXmlFile>
               </suiteXmlFiles>
             </configuration>
           </plugin>

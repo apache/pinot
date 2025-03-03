@@ -123,7 +123,7 @@ public class KafkaStarterUtils {
     return startables;
   }
 
-  public static StreamDataServerStartable startServer(final int port, final int brokerId, final String zkStr,
+  public synchronized static StreamDataServerStartable startServer(final int port, final int brokerId, final String zkStr,
       final Properties baseConf) {
     StreamDataServerStartable kafkaStarter;
     Properties configuration = new Properties(baseConf);
