@@ -51,12 +51,10 @@ public abstract class MultiStageOperator
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
-  protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-    _isEarlyTerminated = false;
   }
 
   /**
@@ -116,7 +114,6 @@ public abstract class MultiStageOperator
       throws Exception;
 
   protected void earlyTerminate() {
-    _isEarlyTerminated = true;
     for (MultiStageOperator child : getChildOperators()) {
       child.earlyTerminate();
     }
@@ -229,6 +226,13 @@ public abstract class MultiStageOperator
           serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
         }
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        return stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
+      }
     },
     FILTER(FilterOperator.StatKey.class) {
       @Override
@@ -236,6 +240,11 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<FilterOperator.StatKey> stats = (StatMap<FilterOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     },
     HASH_JOIN(HashJoinOperator.StatKey.class) {
@@ -259,6 +268,13 @@ public abstract class MultiStageOperator
         serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
             stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
+        return stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED);
+      }
     },
     INTERSECT(SetOperator.StatKey.class) {
       @Override
@@ -266,6 +282,11 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     },
     LEAF(LeafStageTransferableBlockOperator.StatKey.class) {
@@ -282,11 +303,21 @@ public abstract class MultiStageOperator
         }
         response.addBrokerStats(brokerStats);
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
+      }
     },
     LITERAL(LiteralValueOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         // Do nothing
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     },
     MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class) {
@@ -317,6 +348,13 @@ public abstract class MultiStageOperator
         serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
+        return stats.getBoolean(BaseMailboxReceiveOperator.StatKey.EARLY_TERMINATED);
+      }
     },
     MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
       @Override
@@ -333,6 +371,13 @@ public abstract class MultiStageOperator
         serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
             stats.getLong(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
+        return stats.getBoolean(MailboxSendOperator.StatKey.EARLY_TERMINATED);
+      }
     },
     MINUS(SetOperator.StatKey.class) {
       @Override
@@ -340,6 +385,11 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     },
     PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class) {
@@ -349,6 +399,11 @@ public abstract class MultiStageOperator
         StatMap<PipelineBreakerOperator.StatKey> stats = (StatMap<PipelineBreakerOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
+      }
     },
     SORT_OR_LIMIT(SortOperator.StatKey.class) {
       @Override
@@ -356,6 +411,13 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<SortOperator.StatKey> stats = (StatMap<SortOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<SortOperator.StatKey> stats = (StatMap<SortOperator.StatKey>) map;
+        return stats.getBoolean(SortOperator.StatKey.LIMIT_REACHED);
       }
     },
     TRANSFORM(TransformOperator.StatKey.class) {
@@ -365,6 +427,11 @@ public abstract class MultiStageOperator
         StatMap<TransformOperator.StatKey> stats = (StatMap<TransformOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
+      }
     },
     UNION(SetOperator.StatKey.class) {
       @Override
@@ -372,6 +439,11 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     },
     WINDOW(WindowAggregateOperator.StatKey.class) {
@@ -392,6 +464,13 @@ public abstract class MultiStageOperator
           serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
+        return stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED);
+      }
     },
     LOOKUP_JOIN(LookupJoinOperator.StatKey.class) {
       @Override
@@ -399,6 +478,11 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
         response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
+      }
+
+      @Override
+      public boolean isEarlyTerminated(StatMap<?> map) {
+        return false;
       }
     };
 
@@ -425,6 +509,8 @@ public abstract class MultiStageOperator
      * (compatible with {@link #getStatKeyClass()}). This is a way to avoid casting in the caller.
      */
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
+
+    public abstract boolean isEarlyTerminated(StatMap<?> map);
 
     public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
       // Do nothing by default
