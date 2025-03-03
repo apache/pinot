@@ -285,25 +285,45 @@ public class AggregationFunctionUtils {
   public static AggregationInfo buildAggregationInfo(SegmentContext segmentContext, QueryContext queryContext,
       AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
-    BaseProjectOperator<?> projectOperator = null;
-
     // TODO: Create a short-circuit ProjectOperator when filter result is empty
-    if (!filterOperator.isResultEmpty()) {
-      projectOperator = StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
-          aggregationFunctions, filter, predicateEvaluators);
-    }
+    AggregationInfo aggregationInfo =
+        buildAggregationInfoWithStarTree(segmentContext, queryContext, aggregationFunctions, filter, filterOperator,
+            predicateEvaluators);
+    return aggregationInfo != null ? aggregationInfo
+        : buildAggregationInfoWithoutStarTree(segmentContext, queryContext, aggregationFunctions, filterOperator);
+  }
 
-    if (projectOperator != null) {
-      return new AggregationInfo(aggregationFunctions, projectOperator, true);
-    } else {
-      Set<ExpressionContext> expressionsToTransform =
-          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
-              queryContext.getGroupByExpressions());
-      projectOperator =
-          new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              filterOperator).run();
-      return new AggregationInfo(aggregationFunctions, projectOperator, false);
+  /**
+   * Builds {@link AggregationInfo} for aggregations using star-tree index. Returns {@code null} if star-tree index
+   * cannot be used.
+   */
+  @Nullable
+  public static AggregationInfo buildAggregationInfoWithStarTree(SegmentContext segmentContext,
+      QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
+      BaseFilterOperator filterOperator, List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    if (!filterOperator.isResultEmpty()) {
+      BaseProjectOperator<?> projectOperator =
+          StarTreeUtils.createStarTreeBasedProjectOperator(segmentContext.getIndexSegment(), queryContext,
+              aggregationFunctions, filter, predicateEvaluators);
+      if (projectOperator != null) {
+        return new AggregationInfo(aggregationFunctions, projectOperator, true);
+      }
     }
+    return null;
+  }
+
+  /**
+   * Builds {@link AggregationInfo} for aggregations without using star-tree index.
+   */
+  public static AggregationInfo buildAggregationInfoWithoutStarTree(SegmentContext segmentContext,
+      QueryContext queryContext, AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator) {
+    Set<ExpressionContext> expressionsToTransform =
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
+            queryContext.getGroupByExpressions());
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(segmentContext, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+            filterOperator).run();
+    return new AggregationInfo(aggregationFunctions, projectOperator, false);
   }
 
   /**

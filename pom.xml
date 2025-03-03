@@ -177,7 +177,7 @@
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.30.30</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
-    <azure.msal4j.version>1.19.0</azure.msal4j.version>
+    <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>
@@ -191,7 +191,7 @@
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
-    <pulsar.version>3.3.1</pulsar.version>
+    <pulsar.version>4.0.3</pulsar.version>
     <flink.version>1.20.1</flink.version>
 
     <!-- Apache Commons Libraries -->
