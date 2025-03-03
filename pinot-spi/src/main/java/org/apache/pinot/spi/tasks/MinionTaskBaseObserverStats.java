@@ -42,6 +42,8 @@ public class MinionTaskBaseObserverStats {
   protected String _currentState;
   protected long _startTimestamp;
   protected long _endTimestamp;
+  // A map to keep track of the time spent on each stage of a task execution
+  // This stat will be managed by the observer and executor should not worry about maintaining it
   protected Map<String, Timer> _stageTimes = new HashMap<>();
   protected Deque<StatusEntry> _progressLogs = new LinkedList<>();
 
