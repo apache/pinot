@@ -125,8 +125,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}",
-        _defaultTimeoutMs, _enablePrefetch);
+    LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
+        _enablePrefetch);
   }
 
   @Override
