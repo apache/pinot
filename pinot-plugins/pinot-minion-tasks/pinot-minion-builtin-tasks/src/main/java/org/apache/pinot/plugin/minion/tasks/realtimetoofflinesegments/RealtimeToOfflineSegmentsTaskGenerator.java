@@ -250,30 +250,25 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
    */
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
-    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadataForTable(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = getNonConsumingSegmentsZKMetadataForRealtimeTable(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      Segment.Realtime.Status status = segmentZKMetadata.getStatus();
-      if (status.isCompleted()) {
-        completedSegmentsZKMetadata.add(segmentZKMetadata);
-      }
+      completedSegmentsZKMetadata.add(segmentZKMetadata);
 
       // Skip UPLOADED segments that don't conform to the LLC segment name
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
       if (llcSegmentName != null) {
         int partitionId = llcSegmentName.getPartitionGroupId();
         allPartitions.add(partitionId);
-        if (status.isCompleted()) {
-          latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
-            if (latestLLCSegmentName == null
-                || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-              return llcSegmentName;
-            } else {
-              return latestLLCSegmentName;
-            }
-          });
-        }
+        latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
+          if (latestLLCSegmentName == null
+              || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+            return llcSegmentName;
+          } else {
+            return latestLLCSegmentName;
+          }
+        });
       }
     }
 
