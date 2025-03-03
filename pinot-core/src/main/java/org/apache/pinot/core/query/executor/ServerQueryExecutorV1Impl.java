@@ -158,6 +158,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         queryRequest.unregisterFromMdc();
       }
     };
+
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, mdcExecutor, streamer);
     }
