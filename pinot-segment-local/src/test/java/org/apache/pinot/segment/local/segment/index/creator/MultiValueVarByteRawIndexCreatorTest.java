@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByte
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -82,9 +83,11 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOverflowMaxLengthInBytes()
       throws IOException {
-    // contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
-    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH,
-        "column", 10000, DataType.STRING, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2);
+    // Contrived to produce a positive chunk size > Integer.MAX_VALUE but not fail num elements checks
+    // This check only applies to v2/v3
+    new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
+        DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
+        ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   @Test(dataProvider = "params")
