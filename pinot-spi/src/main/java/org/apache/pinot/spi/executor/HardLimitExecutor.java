@@ -46,15 +46,21 @@ public class HardLimitExecutor extends DecoratorExecutorService {
    */
   public static int getMultiStageExecutorHardLimit(PinotConfiguration config) {
     try {
-      return Integer.parseInt(config.getProperty(
+      int maxThreads = Integer.parseInt(config.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS
-      )) * Integer.parseInt(config.getProperty(
+      ));
+      int hardLimitFactor = Integer.parseInt(config.getProperty(
           CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR
       ));
+      if (maxThreads <= 0 || hardLimitFactor <= 0) {
+        return 0;
+      }
+      return maxThreads * hardLimitFactor;
     } catch (NumberFormatException e) {
-      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS);
+      return Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)
+          * Integer.parseInt(CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR);
     }
   }
 
@@ -69,8 +75,8 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     checkTaskAllowed();
     return () -> {
       checkTaskAllowed();
+      _running.getAndIncrement();
       try {
-        _running.getAndIncrement();
         return task.call();
       } finally {
         _running.decrementAndGet();
@@ -83,8 +89,8 @@ public class HardLimitExecutor extends DecoratorExecutorService {
     checkTaskAllowed();
     return () -> {
       checkTaskAllowed();
+      _running.getAndIncrement();
       try {
-        _running.getAndIncrement();
         task.run();
       } finally {
         _running.decrementAndGet();
