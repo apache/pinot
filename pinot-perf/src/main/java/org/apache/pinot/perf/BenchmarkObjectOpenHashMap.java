@@ -36,7 +36,12 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-
+/**
+ * This benchmarks the Group ID generation logic for different types of hashmap implementations (Vanilla HashMap and
+ * Object2IntOpenHashMap) with and without reserved capacity.
+ * To run this benchmark:
+ * ./pinot/pinot-perf/target/pinot-perf-pkg/bin/pinot-BenchmarkObjectOpenHashMap.sh after building the project.
+ */
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
 @Warmup(iterations = 5, time = 10)
