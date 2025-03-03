@@ -90,6 +90,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -968,11 +969,37 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return BrokerResponseNative.BROKER_ONLY_EXPLAIN_PLAN_OUTPUT;
     }
 
+    boolean isAggregation = false;
+    List<String> columnNames = new ArrayList<>();
+    if (pinotQuery.getSelectList() != null) {
+      for (Expression expression : pinotQuery.getSelectList()) {
+        if (expression.getType() == ExpressionType.FUNCTION) {
+          Function function = expression.getFunctionCall();
+          if (function != null && AggregationFunctionType.isAggregationFunction(function.getOperator())) {
+            isAggregation = true;
+            columnNames.add(function.getOperator() + "(" + function.getOperands().get(0).getIdentifier().getName()
+                + ")");
+          }
+        }
+      }
+    }
+
     // Send empty response since we don't need to evaluate either offline or realtime request.
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
         pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
     ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+
+    if (isAggregation) {
+      DataSchema dataSchema = new DataSchema(columnNames.toArray(new String[0]),
+          Collections.nCopies(columnNames.size(), DataSchema.ColumnDataType.LONG).toArray(new DataSchema
+              .ColumnDataType[0]));
+      List<Object[]> rows = new ArrayList<>();
+      rows.add(Collections.nCopies(columnNames.size(), 0L).toArray(new Object[0]));
+      brokerResponse.setResultTable(new ResultTable(dataSchema, rows));
+      brokerResponse.setNumRowsResultSet(1);
+    }
+
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
