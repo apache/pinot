@@ -226,8 +226,9 @@ public class QueryRunner {
    */
   public void processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata,
       @Nullable ThreadExecutionContext parentContext) {
-    long requestId = QueryThreadContext.getRequestId();
-    long deadlineMs = QueryThreadContext.getDeadlineMs();
+    long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);

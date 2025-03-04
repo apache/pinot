@@ -134,20 +134,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
+    Map<String, String> reqMetadata;
+    try {
+      reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while deserializing request metadata", e);
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(e)).build());
+      responseObserver.onCompleted();
+      return;
+    }
+
+    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseThreadContext.open()) {
-      Map<String, String> requestMetadata;
-      try {
-        requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while deserializing request metadata", e);
-        responseObserver.onNext(Worker.QueryResponse.newBuilder()
-            .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-                QueryException.getTruncatedStackTrace(e)).build());
-        responseObserver.onCompleted();
-        return;
-      }
-      registerMetadataOnThreadLocal(requestMetadata);
       long requestId = QueryThreadContext.getRequestId();
 
       Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
@@ -155,7 +155,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       try {
         forEachStage(request,
             (stagePlan, workerMetadata) -> {
-              _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata, parentContext);
+              _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata, parentContext);
               return null;
             },
             (ignored) -> {
@@ -180,24 +180,23 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @Override
   public void explain(Worker.QueryRequest request, StreamObserver<Worker.ExplainResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
-        QueryThreadContext.CloseableContext mseTlCloseable = MseThreadContext.open()) {
-      Map<String, String> requestMetadata;
-      try {
-        requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while deserializing request metadata", e);
-        responseObserver.onNext(Worker.ExplainResponse.newBuilder()
-            .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR,
-                QueryException.getTruncatedStackTrace(e)).build());
-        responseObserver.onCompleted();
-        return;
-      }
-      registerMetadataOnThreadLocal(requestMetadata);
+    Map<String, String> reqMetadata;
+    try {
+      reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while deserializing request metadata", e);
+      responseObserver.onNext(Worker.ExplainResponse.newBuilder()
+          .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(e)).build());
+      responseObserver.onCompleted();
+      return;
+    }
 
+    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+        QueryThreadContext.CloseableContext mseTlCloseable = MseThreadContext.open()) {
       try {
         forEachStage(request,
-            (stagePlan, workerMetadata) -> _queryRunner.explainQuery(workerMetadata, stagePlan, requestMetadata),
+            (stagePlan, workerMetadata) -> _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata),
             (plans) -> {
               Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
               for (StagePlan plan : plans) {
@@ -342,18 +341,5 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
       }
     }
-  }
-
-  private void registerMetadataOnThreadLocal(Map<String, String> requestMetadata) {
-    String cid = requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID);
-    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
-    if (cid == null) {
-      cid = Long.toString(requestId);
-    }
-    QueryThreadContext.setIds(requestId, cid);
-    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
-    long startTimeMs = System.currentTimeMillis();
-    QueryThreadContext.setStartTimeMs(startTimeMs);
-    QueryThreadContext.setDeadlineMs(startTimeMs + timeoutMs);
   }
 }

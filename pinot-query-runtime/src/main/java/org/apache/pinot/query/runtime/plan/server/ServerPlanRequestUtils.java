@@ -55,7 +55,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -106,10 +105,8 @@ public class ServerPlanRequestUtils {
       boolean explain) {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
-    ExecutorService contextAwareExecutorService = QueryThreadContext.contextAwareExecutorService(executorService);
-
     ServerPlanRequestContext serverContext = new ServerPlanRequestContext(stagePlan, leafQueryExecutor,
-        contextAwareExecutorService, executionContext.getPipelineBreakerResult());
+        executorService, executionContext.getPipelineBreakerResult());
     // 1. Compile the PinotQuery
     constructPinotQueryPlan(serverContext, executionContext.getOpChainMetadata());
     // 2. Convert PinotQuery into InstanceRequest list (one for each physical table)

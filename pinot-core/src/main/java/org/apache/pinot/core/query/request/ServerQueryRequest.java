@@ -73,8 +73,7 @@ public class ServerQueryRequest {
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
       boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
-    // TODO: Change to support cids of type string
-    _cid = Long.toString(instanceRequest.getCid() > 0 ? instanceRequest.getCid() : _requestId);
+    _cid = instanceRequest.getCid() != null ? instanceRequest.getCid() : Long.toString(_requestId);
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = enableStreaming;
@@ -192,5 +191,6 @@ public class ServerQueryRequest {
   public void registerOnQueryThreadLocal() {
     // Notice that we register the request id and not the query id.
     QueryThreadContext.setIds(_requestId, _cid);
+    QueryThreadContext.setBrokerId(_brokerId);
   }
 }

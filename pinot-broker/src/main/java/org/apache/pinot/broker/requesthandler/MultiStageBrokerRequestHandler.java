@@ -84,6 +84,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -151,6 +152,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       HttpHeaders httpHeaders, AccessControl accessControl) {
+    QueryThreadContext.setQueryEngine("mse");
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     // Compile the request

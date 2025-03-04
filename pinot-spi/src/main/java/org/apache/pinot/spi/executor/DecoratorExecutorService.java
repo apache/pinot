@@ -212,32 +212,4 @@ public abstract class DecoratorExecutorService implements ExecutorService {
       };
     }
   }
-
-  public static abstract class WithAutoCloseable extends DecoratorExecutorService {
-    public WithAutoCloseable(ExecutorService executorService) {
-      super(executorService);
-    }
-
-    protected abstract AutoCloseable open();
-
-    @Override
-    protected <T> Callable<T> decorate(Callable<T> task) {
-      return () -> {
-        try (AutoCloseable closeable = open()) {
-          return task.call();
-        }
-      };
-    }
-
-    @Override
-    protected Runnable decorate(Runnable task) {
-      return () -> {
-        try (AutoCloseable closeable = open()) {
-          task.run();
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      };
-    }
-  }
 }

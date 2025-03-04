@@ -21,11 +21,16 @@ package org.apache.pinot.spi.query;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.apache.pinot.spi.trace.LoggerConstants;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
@@ -50,6 +55,7 @@ import org.slf4j.MDC;
  * initialized.
  */
 public class QueryThreadContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
 
   /**
@@ -62,7 +68,10 @@ public class QueryThreadContext {
 
   private static Instance get() {
     Instance instance = THREAD_LOCAL.get();
-    Preconditions.checkState(instance != null, "QueryThreadContext is not initialized");
+    if (instance == null) {
+      LOGGER.error("QueryThreadContext is not initialized");
+      throw new IllegalStateException("QueryThreadContext is not initialized");
+    }
     return instance;
   }
 
@@ -103,6 +112,22 @@ public class QueryThreadContext {
     return open(null);
   }
 
+  public static CloseableContext openFromRequestMetadata(Map<String, String> requestMetadata) {
+    CloseableContext open = open();
+    String cid = requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID);
+    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    if (cid == null) {
+      cid = Long.toString(requestId);
+    }
+    QueryThreadContext.setIds(requestId, cid);
+    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long startTimeMs = System.currentTimeMillis();
+    QueryThreadContext.setStartTimeMs(startTimeMs);
+    QueryThreadContext.setDeadlineMs(startTimeMs + timeoutMs);
+
+    return open;
+  }
+
   /**
    * Initializes the {@link QueryThreadContext} with the state captured in the given {@link Memento} object, if any.
    *
@@ -118,7 +143,10 @@ public class QueryThreadContext {
    * @throws IllegalStateException if the {@link QueryThreadContext} is already initialized.
    */
   public static CloseableContext open(@Nullable Memento memento) {
-    Preconditions.checkState(THREAD_LOCAL.get() == null, "QueryThreadContext is already initialized");
+    if (THREAD_LOCAL.get() != null) {
+      LOGGER.error("QueryThreadContext is already initialized");
+      throw new IllegalStateException("QueryThreadContext is already initialized");
+    }
 
     Instance context = new Instance();
     if (memento != null) {
@@ -156,10 +184,25 @@ public class QueryThreadContext {
   public static ExecutorService contextAwareExecutorService(
       ExecutorService executorService,
       Supplier<Memento> mementoSupplier) {
-    return new DecoratorExecutorService.WithAutoCloseable(executorService) {
+    return new DecoratorExecutorService(executorService) {
       @Override
-      protected AutoCloseable open() {
-        return QueryThreadContext.open(mementoSupplier.get());
+      protected <T> Callable<T> decorate(Callable<T> task) {
+        Memento memento = mementoSupplier.get();
+        return () -> {
+          try (CloseableContext ignored = open(memento)) {
+            return task.call();
+          }
+        };
+      }
+
+      @Override
+      protected Runnable decorate(Runnable task) {
+        Memento memento = mementoSupplier.get();
+        return () -> {
+          try (CloseableContext ignored = open(memento)) {
+            task.run();
+          }
+        };
       }
     };
   }
@@ -339,7 +382,7 @@ public class QueryThreadContext {
     private long _requestId;
     private String _cid;
     private String _sql;
-    private String _queryType;
+    private String _queryEngine;
 
     public long getStartTimeMs() {
       return _startTimeMs;
@@ -403,13 +446,13 @@ public class QueryThreadContext {
     }
 
     public String getQueryEngine() {
-      return _queryType;
+      return _queryEngine;
     }
 
     public void setQueryEngine(String queryType) {
       Preconditions.checkState(getQueryEngine() == null, "Query type already set to %s, cannot set again",
           getQueryEngine());
-      _queryType = queryType;
+      _queryEngine = queryType;
     }
 
     @Override

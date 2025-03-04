@@ -44,6 +44,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +92,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
+    QueryThreadContext.setQueryEngine("sse-grpc");
     // TODO: Add servers queried/responded stats
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();

@@ -30,7 +30,7 @@ public enum LoggerConstants {
    * See {@link org.apache.pinot.spi.query.QueryThreadContext#getRequestId()} to know more about this value and its
    * meaning.
    */
-  REQUEST_ID_KEY("pinot.request.id"),
+  REQUEST_ID_KEY("pinot.query.id"),
   /**
    * The correlation or query id of the query.
    *

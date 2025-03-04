@@ -20,11 +20,14 @@ package org.apache.pinot.query;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.LoggerConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,6 +48,7 @@ import org.apache.pinot.spi.trace.LoggerConstants;
  * However, the context is not guaranteed to be initialized in the threads running SSE operators spawned by the SSE.
  */
 public abstract class MseThreadContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MseThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
 
   /**
@@ -56,7 +60,12 @@ public abstract class MseThreadContext {
   }
 
   private static MseThreadContext.Instance get() {
-    return Preconditions.checkNotNull(THREAD_LOCAL.get(), "MseThreadContext is not initialized");
+    Instance instance = THREAD_LOCAL.get();
+    if (instance == null) {
+      LOGGER.error("MseThreadContext is not initialized");
+      throw new IllegalStateException("MseThreadContext is not initialized");
+    }
+    return instance;
   }
 
   /**
@@ -110,7 +119,10 @@ public abstract class MseThreadContext {
    * @throws IllegalStateException if the {@link MseThreadContext} is already initialized.
    */
   public static QueryThreadContext.CloseableContext open(@Nullable Memento memento) {
-    Preconditions.checkState(THREAD_LOCAL.get() == null, "MseThreadContext is already initialized");
+    if (THREAD_LOCAL.get() != null) {
+      LOGGER.error("MseThreadContext is already initialized");
+      throw new IllegalStateException("MseThreadContext is already initialized");
+    }
 
     MseThreadContext.Instance context = new MseThreadContext.Instance();
     if (memento != null) {
@@ -143,10 +155,26 @@ public abstract class MseThreadContext {
   public static ExecutorService contextAwareExecutorService(
       ExecutorService executorService,
       Supplier<Memento> mementoSupplier) {
-    return new DecoratorExecutorService.WithAutoCloseable(executorService) {
+
+    return new DecoratorExecutorService(executorService) {
       @Override
-      protected AutoCloseable open() {
-        return MseThreadContext.open(mementoSupplier.get());
+      protected <T> Callable<T> decorate(Callable<T> task) {
+        MseThreadContext.Memento memento = mementoSupplier.get();
+        return () -> {
+          try (QueryThreadContext.CloseableContext ignored = open(memento)) {
+            return task.call();
+          }
+        };
+      }
+
+      @Override
+      protected Runnable decorate(Runnable task) {
+        MseThreadContext.Memento memento = mementoSupplier.get();
+        return () -> {
+          try (QueryThreadContext.CloseableContext ignored = open(memento)) {
+            task.run();
+          }
+        };
       }
     };
   }
@@ -219,6 +247,7 @@ public abstract class MseThreadContext {
 
     @Override
     public void close() {
+      THREAD_LOCAL.remove();
       if (_stageId != -1) {
         LoggerConstants.STAGE_ID_KEY.registerInMdc(null);
       }

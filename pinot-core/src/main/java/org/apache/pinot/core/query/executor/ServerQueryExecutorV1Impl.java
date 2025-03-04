@@ -84,7 +84,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -141,10 +140,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-    ExecutorService contextAwareExecutorService = QueryThreadContext.contextAwareExecutorService(executorService);
-
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, contextAwareExecutorService, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -153,7 +150,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, contextAwareExecutorService, streamer);
+      return executeInternal(queryRequest, executorService, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
