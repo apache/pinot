@@ -71,6 +71,7 @@ public class PredownloadStatusRecorder {
   private static final String SUCCESS_STATUS = "SUCCESS_%s";
   private static final String FAILURE_STATUS = "FAILURE_%s";
   private static final String NON_RETRIABLE_FAILURE_STATUS = "NONRETRIABLEFAILURE_%s";
+  // TODO: make the path configurable
   private static String _statusRecordFolder = "/shared/predownload/status/";
   @Nullable
   private static PredownloadMetrics _predownloadMetrics;

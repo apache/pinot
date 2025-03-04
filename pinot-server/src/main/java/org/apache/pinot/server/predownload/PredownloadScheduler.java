@@ -182,7 +182,7 @@ public class PredownloadScheduler {
           PredownloadTableInfo predownloadTableInfo = _tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType());
           if (predownloadTableInfo != null) {
             loadSegmentSuccess =
-                predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, _instanceDataManagerConfig);
+                predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo);
           }
         } catch (Exception e) {
           LOGGER.error("Failed to load from local for segment: {} of table: {} with issue ",
@@ -311,7 +311,7 @@ public class PredownloadScheduler {
       _failedSegments.remove(predownloadSegmentInfo.getSegmentName());
       PredownloadTableInfo predownloadTableInfo = _tableInfoMap.get(predownloadSegmentInfo.getTableNameWithType());
       if (predownloadTableInfo != null) {
-        predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, _instanceDataManagerConfig);
+        predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo);
       }
       _totalDownloadedSizeBytes += predownloadSegmentInfo.getLocalSizeBytes();
       _predownloadMetrics.segmentDownloaded(true, predownloadSegmentInfo.getSegmentName(),

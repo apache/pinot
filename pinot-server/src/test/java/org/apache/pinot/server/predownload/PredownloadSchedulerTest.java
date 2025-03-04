@@ -222,13 +222,13 @@ public class PredownloadSchedulerTest {
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentDirectory.getDiskSizeBytes()).thenReturn(DISK_SIZE_BYTES);
     when(segmentMetadata.getCrc()).thenReturn(String.valueOf(CRC));
-    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(2)), any())).thenAnswer(
+    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(2)))).thenAnswer(
         invocation -> {
           _predownloadSegmentInfoList.get(2).updateSegmentInfoFromLocal(segmentDirectory);
           return true;
         });
-    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(0)), any())).thenReturn(false);
-    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(1)), any())).thenReturn(false);
+    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(0)))).thenReturn(false);
+    when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(1)))).thenReturn(false);
 
     _predownloadScheduler.loadSegmentsFromLocal();
     assertEquals(1, _predownloadScheduler._failedSegments.size());

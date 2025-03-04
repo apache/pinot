@@ -68,14 +68,12 @@ public class PredownloadTableInfo {
    * the downloading
    *
    * @param predownloadSegmentInfo SegmentInfo of segment to be loaded
-   * @param instanceDataManagerConfig InstanceDataManagerConfig loaded from scheduler
    * @return true if already presents, false if needs to be downloaded
    */
-  public boolean loadSegmentFromLocal(PredownloadSegmentInfo predownloadSegmentInfo,
-      InstanceDataManagerConfig instanceDataManagerConfig) {
+  public boolean loadSegmentFromLocal(PredownloadSegmentInfo predownloadSegmentInfo) {
     SegmentDirectory segmentDirectory = null;
     try {
-      segmentDirectory = getSegmentDirectory(predownloadSegmentInfo, instanceDataManagerConfig);
+      segmentDirectory = getSegmentDirectory(predownloadSegmentInfo, _instanceDataManagerConfig);
       predownloadSegmentInfo.updateSegmentInfoFromLocal(segmentDirectory);
 
       String segmentName = predownloadSegmentInfo.getSegmentName();

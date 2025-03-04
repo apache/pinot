@@ -54,10 +54,7 @@ public class PredownloadMetrics {
   }
 
   public void preDownloadComplete(PredownloadCompletionReason reason) {
-    if (reason.isSucceed()) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_SUCCEED, 1);
-    } else {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.PREDOWNLOAD_FAILED, 1);
-    }
+    _serverMetrics.addMeteredGlobalValue(
+        reason.isSucceed() ? ServerMeter.PREDOWNLOAD_SUCCEED : ServerMeter.PREDOWNLOAD_FAILED, 1);
   }
 }

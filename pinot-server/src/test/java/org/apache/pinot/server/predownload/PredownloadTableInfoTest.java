@@ -88,7 +88,7 @@ public class PredownloadTableInfoTest {
           .thenReturn(segmentDirectoryLoader);
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(CRC));
 
-      assertTrue(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertTrue(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
       assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(CRC));
       assertTrue(predownloadSegmentInfo.isDownloaded());
       assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
@@ -103,7 +103,7 @@ public class PredownloadTableInfoTest {
       long newCrc = CRC + 1;
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(newCrc));
 
-      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
       assertEquals(predownloadSegmentInfo.getLocalCrc(), String.valueOf(newCrc));
       assertFalse(predownloadSegmentInfo.isDownloaded());
       assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
@@ -118,7 +118,7 @@ public class PredownloadTableInfoTest {
       when(segmentMetadataImpl.getCrc()).thenReturn(null);
       doThrow(IOException.class).when(segmentDirectory).close();
 
-      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo, instanceDataManagerConfig));
+      assertFalse(_predownloadTableInfo.loadSegmentFromLocal(predownloadSegmentInfo));
       assertFalse(predownloadSegmentInfo.isDownloaded());
       assertEquals(predownloadSegmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
     }
