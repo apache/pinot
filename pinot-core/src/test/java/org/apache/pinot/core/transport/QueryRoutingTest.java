@@ -51,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -433,6 +434,9 @@ public class QueryRoutingTest {
 
     // Shut down the server before getting the response
     queryServer.shutDown();
+
+    assertFalse(queryServer.getChannel().isOpen());
+    assertFalse(queryServer.getChannel().isActive());
 
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
