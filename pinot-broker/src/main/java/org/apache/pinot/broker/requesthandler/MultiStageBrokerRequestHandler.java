@@ -52,6 +52,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -303,6 +304,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       }
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
+          _queryThrottler.currentQueryServerThreads());
     } catch (InterruptedException e) {
       LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
@@ -393,6 +396,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return brokerResponse;
     } finally {
       _queryThrottler.release(estimatedNumQueryThreads);
+      _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
+          _queryThrottler.currentQueryServerThreads());
     }
   }
 
