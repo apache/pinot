@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.controller.api;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +60,12 @@ import static org.testng.Assert.assertTrue;
  *
  */
 @Test(groups = "stateless")
-public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
+public class PinotIngestionRestletResourceStatelessTest extends ControllerTest implements HttpHandler {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private File _inputFile;
+  private HttpServer _dummyServer;
+  private String _fileContent;
 
   @BeforeClass
   public void setUp()
@@ -77,12 +85,20 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
 
     // Create a file with few records
     _inputFile = new File(FileUtils.getTempDirectory(), "pinotIngestionRestletResourceTest_data.csv");
+    _fileContent = String.join("\n",
+        "breed|name",
+        "dog|cooper",
+        "cat|kylo",
+        "dog|cookie"
+    );
     try (BufferedWriter bw = new BufferedWriter(new FileWriter(_inputFile))) {
-      bw.write("breed|name\n");
-      bw.write("dog|cooper\n");
-      bw.write("cat|kylo\n");
-      bw.write("dog|cookie\n");
+      bw.write(_fileContent);
     }
+
+    _dummyServer = HttpServer.create();
+    _dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
+    _dummyServer.start();
+    _dummyServer.createContext("/mock/ingestion", this);
   }
 
   @Test
@@ -105,9 +121,8 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     assertEquals(segments.size(), 1);
 
     // ingest from public file URI
-    String uri = "https://gist.githubusercontent.com/cyrilou242/ee95e5c8735755b9453136715b9d330b/raw/"
-            + "ea52d9e5c45dcf003ebb0cca25e4f2057e0b2502/pinotIngestionRestletResourceTest_data.csv";
-    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap, uri));
+    String mockedUri = String.join("", "http://localhost:", String.valueOf(_dummyServer.getAddress().getPort()), "/mock/ingestion");
+    sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap, mockedUri));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 2);
 
@@ -140,5 +155,20 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
     stopFakeInstances();
     stopController();
     stopZk();
+    if (_dummyServer != null) {
+      _dummyServer.stop(0);
+    }
+  }
+
+  @Override
+  public void handle(HttpExchange exchange)
+      throws IOException {
+    exchange.sendResponseHeaders(200, 0);
+    OutputStream out = exchange.getResponseBody();
+    OutputStreamWriter writer = new OutputStreamWriter(out);
+    writer.append(_fileContent);
+    writer.flush();
+    out.flush();
+    out.close();
   }
 }
