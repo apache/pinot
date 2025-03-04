@@ -66,6 +66,7 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
     builder.addTransition(OFFLINE_STATE, CONSUMING_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
     builder.addTransition(OFFLINE_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
     builder.addTransition(CONSUMING_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
+    // Set state transitions to OFFLINE to have higher priority to help reduce memory pressure on servers faster
     builder.addTransition(CONSUMING_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
     builder.addTransition(ONLINE_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
     // Add explicit state transitions to DROPPED from each state to ensure that DROPPED can be processed in a single
