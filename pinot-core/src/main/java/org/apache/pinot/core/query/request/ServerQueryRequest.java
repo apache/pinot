@@ -186,4 +186,8 @@ public class ServerQueryRequest {
   public void unregisterFromMdc() {
     LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
   }
+
+  public List<TableRouteInfo> getTableRouteInfos() {
+    return _tableRouteInfos;
+  }
 }
