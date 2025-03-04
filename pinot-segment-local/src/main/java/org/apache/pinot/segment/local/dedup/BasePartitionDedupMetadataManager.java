@@ -284,7 +284,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     }
     try {
       // segment.getSegmentMetadata().getColumnMetadataMap() will be null when offloading a temporary segment data
-      // manager created in BaseTableDataManager.addSegment which caused replicas to go into ERROR state when
+      // manager created in BaseTableDataManager.addSegment which caused replicas to go into BAD state when
       // metadataTTL is set
       if (segment.getSegmentMetadata() != null && segment.getSegmentMetadata().getColumnMetadataMap() != null) {
         if (skipSegmentOutOfTTL(segment, false)) {
