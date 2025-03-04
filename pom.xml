@@ -172,7 +172,7 @@
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
-    <audienceannotations.version>0.15.0</audienceannotations.version>
+    <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.30.31</aws.sdk.version>
