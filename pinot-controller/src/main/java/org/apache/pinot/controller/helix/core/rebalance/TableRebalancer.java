@@ -701,12 +701,13 @@ public class TableRebalancer {
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
       int segmentsDeleted = removedSegmentSet.size();
 
-      long diskSizeChange = getSegmentsSizeInBytes(newSegmentSet) - getSegmentsSizeInBytes(removedSegmentSet);
+      long diskUtilizationGain = getSegmentsSizeInBytes(newSegmentSet, tableNameWithType, currentAssignment);
+      long diskUtilizationLoss = getSegmentsSizeInBytes(removedSegmentSet, tableNameWithType, currentAssignment);
       DiskUsageInfo diskUsage = getDiskUsageInfoOfInstance(server);
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
-          totalNewSegments, totalExistingSegments, diskUsage.getUsedSpaceBytes(),
-          diskUsage.getUsedSpaceBytes() + diskSizeChange, diskUsage.getTotalSpaceBytes(),
+          totalNewSegments, totalExistingSegments, diskUsage.getUsedSpaceBytes() + diskUtilizationGain - diskUtilizationLoss,
+          diskUsage.getUsedSpaceBytes(), diskUsage.getTotalSpaceBytes(),
           segmentsAdded, segmentsDeleted, segmentsUnchanged, instanceToTagsMap.getOrDefault(server, null)));
     }
 
@@ -1002,9 +1003,12 @@ public class TableRebalancer {
     return ResourceUtilizationInfo.getDiskUsageInfo(instanceId);
   }
 
-  private long getSegmentsSizeInBytes(Set<String> segments) {
-    // TODO: replace with table API to get total segment size
-    return 1000L * segments.size();
+  private long getSegmentsSizeInBytes(Set<String> segments, String tableNameWithType, Map<String, Map<String, String>> currentAssignment) {
+    // TODO: for more accurate size calculation, use segment API to get each segment size
+    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableNameWithType);
+    long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
+        : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
+    return averageSegmentSizeInBytes * segments.size();
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
