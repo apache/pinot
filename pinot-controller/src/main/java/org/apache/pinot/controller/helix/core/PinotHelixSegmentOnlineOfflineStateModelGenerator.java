@@ -47,6 +47,9 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
   // Handling DROPPED state transitions with a higher priority can help prevent
   // servers from running into disk utilization problems.
   public static final int DROPPED_STATE_TRANSITION_PRIORITY = 1;
+  // Set all state transitions to OFFLINE state to have higher priority than default but less
+  // than DROPPED. Processing OFFLINE transitions earlier can help reduce memory pressure on servers.
+  public static final int OFFLINE_STATE_TRANSITION_PRIORITY = 2;
   public static final int DEFAULT_STATE_TRANSITION_PRIORITY = Integer.MAX_VALUE;
 
   public static StateModelDefinition generatePinotStateModelDefinition() {
@@ -60,17 +63,17 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
     builder.addState(DROPPED_STATE);
 
     // Add transitions between the states.
-    builder.addTransition(CONSUMING_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
     builder.addTransition(OFFLINE_STATE, CONSUMING_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
     builder.addTransition(OFFLINE_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(ONLINE_STATE, OFFLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(CONSUMING_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(ONLINE_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
     // Add explicit state transitions to DROPPED from each state to ensure that DROPPED can be processed in a single
     // state transition. Without adding explicit state transitions to DROPPED from ONLINE/CONSUMING, two state
     // transitions will be needed to fully drop a segment (CONSUMING/ONLINE -> OFFLINE, OFFLINE -> DROPPED)
     builder.addTransition(OFFLINE_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(ONLINE_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
     builder.addTransition(CONSUMING_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(ONLINE_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
 
     // set constraints on states.
     // static constraint
