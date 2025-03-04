@@ -87,6 +87,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       for (int i = 0; i < numAggregationFunctions; i++) {
+        AggregationFunction aggregationFunction = _aggregationFunctions[i];
         Object intermediateResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
         if (_queryContext.isNullHandlingEnabled()) {
@@ -94,16 +95,18 @@ public class AggregationDataTableReducer implements DataTableReducer {
           if (nullBitmap != null && nullBitmap.contains(0)) {
             intermediateResultToMerge = null;
           } else {
-            intermediateResultToMerge = AggregationFunctionUtils.getIntermediateResult(dataTable, columnDataType, 0, i);
+            intermediateResultToMerge =
+                AggregationFunctionUtils.getIntermediateResult(aggregationFunction, dataTable, columnDataType, 0, i);
           }
         } else {
-          intermediateResultToMerge = AggregationFunctionUtils.getIntermediateResult(dataTable, columnDataType, 0, i);
+          intermediateResultToMerge =
+              AggregationFunctionUtils.getIntermediateResult(aggregationFunction, dataTable, columnDataType, 0, i);
         }
         Object mergedIntermediateResult = intermediateResults[i];
         if (mergedIntermediateResult == null) {
           intermediateResults[i] = intermediateResultToMerge;
         } else {
-          intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
+          intermediateResults[i] = aggregationFunction.merge(mergedIntermediateResult, intermediateResultToMerge);
         }
       }
     }
