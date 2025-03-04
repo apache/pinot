@@ -42,6 +42,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -547,8 +548,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     if (tableType == TableType.REALTIME) {
       // For realtime table, don't process
       // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS)
-      // 2. sealed segments with start time later than the earliest start time of all in progress segments
-      // This prevents those in-progress segments from not being merged.
+      // 2. most recent sealed segments in each partition
+      // This prevents those in-progress segments and paused segments from being merged.
       //
       // Note that we make the following two assumptions here:
       // 1. streaming data consumer lags are negligible
@@ -565,46 +566,38 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
       //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
       //    records correctly.
-      //
-      // Based on the following considerations:
-      // 1. The BufferTime configuration will do the work of NOT merging the most recent segments, it will cover most
-      //    of the cases
-      // 2. If one wants to merge the most recent segments, and hence changes the BufferTime to 0, we need to make sure
-      //    we do NOT merge the consuming segments
-      // 3. There is a corner case of PauseConsumption, the function will seal the consuming segments and NOT create
-      //    a new one, nor upload the offset metadata.
-      // We decide to ONLY filter out the consuming segments and most recent completed segments for each partition.
-      Map<Integer, SegmentZKMetadata> latestCompletedSegmentInEachPartition = new HashMap<>();
-      List<SegmentZKMetadata> filteredSegments = new ArrayList<>();
+      Map<Integer, LLCSegmentName> latestCompletedSegmentInEachPartition = new HashMap<>();
+      HashSet<String> filteredSegmentNames = new HashSet<>();
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
         if (segmentZKMetadata.getStatus().isCompleted()) {
           // completed segments
-          String[] segmentIdComponents = segmentZKMetadata.getSegmentName().split("__");
-          if (segmentIdComponents.length > 1) {
+          if (LLCSegmentName.isLLCSegment(segmentZKMetadata.getSegmentName())) {
             // realtime segments
-            int partitionId = Integer.parseInt(segmentIdComponents[1]);
+            LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
+            int partitionId = llcSegmentName.getPartitionGroupId();
             if (!latestCompletedSegmentInEachPartition.containsKey(partitionId)) {
-              // latest
-              latestCompletedSegmentInEachPartition.put(partitionId, segmentZKMetadata);
+              // current segment is the latest found
+              latestCompletedSegmentInEachPartition.put(llcSegmentName.getPartitionGroupId(), llcSegmentName);
             } else {
-              long currentOffset = Long.parseLong(segmentZKMetadata.getEndOffset());
-              long maxOffset = Long.parseLong(latestCompletedSegmentInEachPartition.get(partitionId).getEndOffset());
-              if (currentOffset > maxOffset) {
-                // latest
-                filteredSegments.add(latestCompletedSegmentInEachPartition.get(partitionId));
-                latestCompletedSegmentInEachPartition.put(partitionId, segmentZKMetadata);
+              if (llcSegmentName.getSequenceNumber() >
+                      latestCompletedSegmentInEachPartition.get(partitionId).getSequenceNumber()) {
+                // current segment is the latest found
+                filteredSegmentNames.add(latestCompletedSegmentInEachPartition.get(partitionId).getSegmentName());
+                latestCompletedSegmentInEachPartition.put(partitionId, llcSegmentName);
               } else {
-                // not latest
-                filteredSegments.add(segmentZKMetadata);
+                // current segment is not the latest
+                filteredSegmentNames.add(llcSegmentName.getSegmentName());
               }
             }
           } else {
-            // not-realtime segments
-            filteredSegments.add(segmentZKMetadata);
+            // other segments: merged segments, uploaded segments, or ingested offline segments
+            filteredSegmentNames.add(segmentZKMetadata.getSegmentName());
           }
         }
       }
-      return filteredSegments;
+      return allSegments.stream()
+              .filter(a->filteredSegmentNames.contains(a.getSegmentName()))
+              .collect(Collectors.toList());
     } else {
       return allSegments;
     }
