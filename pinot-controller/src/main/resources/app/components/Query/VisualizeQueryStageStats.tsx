@@ -133,8 +133,7 @@ const generateFlowElements = (stats) => {
   const edges: Edge[] = [];
 
   const createFlowNode = (data, level, index, parentId) => {
-
-    const id = `${level}-${index}`; // Unique ID for the node
+    const id = `${parentId ? parentId + '_' : ''}${level}-${index}`; // Unique ID for the node
     const { width, height } = calculateNodeDimensions(data);
 
     // Add the node
@@ -143,7 +142,7 @@ const generateFlowElements = (stats) => {
 
     // Add an edge if this node has a parent
     if (parentId) {
-      edges.push({ id: `edge-${parentId}-${id}`, source: parentId, target: id });
+      edges.push({ id: `edge-${id}`, source: parentId, target: id });
     }
     return flowNode;
   }
