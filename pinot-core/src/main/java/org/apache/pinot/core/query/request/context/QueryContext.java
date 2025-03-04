@@ -627,7 +627,7 @@ public class QueryContext {
         }
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
+            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled, true);
         filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
         filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
       }
@@ -648,7 +648,7 @@ public class QueryContext {
           FilterContext filter = pair.getRight();
           int functionIndex = filteredAggregationFunctions.size();
           AggregationFunction aggregationFunction =
-              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
+              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled, true);
           filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
           filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
         }

@@ -54,7 +54,6 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -247,12 +246,26 @@ public class ObjectSerDeUtils {
         }
         throw new IllegalArgumentException(
             "Unsupported type of value: " + objectSet.first().getClass().getSimpleName());
-      } else if (value instanceof ObjectSet) {
-        ObjectSet objectSet = (ObjectSet) value;
-        if (objectSet.isEmpty() || objectSet.iterator().next() instanceof String) {
+      } else if (value instanceof Set) {
+        Set set = (Set) value;
+        if (set.isEmpty()) {
           return ObjectType.StringSet;
-        } else {
+        }
+        Object sampleValue = set.iterator().next();
+        if (sampleValue instanceof String) {
+          return ObjectType.StringSet;
+        } else if (sampleValue instanceof ByteArray) {
           return ObjectType.BytesSet;
+        } else if (sampleValue instanceof Integer) {
+          return ObjectType.IntSet;
+        } else if (sampleValue instanceof Long) {
+          return ObjectType.LongSet;
+        } else if (sampleValue instanceof Float) {
+          return ObjectType.FloatSet;
+        } else if (sampleValue instanceof Double) {
+          return ObjectType.DoubleSet;
+        } else {
+          throw new IllegalArgumentException("Unsupported type of value: " + sampleValue.getClass().getSimpleName());
         }
       } else if (value instanceof IdSet) {
         return ObjectType.IdSet;
@@ -890,17 +903,23 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<IntSet> INT_SET_SER_DE = new ObjectSerDe<IntSet>() {
+  public static final ObjectSerDe<Set<Integer>> INT_SET_SER_DE = new ObjectSerDe<Set<Integer>>() {
 
     @Override
-    public byte[] serialize(IntSet intSet) {
+    public byte[] serialize(Set<Integer> intSet) {
       int size = intSet.size();
       byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
       ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
       byteBuffer.putInt(size);
-      IntIterator iterator = intSet.iterator();
-      while (iterator.hasNext()) {
-        byteBuffer.putInt(iterator.nextInt());
+      if (intSet instanceof IntSet) {
+        IntIterator iterator = ((IntSet) intSet).iterator();
+        while (iterator.hasNext()) {
+          byteBuffer.putInt(iterator.nextInt());
+        }
+      } else {
+        for (int value : intSet) {
+          byteBuffer.putInt(value);
+        }
       }
       return bytes;
     }
@@ -921,17 +940,23 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<LongSet> LONG_SET_SER_DE = new ObjectSerDe<LongSet>() {
+  public static final ObjectSerDe<Set<Long>> LONG_SET_SER_DE = new ObjectSerDe<Set<Long>>() {
 
     @Override
-    public byte[] serialize(LongSet longSet) {
+    public byte[] serialize(Set<Long> longSet) {
       int size = longSet.size();
       byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
       ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
       byteBuffer.putInt(size);
-      LongIterator iterator = longSet.iterator();
-      while (iterator.hasNext()) {
-        byteBuffer.putLong(iterator.nextLong());
+      if (longSet instanceof LongSet) {
+        LongIterator iterator = ((LongSet) longSet).iterator();
+        while (iterator.hasNext()) {
+          byteBuffer.putLong(iterator.nextLong());
+        }
+      } else {
+        for (long value : longSet) {
+          byteBuffer.putLong(value);
+        }
       }
       return bytes;
     }
@@ -952,17 +977,23 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<FloatSet> FLOAT_SET_SER_DE = new ObjectSerDe<FloatSet>() {
+  public static final ObjectSerDe<Set<Float>> FLOAT_SET_SER_DE = new ObjectSerDe<Set<Float>>() {
 
     @Override
-    public byte[] serialize(FloatSet floatSet) {
+    public byte[] serialize(Set<Float> floatSet) {
       int size = floatSet.size();
       byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
       ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
       byteBuffer.putInt(size);
-      FloatIterator iterator = floatSet.iterator();
-      while (iterator.hasNext()) {
-        byteBuffer.putFloat(iterator.nextFloat());
+      if (floatSet instanceof FloatSet) {
+        FloatIterator iterator = ((FloatSet) floatSet).iterator();
+        while (iterator.hasNext()) {
+          byteBuffer.putFloat(iterator.nextFloat());
+        }
+      } else {
+        for (float value : floatSet) {
+          byteBuffer.putFloat(value);
+        }
       }
       return bytes;
     }
@@ -983,17 +1014,23 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<DoubleSet> DOUBLE_SET_SER_DE = new ObjectSerDe<DoubleSet>() {
+  public static final ObjectSerDe<Set<Double>> DOUBLE_SET_SER_DE = new ObjectSerDe<Set<Double>>() {
 
     @Override
-    public byte[] serialize(DoubleSet doubleSet) {
+    public byte[] serialize(Set<Double> doubleSet) {
       int size = doubleSet.size();
       byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
       ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
       byteBuffer.putInt(size);
-      DoubleIterator iterator = doubleSet.iterator();
-      while (iterator.hasNext()) {
-        byteBuffer.putDouble(iterator.nextDouble());
+      if (doubleSet instanceof DoubleSet) {
+        DoubleIterator iterator = ((DoubleSet) doubleSet).iterator();
+        while (iterator.hasNext()) {
+          byteBuffer.putDouble(iterator.nextDouble());
+        }
+      } else {
+        for (double value : doubleSet) {
+          byteBuffer.putDouble(value);
+        }
       }
       return bytes;
     }
