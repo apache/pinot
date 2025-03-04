@@ -273,7 +273,8 @@ public class TableRebalancer {
     try {
       sortedTiers = getSortedTiers(tableConfig, providedTierToSegmentsMap);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
-          getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun, forceMinimizeDataMovement);
+          getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun,
+              forceMinimizeDataMovement);
       tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
       tierInstancePartitionsUnchanged = tierToInstancePartitionsMapAndUnchanged.getRight();
     } catch (Exception e) {
@@ -489,9 +490,11 @@ public class TableRebalancer {
           try {
             // Re-calculate the instance partitions in case the instance configs changed during the rebalance
             instancePartitionsMap =
-                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false, forceMinimizeDataMovement).getLeft();
+                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false,
+                    forceMinimizeDataMovement).getLeft();
             tierToInstancePartitionsMap =
-                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false, forceMinimizeDataMovement).getLeft();
+                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false,
+                    forceMinimizeDataMovement).getLeft();
             targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
                 tierToInstancePartitionsMap, rebalanceConfig);
           } catch (Exception e) {
@@ -738,18 +741,21 @@ public class TableRebalancer {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       Pair<InstancePartitions, Boolean> partitionAndUnchangedForOffline =
-          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, bootstrap, dryRun, forceMinimizeDataMovement);
+          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, bootstrap, dryRun,
+              forceMinimizeDataMovement);
       instancePartitionsMap.put(InstancePartitionsType.OFFLINE, partitionAndUnchangedForOffline.getLeft());
       instancePartitionsUnchanged = partitionAndUnchangedForOffline.getRight();
     } else {
       Pair<InstancePartitions, Boolean> partitionAndUnchangedForConsuming =
-          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, bootstrap, dryRun, forceMinimizeDataMovement);
+          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, bootstrap, dryRun,
+              forceMinimizeDataMovement);
       instancePartitionsMap.put(InstancePartitionsType.CONSUMING, partitionAndUnchangedForConsuming.getLeft());
       instancePartitionsUnchanged = partitionAndUnchangedForConsuming.getRight();
       String tableNameWithType = tableConfig.getTableName();
       if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
         Pair<InstancePartitions, Boolean> partitionAndUnchangedForCompleted =
-            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, bootstrap, dryRun, forceMinimizeDataMovement);
+            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, bootstrap, dryRun,
+                forceMinimizeDataMovement);
         LOGGER.info(
             "COMPLETED segments should be relocated, fetching/computing COMPLETED instance partitions for table: {}",
             tableNameWithType);
@@ -888,7 +894,8 @@ public class TableRebalancer {
       LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
           tableConfig.getTableName());
       Pair<InstancePartitions, Boolean> partitionsAndUnchanged =
-          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun, forceMinimizeDataMovement);
+          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun,
+              forceMinimizeDataMovement);
       tierToInstancePartitionsMap.put(tier.getName(), partitionsAndUnchanged.getLeft());
       instancePartitionsUnchanged = instancePartitionsUnchanged && partitionsAndUnchanged.getRight();
     }
