@@ -513,6 +513,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNull(rebalanceResult.getPreChecksResult());
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    for (int i = 0; i < numServersToAdd; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
     executorService.shutdown();
   }
 
@@ -865,7 +872,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       throws Exception {
     int numServers = 6;
     for (int i = 0; i < numServers; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+      addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_balance_" + SERVER_INSTANCE_ID_PREFIX + i,
+          true);
     }
 
     // Create the table with default balanced segment assignment
@@ -911,7 +919,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add one server instance
-    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX, true);
+    addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_balance_" + SERVER_INSTANCE_ID_PREFIX, true);
 
     // Table without instance assignment config should work fine (ignore) with the minimizeDataMovement flag set
     // Try dry-run summary mode
@@ -950,7 +958,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getInstances(0, 0).size(),
         numServers + 1);
+
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance("minimizeDataMovement_balance_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
   }
 
   @Test
@@ -958,7 +970,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       throws Exception {
     int numServers = 6;
     for (int i = 0; i < numServers; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+      addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_" + SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
     // One instance per replica group, no partition
@@ -1011,7 +1023,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add one server instance
-    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + numServers, true);
+    addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_" + SERVER_INSTANCE_ID_PREFIX + numServers, true);
 
     // increase replica group size by 1
     instanceAssignmentConfig = new InstanceAssignmentConfig(
@@ -1043,7 +1055,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         NUM_REPLICAS + 1);
 
     // add one server instance
-    addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + (numServers + 1), true);
+    addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_" + SERVER_INSTANCE_ID_PREFIX + (numServers + 1),
+        true);
 
     // decrease replica group size by 1
     instanceAssignmentConfig = new InstanceAssignmentConfig(
@@ -1076,6 +1089,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         NUM_REPLICAS);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance("minimizeDataMovement_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
   }
 
   @AfterClass
