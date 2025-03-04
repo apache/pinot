@@ -565,19 +565,46 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
       //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
       //    records correctly.
-      long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
+      //
+      // Based on the following considerations:
+      // 1. The BufferTime configuration will do the work of NOT merging the most recent segments, it will cover most
+      //    of the cases
+      // 2. If one wants to merge the most recent segments, and hence changes the BufferTime to 0, we need to make sure
+      //    we do NOT merge the consuming segments
+      // 3. There is a corner case of PauseConsumption, the function will seal the consuming segments and NOT create
+      //    a new one, nor upload the offset metadata.
+      // We decide to ONLY filter out the consuming segments and most recent completed segments for each partition.
+      Map<Integer, SegmentZKMetadata> latestCompletedSegmentInEachPartition = new HashMap<>();
+      List<SegmentZKMetadata> filteredSegments = new ArrayList<>();
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
-        if (!segmentZKMetadata.getStatus().isCompleted()
-            && segmentZKMetadata.getTotalDocs() > 0
-            && segmentZKMetadata.getStartTimeMs() < earliestStartTimeMsOfInProgressSegments) {
-          earliestStartTimeMsOfInProgressSegments = segmentZKMetadata.getStartTimeMs();
+        if (segmentZKMetadata.getStatus().isCompleted()) {
+          // completed segments
+          String[] segmentIdComponents = segmentZKMetadata.getSegmentName().split("__");
+          if (segmentIdComponents.length > 1) {
+            // realtime segments
+            int partitionId = Integer.parseInt(segmentIdComponents[1]);
+            if (!latestCompletedSegmentInEachPartition.containsKey(partitionId)) {
+              // latest
+              latestCompletedSegmentInEachPartition.put(partitionId, segmentZKMetadata);
+            } else {
+              long currentOffset = Long.parseLong(segmentZKMetadata.getEndOffset());
+              long maxOffset = Long.parseLong(latestCompletedSegmentInEachPartition.get(partitionId).getEndOffset());
+              if (currentOffset > maxOffset) {
+                // latest
+                filteredSegments.add(latestCompletedSegmentInEachPartition.get(partitionId));
+                latestCompletedSegmentInEachPartition.put(partitionId, segmentZKMetadata);
+              } else {
+                // not latest
+                filteredSegments.add(segmentZKMetadata);
+              }
+            }
+          } else {
+            // not-realtime segments
+            filteredSegments.add(segmentZKMetadata);
+          }
         }
       }
-      final long finalEarliestStartTimeMsOfInProgressSegments = earliestStartTimeMsOfInProgressSegments;
-      return allSegments.stream()
-          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
-              && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
-          .collect(Collectors.toList());
+      return filteredSegments;
     } else {
       return allSegments;
     }
