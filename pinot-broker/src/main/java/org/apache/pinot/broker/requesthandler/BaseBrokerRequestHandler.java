@@ -177,7 +177,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
         }
       }
-      QueryThreadContext.setIds(requestId, extractClientRequestId(sqlNodeAndOptions));
+      String cid = extractClientRequestId(sqlNodeAndOptions);
+      QueryThreadContext.setIds(requestId, cid != null ? cid : Long.toString(requestId));
 
       // check app qps before doing anything
       String application = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.APPLICATION_NAME);
@@ -296,6 +297,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
+  @Nullable
   protected String extractClientRequestId(SqlNodeAndOptions sqlNodeAndOptions) {
     return sqlNodeAndOptions.getOptions() != null
         ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
