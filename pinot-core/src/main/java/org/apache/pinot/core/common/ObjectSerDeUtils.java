@@ -1805,17 +1805,25 @@ public class ObjectSerDeUtils {
   };
   //@formatter:on
 
+  /**
+   * @deprecated Use each individual SER_DE class instead.
+   */
+  @Deprecated
   public static byte[] serialize(Object value, int objectTypeValue) {
     return SER_DES[objectTypeValue].serialize(value);
   }
 
+  /**
+   * @deprecated Use each individual SER_DE class instead.
+   */
+  @Deprecated
   public static <T> T deserialize(CustomObject customObject) {
     return (T) SER_DES[customObject.getType()].deserialize(customObject.getBuffer());
   }
 
   @VisibleForTesting
   public static byte[] serialize(Object value) {
-    return serialize(value, ObjectType.getObjectType(value)._value);
+    return SER_DES[ObjectType.getObjectType(value)._value].serialize(value);
   }
 
   @VisibleForTesting

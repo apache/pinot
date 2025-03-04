@@ -19,11 +19,14 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.query.context.PlannerContext;
@@ -33,9 +36,12 @@ import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DispatchablePlanContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DispatchablePlanContext.class);
   private final WorkerManager _workerManager;
 
   private final long _requestId;
@@ -86,10 +92,8 @@ public class DispatchablePlanContext {
     return _dispatchablePlanStageRootMap;
   }
 
-  public List<DispatchablePlanFragment> constructDispatchablePlanFragmentList(PlanFragment subPlanRoot) {
-    DispatchablePlanFragment[] dispatchablePlanFragmentArray =
-        new DispatchablePlanFragment[_dispatchablePlanStageRootMap.size()];
-    createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, subPlanRoot);
+  public Map<Integer, DispatchablePlanFragment> constructDispatchablePlanFragmentMap(PlanFragment subPlanRoot) {
+    Map<Integer, DispatchablePlanFragment> dispatchablePlanFragmentMap = createDispatchablePlanFragmentMap(subPlanRoot);
     for (Map.Entry<Integer, DispatchablePlanMetadata> planMetadataEntry : _dispatchablePlanMetadataMap.entrySet()) {
       int stageId = planMetadataEntry.getKey();
       DispatchablePlanMetadata dispatchablePlanMetadata = planMetadataEntry.getValue();
@@ -115,7 +119,7 @@ public class DispatchablePlanContext {
       }
 
       // set the stageMetadata
-      DispatchablePlanFragment dispatchablePlanFragment = dispatchablePlanFragmentArray[stageId];
+      DispatchablePlanFragment dispatchablePlanFragment = dispatchablePlanFragmentMap.get(stageId);
       dispatchablePlanFragment.setWorkerMetadataList(Arrays.asList(workerMetadataArray));
       if (workerIdToSegmentsMap != null) {
         dispatchablePlanFragment.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
@@ -130,14 +134,26 @@ public class DispatchablePlanContext {
         dispatchablePlanFragment.setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
     }
-    return Arrays.asList(dispatchablePlanFragmentArray);
+    return dispatchablePlanFragmentMap;
   }
 
-  private void createDispatchablePlanFragmentList(DispatchablePlanFragment[] dispatchablePlanFragmentArray,
-      PlanFragment planFragmentRoot) {
-    dispatchablePlanFragmentArray[planFragmentRoot.getFragmentId()] = new DispatchablePlanFragment(planFragmentRoot);
-    for (PlanFragment childPlanFragment : planFragmentRoot.getChildren()) {
-      createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, childPlanFragment);
+  private Map<Integer, DispatchablePlanFragment> createDispatchablePlanFragmentMap(PlanFragment planFragmentRoot) {
+    HashMap<Integer, DispatchablePlanFragment> result =
+        Maps.newHashMapWithExpectedSize(_dispatchablePlanMetadataMap.size());
+    Queue<PlanFragment> pendingPlanFragmentIds = new ArrayDeque<>();
+    pendingPlanFragmentIds.add(planFragmentRoot);
+    while (!pendingPlanFragmentIds.isEmpty()) {
+      PlanFragment planFragment = pendingPlanFragmentIds.poll();
+      int planFragmentId = planFragment.getFragmentId();
+
+      if (result.containsKey(planFragmentId)) { // this can happen if some stage is spooled.
+        LOGGER.debug("Skipping already visited stage {}", planFragmentId);
+        continue;
+      }
+      result.put(planFragmentId, new DispatchablePlanFragment(planFragment));
+
+      pendingPlanFragmentIds.addAll(planFragment.getChildren());
     }
+    return result;
   }
 }

@@ -583,8 +583,7 @@ public class PinotHelixResourceManager {
     String instanceId = InstanceUtils.getHelixInstanceId(instance);
     InstanceConfig instanceConfig = getHelixInstanceConfig(instanceId);
     if (instanceConfig != null) {
-      throw new ClientErrorException(String.format("Instance: %s already exists", instanceId),
-          Response.Status.CONFLICT);
+      throw new ClientErrorException("Instance: " + instanceId + " already exists", Response.Status.CONFLICT);
     }
 
     instanceConfig = InstanceUtils.toHelixInstanceConfig(instance);
@@ -606,8 +605,8 @@ public class PinotHelixResourceManager {
       HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
-      return PinotResourceManagerResponse.success(
-          String.format("Added instance: %s, and updated broker resource - tables added: %s", instanceId, tablesAdded));
+      return PinotResourceManagerResponse.success("Added instance: " + instanceId + ", and updated broker resource - "
+          + "tables added: " + tablesAdded);
     } else {
       return PinotResourceManagerResponse.success("Added instance: " + instanceId);
     }
@@ -648,9 +647,8 @@ public class PinotHelixResourceManager {
       HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-      return PinotResourceManagerResponse.success(
-          String.format("Updated instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
-              instanceId, tablesAdded, tablesRemoved));
+      return PinotResourceManagerResponse.success("Updated instance: " + instanceId + ", and updated broker resource - "
+          + "tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
     } else {
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
@@ -689,12 +687,10 @@ public class PinotHelixResourceManager {
       HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-      return PinotResourceManagerResponse.success(String.format(
-          "Updated tags: %s for instance: %s, and updated broker resource - tables added: %s, tables removed: %s",
-          newTags, instanceId, tablesAdded, tablesRemoved));
+      return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId
+          + ", and updated broker resource - tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
     } else {
-      return PinotResourceManagerResponse.success(
-          String.format("Updated tags: %s for instance: %s", newTags, instanceId));
+      return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId);
     }
   }
 
@@ -719,9 +715,8 @@ public class PinotHelixResourceManager {
     HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
-    return PinotResourceManagerResponse.success(
-        String.format("Updated broker resource for broker: %s - tables added: %s, tables removed: %s", instanceId,
-            tablesAdded, tablesRemoved));
+    return PinotResourceManagerResponse.success("Updated broker resource for broker: " + instanceId
+        + " - tables added: " + tablesAdded + ", tables removed: " + tablesRemoved);
   }
 
   /**
@@ -1381,9 +1376,8 @@ public class PinotHelixResourceManager {
     int numOfflineInstances = serverTenant.getOfflineInstances();
     int numRealtimeInstances = serverTenant.getRealtimeInstances();
     if (numInstances < numOfflineInstances || numInstances < numRealtimeInstances) {
-      throw new BadRequestException(
-          String.format("Cannot request more offline instances: %d or realtime instances: %d than total instances: %d",
-              numOfflineInstances, numRealtimeInstances, numInstances));
+      throw new BadRequestException("Cannot request more offline instances: " + numOfflineInstances
+          + " or realtime instances: " + numRealtimeInstances + " than total instances: " + numInstances);
     }
     // TODO: Consider throwing BadRequestException
     List<String> untaggedInstances = getOnlineUnTaggedServerInstanceList();
@@ -1529,7 +1523,7 @@ public class PinotHelixResourceManager {
       if (override) {
         updateSchema(schema, oldSchema, force);
       } else {
-        throw new SchemaAlreadyExistsException(String.format("Schema: %s already exists", schemaName));
+        throw new SchemaAlreadyExistsException("Schema: " + schemaName + " already exists");
       }
     } else {
       // Add new schema
@@ -1556,7 +1550,7 @@ public class PinotHelixResourceManager {
 
     Schema oldSchema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
     if (oldSchema == null) {
-      throw new SchemaNotFoundException(String.format("Schema: %s does not exist", schemaName));
+      throw new SchemaNotFoundException("Schema: " + schemaName + " does not exist");
     }
 
     updateSchema(schema, oldSchema, forceTableSchemaUpdate);
@@ -1588,8 +1582,8 @@ public class PinotHelixResourceManager {
         LOGGER.warn("Force updated schema: {} which is backward incompatible with the existing schema", oldSchema);
       } else {
         // TODO: Add the reason of the incompatibility
-        throw new SchemaBackwardIncompatibleException(
-            String.format("New schema: %s is not backward-compatible with the existing schema", schemaName));
+        throw new SchemaBackwardIncompatibleException("New schema: " + schemaName + " is not backward-compatible with "
+            + "the existing schema");
       }
     }
     ZKMetadataProvider.setSchema(_propertyStore, schema);
@@ -1880,9 +1874,8 @@ public class PinotHelixResourceManager {
     if (CollectionUtils.isNotEmpty(tierConfigList)) {
       for (TierConfig tierConfig : tierConfigList) {
         if (getInstancesWithTag(tierConfig.getServerTag()).isEmpty()) {
-          throw new InvalidTableConfigException(
-              String.format("Failed to find instances with tag: %s as used by tier: %s for table: %s",
-                  tierConfig.getServerTag(), tierConfig.getName(), tableNameWithType));
+          throw new InvalidTableConfigException("Failed to find instances with tag: " + tierConfig.getServerTag()
+              + " as used by tier: " + tierConfig.getName() + " for table: " + tableNameWithType);
         }
       }
     }
@@ -1902,9 +1895,8 @@ public class PinotHelixResourceManager {
         String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
             CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
         if (!minionInstanceTagSet.contains(taskInstanceTag)) {
-          throw new InvalidTableConfigException(
-              String.format("Failed to find minion instances with tag: %s for table: %s", taskInstanceTag,
-                  tableConfig.getTableName()));
+          throw new InvalidTableConfigException("Failed to find minion instances with tag: " + taskInstanceTag
+              + " for table: " + tableConfig.getTableName());
         }
       });
     }
@@ -2862,7 +2854,7 @@ public class PinotHelixResourceManager {
     if (liveInstance == null) {
       // check if the instance exists in the cluster
       String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
-      throw new RuntimeException(String.format("Can't find instance: %s on %s", instanceName, instanceConfigPath));
+      throw new RuntimeException("Can't find instance: " + instanceName + " on " + instanceConfigPath);
     }
 
     // gather metadata for sending state transition message.
@@ -2884,9 +2876,9 @@ public class PinotHelixResourceManager {
           || !resetPartitionNames.contains(message.getPartitionName())) {
         continue;
       }
-      throw new RuntimeException(
-          String.format("Can't reset state for %s.%s on %s, because a pending message %s exists for resource %s",
-              resourceName, resetPartitionNames, instanceName, message, message.getResourceName()));
+      throw new RuntimeException("Can't reset state for " + resourceName + "." + resetPartitionNames + " on "
+          + instanceName + ", because a pending message " + message + " exists for resource "
+          + message.getResourceName());
     }
 
     String adminName = null;
@@ -3747,9 +3739,8 @@ public class PinotHelixResourceManager {
       try {
         instanceAdminEndpoint = _instanceAdminEndpointCache.get(instance);
       } catch (Exception e) {
-        String errorMessage =
-            String.format("Caught exception while getting instance admin endpoint for instance: %s. Error message: %s",
-                instance, e.getMessage());
+        String errorMessage = "Caught exception while getting instance admin endpoint for instance: " + instance
+            + ". Error message: " + e.getMessage();
         LOGGER.error(errorMessage, e);
         throw new InvalidConfigException(errorMessage);
       }
@@ -3997,8 +3988,8 @@ public class PinotHelixResourceManager {
           }
         });
       } catch (Exception e) {
-        String errorMsg = String.format("Failed to update the segment lineage during startReplaceSegments. "
-            + "(tableName = %s, segmentsFrom = %s, segmentsTo = %s)", tableNameWithType, segmentsFrom, segmentsTo);
+        String errorMsg = "Failed to update the segment lineage during startReplaceSegments. (tableName = "
+            + tableNameWithType + ", segmentsFrom = " + segmentsFrom + ", segmentsTo = " + segmentsTo + ")";
         LOGGER.error(errorMsg, e);
         throw new RuntimeException(errorMsg, e);
       }
@@ -4053,10 +4044,9 @@ public class PinotHelixResourceManager {
               + "segmentLineageEntryId = {})", tableNameWithType, segmentLineageEntryId);
           return true;
         } else if (lineageEntry.getState() == LineageEntryState.REVERTED) {
-          String errorMsg = String.format(
-              "The target lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED' state. "
-                  + "(tableNameWithType=%s, segmentLineageEntryId=%s, state=%s)", tableNameWithType,
-              segmentLineageEntryId, lineageEntry.getState());
+          String errorMsg = "The target lineage entry state is not 'IN_PROGRESS'. Cannot update to 'COMPLETED' state. "
+              + "(tableNameWithType=" + tableNameWithType + ", segmentLineageEntryId=" + segmentLineageEntryId
+              + ", state=" + lineageEntry.getState() + ")";
           LOGGER.error(errorMsg);
           throw new RuntimeException(errorMsg);
         }
@@ -4109,8 +4099,8 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = String.format("Failed to update the segment lineage during endReplaceSegments. "
-          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
+      String errorMsg = "Failed to update the segment lineage during endReplaceSegments. (tableName = "
+          + tableNameWithType + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -4253,8 +4243,8 @@ public class PinotHelixResourceManager {
         }
       });
     } catch (Exception e) {
-      String errorMsg = String.format("Failed to update the segment lineage during revertReplaceSegments. "
-          + "(tableName = %s, segmentLineageEntryId = %s)", tableNameWithType, segmentLineageEntryId);
+      String errorMsg = "Failed to update the segment lineage during revertReplaceSegments. (tableName = "
+          + tableNameWithType + ", segmentLineageEntryId = " + segmentLineageEntryId + ")";
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
@@ -4290,9 +4280,8 @@ public class PinotHelixResourceManager {
 
         // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
         if (!currentLineageEntry.equals(lineageEntryToMatch)) {
-          String errorMsg = String.format(
-              "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
-                  + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
+          String errorMsg = "Aborting the to update lineage entry since we find that the entry has been modified for "
+              + "table " + tableConfig.getTableName() + ", entry id: " + lineageEntryId;
           LOGGER.error(errorMsg);
           throw new RuntimeException(errorMsg);
         }
@@ -4309,8 +4298,8 @@ public class PinotHelixResourceManager {
                 segmentLineageToUpdate);
             break;
           default:
-            String errorMsg = String.format("Aborting the lineage entry update with type: %s, as the allowed update"
-                + "types in this method are END and REVERT", lineageUpdateType);
+            String errorMsg = "Aborting the lineage entry update with type: " + lineageUpdateType + ", as the allowed "
+                + "update types in this method are END and REVERT";
             throw new IllegalStateException(errorMsg);
         }
 
@@ -4364,7 +4353,7 @@ public class PinotHelixResourceManager {
   public Set<String> getOnlineSegmentsFromExternalView(String tableNameWithType) {
     ExternalView externalView = getTableExternalView(tableNameWithType);
     if (externalView == null) {
-      LOGGER.warn(String.format("External view is null for table (%s)", tableNameWithType));
+      LOGGER.warn("External view is null for table (" + tableNameWithType + ")");
       return Collections.emptySet();
     }
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
@@ -4501,7 +4490,7 @@ public class PinotHelixResourceManager {
     TableType inputTableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (inputTableType != null) {
       if (!hasTable(tableName)) {
-        throw new TableNotFoundException(String.format("Table=%s not found", tableName));
+        throw new TableNotFoundException("Table=" + tableName + " not found");
       }
       return getLiveBrokersForTable(ev, tableName);
     }
@@ -4510,7 +4499,7 @@ public class PinotHelixResourceManager {
     boolean hasOfflineTable = hasTable(offlineTableName);
     boolean hasRealtimeTable = hasTable(realtimeTableName);
     if (!hasOfflineTable && !hasRealtimeTable) {
-      throw new TableNotFoundException(String.format("Table=%s not found", tableName));
+      throw new TableNotFoundException("Table=" + tableName + " not found");
     }
     if (hasOfflineTable && hasRealtimeTable) {
       Set<String> offlineTables = new HashSet<>(getLiveBrokersForTable(ev, offlineTableName));
