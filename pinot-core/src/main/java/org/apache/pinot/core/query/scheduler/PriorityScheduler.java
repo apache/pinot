@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.exception.QueryException;
@@ -34,6 +35,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,7 +104,8 @@ public abstract class PriorityScheduler extends QueryScheduler {
             ServerQueryRequest queryRequest = request.getQueryRequest();
             final QueryExecutorService executor =
                 _resourceManager.getExecutorService(queryRequest, request.getSchedulerGroup());
-            final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executor);
+            ExecutorService innerExecutor = QueryThreadContext.contextAwareExecutorService(executor);
+            final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, innerExecutor);
             queryFutureTask.addListener(new Runnable() {
               @Override
               public void run() {
