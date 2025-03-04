@@ -288,8 +288,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throws Exception {
     Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
     Optional<Long> requestId = _clientQueryIds.entrySet().stream()
-        .filter(e -> clientQueryId.equals(e.getValue())).map(Map.Entry::getKey).findFirst();
+        .filter(e -> clientQueryId.equals(e.getValue()))
+        .map(Map.Entry::getKey)
+        .findFirst();
     if (requestId.isPresent()) {
+      QueryThreadContext.setIds(requestId.get(), clientQueryId);
       return cancelQuery(requestId.get(), timeoutMs, executor, connMgr, serverResponses);
     } else {
       LOGGER.warn("Query cancellation cannot be performed due to unknown client query id: {}", clientQueryId);

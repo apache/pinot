@@ -78,6 +78,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -398,7 +399,7 @@ public class PinotClientRequest {
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
-    try {
+    try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient && _requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
         String resp = "Cancelled client query: " + id;
@@ -407,11 +408,12 @@ public class PinotClientRequest {
         }
         return resp;
       } else if (_requestHandler.cancelQuery(Long.parseLong(id), timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-          String resp = "Cancelled query: " + id;
-          if (verbose) {
-            resp += " with responses from servers: " + serverResponses;
-          }
-          return resp;
+        QueryThreadContext.setIds(Long.parseLong(id), id);
+        String resp = "Cancelled query: " + id;
+        if (verbose) {
+          resp += " with responses from servers: " + serverResponses;
+        }
+        return resp;
       }
     } catch (NumberFormatException e) {
       Response.status(Response.Status.BAD_REQUEST).entity(String.format("Invalid internal query id: %s", id));

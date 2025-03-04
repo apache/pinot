@@ -252,6 +252,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String globalQueryId = getGlobalQueryId(queryId);
     List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
+      // TODO: how should we add the cid here? Maybe as a query param?
+      //  we can get the cid from QueryThreadContext
       serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
