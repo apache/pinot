@@ -251,9 +251,13 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
-  public boolean isMinimizeDataMovement() { return _minimizeDataMovement; }
+  public boolean isMinimizeDataMovement() {
+    return _minimizeDataMovement;
+  }
 
-  public void setMinimizeDataMovement(boolean minimizeDataMovement) { _minimizeDataMovement = minimizeDataMovement; }
+  public void setMinimizeDataMovement(boolean minimizeDataMovement) {
+    _minimizeDataMovement = minimizeDataMovement;
+  }
 
   @Override
   public String toString() {

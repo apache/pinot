@@ -95,8 +95,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-        _helixResourceManager.getTableSizeReader());
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -532,9 +532,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, NO_TIER_NAME, numServers, numServers, 0));
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setServerTenant(NO_TIER_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setServerTenant(NO_TIER_NAME)
+        .build();
     // Create the table
     addDummySchema(TIERED_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
@@ -675,9 +676,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.createServerTenant(
         new Tenant(TenantRole.SERVER, "replicaAssignment" + NO_TIER_NAME, numServers, numServers, 0));
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setServerTenant("replicaAssignment" + NO_TIER_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setServerTenant("replicaAssignment" + NO_TIER_NAME)
+        .build();
     // Create the table
     addDummySchema(TIERED_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
@@ -859,7 +861,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testRebalanceWithMinimizeDataMovementBalanced() throws Exception {
+  public void testRebalanceWithMinimizeDataMovementBalanced()
+      throws Exception {
     int numServers = 6;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
@@ -928,7 +931,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceServerInfo.getNumServers().getValueBeforeRebalance(), numServers);
     assertEquals(rebalanceServerInfo.getNumServers().getExpectedValueAfterRebalance(), numServers + 1);
 
-
     // Check if the instance assignment is the same as the one without minimizeDataMovement flag set
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
@@ -946,7 +948,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     // Should see the added server in the instance assignment
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getInstances(0, 0).size(), numServers + 1);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getInstances(0, 0).size(),
+        numServers + 1);
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
 
@@ -961,13 +964,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // One instance per replica group, no partition
     InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false,
-            null), null, false);
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false, null), null, false);
 
     // Create the table
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig)).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(NUM_REPLICAS)
+        .setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig))
+        .build();
 
     addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
@@ -1010,12 +1013,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // add one server instance
     addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + numServers, true);
 
-
     // increase replica group size by 1
     instanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS + 1, 1, 0, 0, false,
-            null), null, false);
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS + 1, 1, 0, 0, false, null), null, false);
 
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
@@ -1033,13 +1034,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceServerInfo.getServersAdded().size(), 1);
     assertEquals(rebalanceServerInfo.getServersRemoved().size(), 0);
 
-
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setMinimizeDataMovement(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS + 1);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(),
+        NUM_REPLICAS + 1);
 
     // add one server instance
     addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + (numServers + 1), true);
@@ -1047,8 +1048,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // decrease replica group size by 1
     instanceAssignmentConfig = new InstanceAssignmentConfig(
         new InstanceTagPoolConfig(TagNameUtils.getOfflineTagForTenant(null), false, 0, null), null,
-        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false,
-            null), null, false);
+        new InstanceReplicaGroupPartitionConfig(true, 0, NUM_REPLICAS, 1, 0, 0, false, null), null, false);
 
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
     _helixResourceManager.updateTableConfig(tableConfig);
@@ -1067,13 +1067,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceServerInfo.getServersAdded().size(), 0);
     assertEquals(rebalanceServerInfo.getServersRemoved().size(), 1);
 
-
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setMinimizeDataMovement(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(), NUM_REPLICAS);
+    assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(),
+        NUM_REPLICAS);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
   }
