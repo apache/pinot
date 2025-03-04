@@ -31,24 +31,25 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The {@link MseThreadContext} class provides a way to set and retrieve the MSE specific information current thread.
+ * The {@link MseWorkerThreadContext} class provides a way to set and retrieve the MSE specific information current
+ * thread.
  *
  * This class follows the same design principles as {@link QueryThreadContext} and therefore the code is more complex
  * than a reader may expect. The main reason for this complexity is to ensure that the context is properly initialized,
  * closed and kept in the current thread. This is important to avoid leaking context information or having
  * multi-threading issues. Please read the documentation of {@link QueryThreadContext} for more information.
  *
- * The {@link MseThreadContext} is used to set the stage id and worker id of the current thread. These values are used
- * to identify the stage and worker that are processing the query. The stage id is used to identify the stage of the
- * query execution and the worker id is used to identify the worker that is processing the query. In conjunction with
+ * The {@link MseWorkerThreadContext} is used to set the stage id and worker id of the current thread. These values are
+ * used to identify the stage and worker that are processing the query. The stage id is used to identify the stage of
+ * th query execution and the worker id is used to identify the worker that is processing the query. In conjunction with
  * the query id, these three values can be used to uniquely identify a worker processing a query in MSE.
  *
  * It is guaranteed that all server threads running MSE operators will have this context initialized. The same can be
  * said for the server threads running SSE operators spawned by the MSE operators.
  * However, the context is not guaranteed to be initialized in the threads running SSE operators spawned by the SSE.
  */
-public abstract class MseThreadContext {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MseThreadContext.class);
+public abstract class MseWorkerThreadContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MseWorkerThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
 
   /**
@@ -56,10 +57,10 @@ public abstract class MseThreadContext {
    *
    * Use {@link #open()} to initialize the context instead.
    */
-  private MseThreadContext() {
+  private MseWorkerThreadContext() {
   }
 
-  private static MseThreadContext.Instance get() {
+  private static MseWorkerThreadContext.Instance get() {
     Instance instance = THREAD_LOCAL.get();
     if (instance == null) {
       LOGGER.error("MseThreadContext is not initialized");
@@ -69,7 +70,7 @@ public abstract class MseThreadContext {
   }
 
   /**
-   * Returns {@code true} if the {@link MseThreadContext} is initialized in the current thread.
+   * Returns {@code true} if the {@link MseWorkerThreadContext} is initialized in the current thread.
    *
    * Initializing the context means that the {@link #open()} method was called and the returned object is not closed
    * yet.
@@ -79,44 +80,46 @@ public abstract class MseThreadContext {
   }
 
   /**
-   * Captures the state of the {@link MseThreadContext} in the current thread.
+   * Captures the state of the {@link MseWorkerThreadContext} in the current thread.
    *
-   * This method is used to capture the state of the {@link MseThreadContext} in the current thread so that it can be
-   * restored later in another thread.
+   * This method is used to capture the state of the {@link MseWorkerThreadContext} in the current thread so that it can
+   * be restored later in another thread.
    *
-   * @return a {@link Memento} object that captures the state of the {@link MseThreadContext}
-   * @throws IllegalStateException if the {@link MseThreadContext} is not initialized
+   * @return a {@link Memento} object that captures the state of the {@link MseWorkerThreadContext}
+   * @throws IllegalStateException if the {@link MseWorkerThreadContext} is not initialized
    */
   public static Memento createMemento() {
     return new Memento(get());
   }
 
   /**
-   * Initializes the {@link MseThreadContext} with default values.
+   * Initializes the {@link MseWorkerThreadContext} with default values.
    *
-   * This method will throw an {@link IllegalStateException} if the {@link MseThreadContext} is already initialized.
+   * This method will throw an {@link IllegalStateException} if the {@link MseWorkerThreadContext} is already
+   * initialized.
    * That indicates an error in the code. Older context must be closed before opening a new one.
    *
    * @return an {@link AutoCloseable} object that should be used within a try-with-resources block
-   * @throws IllegalStateException if the {@link MseThreadContext} is already initialized.
+   * @throws IllegalStateException if the {@link MseWorkerThreadContext} is already initialized.
    */
   public static QueryThreadContext.CloseableContext open() {
     return open(null);
   }
 
   /**
-   * Initializes the {@link MseThreadContext} with the state captured in the given {@link Memento} object, if any.
+   * Initializes the {@link MseWorkerThreadContext} with the state captured in the given {@link Memento} object, if any.
    *
-   * This method will throw an {@link IllegalStateException} if the {@link MseThreadContext} is already initialized.
+   * This method will throw an {@link IllegalStateException} if the {@link MseWorkerThreadContext} is already
+   * initialized.
    * That indicates an error in the code. Older context must be closed before opening a new one.
    *
-   * Values that were set in the {@link Memento} object will be set in the {@link MseThreadContext} and therefore
+   * Values that were set in the {@link Memento} object will be set in the {@link MseWorkerThreadContext} and therefore
    * they couldn't be set again in the current thread (at least until the returned {@link AutoCloseable} is closed).
    *
    * @param memento the {@link Memento} object to capture the state from
    *                (if {@code null}, the context will be initialized with default values)
    * @return an {@link AutoCloseable} object that should be used within a try-with-resources block
-   * @throws IllegalStateException if the {@link MseThreadContext} is already initialized.
+   * @throws IllegalStateException if the {@link MseWorkerThreadContext} is already initialized.
    */
   public static QueryThreadContext.CloseableContext open(@Nullable Memento memento) {
     if (THREAD_LOCAL.get() != null) {
@@ -124,7 +127,7 @@ public abstract class MseThreadContext {
       throw new IllegalStateException("MseThreadContext is already initialized");
     }
 
-    MseThreadContext.Instance context = new MseThreadContext.Instance();
+    MseWorkerThreadContext.Instance context = new MseWorkerThreadContext.Instance();
     if (memento != null) {
       context.setStageId(memento._stageId);
       context.setWorkerId(memento._workerId);
@@ -136,18 +139,18 @@ public abstract class MseThreadContext {
   }
 
   /**
-   * Returns a new {@link ExecutorService} whose tasks will be executed with the {@link MseThreadContext} initialized
-   * with the state of the thread submitting the tasks.
+   * Returns a new {@link ExecutorService} whose tasks will be executed with the {@link MseWorkerThreadContext}
+   * initialized with the state of the thread submitting the tasks.
    *
    * @param executorService the {@link ExecutorService} to decorate
    */
   public static ExecutorService contextAwareExecutorService(ExecutorService executorService) {
-    return contextAwareExecutorService(executorService, MseThreadContext::createMemento);
+    return contextAwareExecutorService(executorService, MseWorkerThreadContext::createMemento);
   }
 
   /**
-   * Returns a new {@link ExecutorService} whose tasks will be executed with the {@link MseThreadContext} initialized
-   * with the state captured in the given {@link MseThreadContext.Memento} object.
+   * Returns a new {@link ExecutorService} whose tasks will be executed with the {@link MseWorkerThreadContext}
+   * initialized with the state captured in the given {@link MseWorkerThreadContext.Memento} object.
    *
    * @param executorService the {@link ExecutorService} to decorate
    * @param mementoSupplier a supplier that provides the {@link Memento} object to capture the state from
@@ -159,7 +162,7 @@ public abstract class MseThreadContext {
     return new DecoratorExecutorService(executorService) {
       @Override
       protected <T> Callable<T> decorate(Callable<T> task) {
-        MseThreadContext.Memento memento = mementoSupplier.get();
+        MseWorkerThreadContext.Memento memento = mementoSupplier.get();
         return () -> {
           try (QueryThreadContext.CloseableContext ignored = open(memento)) {
             return task.call();
@@ -169,7 +172,7 @@ public abstract class MseThreadContext {
 
       @Override
       protected Runnable decorate(Runnable task) {
-        MseThreadContext.Memento memento = mementoSupplier.get();
+        MseWorkerThreadContext.Memento memento = mementoSupplier.get();
         return () -> {
           try (QueryThreadContext.CloseableContext ignored = open(memento)) {
             task.run();
@@ -183,7 +186,7 @@ public abstract class MseThreadContext {
    * Returns the stage id of the current thread.
    *
    * The default value is -1.
-   * @throws IllegalStateException if the {@link MseThreadContext} is not initialized
+   * @throws IllegalStateException if the {@link MseWorkerThreadContext} is not initialized
    */
   public static int getStageId() {
     return get().getStageId();
@@ -194,7 +197,8 @@ public abstract class MseThreadContext {
    *
    * The stage id can only be set once.
    *
-   * @throws IllegalStateException if the stage id is already set or if the {@link MseThreadContext} is not initialized
+   * @throws IllegalStateException if the stage id is already set or if the {@link MseWorkerThreadContext} is not
+   * initialized
    */
   public static void setStageId(int stageId) {
     get().setStageId(stageId);
@@ -204,7 +208,7 @@ public abstract class MseThreadContext {
    * Returns the worker id of the current thread.
    *
    * The default value is -1.
-   * @throws IllegalStateException if the {@link MseThreadContext} is not initialized
+   * @throws IllegalStateException if the {@link MseWorkerThreadContext} is not initialized
    */
   public static int getWorkerId() {
     return get()._workerId;
@@ -215,7 +219,8 @@ public abstract class MseThreadContext {
    *
    * The worker id can only be set once.
    *
-   * @throws IllegalStateException if the worker id is already set or if the {@link MseThreadContext} is not initialized
+   * @throws IllegalStateException if the worker id is already set or if the {@link MseWorkerThreadContext} is not
+   * initialized
    */
   public static void setWorkerId(int workerId) {
     get().setWorkerId(workerId);

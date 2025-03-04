@@ -46,7 +46,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import org.apache.pinot.query.MseThreadContext;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -175,7 +175,7 @@ public class QueryRunner {
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    _executorService = MseThreadContext.contextAwareExecutorService(
+    _executorService = MseWorkerThreadContext.contextAwareExecutorService(
         QueryThreadContext.contextAwareExecutorService(
             ExecutorServiceUtils.create(
                 config,

@@ -41,7 +41,7 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
-import org.apache.pinot.query.MseThreadContext;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -81,14 +81,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
-    _querySubmissionExecutorService =
-        MseThreadContext.contextAwareExecutorService(
-            QueryThreadContext.contextAwareExecutorService(
-                Executors.newCachedThreadPool(
-                    new NamedThreadFactory("query_submission_executor_on_" + _port + "_port")
-                )
+    _querySubmissionExecutorService = MseWorkerThreadContext.contextAwareExecutorService(
+        QueryThreadContext.contextAwareExecutorService(
+            Executors.newCachedThreadPool(
+                new NamedThreadFactory("query_submission_executor_on_" + _port + "_port")
             )
-        );
+        )
+    );
   }
 
   public void start() {
@@ -147,7 +146,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
 
     try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseThreadContext.open()) {
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       long requestId = QueryThreadContext.getRequestId();
       QueryThreadContext.setQueryEngine("mse");
 
@@ -194,7 +193,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
 
     try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseThreadContext.open()) {
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       try {
         forEachStage(request,
             (stagePlan, workerMetadata) -> _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata),
@@ -269,7 +268,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
               protoStagePlan.getStageMetadata().getStageId()), e);
     }
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
-    MseThreadContext.setStageId(stageMetadata.getStageId());
+    MseWorkerThreadContext.setStageId(stageMetadata.getStageId());
     List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
     int numWorkers = workerMetadataList.size();
     CompletableFuture<W>[] workerSubmissionStubs = new CompletableFuture[numWorkers];
@@ -277,7 +276,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       WorkerMetadata workerMetadata = workerMetadataList.get(j);
       workerSubmissionStubs[j] = CompletableFuture.supplyAsync(
           () -> {
-            MseThreadContext.setWorkerId(workerMetadata.getWorkerId());
+            MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
             return submitFunction.apply(stagePlan, workerMetadata);
           },
           _querySubmissionExecutorService);
