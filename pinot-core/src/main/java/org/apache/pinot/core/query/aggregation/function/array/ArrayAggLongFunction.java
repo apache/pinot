@@ -20,8 +20,10 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -55,5 +57,16 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongArrayList longArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongArrayList.getValue(),
+        ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.serialize(longArrayList));
+  }
+
+  @Override
+  public LongArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

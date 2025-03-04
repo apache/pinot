@@ -19,14 +19,17 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleOpenHashSet> {
+public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleSet> {
   public ArrayAggDistinctDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -54,5 +57,16 @@ public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<D
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(DoubleSet doubleOpenHashSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleSet.getValue(),
+        ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize(doubleOpenHashSet));
+  }
+
+  @Override
+  public DoubleSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DOUBLE_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }
