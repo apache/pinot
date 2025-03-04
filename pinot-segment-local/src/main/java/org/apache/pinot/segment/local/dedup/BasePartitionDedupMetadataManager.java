@@ -283,8 +283,13 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      if (skipSegmentOutOfTTL(segment, false)) {
-        return;
+      // segment.getSegmentMetadata().getColumnMetadataMap() will be null when offloading a temporary segment data
+      // manager created in BaseTableDataManager.addSegment which caused replicas to go into ERROR state when
+      // metadataTTL is set
+      if (segment.getSegmentMetadata() != null && segment.getSegmentMetadata().getColumnMetadataMap() != null) {
+        if (skipSegmentOutOfTTL(segment, false)) {
+          return;
+        }
       }
       try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
           _primaryKeyColumns, _dedupTimeColumn)) {
