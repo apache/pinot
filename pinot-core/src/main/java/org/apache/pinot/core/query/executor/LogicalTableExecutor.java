@@ -316,25 +316,9 @@ public class LogicalTableExecutor implements QueryExecutor {
     }
 
     InstanceResponseBlock instanceResponse = null;
-    int numSegmentsAcquired = 0;
     try {
-      List<IndexSegment> indexSegments = new ArrayList<>();
-      Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
-
-      for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
-        indexSegments.addAll(tableExecutionInfo._indexSegments);
-        if (tableExecutionInfo._providedSegmentContexts != null) {
-          if (providedSegmentContexts == null) {
-            providedSegmentContexts = new HashMap<>();
-          }
-          providedSegmentContexts.putAll(tableExecutionInfo._providedSegmentContexts);
-          numSegmentsAcquired += tableExecutionInfo._segmentDataManagers.size();
-        }
-      }
-
-      instanceResponse =
-          executeInternal(tableExecutionInfoMap, indexSegments, providedSegmentContexts, queryContext, timerContext,
-              executorService, streamer, queryRequest.isEnableStreaming());
+      instanceResponse = executeInternal(tableExecutionInfoMap, queryContext, timerContext, executorService, streamer,
+          queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
@@ -374,7 +358,7 @@ public class LogicalTableExecutor implements QueryExecutor {
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
     instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName(),
-        Integer.toString(numSegmentsAcquired));
+        Integer.toString(tableExecutionInfoMap.values().stream().mapToInt(t -> t._segmentDataManagers.size()).sum()));
     instanceResponse.addMetadata(DataTable.MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
 
     // When segment is removed from the IdealState:
@@ -444,37 +428,46 @@ public class LogicalTableExecutor implements QueryExecutor {
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
   private InstanceResponseBlock executeInternal(Map<String, TableExecutionInfo> tableExecutionInfoMap,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
       QueryContext queryContext, TimerContext timerContext, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer, boolean enableStreaming)
       throws Exception {
-    handleSubquery(queryContext, tableExecutionInfoMap, indexSegments, providedSegmentContexts, timerContext,
-        executorService);
+    handleSubquery(queryContext, tableExecutionInfoMap, timerContext, executorService);
 
     // Compute total docs for the table before pruning the segments
     long numTotalDocs = 0;
-    for (IndexSegment indexSegment : indexSegments) {
-      numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
-    }
+    int numSelectedSegments = 0;
+    List<IndexSegment> indexSegments = new ArrayList<>();
+    List<SegmentContext> selectedSegmentContexts = new ArrayList<>();
+    SegmentPrunerStatistics totalPrunerStats = new SegmentPrunerStatistics();
+    totalPrunerStats.setInvalidSegments(0);
+    totalPrunerStats.setLimitPruned(0);
+    totalPrunerStats.setValuePruned(0);
 
-    SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
-    List<IndexSegment> selectedSegments =
-        selectSegments(indexSegments, queryContext, timerContext, executorService, prunerStats);
+    for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+      numTotalDocs +=
+          tableExecutionInfo._indexSegments.stream().mapToInt(i -> i.getSegmentMetadata().getTotalDocs()).sum();
+      indexSegments.addAll(tableExecutionInfo._indexSegments);
+
+      SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
+      List<IndexSegment> selectedSegments =
+          selectSegments(tableExecutionInfo._indexSegments, queryContext, timerContext, executorService, prunerStats);
+
+      totalPrunerStats.setValuePruned(prunerStats.getValuePruned() + totalPrunerStats.getValuePruned());
+      totalPrunerStats.setLimitPruned(prunerStats.getLimitPruned() + prunerStats.getLimitPruned());
+      totalPrunerStats.setInvalidSegments(prunerStats.getInvalidSegments() + prunerStats.getInvalidSegments());
+
+      if (tableExecutionInfo._providedSegmentContexts == null) {
+        selectedSegmentContexts.addAll(
+          tableExecutionInfo._tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions()));
+      } else {
+        selectedSegments.forEach(s -> selectedSegmentContexts.add(tableExecutionInfo._providedSegmentContexts.get(s)));
+      }
+      numSelectedSegments += selectedSegments.size();
+    }
 
     int numTotalSegments = indexSegments.size();
-    int numSelectedSegments = selectedSegments.size();
+
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
-    List<SegmentContext> selectedSegmentContexts;
-    if (providedSegmentContexts == null) {
-      selectedSegmentContexts = new ArrayList<>();
-      for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
-        selectedSegmentContexts.addAll(
-            tableExecutionInfo._tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions()));
-      }
-    } else {
-      selectedSegmentContexts = new ArrayList<>(selectedSegments.size());
-      selectedSegments.forEach(s -> selectedSegmentContexts.add(providedSegmentContexts.get(s)));
-    }
 
     InstanceResponseBlock instanceResponse =
         execute(indexSegments, queryContext, timerContext, executorService, streamer, enableStreaming,
@@ -487,7 +480,7 @@ public class LogicalTableExecutor implements QueryExecutor {
     int prunedSegments = numTotalSegments - numSelectedSegments;
     instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(),
         String.valueOf(prunedSegments));
-    addPrunerStats(instanceResponse, prunerStats);
+    addPrunerStats(instanceResponse, totalPrunerStats);
 
     return instanceResponse;
   }
@@ -605,13 +598,11 @@ public class LogicalTableExecutor implements QueryExecutor {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(QueryContext queryContext, Map<String, TableExecutionInfo> tableExecutionInfoMap,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
       TimerContext timerContext, ExecutorService executorService)
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null && !filter.isConstant()) {
-      handleSubquery(filter, tableExecutionInfoMap, indexSegments, providedSegmentContexts, timerContext,
-          executorService, queryContext.getEndTimeMs());
+      handleSubquery(filter, tableExecutionInfoMap, timerContext, executorService, queryContext.getEndTimeMs());
     }
   }
 
@@ -620,18 +611,15 @@ public class LogicalTableExecutor implements QueryExecutor {
    * <p>Currently only supports subquery within the lhs of the predicate.
    */
   private void handleSubquery(FilterContext filter, Map<String, TableExecutionInfo> tableExecutionInfoMap,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
       TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        handleSubquery(child, tableExecutionInfoMap, indexSegments, providedSegmentContexts, timerContext,
-            executorService, endTimeMs);
+        handleSubquery(child, tableExecutionInfoMap, timerContext, executorService, endTimeMs);
       }
     } else {
-      handleSubquery(filter.getPredicate().getLhs(), tableExecutionInfoMap, indexSegments, providedSegmentContexts,
-          timerContext, executorService, endTimeMs);
+      handleSubquery(filter.getPredicate().getLhs(), tableExecutionInfoMap, timerContext, executorService, endTimeMs);
     }
   }
 
@@ -643,7 +631,6 @@ public class LogicalTableExecutor implements QueryExecutor {
    * rewritten to an IN_ID_SET transform function.
    */
   private void handleSubquery(ExpressionContext expression, Map<String, TableExecutionInfo> tableExecutionInfoMap,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
       TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
     FunctionContext function = expression.getFunction();
@@ -671,8 +658,7 @@ public class LogicalTableExecutor implements QueryExecutor {
       subquery.setEndTimeMs(endTimeMs);
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
-          executeInternal(tableExecutionInfoMap, new ArrayList<>(indexSegments), providedSegmentContexts, subquery,
-              timerContext, executorService, null, false);
+          executeInternal(tableExecutionInfoMap, subquery, timerContext, executorService, null, false);
       BaseResultsBlock resultsBlock = instanceResponse.getResultsBlock();
       Preconditions.checkState(resultsBlock instanceof AggregationResultsBlock,
           "Got unexpected results block type: %s, expecting aggregation results",
@@ -685,8 +671,7 @@ public class LogicalTableExecutor implements QueryExecutor {
       arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
-        handleSubquery(argument, tableExecutionInfoMap, indexSegments, providedSegmentContexts, timerContext,
-            executorService, endTimeMs);
+        handleSubquery(argument, tableExecutionInfoMap, timerContext, executorService, endTimeMs);
       }
     }
   }
