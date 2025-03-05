@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -283,13 +284,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       return;
     }
     try {
-      // segment.getSegmentMetadata().getColumnMetadataMap() will be null when offloading a temporary segment data
-      // manager created in BaseTableDataManager.addSegment which caused replicas to go into BAD state when
-      // metadataTTL is set
-      if (segment.getSegmentMetadata() != null && segment.getSegmentMetadata().getColumnMetadataMap() != null) {
-        if (skipSegmentOutOfTTL(segment, false)) {
-          return;
-        }
+      if (skipSegmentOutOfTTL(segment, false)) {
+        return;
       }
       try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
           _primaryKeyColumns, _dedupTimeColumn)) {
@@ -299,6 +295,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         updatePrimaryKeyGauge();
       }
     } catch (Exception e) {
+      System.out.println(Thread.currentThread() + " Not ignoring the exception");
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s of table: %s from %s", segment.getSegmentName(),
               _tableNameWithType, this.getClass().getSimpleName()), e);
@@ -314,6 +311,11 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   }
 
   protected double getMaxDedupTime(IndexSegment segment) {
+    if (segment instanceof MutableSegment) {
+      // MutableSegment doesn't have columnMetadataMap to get the max dedup time, so returning the largest value seen
+      // so far to process this segment as within TTL comparison with max dedup time of this segment will be ignored
+      return _largestSeenTime.get();
+    }
     return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
         .getMaxValue()).doubleValue();
   }
