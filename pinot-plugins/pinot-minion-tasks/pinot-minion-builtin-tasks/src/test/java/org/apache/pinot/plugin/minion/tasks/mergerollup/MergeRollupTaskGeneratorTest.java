@@ -246,7 +246,7 @@ public class MergeRollupTaskGeneratorTest {
     // the two following segments will be skipped when generating tasks
     SegmentZKMetadata realtimeTableSegmentMetadata1 =
         getSegmentZKMetadata("testTable__0__0__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
-    realtimeTableSegmentMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    realtimeTableSegmentMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     SegmentZKMetadata realtimeTableSegmentMetadata2 =
         getSegmentZKMetadata("testTable__1__0__0", 5000, 50_000, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
@@ -266,15 +266,14 @@ public class MergeRollupTaskGeneratorTest {
 
     // Skip task generation, if the table is a realtime table and all segments are skipped
     // We don't test realtime REFRESH table because this combination does not make sense
-    assertTrue(MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.REALTIME,
-        Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2)).isEmpty());
+    assertTrue(MergeRollupTaskGenerator.filterSegmentsforRealtimeTable(
+            Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2)
+    ).isEmpty());
     TableConfig realtimeTableConfig = getTableConfig(TableType.REALTIME, new HashMap<>());
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
     // Skip task generation, if the table is an offline REFRESH table
-    assertFalse(MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.OFFLINE,
-        Lists.newArrayList(offlineTableSegmentMetadata)).isEmpty());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", null));
     TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, new HashMap<>());
@@ -287,11 +286,11 @@ public class MergeRollupTaskGeneratorTest {
    * Test pre-filter of task generation
    */
   @Test
-  public void testFilterSegmentsBasedOnStatus() {
+  public void testFilterSegmentsforRealtimeTable() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
 
     when(mockClusterInfoProvide.getTaskStates(MinionConstants.MergeRollupTask.TASK_TYPE)).thenReturn(new HashMap<>());
-    // construct 4 following segments, among these, only 0_0 can be scheduled, others should be filtered out
+    // construct 3 following segments, among these, only 0_0 can be scheduled, others should be filtered out
     // partition 0, completed 0
     SegmentZKMetadata realtimeTableSegmentMetadata1 =
             getSegmentZKMetadata("testTable__0__0__0", 5000, 6000, TimeUnit.MILLISECONDS,
@@ -302,28 +301,23 @@ public class MergeRollupTaskGeneratorTest {
             getSegmentZKMetadata("testTable__0__1__1", 6000, 7000, TimeUnit.MILLISECONDS,
                     null, "60000", "70000");
     realtimeTableSegmentMetadata2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    // partition 0, consuming 2
-    SegmentZKMetadata realtimeTableSegmentMetadata3 =
-            getSegmentZKMetadata("testTable__0__2__2", 7000, 8000, TimeUnit.MILLISECONDS,
-                    null, "70000", "80000");
-    realtimeTableSegmentMetadata3.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     // partition 1, completed 0
-    SegmentZKMetadata realtimeTableSegmentMetadata4 =
+    SegmentZKMetadata realtimeTableSegmentMetadata3 =
             getSegmentZKMetadata("testTable__1__0__0", 5500, 6500, TimeUnit.MILLISECONDS,
                     null, "55000", "65000");
-    realtimeTableSegmentMetadata4.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    realtimeTableSegmentMetadata3.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
             Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2,
-                    realtimeTableSegmentMetadata3, realtimeTableSegmentMetadata4));
+                    realtimeTableSegmentMetadata3));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(
             getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList("testTable__0", "server0", "ONLINE")));
 
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
 
-    List<SegmentZKMetadata> filterResult = MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.REALTIME,
+    List<SegmentZKMetadata> filterResult = MergeRollupTaskGenerator.filterSegmentsforRealtimeTable(
             Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2,
-                    realtimeTableSegmentMetadata3, realtimeTableSegmentMetadata4));
+                    realtimeTableSegmentMetadata3));
     assertEquals(filterResult.size(), 1);
     assertEquals(filterResult.get(0).getSegmentName(), "testTable__0__0__0");
   }
