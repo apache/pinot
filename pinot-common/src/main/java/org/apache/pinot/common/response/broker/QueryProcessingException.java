@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.response.broker;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -29,26 +28,28 @@ import org.apache.pinot.spi.exception.QueryErrorMessage;
  *
  * This is only used to serialize the error message and error code when a broker sends an error message to the client.
  * In other cases use {@link QueryErrorMessage} instead.
+ *
+ * Notice even the suffix of this class is <em>Exception</em>, it is not a Java {@link Exception}.
  */
-public class BrokerResponseErrorMessage {
+public class QueryProcessingException {
   private int _errorCode;
   private String _message;
 
-  @JsonCreator
-  public BrokerResponseErrorMessage(
-      @JsonProperty("errorCode") int errorCode,
-      @JsonProperty("message") String message) {
+  public QueryProcessingException() {
+  }
+
+  public QueryProcessingException(int errorCode, String message) {
     _errorCode = errorCode;
     _message = message;
   }
 
-  public BrokerResponseErrorMessage(QueryErrorCode errorCode, String message) {
+  public QueryProcessingException(QueryErrorCode errorCode, String message) {
     _errorCode = errorCode.getId();
     _message = message == null ? errorCode.getDefaultMessage() : message;
   }
 
-  public static BrokerResponseErrorMessage fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
-    return new BrokerResponseErrorMessage(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
+  public static QueryProcessingException fromQueryErrorMessage(QueryErrorMessage queryErrorMessage) {
+    return new QueryProcessingException(queryErrorMessage.getErrCode(), queryErrorMessage.getUsrMsg());
   }
 
   @JsonProperty("errorCode")

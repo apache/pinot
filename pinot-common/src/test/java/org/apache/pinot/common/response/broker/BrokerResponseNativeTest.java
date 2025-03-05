@@ -54,7 +54,7 @@ public class BrokerResponseNativeTest {
       throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
-    expected.addException(new BrokerResponseErrorMessage(400, errorMsgStr));
+    expected.addException(new QueryProcessingException(400, errorMsgStr));
     String brokerString = expected.toJsonString();
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(),

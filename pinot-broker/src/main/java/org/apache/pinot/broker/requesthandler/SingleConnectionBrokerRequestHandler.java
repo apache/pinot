@@ -36,7 +36,7 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
@@ -155,11 +155,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     Exception brokerRequestSendException = asyncQueryResponse.getException();
     if (brokerRequestSendException != null) {
       brokerResponse.addException(
-          new BrokerResponseErrorMessage(QueryErrorCode.BROKER_REQUEST_SEND, brokerRequestSendException.getMessage()));
+          new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND, brokerRequestSendException.getMessage()));
     }
     int numServersNotResponded = serversNotResponded.size();
     if (numServersNotResponded != 0) {
-      brokerResponse.addException(new BrokerResponseErrorMessage(QueryErrorCode.SERVER_NOT_RESPONDING,
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
 
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())

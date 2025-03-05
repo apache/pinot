@@ -44,7 +44,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -121,7 +121,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
       } catch (TimeoutException e) {
         brokerResponse.getExceptions()
-            .add(new BrokerResponseErrorMessage(QueryErrorCode.BROKER_TIMEOUT, e.getMessage()));
+            .add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, e.getMessage()));
       }
     }
 

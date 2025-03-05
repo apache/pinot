@@ -28,7 +28,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -103,19 +103,19 @@ public class SqlQueryExecutor {
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
         } catch (Exception e) {
-          result.addException(new BrokerResponseErrorMessage(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
       case HTTP:
         try {
           result.setResultTable(new ResultTable(statement.getResultSchema(), statement.execute()));
         } catch (Exception e) {
-          result.addException(new BrokerResponseErrorMessage(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
+          result.addException(new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, e.getMessage()));
         }
         break;
       default:
         result.addException(
-            new BrokerResponseErrorMessage(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
+            new QueryProcessingException(QueryErrorCode.QUERY_EXECUTION, "Unsupported statement: " + statement));
         break;
     }
     return result;

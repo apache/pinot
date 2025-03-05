@@ -68,7 +68,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
-  private List<BrokerResponseErrorMessage> _exceptions = new ArrayList<>();
+  private List<QueryProcessingException> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
@@ -108,18 +108,18 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   public BrokerResponseNative(QueryErrorCode errorCode, String errorMessage) {
-    _exceptions.add(new BrokerResponseErrorMessage(errorCode.getId(), errorMessage));
+    _exceptions.add(new QueryProcessingException(errorCode.getId(), errorMessage));
   }
 
   public BrokerResponseNative(QueryErrorCode errorCode) {
-    _exceptions.add(new BrokerResponseErrorMessage(errorCode.getId(), errorCode.getDefaultMessage()));
+    _exceptions.add(new QueryProcessingException(errorCode.getId(), errorCode.getDefaultMessage()));
   }
 
   public BrokerResponseNative(QueryErrorMessage errorMsg) {
-    _exceptions.add(BrokerResponseErrorMessage.fromQueryErrorMessage(errorMsg));
+    _exceptions.add(QueryProcessingException.fromQueryErrorMessage(errorMsg));
   }
 
-  public static BrokerResponseNative fromBrokerErrors(List<BrokerResponseErrorMessage> exceptions) {
+  public static BrokerResponseNative fromBrokerErrors(List<QueryProcessingException> exceptions) {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
     brokerResponse.setExceptions(exceptions);
     return brokerResponse;
@@ -180,15 +180,15 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public List<BrokerResponseErrorMessage> getExceptions() {
+  public List<QueryProcessingException> getExceptions() {
     return _exceptions;
   }
 
-  public void setExceptions(List<BrokerResponseErrorMessage> exceptions) {
+  public void setExceptions(List<QueryProcessingException> exceptions) {
     _exceptions = exceptions;
   }
 
-  public void addException(BrokerResponseErrorMessage exception) {
+  public void addException(QueryProcessingException exception) {
     _exceptions.add(exception);
   }
 

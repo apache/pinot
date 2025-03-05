@@ -53,7 +53,7 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -365,7 +365,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Set<String> unavailableSegments = entry.getValue();
         int unavailableSegmentsInSubPlan = unavailableSegments.size();
         numUnavailableSegments += unavailableSegmentsInSubPlan;
-        BrokerResponseErrorMessage errMsg = new BrokerResponseErrorMessage(QueryErrorCode.SERVER_SEGMENT_MISSING,
+        QueryProcessingException errMsg = new QueryProcessingException(QueryErrorCode.SERVER_SEGMENT_MISSING,
             "Found " + unavailableSegmentsInSubPlan + " unavailable segments for table " + tableName + ": "
                 + toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG));
         brokerResponse.addException(errMsg);

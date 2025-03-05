@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.broker.BrokerResponseErrorMessage;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -75,7 +75,7 @@ public class BrokerReduceServiceTest {
             mock(BrokerMetrics.class));
     brokerReduceService.shutDown();
 
-    List<BrokerResponseErrorMessage> exceptions = brokerResponse.getExceptions();
+    List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.BROKER_TIMEOUT.getId());
   }
