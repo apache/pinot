@@ -21,6 +21,13 @@
         ]
       },
       {
+        "description": "CTE with search + OR filter on constants",
+        "sql": "WITH CTE_1 AS (SELECT CASE WHEN strCol = 'foo' THEN 'A' ELSE strCol END AS cased FROM {mytable}) SELECT 1 FROM CTE_1 WHERE ((cased = 'B') OR (cased = 'A'))",
+        "outputs": [
+          [1]
+        ]
+      },
+      {
         "description": "Literal SEARCH filter on subquery with CASE WHEN",
         "sql": "SELECT * FROM (SELECT CASE WHEN strCol = 'foo' THEN 'a' ELSE 'b' END AS val FROM {mytable}) WHERE val IN ('a', 'b')",
         "outputs": [

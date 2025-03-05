@@ -22,6 +22,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -59,7 +60,11 @@ public class PinotFilterExpandSearchRule extends RelOptRule {
         }
         return false;
       case SEARCH:
-        return true;
+        // We only want to expand SEARCH operators where the first operand is a literal. This is because we want to
+        // avoid sending literal-only filters to the leaf stage since the v1 engine doesn't support such filters.
+        // All other SEARCH operators will be expanded during conversion from RexNode to RexExpression.
+        // This is to avoid the creation of lots of OR filters which can be expensive to process in other rules.
+        return ((RexCall) condition).getOperands().get(0) instanceof RexLiteral;
       default:
         return false;
     }
