@@ -121,7 +121,8 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest i
     assertEquals(segments.size(), 1);
 
     // ingest from public file URI
-    String mockedUri = String.join("", "http://localhost:", String.valueOf(_dummyServer.getAddress().getPort()), "/mock/ingestion");
+    String mockedUri = String.join("",
+        "http://localhost:", String.valueOf(_dummyServer.getAddress().getPort()), "/mock/ingestion");
     sendHttpPost(_controllerRequestURLBuilder.forIngestFromURI(TABLE_NAME_WITH_TYPE, batchConfigMap, mockedUri));
     segments = _helixResourceManager.getSegmentsFor(TABLE_NAME_WITH_TYPE, false);
     assertEquals(segments.size(), 2);
