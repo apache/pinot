@@ -572,22 +572,22 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           String segmentName = segmentZKMetadata.getSegmentName();
           if (LLCSegmentName.isLLCSegment(segmentName)) {
             LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-            partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
+            partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) ->
+            {
               if (latestSegment == null) {
                 return segmentName;
               } else {
-                return new LLCSegmentName(latestSegment).getSequenceNumber() > llcSegmentName.getSequenceNumber() ?
-                        latestSegment : segmentName;
+                return new LLCSegmentName(latestSegment).getSequenceNumber() > llcSegmentName.getSequenceNumber()
+                        ? latestSegment : segmentName;
               }
             });
           }
         }
       }
       return allSegments.stream()
-              .filter(a-> ( a.getStatus().isCompleted()
-                      && !partitionIdToLatestCompletedSegment.containsValue(a.getSegmentName())
-                      ))
-              .collect(Collectors.toList());
+              .filter(a -> (a.getStatus().isCompleted()
+                        && !partitionIdToLatestCompletedSegment.containsValue(a.getSegmentName())
+              )).collect(Collectors.toList());
     } else {
       return allSegments;
     }
