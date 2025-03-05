@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -112,6 +114,17 @@ public class StUnionAggregationFunction extends BaseSingleInputAggregationFuncti
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(Geometry geometry) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Geometry.getValue(),
+        ObjectSerDeUtils.GEOMETRY_SER_DE.serialize(geometry));
+  }
+
+  @Override
+  public Geometry deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.GEOMETRY_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

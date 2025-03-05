@@ -19,15 +19,18 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
 
-public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<ObjectOpenHashSet<String>> {
+public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<ObjectSet<String>> {
   public ArrayAggDistinctStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }
@@ -50,5 +53,16 @@ public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<O
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectSet<String> stringSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
+        ObjectSerDeUtils.STRING_SET_SER_DE.serialize(stringSet));
+  }
+
+  @Override
+  public ObjectSet<String> deserializeIntermediateResult(CustomObject customObject) {
+    return (ObjectSet<String>) ObjectSerDeUtils.STRING_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

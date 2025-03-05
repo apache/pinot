@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -230,6 +231,17 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
+        ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
+  }
+
+  @Override
+  public TDigest deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

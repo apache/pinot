@@ -26,7 +26,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -119,15 +118,9 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Serializes the intermediate result into a custom object. This method should be implemented if the intermediate
    * result type is OBJECT.
-   *
-   * TODO: Override this method in the aggregation functions that return OBJECT type intermediate results to reduce the
-   *       overhead of instanceof checks in the default implementation.
    */
   default SerializedIntermediateResult serializeIntermediateResult(IntermediateResult intermediateResult) {
-    assert getIntermediateResultColumnType() == ColumnDataType.OBJECT;
-    int type = ObjectSerDeUtils.ObjectType.getObjectType(intermediateResult).getValue();
-    byte[] bytes = ObjectSerDeUtils.serialize(intermediateResult, type);
-    return new SerializedIntermediateResult(type, bytes);
+    throw new UnsupportedOperationException("Cannot serialize intermediate result for function: " + getType());
   }
 
   /**
@@ -154,13 +147,9 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Deserializes the intermediate result from the custom object. This method should be implemented if the intermediate
    * result type is OBJECT.
-   *
-   * TODO: Override this method in the aggregation functions that return OBJECT type intermediate results to not rely
-   *       on the type to decouple this from ObjectSerDeUtils.
    */
   default IntermediateResult deserializeIntermediateResult(CustomObject customObject) {
-    assert getIntermediateResultColumnType() == ColumnDataType.OBJECT;
-    return ObjectSerDeUtils.deserialize(customObject);
+    throw new UnsupportedOperationException("Cannot deserialize intermediate result for function: " + getType());
   }
 
   /**
