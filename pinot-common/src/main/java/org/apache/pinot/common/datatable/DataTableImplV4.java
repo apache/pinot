@@ -31,7 +31,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
@@ -401,12 +400,6 @@ public class DataTableImplV4 implements DataTable {
       stringDictionary[i] = DataTableUtils.decodeString(buffer);
     }
     return stringDictionary;
-  }
-
-  @Override
-  @Deprecated
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
   }
 
   @Override

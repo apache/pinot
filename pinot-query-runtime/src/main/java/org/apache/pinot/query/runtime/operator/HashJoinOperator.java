@@ -179,8 +179,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockDuplicateKeys(TransferableBlock leftBlock)
-      throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockDuplicateKeys(TransferableBlock leftBlock) {
     List<Object[]> leftRows = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -219,8 +218,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private void handleUnmatchedLeftRow(Object[] leftRow, List<Object[]> rows)
-      throws ProcessingException {
+  private void handleUnmatchedLeftRow(Object[] leftRow, List<Object[]> rows) {
     if (needUnmatchedLeftRows()) {
       if (isMaxRowsLimitReached(rows.size())) {
         return;
