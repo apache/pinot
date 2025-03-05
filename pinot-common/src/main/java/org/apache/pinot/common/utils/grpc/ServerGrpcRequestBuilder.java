@@ -23,10 +23,10 @@ import com.google.protobuf.ByteString;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -35,6 +35,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 public class ServerGrpcRequestBuilder {
   private long _requestId;
+  @Nullable
   private String _cid;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
@@ -44,17 +45,13 @@ public class ServerGrpcRequestBuilder {
   private BrokerRequest _brokerRequest;
   private List<String> _segments;
 
-  /**
-   * Create a new builder, reading as much as possible from the current thread context, including request ID and CID.
-   */
-  public static ServerGrpcRequestBuilder fromThreadContext() {
-    return new ServerGrpcRequestBuilder()
-        .setIds(QueryThreadContext.getRequestId(), QueryThreadContext.getCid());
+  public ServerGrpcRequestBuilder setRequestId(long requestId) {
+    _requestId = requestId;
+    return this;
   }
 
-  public ServerGrpcRequestBuilder setIds(long requestId, String cid) {
-    _requestId = requestId;
-    _cid = cid;
+  public ServerGrpcRequestBuilder setCid(String cid) {
+    _cid = Preconditions.checkNotNull(cid);
     return this;
   }
 
@@ -96,7 +93,8 @@ public class ServerGrpcRequestBuilder {
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put(Request.MetadataKeys.REQUEST_ID, Long.toString(_requestId));
-    metadata.put(Request.MetadataKeys.CORRELATION_ID, _cid);
+    String cid = _cid != null ? _cid : Long.toString(_requestId);
+    metadata.put(Request.MetadataKeys.CORRELATION_ID, cid);
     metadata.put(Request.MetadataKeys.BROKER_ID, _brokerId);
     metadata.put(Request.MetadataKeys.ENABLE_TRACE, Boolean.toString(_enableTrace));
     metadata.put(Request.MetadataKeys.ENABLE_STREAMING, Boolean.toString(_enableStreaming));
