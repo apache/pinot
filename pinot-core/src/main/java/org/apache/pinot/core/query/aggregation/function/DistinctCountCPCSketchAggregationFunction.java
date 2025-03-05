@@ -24,9 +24,11 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.memory.Memory;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -401,6 +403,17 @@ public class DistinctCountCPCSketchAggregationFunction
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(CpcSketchAccumulator cpcSketchAccumulator) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.CpcSketchAccumulator.getValue(),
+        ObjectSerDeUtils.DATA_SKETCH_CPC_ACCUMULATOR_SER_DE.serialize(cpcSketchAccumulator));
+  }
+
+  @Override
+  public CpcSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

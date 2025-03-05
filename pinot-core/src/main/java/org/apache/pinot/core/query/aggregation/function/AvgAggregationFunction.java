@@ -203,13 +203,13 @@ public class AvgAggregationFunction extends NullableSingleInputAggregationFuncti
 
   @Override
   public SerializedIntermediateResult serializeIntermediateResult(AvgPair avgPair) {
-    // ObjectSerDeUtils.ObjectType.AvgPair.getValue() == 4
-    return new SerializedIntermediateResult(4, avgPair.toBytes());
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.AvgPair.getValue(),
+        ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
   }
 
   @Override
   public AvgPair deserializeIntermediateResult(CustomObject customObject) {
-    return AvgPair.fromByteBuffer(customObject.getBuffer());
+    return ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override
