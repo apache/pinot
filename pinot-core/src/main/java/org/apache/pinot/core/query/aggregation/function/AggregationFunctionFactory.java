@@ -39,8 +39,10 @@ import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggr
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayLongAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelEventsFunctionEvalAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelStepDurationStatsAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -467,6 +469,10 @@ public class AggregationFunctionFactory {
             return new FunnelMatchStepAggregationFunction(arguments);
           case FUNNELCOMPLETECOUNT:
             return new FunnelCompleteCountAggregationFunction(arguments);
+          case FUNNELSTEPDURATIONSTATS:
+            return new FunnelStepDurationStatsAggregationFunction(arguments);
+          case FUNNELEVENTSFUNCTIONEVAL:
+            return new FunnelEventsFunctionEvalAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
