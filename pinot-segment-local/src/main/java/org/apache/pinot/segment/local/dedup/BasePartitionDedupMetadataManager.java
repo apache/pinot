@@ -295,7 +295,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         updatePrimaryKeyGauge();
       }
     } catch (Exception e) {
-      System.out.println(Thread.currentThread() + " Not ignoring the exception");
       throw new RuntimeException(
           String.format("Caught exception while removing segment: %s of table: %s from %s", segment.getSegmentName(),
               _tableNameWithType, this.getClass().getSimpleName()), e);
