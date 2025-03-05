@@ -299,12 +299,12 @@ public class MergeRollupTaskGeneratorTest {
     realtimeTableSegmentMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     // partition 0, completed 1
     SegmentZKMetadata realtimeTableSegmentMetadata2 =
-            getSegmentZKMetadata("testTable__0__0__1", 6000, 7000, TimeUnit.MILLISECONDS,
+            getSegmentZKMetadata("testTable__0__1__1", 6000, 7000, TimeUnit.MILLISECONDS,
                     null, "60000", "70000");
     realtimeTableSegmentMetadata2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     // partition 0, consuming 2
     SegmentZKMetadata realtimeTableSegmentMetadata3 =
-            getSegmentZKMetadata("testTable__0__0__2", 7000, 8000, TimeUnit.MILLISECONDS,
+            getSegmentZKMetadata("testTable__0__2__2", 7000, 8000, TimeUnit.MILLISECONDS,
                     null, "70000", "80000");
     realtimeTableSegmentMetadata3.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     // partition 1, completed 0
