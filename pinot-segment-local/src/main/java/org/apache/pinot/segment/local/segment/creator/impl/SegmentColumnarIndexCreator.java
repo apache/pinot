@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -574,6 +575,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
+    // Columns (MAP data type) have virtual child columns, read and merge all child column metadata
+    // into segment metadata properties
+    File[] mapFiles = _indexDir.listFiles(
+        (dir, name) -> name.endsWith(V1Constants.MetadataKeys.Column.CHILD_COLUMN_METADATA_PROP_FILENAME_SUFFIX));
+    if (mapFiles != null) {
+      for (File mapFile : mapFiles) {
+        PropertiesConfiguration mapProperties = CommonsConfigurationUtils.fromFile(mapFile);
+        for (Iterator<String> it = mapProperties.getKeys(); it.hasNext();) {
+          String key = it.next();
+          properties.setProperty(key, mapProperties.getProperty(key));
+        }
+      }
+    }
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
