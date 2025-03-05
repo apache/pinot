@@ -243,11 +243,23 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * Returns the schema for the given table, or {@code null} if it does not exist.
+   * Returns the schema for the given logical or physical table, or {@code null} if it does not exist.
    */
   @Nullable
   @Override
   public Schema getSchema(String rawTableName) {
+    if (isLogicalTable(rawTableName)) {
+      return getLogicalTableSchema(rawTableName);
+    }
+
+    return getPhysicalTableSchema(rawTableName);
+  }
+
+  /**
+   * Returns the schema for the given physical or hybrid table, or {@code null} if it does not exist.
+   */
+  @Nullable
+  public Schema getPhysicalTableSchema(String rawTableName) {
     String schemaName = _schemaNameMap.getOrDefault(rawTableName, rawTableName);
     SchemaInfo schemaInfo = _schemaInfoMap.get(schemaName);
     return schemaInfo != null ? schemaInfo._schema : null;
@@ -487,8 +499,20 @@ public class TableCache implements PinotConfigProvider {
     return _logicalTableNameMap.get(logicalTableName);
   }
 
+  public boolean isLogicalTable(String logicalTableName) {
+    return _logicalTableNameMap.containsKey(logicalTableName);
+  }
+
   public List<LogicalTable> getLogicalTables() {
     return new ArrayList<>(_logicalTableNameMap.values());
+  }
+
+  public Schema getLogicalTableSchema(String logicalTableName) {
+    LogicalTable logicalTable = getLogicalTable(logicalTableName);
+    if (logicalTable == null) {
+      return null;
+    }
+    return getPhysicalTableSchema(logicalTable.getPhysicalTableNames().get(0));
   }
 
   @Override
