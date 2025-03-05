@@ -174,6 +174,7 @@ public class SortOperator extends MultiStageOperator {
                   _context.getId());
             }
             // setting operator to be early terminated and awaits EOS block next.
+            _statMap.merge(StatKey.LIMIT_REACHED, true);
             earlyTerminate();
           }
         }
@@ -201,7 +202,8 @@ public class SortOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
+    },
+    LIMIT_REACHED(StatMap.Type.BOOLEAN);
     //@formatter:on
 
     private final StatMap.Type _type;

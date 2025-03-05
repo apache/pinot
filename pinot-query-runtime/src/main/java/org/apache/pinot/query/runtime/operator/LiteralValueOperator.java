@@ -73,7 +73,7 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (!_isLiteralBlockReturned && !_isEarlyTerminated && !_literalRows.isEmpty()) {
+    if (!_isLiteralBlockReturned && !_literalRows.isEmpty()) {
       _isLiteralBlockReturned = true;
       return constructBlock();
     } else {

@@ -235,6 +235,12 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
+  @Override
+  protected void earlyTerminate() {
+    super.earlyTerminate();
+    _statMap.merge(StatKey.EARLY_TERMINATED, true);
+  }
+
   protected TransferableBlock createLeafBlock() {
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(
         MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
@@ -349,7 +355,17 @@ public class MailboxSendOperator extends MultiStageOperator {
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
+    },
+    /**
+     * This shouldn't be actually here, but we need it to be sure that we detect early termination in all cases.
+     *
+     * Usually early termination should be marked on the operartor that actually terminates early, but in some cases
+     * (like {@link MultiStageOperator#sampleAndCheckInterruption()} we are just early terminating the child operators
+     * without marking the operator itself as early terminated or failing accordingly).
+     *
+     * By capturing the early termination here, we can ensure that the operator is marked as early terminated.
+     */
+    EARLY_TERMINATED(StatMap.Type.BOOLEAN);
     //@formatter:on
 
     private final StatMap.Type _type;

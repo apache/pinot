@@ -228,12 +228,10 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW, _aggFunctions);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
+          _input.earlyTerminate();
+          _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
           if (_errorOnNumGroupsLimit) {
-            _input.earlyTerminate();
             throw new RuntimeException("NUM_GROUPS_LIMIT has been reached at " + _operatorId);
-          } else {
-            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
-            _input.earlyTerminate();
           }
         }
         return dataBlock;
@@ -447,7 +445,8 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
     },
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    EARLY_TERMINATED(StatMap.Type.BOOLEAN);
     //@formatter:on
 
     private final StatMap.Type _type;

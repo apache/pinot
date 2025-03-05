@@ -343,7 +343,7 @@ public class MultiStageQueryStats {
    * The final stats for the stage are obtained in the execution root (usually the broker) by
    * {@link Closed#merge(StageStats) merging} the partial views from all OpChains.
    */
-  public abstract static class StageStats {
+  public abstract static class StageStats implements Iterable<Entry> {
 
     /**
      * The types of the operators in the stage.
@@ -427,6 +427,24 @@ public class MultiStageQueryStats {
       while (typeIterator.hasNext()) {
         consumer.accept(typeIterator.next(), statIterator.next());
       }
+    }
+
+    @Override
+    public Iterator<Entry> iterator() {
+      return new Iterator<>() {
+        final Iterator<MultiStageOperator.Type> _typeIterator = _operatorTypes.iterator();
+        final Iterator<StatMap<?>> _statIterator = _operatorStats.iterator();
+
+        @Override
+        public boolean hasNext() {
+          return _typeIterator.hasNext();
+        }
+
+        @Override
+        public Entry next() {
+          return new Entry(_typeIterator.next(), _statIterator.next());
+        }
+      };
     }
 
     public JsonNode asJson() {
@@ -648,6 +666,24 @@ public class MultiStageQueryStats {
     }
 
     public MultiStageQueryStats build() {
+      return _stats;
+    }
+  }
+
+  public static class Entry {
+    private final MultiStageOperator.Type _type;
+    private final StatMap<?> _stats;
+
+    public Entry(MultiStageOperator.Type type, StatMap<?> stats) {
+      _type = type;
+      _stats = stats;
+    }
+
+    public MultiStageOperator.Type getType() {
+      return _type;
+    }
+
+    public StatMap<?> getStats() {
       return _stats;
     }
   }

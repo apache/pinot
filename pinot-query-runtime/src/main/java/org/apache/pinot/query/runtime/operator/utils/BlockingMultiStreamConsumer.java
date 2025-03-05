@@ -45,6 +45,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    */
   protected int _lastRead;
   private E _errorBlock = null;
+  private boolean _earlyTerminated = false;
 
   public BlockingMultiStreamConsumer(Object id, long deadlineMs, List<? extends AsyncStream<E>> asyncProducers) {
     _id = id;
@@ -81,6 +82,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   public void earlyTerminate() {
+    _earlyTerminated = true;
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.earlyTerminate();
     }
@@ -175,6 +177,10 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     if (System.currentTimeMillis() > _deadlineMs) {
       _errorBlock = onTimeout();
       return _errorBlock;
+    }
+
+    if (_earlyTerminated) {
+      return onEos();
     }
 
     E block = readBlockOrNull();

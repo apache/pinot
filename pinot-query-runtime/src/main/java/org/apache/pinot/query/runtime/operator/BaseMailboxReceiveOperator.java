@@ -88,7 +88,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
   @Override
   protected void earlyTerminate() {
-    _isEarlyTerminated = true;
+    super.earlyTerminate();
+    _statMap.merge(StatKey.EARLY_TERMINATED, true);
     _multiConsumer.earlyTerminate();
   }
 
@@ -231,7 +232,17 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /**
      * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
      */
-    UPSTREAM_WAIT_MS(StatMap.Type.LONG);
+    UPSTREAM_WAIT_MS(StatMap.Type.LONG),
+    /**
+     * This shouldn't be actually here, but we need it to be sure that we detect early termination in all cases.
+     *
+     * Usually early termination should be marked on the operartor that actually terminates early, but in some cases
+     * (like {@link MultiStageOperator#sampleAndCheckInterruption()} we are just early terminating the child operators
+     * without marking the operator itself as early terminated or failing accordingly).
+     *
+     * By capturing the early termination here, we can ensure that the operator is marked as early terminated.
+     */
+    EARLY_TERMINATED(StatMap.Type.BOOLEAN);
     //@formatter:on
 
     private final StatMap.Type _type;
