@@ -312,7 +312,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected double getMaxDedupTime(IndexSegment segment) {
     if (segment instanceof MutableSegment) {
       // MutableSegment doesn't have columnMetadataMap to get the max dedup time, so returning the largest value seen
-      // so far to process this segment, as within TTL comparison with max dedup time of this segment will be ignored
+      // so far to process this segment, as mutable segment is always considered to be within TTL
       return _largestSeenTime.get();
     }
     return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
