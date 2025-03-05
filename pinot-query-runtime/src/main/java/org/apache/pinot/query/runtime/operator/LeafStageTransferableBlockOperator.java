@@ -182,7 +182,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       return constructMetadataBlock();
     } else {
       // Regular data block
-      return composeTransferableBlock(resultsBlock, _dataSchema);
+      return composeTransferableBlock(resultsBlock);
     }
   }
 
@@ -505,25 +505,23 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
    * Composes the {@link TransferableBlock} from the {@link BaseResultsBlock} returned from single-stage engine. It
    * converts the data types of the results to conform with the desired data schema asked by the multi-stage engine.
    */
-  private static TransferableBlock composeTransferableBlock(BaseResultsBlock resultsBlock,
-      DataSchema desiredDataSchema) {
+  private TransferableBlock composeTransferableBlock(BaseResultsBlock resultsBlock) {
     if (resultsBlock instanceof SelectionResultsBlock) {
-      return composeSelectTransferableBlock((SelectionResultsBlock) resultsBlock, desiredDataSchema);
+      return composeSelectTransferableBlock((SelectionResultsBlock) resultsBlock);
     } else {
-      return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
+      return composeDirectTransferableBlock(resultsBlock);
     }
   }
 
   /**
    * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
    */
-  private static TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock,
-      DataSchema desiredDataSchema) {
+  private TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock) {
     int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
-      return composeColumnIndexedTransferableBlock(resultsBlock, desiredDataSchema, columnIndices);
+      return composeColumnIndexedTransferableBlock(resultsBlock, columnIndices);
     } else {
-      return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
+      return composeDirectTransferableBlock(resultsBlock);
     }
   }
 
@@ -555,13 +553,12 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return true;
   }
 
-  private static TransferableBlock composeColumnIndexedTransferableBlock(BaseResultsBlock block,
-      DataSchema outputDataSchema, int[] columnIndices) {
+  private TransferableBlock composeColumnIndexedTransferableBlock(SelectionResultsBlock block, int[] columnIndices) {
     List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
-    ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
     List<Object[]> convertedRows = new ArrayList<>(resultRows.size());
     boolean needConvert = false;
     int numColumns = columnIndices.length;
@@ -580,7 +577,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         convertedRows.add(reorderRow(row, columnIndices));
       }
     }
-    return new TransferableBlock(convertedRows, outputDataSchema, DataBlock.Type.ROW);
+    return new TransferableBlock(convertedRows, _dataSchema, DataBlock.Type.ROW);
   }
 
   private static Object[] reorderAndConvertRow(Object[] row, ColumnDataType[] inputStoredTypes,
@@ -610,18 +607,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return resultRow;
   }
 
-  private static TransferableBlock composeDirectTransferableBlock(BaseResultsBlock block, DataSchema outputDataSchema) {
+  private TransferableBlock composeDirectTransferableBlock(BaseResultsBlock block) {
     List<Object[]> resultRows = block.getRows();
     DataSchema inputDataSchema = block.getDataSchema();
     assert resultRows != null && inputDataSchema != null;
     ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
-    ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] outputStoredTypes = _dataSchema.getStoredColumnDataTypes();
     if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
       for (Object[] row : resultRows) {
         convertRow(row, inputStoredTypes, outputStoredTypes);
       }
     }
-    return new TransferableBlock(resultRows, outputDataSchema, DataBlock.Type.ROW);
+    return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW,
+        _requests.get(0).getQueryContext().getAggregationFunctions());
   }
 
   public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {

@@ -26,12 +26,10 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -153,7 +151,6 @@ public class DataTableSerDeTest {
 
   private void testEmptyValues(DataSchema dataSchema, int numRows, Object[] emptyValues)
       throws IOException {
-
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     for (int rowId = 0; rowId < numRows; rowId++) {
       dataTableBuilder.startRow();
@@ -174,7 +171,7 @@ public class DataTableSerDeTest {
         } else if (emptyValue instanceof ByteArray) {
           dataTableBuilder.setColumn(columnId, (ByteArray) emptyValue);
         } else {
-          dataTableBuilder.setColumn(columnId, emptyValue);
+          Assert.fail();
         }
       }
       dataTableBuilder.finishRow();
@@ -362,11 +359,6 @@ public class DataTableSerDeTest {
             BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
-          // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
-          case OBJECT:
-            OBJECTS[rowId] = isNull ? null : RANDOM.nextDouble();
-            dataTableBuilder.setColumn(colId, OBJECTS[rowId]);
-            break;
           case INT_ARRAY:
             int length = RANDOM.nextInt(20);
             int[] intArray = new int[length];
@@ -441,8 +433,9 @@ public class DataTableSerDeTest {
             MAPS[rowId] = map;
             dataTableBuilder.setColumn(colId, map);
             break;
+          case OBJECT:
           case UNKNOWN:
-            dataTableBuilder.setColumn(colId, (Object) null);
+            dataTableBuilder.setNull(colId);
             break;
           default:
             throw new UnsupportedOperationException("Unable to generate random data for: " + columnDataTypes[colId]);
@@ -503,15 +496,6 @@ public class DataTableSerDeTest {
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), isNull ? new byte[0] : BYTES[rowId],
                 ERROR_MESSAGE);
             break;
-          case OBJECT:
-            CustomObject customObject = newDataTable.getCustomObject(rowId, colId);
-            if (isNull) {
-              Assert.assertNull(customObject, ERROR_MESSAGE);
-            } else {
-              Assert.assertNotNull(customObject);
-              Assert.assertEquals(ObjectSerDeUtils.deserialize(customObject), OBJECTS[rowId], ERROR_MESSAGE);
-            }
-            break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), INT_ARRAYS[rowId]), ERROR_MESSAGE);
             break;
@@ -545,6 +529,7 @@ public class DataTableSerDeTest {
           case MAP:
             Assert.assertEquals(newDataTable.getMap(rowId, colId), MAPS[rowId], ERROR_MESSAGE);
             break;
+          case OBJECT:
           case UNKNOWN:
             Object nulValue = newDataTable.getCustomObject(rowId, colId);
             Assert.assertNull(nulValue, ERROR_MESSAGE);

@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.tdunning.math.stats.TDigest;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -127,6 +128,16 @@ public class PercentileRawTDigestAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _percentileTDigestAggregationFunction.getIntermediateResultColumnType();
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(TDigest tDigest) {
+    return _percentileTDigestAggregationFunction.serializeIntermediateResult(tDigest);
+  }
+
+  @Override
+  public TDigest deserializeIntermediateResult(CustomObject customObject) {
+    return _percentileTDigestAggregationFunction.deserializeIntermediateResult(customObject);
   }
 
   @Override

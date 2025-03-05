@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -195,6 +196,17 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(MinMaxRangePair minMaxRangePair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.MinMaxRangePair.getValue(),
+        ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+  }
+
+  @Override
+  public MinMaxRangePair deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

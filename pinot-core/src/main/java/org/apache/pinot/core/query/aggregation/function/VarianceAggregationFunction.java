@@ -20,9 +20,11 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -170,6 +172,17 @@ public class VarianceAggregationFunction extends NullableSingleInputAggregationF
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(VarianceTuple varianceTuple) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.VarianceTuple.getValue(),
+        ObjectSerDeUtils.VARIANCE_TUPLE_OBJECT_SER_DE.serialize(varianceTuple));
+  }
+
+  @Override
+  public VarianceTuple deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.VARIANCE_TUPLE_OBJECT_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

@@ -142,13 +142,13 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.18.2</jackson.version>
+    <jackson.version>2.18.3</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.1</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
-    <swagger-ui.version>5.18.3</swagger-ui.version>
+    <swagger-ui.version>5.20.0</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -172,12 +172,12 @@
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
-    <audienceannotations.version>0.15.0</audienceannotations.version>
+    <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.30</aws.sdk.version>
+    <aws.sdk.version>2.30.32</aws.sdk.version>
     <azure.sdk.version>1.2.31</azure.sdk.version>
-    <azure.msal4j.version>1.19.0</azure.msal4j.version>
+    <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>
@@ -191,7 +191,7 @@
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
-    <pulsar.version>3.3.1</pulsar.version>
+    <pulsar.version>4.0.3</pulsar.version>
     <flink.version>1.20.1</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -233,7 +233,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.70.0</grpc.version>
-    <google.cloud.libraries.version>26.55.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.56.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
@@ -275,13 +275,12 @@
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
-    <mockito-core.version>5.15.2</mockito-core.version>
+    <mockito-core.version>5.16.0</mockito-core.version>
     <equalsverifier.version>3.19.1</equalsverifier.version>
     <testcontainers.version>1.20.5</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
-    <fmpp.version>0.9.16</fmpp.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
@@ -788,7 +787,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.0</version>
+        <version>3.49.1</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -2051,11 +2050,6 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
-      <dependency>
-        <groupId>net.sourceforge.fmpp</groupId>
-        <artifactId>fmpp</artifactId>
-        <version>${fmpp.version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2454,7 +2448,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.3</version>
+            <version>10.21.4</version>
           </dependency>
         </dependencies>
         <executions>

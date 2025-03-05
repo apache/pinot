@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
@@ -79,5 +80,16 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
   @Override
   public double[] getDoubleMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
     return ArraySerDeUtils.deserializeDoubleArrayWithoutLength(context.getValue(docId));
+  }
+
+  @Override
+  public int getNumValuesMV(int docId, ReaderContext context) {
+    byte[] bytes = context.getValue(docId);
+    int valueSize = getStoredType().size();
+    if (valueSize > 0) {
+      return bytes.length / valueSize;
+    } else {
+      return ByteBuffer.wrap(bytes).getInt();
+    }
   }
 }

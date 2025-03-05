@@ -86,6 +86,7 @@ public interface DataBlock {
 
   Map<String, Object> getMap(int rowId, int colId);
 
+  @Nullable
   CustomObject getCustomObject(int rowId, int colId);
 
   @Nullable
