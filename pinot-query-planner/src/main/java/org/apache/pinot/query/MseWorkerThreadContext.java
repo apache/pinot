@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 public abstract class MseWorkerThreadContext {
   private static final Logger LOGGER = LoggerFactory.getLogger(MseWorkerThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
+  private static final FakeInstance FAKE_INSTANCE = new FakeInstance();
 
   /**
    * Private constructor to prevent instantiation.
@@ -63,8 +64,14 @@ public abstract class MseWorkerThreadContext {
   private static MseWorkerThreadContext.Instance get() {
     Instance instance = THREAD_LOCAL.get();
     if (instance == null) {
-      LOGGER.error("MseThreadContext is not initialized");
-      throw new IllegalStateException("MseThreadContext is not initialized");
+      String errorMessage = "MseThreadContext is not initialized";
+      if (QueryThreadContext.isStrictMode()) {
+        LOGGER.error(errorMessage);
+        throw new IllegalStateException(errorMessage);
+      } else {
+        LOGGER.debug(errorMessage);
+        return FAKE_INSTANCE;
+      }
     }
     return instance;
   }
@@ -123,8 +130,14 @@ public abstract class MseWorkerThreadContext {
    */
   public static QueryThreadContext.CloseableContext open(@Nullable Memento memento) {
     if (THREAD_LOCAL.get() != null) {
-      LOGGER.error("MseThreadContext is already initialized");
-      throw new IllegalStateException("MseThreadContext is already initialized");
+      String errorMessage = "MseThreadContext is already initialized";
+      if (QueryThreadContext.isStrictMode()) {
+        LOGGER.error(errorMessage);
+        throw new IllegalStateException(errorMessage);
+      } else {
+        LOGGER.debug(errorMessage);
+        return FAKE_INSTANCE;
+      }
     }
 
     MseWorkerThreadContext.Instance context = new MseWorkerThreadContext.Instance();
@@ -259,6 +272,23 @@ public abstract class MseWorkerThreadContext {
       if (_workerId != -1) {
         LoggerConstants.WORKER_ID_KEY.registerInMdc(null);
       }
+    }
+  }
+
+  public static class FakeInstance extends Instance {
+    @Override
+    public void setStageId(int stageId) {
+      LOGGER.debug("Setting stage id to {} in a fake instance", stageId);
+    }
+
+    @Override
+    public void setWorkerId(int workerId) {
+      LOGGER.debug("Setting worker id to {} in a fake instance", workerId);
+    }
+
+    @Override
+    public void close() {
+      // Do nothing
     }
   }
 

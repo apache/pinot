@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class CommonConstants {
@@ -1357,6 +1358,18 @@ public class CommonConstants {
   }
 
   public static class Query {
+
+    /**
+     * Configuration keys for query context mode.
+     *
+     * Valid values are 'strict' (ignoring case) or empty.
+     *
+     * In strict mode, if the {@link QueryThreadContext} is not initialized, an {@link IllegalStateException} will be
+     * thrown when setter and getter methods are used. Otherwise a warning will be logged and the fake instance will be
+     * returned.
+     */
+    public static final String CONFIG_OF_QUERY_CONTEXT_MODE = "pinot.query.context.mode";
+
     public static class Request {
       public static class MetadataKeys {
         public static final String REQUEST_ID = "requestId";

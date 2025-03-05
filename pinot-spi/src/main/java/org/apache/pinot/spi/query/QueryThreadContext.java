@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.DecoratorExecutorService;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -57,6 +58,17 @@ import org.slf4j.MDC;
 public class QueryThreadContext {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
+  public static volatile boolean _strictMode = false;
+  private static final FakeInstance FAKE_INSTANCE = new FakeInstance();
+
+  static {
+    // This is a hack to know if assertions are enabled or not
+    boolean assertEnabled = false;
+    //CHECKSTYLE:OFF
+    assert assertEnabled = true;
+    //CHECKSTYLE:ON
+    _strictMode = assertEnabled;
+  }
 
   /**
    * Private constructor to prevent instantiation.
@@ -66,11 +78,45 @@ public class QueryThreadContext {
   private QueryThreadContext() {
   }
 
+  /**
+   * Sets the strict mode of the {@link QueryThreadContext} from the given configuration.
+   */
+  public static void onStartup(PinotConfiguration conf) {
+    String mode = conf.getProperty(CommonConstants.Query.CONFIG_OF_QUERY_CONTEXT_MODE);
+    if ("strict".equalsIgnoreCase(mode)) {
+      _strictMode = true;
+    }
+    if (mode != null && !mode.isEmpty()) {
+      throw new IllegalArgumentException("Invalid value '" + mode + "' for "
+          + CommonConstants.Query.CONFIG_OF_QUERY_CONTEXT_MODE + ". Expected 'strict' or empty");
+    }
+  }
+
+  /**
+   * Returns {@code true} if the {@link QueryThreadContext} is in strict mode.
+   *
+   * In strict mode, if the {@link QueryThreadContext} is not initialized, an {@link IllegalStateException} will be
+   * thrown when setter and getter methods are used.
+   * In non-strict mode, a warning will be logged and the fake instance will be returned.
+   *
+   * @see #onStartup(PinotConfiguration)
+   */
+  public static boolean isStrictMode() {
+    return _strictMode;
+  }
+
   private static Instance get() {
     Instance instance = THREAD_LOCAL.get();
     if (instance == null) {
-      LOGGER.error("QueryThreadContext is not initialized");
-      throw new IllegalStateException("QueryThreadContext is not initialized");
+      String errorMessage = "QueryThreadContext is not initialized";
+      if (_strictMode) {
+        LOGGER.error(errorMessage);
+        throw new IllegalStateException("QueryThreadContext is not initialized");
+      } else {
+        LOGGER.debug(errorMessage);
+        // in non-strict mode, return the fake instance
+        return FAKE_INSTANCE;
+      }
     }
     return instance;
   }
@@ -144,8 +190,14 @@ public class QueryThreadContext {
    */
   public static CloseableContext open(@Nullable Memento memento) {
     if (THREAD_LOCAL.get() != null) {
-      LOGGER.error("QueryThreadContext is already initialized");
-      throw new IllegalStateException("QueryThreadContext is already initialized");
+      String errorMessage = "QueryThreadContext is already initialized";
+      if (_strictMode) {
+        LOGGER.error(errorMessage);
+        throw new IllegalStateException("QueryThreadContext is already initialized");
+      } else {
+        LOGGER.debug(errorMessage);
+        return FAKE_INSTANCE;
+      }
     }
 
     Instance context = new Instance();
@@ -476,6 +528,48 @@ public class QueryThreadContext {
       if (_cid != null) {
         LoggerConstants.CORRELATION_ID_KEY.unregisterFromMdc();
       }
+    }
+  }
+
+  private static class FakeInstance extends Instance {
+    @Override
+    public void setStartTimeMs(long startTimeMs) {
+      LOGGER.debug("Setting start time to {} in a fake context", startTimeMs);
+    }
+
+    @Override
+    public void setDeadlineMs(long deadlineMs) {
+      LOGGER.debug("Setting deadline to {} in a fake context", deadlineMs);
+    }
+
+    @Override
+    public void setBrokerId(String brokerId) {
+      LOGGER.debug("Setting broker id to {} in a fake context", brokerId);
+    }
+
+    @Override
+    public void setRequestId(long requestId) {
+      LOGGER.debug("Setting request id to {} in a fake context", requestId);
+    }
+
+    @Override
+    public void setCid(String cid) {
+      LOGGER.debug("Setting correlation id to {} in a fake context", cid);
+    }
+
+    @Override
+    public void setSql(String sql) {
+      LOGGER.debug("Setting SQL to {} in a fake context", sql);
+    }
+
+    @Override
+    public void setQueryEngine(String queryType) {
+      LOGGER.debug("Setting query type to {} in a fake context", queryType);
+    }
+
+    @Override
+    public void close() {
+      // Do nothing
     }
   }
 
