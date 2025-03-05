@@ -321,10 +321,11 @@ public class MergeRollupTaskGeneratorTest {
     MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
     generator.init(mockClusterInfoProvide);
 
-    assertEquals(MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.REALTIME,
+    List<SegmentZKMetadata> filterResult = MergeRollupTaskGenerator.filterSegmentsBasedOnStatus(TableType.REALTIME,
             Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2,
-                    realtimeTableSegmentMetadata3, realtimeTableSegmentMetadata4))
-            .size(), 1);
+                    realtimeTableSegmentMetadata3, realtimeTableSegmentMetadata4));
+    assertEquals(filterResult.size(), 1);
+    assertEquals(filterResult.get(0).getSegmentName(), "testTable__0__0__0");
   }
 
   private void checkPinotTaskConfig(Map<String, String> pinotTaskConfig, String segments, String mergeLevel,

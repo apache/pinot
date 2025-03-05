@@ -566,37 +566,27 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
       //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
       //    records correctly.
-      Map<Integer, LLCSegmentName> latestCompletedSegmentInEachPartition = new HashMap<>();
-      HashSet<String> filteredSegmentNames = new HashSet<>();
+      Map<Integer, String> partitionIdToLatestCompletedSegment = new HashMap<>();
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
         if (segmentZKMetadata.getStatus().isCompleted()) {
-          // completed segments
-          if (LLCSegmentName.isLLCSegment(segmentZKMetadata.getSegmentName())) {
-            // realtime segments
-            LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
-            int partitionId = llcSegmentName.getPartitionGroupId();
-            if (!latestCompletedSegmentInEachPartition.containsKey(partitionId)) {
-              // current segment is the latest found
-              latestCompletedSegmentInEachPartition.put(llcSegmentName.getPartitionGroupId(), llcSegmentName);
-            } else {
-              if (llcSegmentName.getSequenceNumber() >
-                      latestCompletedSegmentInEachPartition.get(partitionId).getSequenceNumber()) {
-                // current segment is the latest found
-                filteredSegmentNames.add(latestCompletedSegmentInEachPartition.get(partitionId).getSegmentName());
-                latestCompletedSegmentInEachPartition.put(partitionId, llcSegmentName);
+          String segmentName = segmentZKMetadata.getSegmentName();
+          if (LLCSegmentName.isLLCSegment(segmentName)) {
+            LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+            partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
+              if (latestSegment == null) {
+                return segmentName;
               } else {
-                // current segment is not the latest
-                filteredSegmentNames.add(llcSegmentName.getSegmentName());
+                return new LLCSegmentName(latestSegment).getSequenceNumber() > llcSegmentName.getSequenceNumber() ?
+                        latestSegment : segmentName;
               }
-            }
-          } else {
-            // other segments: merged segments, uploaded segments, or ingested offline segments
-            filteredSegmentNames.add(segmentZKMetadata.getSegmentName());
+            });
           }
         }
       }
       return allSegments.stream()
-              .filter(a->filteredSegmentNames.contains(a.getSegmentName()))
+              .filter(a-> ( a.getStatus().isCompleted()
+                      && !partitionIdToLatestCompletedSegment.containsValue(a.getSegmentName())
+                      ))
               .collect(Collectors.toList());
     } else {
       return allSegments;
