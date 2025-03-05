@@ -281,8 +281,6 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
-    <fmpp.version>0.9.16</fmpp.version>
-    <bsh.version>2.0b6</bsh.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
@@ -2051,22 +2049,6 @@
         <artifactId>scalatest_${scala.compat.version}</artifactId>
         <version>${scalatest.version}</version>
         <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>net.sourceforge.fmpp</groupId>
-        <artifactId>fmpp</artifactId>
-        <version>${fmpp.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.beanshell</groupId>
-            <artifactId>bsh</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache-extras.beanshell</groupId>
-        <artifactId>bsh</artifactId>
-        <version>${bsh.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
