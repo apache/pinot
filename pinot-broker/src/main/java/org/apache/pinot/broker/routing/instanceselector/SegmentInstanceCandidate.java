@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import groovy.transform.EqualsAndHashCode;
+
 import javax.annotation.concurrent.Immutable;
 
 
@@ -28,6 +30,8 @@ import javax.annotation.concurrent.Immutable;
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
+
+  private int replicaGroup = -1;
 
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
@@ -40,5 +44,9 @@ public class SegmentInstanceCandidate {
 
   public boolean isOnline() {
     return _online;
+  }
+
+  public int getReplicaGroup() {
+    return replicaGroup;
   }
 }
