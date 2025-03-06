@@ -205,8 +205,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     for (String column : existingAllColumns) {
       if (_schema != null && !_schema.hasColumn(column)) {
         // _schema will be null only in tests
-        if (!CommonConstants.Segment.BuiltInVirtualColumn.ALL_COLUMNS.contains(column)) {
-          // Skip logs for virtual columns as they are known not to be in the schema.
+        if (!CommonConstants.Segment.BuiltInVirtualColumn.ALL_VIRTUAL_COLUMNS.contains(column)) {
+          // Skip logs for virtual columns as they are known not to be in the schema in most cases. Note that virtual
+          // columns may be in the schema if it's extended by addBuiltInVirtualColumnsToSegmentSchema() method. So we
+          // just check them here to skip logs and don't skip them for cases when they are in the schema.
           LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column,
               segmentName);
         }

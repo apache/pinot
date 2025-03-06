@@ -1341,7 +1341,7 @@ public class CommonConstants {
       public static final String DOCID = "$docId";
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
-      public static final Set<String> ALL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
+      public static final Set<String> ALL_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
     }
   }
 
