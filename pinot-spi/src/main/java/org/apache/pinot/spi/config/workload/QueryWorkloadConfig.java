@@ -24,37 +24,50 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class WorkloadConfig extends BaseJsonConfig {
+public class QueryWorkloadConfig extends BaseJsonConfig {
 
-  private static final String WORKLOAD_ID = "id";
-  private static final String ENFORCEMENT_PROFILE = "enforcementProfile";
+  private static final String WORKLOAD_NAME = "workloadName";
+  public static final String LEAF_NODE = "leafNode";
+  public static final String NON_LEAF_NODE = "nonLeafNode";
 
-  @JsonPropertyDescription("Unique identifier for the workload")
+  @JsonPropertyDescription("Describes the workload name for the query workload")
   private String _workloadName;
 
-  @JsonPropertyDescription("Enforcement profile for the workload")
-  private EnforcementProfile _enforcementProfile;
+  @JsonPropertyDescription("Describes the leaf node")
+  private NodeConfig _leafNode;
+
+  @JsonPropertyDescription("Describes the non-leaf node")
+  private NodeConfig _nonLeafNode;
 
   @JsonCreator
-  public WorkloadConfig(@JsonProperty(value = WORKLOAD_ID, required = true) String workloadId,
-      @JsonProperty(value = ENFORCEMENT_PROFILE, required = true) EnforcementProfile enforcementProfile) {
-    _workloadName = workloadId;
-    _enforcementProfile = enforcementProfile;
+  public QueryWorkloadConfig(@JsonProperty(WORKLOAD_NAME) String workloadName,
+      @JsonProperty(LEAF_NODE) NodeConfig leafNode, @JsonProperty(NON_LEAF_NODE) NodeConfig nonLeafNode) {
+    _workloadName = workloadName;
+    _leafNode = leafNode;
+    _nonLeafNode = nonLeafNode;
   }
 
   public String getWorkloadName() {
     return _workloadName;
   }
 
-  public EnforcementProfile getEnforcementProfile() {
-    return _enforcementProfile;
+  public NodeConfig getLeafNode() {
+    return _leafNode;
+  }
+
+  public NodeConfig getNonLeafNode() {
+    return _nonLeafNode;
   }
 
   public void setWorkloadName(String workloadName) {
     _workloadName = workloadName;
   }
 
-  public void setEnforcementProfile(EnforcementProfile enforcementProfile) {
-    _enforcementProfile = enforcementProfile;
+  public void setLeafNode(NodeConfig leafNode) {
+    _leafNode = leafNode;
+  }
+
+  public void setNonLeafNode(NodeConfig nonLeafNode) {
+    _nonLeafNode = nonLeafNode;
   }
 }

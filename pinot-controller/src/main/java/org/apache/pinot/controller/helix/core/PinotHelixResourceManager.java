@@ -175,7 +175,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
-import org.apache.pinot.spi.config.workload.WorkloadConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -4606,23 +4606,24 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public List<WorkloadConfig> getAllWorkloadConfigs() throws Exception {
-    return ZKMetadataProvider.getAllWorkloadConfigs(_propertyStore);
+  public List<QueryWorkloadConfig> getQueryWorkloadConfigs() throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfigs(_propertyStore);
   }
 
   @Nullable
-  public WorkloadConfig getWorkloadConfig(String workload) throws Exception {
-    return ZKMetadataProvider.getWorkloadConfig(_propertyStore, workload);
+  public QueryWorkloadConfig getQueryWorkloadConfig(String workload) throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, workload);
   }
 
-  public void setWorkloadConfig(WorkloadConfig workloadConfig) throws Exception {
-    if (!ZKMetadataProvider.setWorkloadConfig(_propertyStore, workloadConfig)) {
-      throw new RuntimeException("Failed to set workload config for workload: " + workloadConfig.getWorkloadName());
+  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) {
+    if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
+      throw new RuntimeException("Failed to set workload config for workload: "
+          + queryWorkloadConfig.getWorkloadName());
     }
   }
 
-  public void deleteWorkloadConfig(String workload) {
-    ZKMetadataProvider.deleteWorkloadConfig(_propertyStore, workload);
+  public void deleteQueryWorkloadConfig(String workload) {
+    ZKMetadataProvider.deleteQueryWorkloadConfig(_propertyStore, workload);
   }
 
 

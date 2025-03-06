@@ -20,8 +20,8 @@ package org.apache.pinot.common.utils.config;
 
 import com.google.common.base.Preconditions;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.spi.config.workload.EnforcementProfile;
-import org.apache.pinot.spi.config.workload.WorkloadConfig;
+import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -30,34 +30,43 @@ public class WorkloadConfigUtils {
   }
 
   /**
-   * Converts a ZNRecord into a WorkloadConfig object by extracting mapFields.
+   * Converts a ZNRecord into a QueryWorkloadConfig object by extracting mapFields.
    *
    * @param znRecord The ZNRecord containing workload config data.
-   * @return A WorkloadConfig object.
+   * @return A QueryWorkloadConfig object.
    */
-  public static WorkloadConfig fromZNRecord(ZNRecord znRecord) throws Exception {
+  public static QueryWorkloadConfig fromZNRecord(ZNRecord znRecord) throws Exception {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
+    Preconditions.checkNotNull(znRecord.getId(), "WorkloadId cannot be null");
+    Preconditions.checkNotNull(znRecord.getSimpleField(QueryWorkloadConfig.LEAF_NODE), "LeafNode cannot be null");
+    Preconditions.checkNotNull(znRecord.getSimpleField(QueryWorkloadConfig.NON_LEAF_NODE),
+        "NonLeafNode cannot be null");
+
     String workloadId = znRecord.getId();
 
-    String enforcementProfileStringJson = znRecord.getSimpleField("enforcementProfile");
-    Preconditions.checkArgument(enforcementProfileStringJson != null, "enforcementProfile field is missing");
+    String leafNodeJsonString = znRecord.getSimpleField(QueryWorkloadConfig.LEAF_NODE);
+    NodeConfig leafNode = JsonUtils.stringToObject(leafNodeJsonString, NodeConfig.class);
 
-    EnforcementProfile enforcementProfile = JsonUtils.stringToObject(enforcementProfileStringJson, EnforcementProfile.class);
-    return new WorkloadConfig(workloadId, enforcementProfile);
+    String nonLeadNodeJsonString = znRecord.getSimpleField(QueryWorkloadConfig.NON_LEAF_NODE);
+    NodeConfig nonLeadNode = JsonUtils.stringToObject(nonLeadNodeJsonString, NodeConfig.class);
+
+    return new QueryWorkloadConfig(workloadId, leafNode, nonLeadNode);
   }
 
   /**
    * Updates a ZNRecord with the fields from a WorkloadConfig object.
    *
-   * @param workloadConfig The WorkloadConfig object to convert.
+   * @param queryWorkloadConfig The QueryWorkloadConfig object to convert.
    * @param znRecord The ZNRecord to update.
    */
-  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, WorkloadConfig workloadConfig) {
-    Preconditions.checkNotNull(workloadConfig, "WorkloadConfig cannot be null");
+  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, QueryWorkloadConfig queryWorkloadConfig) {
+    Preconditions.checkNotNull(queryWorkloadConfig, "QueryWorkloadConfig cannot be null");
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(workloadConfig.getEnforcementProfile(), "EnforcementProfile cannot be null");
+    Preconditions.checkNotNull(queryWorkloadConfig.getWorkloadName(), "WorkloadId cannot be null");
+    Preconditions.checkNotNull(queryWorkloadConfig.getLeafNode(), "LeafNode cannot be null");
+    Preconditions.checkNotNull(queryWorkloadConfig.getNonLeafNode(), "NonLeafNode cannot be null");
 
-    String enforcementProfileStringJson = workloadConfig.getEnforcementProfile().toJsonString();
-    znRecord.setSimpleField("enforcementProfile", enforcementProfileStringJson);
+    znRecord.setSimpleField(QueryWorkloadConfig.LEAF_NODE, queryWorkloadConfig.getLeafNode().toJsonString());
+    znRecord.setSimpleField(QueryWorkloadConfig.NON_LEAF_NODE, queryWorkloadConfig.getNonLeafNode().toJsonString());
   }
 }
