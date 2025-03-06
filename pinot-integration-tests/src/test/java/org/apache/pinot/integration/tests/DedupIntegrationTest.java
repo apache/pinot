@@ -49,8 +49,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private List<File> _avroFiles;
   private static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas_REALTIME";
-  private static final String DEDUP_WITH_REPLICAS_SCHEMA="DedupTableWithReplicas";
-
+  private static final String DEDUP_WITH_REPLICAS_SCHEMA = "DedupTableWithReplicas";
 
   @BeforeClass
   public void setUp()
@@ -82,7 +81,8 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     Schema schemaWithReplicas = createSchema(getSchemaFileName());
     schemaWithReplicas.setSchemaName(DEDUP_WITH_REPLICAS_SCHEMA);
     addSchema(schemaWithReplicas);
-    TableConfig tableConfigWithReplication = createDedupTableConfigWithReplication(_avroFiles.get(0), "id", getNumKafkaPartitions());
+    TableConfig tableConfigWithReplication =
+        createDedupTableConfigWithReplication(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfigWithReplication);
     waitForDocsLoaded(600_000L, true, DEDUP_TABLE_WITH_REPLICAS);
   }
@@ -90,7 +90,8 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   /**
    * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
    */
-  protected TableConfig createDedupTableConfigWithReplication(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
+  protected TableConfig createDedupTableConfigWithReplication(File sampleAvroFile, String primaryKeyColumn,
+      int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
@@ -104,8 +105,8 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
         .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
-        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 2))
-        .setDedupConfig(dedupConfig).build();
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 2)).setDedupConfig(dedupConfig)
+        .build();
   }
 
   @AfterClass
