@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hashing;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -202,6 +204,13 @@ public interface Dictionary extends IndexReader {
     return new ByteArray(getBytesValue(dictId));
   }
 
+  /**
+   * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
+   */
+  default HashValue128 get128BitsMurmur3HashValue(int dictId) {
+    return Hashing.murmur3_128().hashBytesTo128Bits(getBytesValue(dictId));
+  }
+
   // Batch read APIs
 
   default void readIntValues(int[] dictIds, int length, int[] outValues) {
@@ -273,6 +282,12 @@ public interface Dictionary extends IndexReader {
   default void readMapValues(int[] dictIds, int length, Map[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = MapUtils.deserializeMap(getBytesValue(dictIds[i]));
+    }
+  }
+
+  default void read128BitsMurmur3HashValues(int[] dictIds, int length, HashValue128[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get128BitsMurmur3HashValue(dictIds[i]);
     }
   }
 

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hasher128;
+import com.dynatrace.hash4j.hashing.Hashing;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
@@ -140,6 +143,18 @@ public class TransformBlockValSet implements BlockValSet {
       recordTransformValues(scope, DataType.BYTES, true);
       return _transformFunction.transformToBytesValuesSV(_valueBlock);
     }
+  }
+
+  @Override
+  public HashValue128[] get128BitsMurmur3HashValuesSV() {
+    byte[][] bytes = getBytesValuesSV();
+    int length = bytes.length;
+    HashValue128[] hashValues = new HashValue128[length];
+    Hasher128 hasher = Hashing.murmur3_128();
+    for (int i = 0; i < length; i++) {
+      hashValues[i] = hasher.hashBytesTo128Bits(bytes[i]);
+    }
+    return hashValues;
   }
 
   @Override

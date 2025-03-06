@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
@@ -159,6 +160,14 @@ public class ProjectionBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.BYTES, true);
       return _dataBlockCache.getBytesValuesForSVColumn(_column);
+    }
+  }
+
+  @Override
+  public HashValue128[] get128BitsMurmur3HashValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, true);
+      return _dataBlockCache.get128BitsMurmur3HashValuesForSVColumn(_column);
     }
   }
 

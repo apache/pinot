@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hashing;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,8 @@ import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -373,6 +377,53 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     }
   }
 
+  default void readValuesSV(int[] docIds, int length, String[] values, T context) {
+    switch (getStoredType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Integer.toString(getInt(docIds[i], context));
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = Long.toString(getLong(docIds[i], context));
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Float.toString(getFloat(docIds[i], context));
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = Double.toString(getDouble(docIds[i], context));
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).toPlainString();
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = getString(docIds[i], context);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          values[i] = BytesUtils.toHexString(getBytes(docIds[i], context));
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < length; i++) {
+          values[i] = MapUtils.toString(getMap(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
   /**
    * Reads the INT value at the given document id.
    *
@@ -461,6 +512,10 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
         + "This indicates that either the column is getting mistyped or the wrong "
         + "ForwardIndexReader is being created to read this column.");
+  }
+
+  default HashValue128 get128BitsMurmur3Hash(int docId, T context) {
+    return Hashing.murmur3_128().hashBytesTo128Bits(getBytes(docId, context));
   }
 
   /**
