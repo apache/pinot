@@ -344,6 +344,9 @@ public class MultistageGroupByExecutor {
         // compliant results. However, if the query option to skip empty groups is set, we avoid this step for
         // improved performance.
         generateGroupByKeys(block);
+        for (int i = 0; i < _aggFunctions.length; i++) {
+          _aggregateResultHolders[i].ensureCapacity(_groupIdGenerator.getNumGroups());
+        }
       }
     }
   }
@@ -449,7 +452,7 @@ public class MultistageGroupByExecutor {
   private int[] generateGroupByKeys(DataBlock dataBlock) {
     Object[] keys;
     if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractColumn(dataBlock, _groupKeyIds[0]);
+      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0]);
     } else {
       keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds);
     }
@@ -496,7 +499,7 @@ public class MultistageGroupByExecutor {
   private int[] generateGroupByKeys(DataBlock dataBlock, int numMatchedRows, RoaringBitmap matchedBitmap) {
     Object[] keys;
     if (_groupKeyIds.length == 1) {
-      keys = DataBlockExtractUtils.extractColumn(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
+      keys = DataBlockExtractUtils.extractKey(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
     } else {
       keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds, numMatchedRows, matchedBitmap);
     }

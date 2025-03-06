@@ -544,8 +544,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
       Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
     } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(
-        String.format("Time out while waiting segments become ONLINE. (tableNameWithType = %s)", tableNameWithType));
+    throw new TimeoutException("Time out while waiting segments become ONLINE. (tableNameWithType = "
+        + tableNameWithType + ")");
   }
 
   @Test(dependsOnMethods = "testRangeIndexTriggering")
@@ -596,8 +596,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // with only one segment being reloaded with force download and dropping the inverted index.
     long tableSizeAfterReloadSegment = getTableSize(getTableName());
     assertTrue(tableSizeAfterReloadSegment > _tableSize && tableSizeAfterReloadSegment < tableSizeWithNewIndex,
-        String.format("Table size: %d should be between %d and %d after dropping inverted index from segment: %s",
-            tableSizeAfterReloadSegment, _tableSize, tableSizeWithNewIndex, segmentName));
+        "Table size: " + tableSizeAfterReloadSegment + " should be between " + _tableSize + " and "
+            + tableSizeWithNewIndex + " after dropping inverted index from segment: " + segmentName);
 
     // Add inverted index back to check if reloading whole table with force download works.
     // Note that because we have force downloaded a segment above, it's important to reset the table state by adding
@@ -3453,44 +3453,63 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
-    response1 = response1.replaceAll("docs:[0-9]+", "docs:*");
+    response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
+        .replaceAll("Time: \\d+\\.\\d+", "Time:*");
 
-    //@formatter:off
-    assertEquals(response1, "{"
-        + "\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
-        + "\"rows\":[["
-        + "\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
-        + "GROUP BY name ORDER BY 1\","
-        + "\"Execution Plan\\n"
-        + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
-        + "  PinotLogicalSortExchange("
-        + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
-        + "    LogicalProject(count=[$1], name=[$0])\\n"
-        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\\n"
-        + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
-        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\\n"
-        + "            LogicalTableScan(table=[[default, mytable]])\\n"
-        + "\"]]}");
-    //@formatter:on
+    JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(1).asText(), "PLAN");
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(2).asText(), "RULE_TIMINGS");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(1).asText(), "STRING");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+
+    assertEquals(response1Json.get("rows").get(0).get(0).asText(),
+        "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name"
+            + " ORDER BY 1");
+    assertEquals(response1Json.get("rows").get(0).get(1).asText(), "Execution Plan\n"
+        + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], "
+        + "isSortOnReceiver=[true])\n"
+        + "    LogicalProject(count=[$1], name=[$0])\n"
+        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
+        + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "            LogicalTableScan(table=[[default, mytable]])\n");
+    assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
+        + "Rule: AggregateProjectMergeRule -> Time:*\n"
+        + "Rule: Project -> Time:*\n"
+        + "Rule: AggregateRemoveRule -> Time:*\n"
+        + "Rule: SortRemoveRule -> Time:*\n");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
-    String response2 = postQuery(query2).get("resultTable").toString();
+    String response2 = postQuery(query2).get("resultTable").toString()
+        .replaceAll("Time: \\d+\\.\\d+", "Time: *");
 
-    //@formatter:off
-    Pattern pattern = Pattern.compile("\\{"
-        + "\"dataSchema\":\\{\"columnNames\":\\[\"SQL\",\"PLAN\"],\"columnDataTypes\":\\[\"STRING\",\"STRING\"]},"
-        + "\"rows\":\\[\\[\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
-        + "\"Execution Plan.."
-        + "LogicalProject\\(.*\\).."
-        + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\).."
-        + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)..\""
-        + "]]}");
-    //@formatter:on
-    boolean found = pattern.matcher(response2).find();
-    assertTrue(found, "Pattern " + pattern + " not found in " + response2);
+    JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(1).asText(), "PLAN");
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(2).asText(), "RULE_TIMINGS");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(1).asText(), "STRING");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    assertEquals(response2Json.get("rows").get(0).get(0).asText(),
+        "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0");
+    assertTrue(Pattern.compile(
+        "Execution Plan\n"
+            + "LogicalProject\\(.*\\)\n"
+            + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
+            + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
+    ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
+    assertEquals(response2Json.get("rows").get(0).get(2).asText(),
+        "Rule Execution Times\n"
+            + "Rule: Project -> Time: *\n"
+            + "Rule: FilterProjectTransposeRule -> Time: *\n"
+            + "Rule: Filter -> Time: *\n"
+            + "Rule: ProjectFilterTransposeRule -> Time: *\n");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
@@ -4016,7 +4035,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testResponseWithClientRequestId(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String clientRequestId = UUID.randomUUID().toString();
     String sqlQuery =

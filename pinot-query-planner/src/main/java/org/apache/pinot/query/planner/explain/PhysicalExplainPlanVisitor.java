@@ -67,16 +67,16 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
    * @return a String representation of the query plan tree
    */
   public static String explain(DispatchableSubPlan dispatchableSubPlan) {
-    if (dispatchableSubPlan.getQueryStageList().isEmpty()) {
+    if (dispatchableSubPlan.getQueryStageMap().isEmpty()) {
       return "EMPTY";
     }
 
     // the root of a query plan always only has a single node
     QueryServerInstance rootServer =
-        dispatchableSubPlan.getQueryStageList().get(0).getServerInstanceToWorkerIdMap()
+        dispatchableSubPlan.getQueryStageMap().get(0).getServerInstanceToWorkerIdMap()
             .keySet().iterator().next();
     return explainFrom(dispatchableSubPlan,
-        dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getFragmentRoot(), rootServer);
+        dispatchableSubPlan.getQueryStageMap().get(0).getPlanFragment().getFragmentRoot(), rootServer);
   }
 
   /**
@@ -173,7 +173,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
     MailboxSendNode sender = node.getSender();
     int senderStageId = node.getSenderStageId();
-    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageList().get(senderStageId);
+    DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageMap().get(senderStageId);
 
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         dispatchablePlanFragment.getServerInstanceToWorkerIdMap();
@@ -219,7 +219,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     // This iterator is guaranteed to be sorted by stageId
     for (Integer receiverStageId : node.getReceiverStageIds()) {
       List<MailboxInfo> receiverMailboxInfos =
-          _dispatchableSubPlan.getQueryStageList().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
+          _dispatchableSubPlan.getQueryStageMap().get(node.getStageId()).getWorkerMetadataList().get(context._workerId)
               .getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
       // Sort to ensure print order
       Stream<String> stageDescriptions = receiverMailboxInfos.stream()
@@ -248,7 +248,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   public StringBuilder visitTableScan(TableScanNode node, Context context) {
     return appendInfo(node, context)
         .append(' ')
-        .append(_dispatchableSubPlan.getQueryStageList()
+        .append(_dispatchableSubPlan.getQueryStageMap()
             .get(node.getStageId())
             .getWorkerIdToSegmentsMap()
             .get(context._host))

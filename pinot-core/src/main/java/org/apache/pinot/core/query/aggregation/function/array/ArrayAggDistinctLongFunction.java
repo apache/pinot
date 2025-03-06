@@ -19,15 +19,18 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongOpenHashSet> {
+public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongSet> {
   public ArrayAggDistinctLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
@@ -56,5 +59,16 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongO
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongSet longSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongSet.getValue(),
+        ObjectSerDeUtils.LONG_SET_SER_DE.serialize(longSet));
+  }
+
+  @Override
+  public LongSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.LONG_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }
