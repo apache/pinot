@@ -23,8 +23,8 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
@@ -176,7 +176,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testCancelByClientQueryId(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String clientRequestId = UUID.randomUUID().toString();
     // tricky query: use sleep with some column data to avoid Calcite from optimizing it on compile time
@@ -184,16 +184,24 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
         "SET clientQueryId='" + clientRequestId + "'; "
             + "SELECT sleep(ActualElapsedTime+60000) FROM mytable WHERE ActualElapsedTime > 0 limit 1";
 
-    new Timer().schedule(new java.util.TimerTask() {
-      @Override
-      public void run() {
+    Executors.newSingleThreadExecutor().submit(() -> {
+      TestUtils.waitForCondition(aVoid -> {
         try {
-          sendCancel(clientRequestId);
+          JsonNode queries = getActiveQueries();
+          // terrible approach, but for a test...
+          return queries.toString().contains(clientRequestId);
         } catch (Exception e) {
-          fail("No exception should be thrown", e);
+          fail("Exception fetching active queries", e);
+          return false;
         }
+      }, 60000, "Query not shown as active.");
+
+      try {
+        sendCancel(clientRequestId);
+      } catch (Exception e) {
+        fail("Exception sending cancel", e);
       }
-    }, 500);
+    });
 
     JsonNode result = postQuery(sqlQuery);
     // ugly: error message differs from SSQE to MSQE
@@ -211,7 +219,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
     assertNotNull(exceptions);
     assertTrue(exceptions.isArray());
     assertFalse(exceptions.isEmpty());
-    for (JsonNode exception: exceptions) {
+    for (JsonNode exception : exceptions) {
       JsonNode message = exception.get("message");
       if (message != null && message.asText().contains(errorText)) {
         return;

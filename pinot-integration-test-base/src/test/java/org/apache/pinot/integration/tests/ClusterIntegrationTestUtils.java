@@ -872,10 +872,6 @@ public class ClusterIntegrationTestUtils {
     return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
-  public static String getBrokerQueryCancelUrl(String brokerBaseApiUrl, String brokerId, String clientQueryId) {
-    return brokerBaseApiUrl + "/clientQuery/" + brokerId + "/" + clientQueryId;
-  }
-
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
       ResultSet h2ResultSet, ResultSetMetaData h2MetaData, Collection<String> orderByColumns)
       throws SQLException {
