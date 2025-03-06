@@ -304,7 +304,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
   private static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
   private static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
-  private static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
+  public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
   private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
