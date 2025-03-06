@@ -566,23 +566,27 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
     //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
     //    records correctly.
-    Map<Integer, String> partitionIdToLatestCompletedSegment = new HashMap<>();
+    Map<Integer, LLCSegmentName> partitionIdToLatestCompletedSegment = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : allSegments) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (LLCSegmentName.isLLCSegment(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
           if (latestSegment == null) {
-            return segmentName;
+            return llcSegmentName;
           } else {
-            return new LLCSegmentName(latestSegment).getSequenceNumber() > llcSegmentName.getSequenceNumber()
-                    ? latestSegment : segmentName;
+            return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber()
+                    ? latestSegment : llcSegmentName;
           }
         });
       }
     }
+    Set<String> filteredSegmentNames = new HashSet<>();
+    for (LLCSegmentName llcSegmentName : partitionIdToLatestCompletedSegment.values()) {
+      filteredSegmentNames.add(llcSegmentName.getSegmentName());
+    }
     return allSegments.stream()
-            .filter(a -> !partitionIdToLatestCompletedSegment.containsValue(a.getSegmentName()))
+            .filter(a -> !filteredSegmentNames.contains(a.getSegmentName()))
             .collect(Collectors.toList());
   }
 

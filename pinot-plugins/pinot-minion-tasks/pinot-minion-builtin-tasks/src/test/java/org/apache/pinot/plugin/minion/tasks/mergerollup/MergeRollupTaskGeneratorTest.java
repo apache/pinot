@@ -293,17 +293,17 @@ public class MergeRollupTaskGeneratorTest {
     // construct 3 following segments, among these, only 0_0 can be scheduled, others should be filtered out
     // partition 0, completed 0
     SegmentZKMetadata realtimeTableSegmentMetadata1 =
-            getSegmentZKMetadata("testTable__0__0__0", 5000, 6000, TimeUnit.MILLISECONDS,
+            getSegmentZKMetadata("testTable__0__0__20250224T0900Z", 5000, 6000, TimeUnit.MILLISECONDS,
                     null, "50000", "60000");
     realtimeTableSegmentMetadata1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     // partition 0, completed 1
     SegmentZKMetadata realtimeTableSegmentMetadata2 =
-            getSegmentZKMetadata("testTable__0__1__1", 6000, 7000, TimeUnit.MILLISECONDS,
+            getSegmentZKMetadata("testTable__0__1__20250224T0902Z", 6000, 7000, TimeUnit.MILLISECONDS,
                     null, "60000", "70000");
     realtimeTableSegmentMetadata2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     // partition 1, completed 0
     SegmentZKMetadata realtimeTableSegmentMetadata3 =
-            getSegmentZKMetadata("testTable__1__0__0", 5500, 6500, TimeUnit.MILLISECONDS,
+            getSegmentZKMetadata("testTable__1__0__20250224T0900Z", 5500, 6500, TimeUnit.MILLISECONDS,
                     null, "55000", "65000");
     realtimeTableSegmentMetadata3.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
@@ -319,7 +319,7 @@ public class MergeRollupTaskGeneratorTest {
             Lists.newArrayList(realtimeTableSegmentMetadata1, realtimeTableSegmentMetadata2,
                     realtimeTableSegmentMetadata3));
     assertEquals(filterResult.size(), 1);
-    assertEquals(filterResult.get(0).getSegmentName(), "testTable__0__0__0");
+    assertEquals(filterResult.get(0).getSegmentName(), "testTable__0__0__20250224T0900Z");
   }
 
   private void checkPinotTaskConfig(Map<String, String> pinotTaskConfig, String segments, String mergeLevel,
