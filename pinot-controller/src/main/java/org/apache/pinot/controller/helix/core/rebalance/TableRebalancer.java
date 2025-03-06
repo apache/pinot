@@ -181,7 +181,6 @@ public class TableRebalancer {
       rebalanceJobId = createUniqueRebalanceJobIdentifier();
     }
     boolean dryRun = rebalanceConfig.isDryRun();
-    boolean summary = rebalanceConfig.isSummary();
     boolean preChecks = rebalanceConfig.isPreChecks();
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
     boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
@@ -196,18 +195,13 @@ public class TableRebalancer {
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
     LOGGER.info(
-        "Start rebalancing table: {} with dryRun: {}, summary: {}, preChecks: {}, reassignInstances: {}, "
-            + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
-            + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, externalViewCheckIntervalInMs: {}, "
+        "Start rebalancing table: {} with dryRun: {}, preChecks: {}, reassignInstances: {}, includeConsuming: {},"
+            + "bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {},"
+            + "lowDiskMode: {}, bestEfforts: {}, externalViewCheckIntervalInMs: {}, "
             + "externalViewStabilizationTimeoutInMs: {}",
-        tableNameWithType, dryRun, summary, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
+        tableNameWithType, dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
-
-    if (summary && !dryRun) {
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-          "Must enable dry-run mode to use summary mode", null, null, null, null, null);
-    }
 
     // Perform pre-checks if enabled
     Map<String, String> preChecksResult = null;
@@ -313,12 +307,10 @@ public class TableRebalancer {
             + "segmentAssignmentUnchanged: {} for table: {}", rebalanceJobId, instancePartitionsUnchanged,
         tierInstancePartitionsUnchanged, segmentAssignmentUnchanged, tableNameWithType);
 
-    RebalanceSummaryResult summaryResult = null;
-    if (summary) {
-      // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
-      // is expected or not based on the summary results
-      summaryResult = calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId);
-    }
+    // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
+    // is expected or not based on the summary results
+    RebalanceSummaryResult summaryResult =
+        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId);
 
     if (segmentAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
@@ -327,31 +319,21 @@ public class TableRebalancer {
             String.format("For rebalanceId: %s, instance unchanged and table: %s is already balanced", rebalanceJobId,
                 tableNameWithType));
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
-            summary ? null : instancePartitionsMap, summary ? null : tierToInstancePartitionsMap,
-            summary ? null : targetAssignment, preChecksResult, summaryResult);
+            instancePartitionsMap,tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       } else {
         if (dryRun) {
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
               "Instance reassigned in dry-run mode, table is already balanced",
-              summary ? null : instancePartitionsMap, summary ? null : tierToInstancePartitionsMap,
-              summary ? null : targetAssignment, preChecksResult, summaryResult);
+              instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
         } else {
           _tableRebalanceObserver.onSuccess(
               String.format("For rebalanceId: %s, instance reassigned but table: %s is already balanced",
                   rebalanceJobId, tableNameWithType));
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
-              "Instance reassigned, table is already balanced", summary ? null : instancePartitionsMap,
-              summary ? null : tierToInstancePartitionsMap, summary ? null : targetAssignment, preChecksResult,
-              summaryResult);
+              "Instance reassigned, table is already balanced", instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
         }
       }
-    }
-
-    if (summary) {
-      LOGGER.info("For rebalanceId: {}, rebalancing table: {} in dry-run summary mode, returning the summary only",
-          rebalanceJobId, tableNameWithType);
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE, "Dry-run summary mode", null,
-          null, null, preChecksResult, summaryResult);
     }
 
     if (dryRun) {
