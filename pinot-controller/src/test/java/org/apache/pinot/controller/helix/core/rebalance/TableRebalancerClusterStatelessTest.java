@@ -36,7 +36,6 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -611,7 +610,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION), "Within threshold");
-
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
