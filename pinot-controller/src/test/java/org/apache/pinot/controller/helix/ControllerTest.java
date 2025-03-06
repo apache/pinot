@@ -227,6 +227,8 @@ public class ControllerTest {
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    // Disable resource util check in test
+    properties.put(ControllerConf.RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY, 30_000);
     overrideControllerConf(properties);
     return properties;
   }
