@@ -59,7 +59,6 @@ import static org.testng.Assert.assertTrue;
  * Tests for the ingestion restlet
  *
  */
-@Test(groups = "stateless")
 public class PinotIngestionRestletResourceStatelessTest extends ControllerTest implements HttpHandler {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
