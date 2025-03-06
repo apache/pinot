@@ -1231,10 +1231,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
-    // MultistageGroupByExecutor
+    // MultistageGroupByExecutor. This will use a "DIRECT" aggregation.
     String sqlQuery = "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
         + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
         + "AirlineID";
@@ -1253,7 +1253,39 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+      throws Exception {
+    // Query written this way with a CTE and limit will be planned such that the multi-stage group by executor will be
+    // used for both leaf and final aggregation
+    String sqlQuery = "SET mseMaxInitialResultHolderCapacity = 1;\n"
+        + "WITH tmp AS ("
+        + "  SELECT *"
+        + "  FROM mytable"
+        + "  WHERE AirlineID > 20000"
+        + "  LIMIT 10000"
+        + ") "
+        + "SELECT AirlineID,"
+        + "  COUNT(*) FILTER ("
+        + "    WHERE Origin = 'garbage'"
+        + ") "
+        + "FROM tmp "
+        + "GROUP BY AirlineID";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+    // Ensure that result set is not empty
+    assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+    // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+    JsonNode rows = result.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i).get(1).asInt(), 0);
+      // Ensure that the main filter was applied
+      assertTrue(rows.get(i).get(0).asInt() > 20000);
+    }
+  }
+
+  @Test
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
     // MultistageGroupByExecutor
