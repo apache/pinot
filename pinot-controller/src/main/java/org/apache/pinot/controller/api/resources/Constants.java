@@ -53,6 +53,7 @@ public class Constants {
   public static final String APP_CONFIGS = "AppConfigs";
   public static final String PERIODIC_TASK_TAG = "PeriodicTask";
   public static final String UPSERT_RESOURCE_TAG = "Upsert";
+  public static final String QUERY_WORKLOAD_TAG = "QueryWorkload";
 
   public static final String REALTIME_SEGMENT_VALIDATION_MANAGER = "RealtimeSegmentValidationManager";
 

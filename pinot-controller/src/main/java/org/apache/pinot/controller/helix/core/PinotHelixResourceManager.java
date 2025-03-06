@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -175,7 +176,9 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
-import org.apache.pinot.spi.config.workload.WorkloadConfig;
+import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationScheme;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -3421,6 +3424,28 @@ public class PinotHelixResourceManager {
     return tableConfigs;
   }
 
+
+  public List<String> getServerInstancesConfigsFor(String tableName) {
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    Set<String> serverInstances = new HashSet<>();
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
+    TenantConfig tenantConfig = null;
+    if (offlineTableConfig != null) {
+       tenantConfig = offlineTableConfig.getTenantConfig();
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
+    }
+    if (realtimeTableConfig != null) {
+      tenantConfig = realtimeTableConfig.getTenantConfig();
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
+    }
+    return new ArrayList<>(serverInstances);
+  }
+
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);
@@ -4606,23 +4631,77 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public List<WorkloadConfig> getAllWorkloadConfigs() throws Exception {
-    return ZKMetadataProvider.getAllWorkloadConfigs(_propertyStore);
+  public List<QueryWorkloadConfig> getQueryWorkloadConfigs() throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfigs(_propertyStore);
   }
 
   @Nullable
-  public WorkloadConfig getWorkloadConfig(String workload) throws Exception {
-    return ZKMetadataProvider.getWorkloadConfig(_propertyStore, workload);
+  public QueryWorkloadConfig getQueryWorkloadConfig(String workload) throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, workload);
   }
 
-  public void setWorkloadConfig(WorkloadConfig workloadConfig) throws Exception {
-    if (!ZKMetadataProvider.setWorkloadConfig(_propertyStore, workloadConfig)) {
-      throw new RuntimeException("Failed to set workload config for workload: " + workloadConfig.getWorkloadName());
+  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
+    if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
+      throw new RuntimeException("Failed to set workload config for workload: "
+          + queryWorkloadConfig.getQueryWorkloadName());
+    }
+    QueryWorkloadRefreshMessage refreshMessage = new QueryWorkloadRefreshMessage(queryWorkloadConfig);
+    Set<String> allInstances = getInstancesForPropagation(queryWorkloadConfig.getNodeConfigs());
+    sendQueryWorkloadRefreshMessage(refreshMessage, allInstances);
+  }
+
+  // TODO: Have an interface for this
+  public Set<String> getInstancesForPropagation(List<NodeConfig> nodeConfigs) {
+    Set<String> instances = new HashSet<>();
+    for (NodeConfig nodeConfig : nodeConfigs) {
+      NodeConfig.Type nodeType = nodeConfig.getNodeType();
+      PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
+      PropagationScheme.Type type = propagationScheme.getType();
+      if (type == PropagationScheme.Type.TABLE && nodeType == NodeConfig.Type.NON_LEAF_NODE) {
+        List<String> tables = propagationScheme.getValues();
+        for (String table : tables) {
+          instances.addAll(getBrokerInstancesFor(table));
+        }
+      } else if (type == PropagationScheme.Type.TABLE && nodeType == NodeConfig.Type.LEAF_NODE) {
+        List<String> tables = propagationScheme.getValues();
+        for (String table : tables) {
+          instances.addAll(getAllInstancesForServerTenant(table));
+        }
+      } else if (type == PropagationScheme.Type.TENANT && nodeType == NodeConfig.Type.NON_LEAF_NODE) {
+        List<String> tenants = propagationScheme.getValues();
+        for (String tenant : tenants) {
+          instances.addAll(getAllInstancesForBrokerTenant(tenant));
+        }
+      } else if (type == PropagationScheme.Type.TENANT && nodeType == NodeConfig.Type.LEAF_NODE) {
+        List<String> tenants = propagationScheme.getValues();
+        for (String tenant : tenants) {
+          instances.addAll(getAllInstancesForServerTenant(tenant));
+        }
+      } else {
+        throw new IllegalArgumentException("Unsupported propagation scheme type: " + type);
+      }
+    }
+    return instances;
+  }
+
+  public void sendQueryWorkloadRefreshMessage(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage, Set<String> instances) {
+    for (String instance : instances) {
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setInstanceName(instance);
+      recipientCriteria.setSessionSpecific(true);
+      int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria, queryWorkloadRefreshMessage, null, -1);
+      if (numMessagesSent > 0) {
+       LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
+      }
+      else {
+        LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+      }
     }
   }
 
-  public void deleteWorkloadConfig(String workload) {
-    ZKMetadataProvider.deleteWorkloadConfig(_propertyStore, workload);
+  public void deleteQueryWorkloadConfig(String workload) {
+    ZKMetadataProvider.deleteQueryWorkloadConfig(_propertyStore, workload);
   }
 
 

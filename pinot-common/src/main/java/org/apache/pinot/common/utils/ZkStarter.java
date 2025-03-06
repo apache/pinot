@@ -181,7 +181,7 @@ public class ZkStarter {
       // Wait until the ZK server is started
       for (int retry = 0; retry < DEFAULT_ZK_CLIENT_RETRIES; retry++) {
         try {
-          ZkClient client = new ZkClient("localhost:" + port, 1000 * (DEFAULT_ZK_CLIENT_RETRIES - retry));
+          ZkClient client = new ZkClient("localhost:" + port, 3000 * (DEFAULT_ZK_CLIENT_RETRIES - retry));
           client.waitUntilConnected(DEFAULT_ZK_CLIENT_RETRIES - retry, TimeUnit.SECONDS);
           closeAsync(client);
           break;

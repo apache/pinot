@@ -31,6 +31,7 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
@@ -77,6 +78,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
+      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
+        LOGGER.info("Received query workload refresh message on server: {}", message);
+        return new DefaultMessageHandler(message, _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config.workload;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -31,36 +30,51 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class EnforcementProfile extends BaseJsonConfig {
 
-  private static final String BROKER_COST = "brokerCost";
-  private static final String SERVER_COST = "serverCost";
+  private static final String CPU_COST = "cpuCost";
+  private static final String MEMORY_COST = "memoryCost";
+  private static final String ENFORCEMENT_PERIOD_MILLIS = "enforcementPeriodMillis";
 
+  private static final long DEFAULT_ENFORCEMENT_PERIOD_MILLIS = 60000L;
 
-  @JsonPropertyDescription("Workload cost for the broker")
-  private WorkloadCost _brokerCost;
+  @JsonPropertyDescription("Max CPU cost allowed for the workload")
+  private double _cpuCost;
 
-  @JsonPropertyDescription("Workload cost for the server")
-  private WorkloadCost _serverCost;
+  @JsonPropertyDescription("Max memory cost allowed for the workload")
+  private double _memoryCost;
 
-  @JsonCreator
-  public EnforcementProfile(@JsonProperty(BROKER_COST) @Nullable WorkloadCost brokerCost,
-      @JsonProperty(SERVER_COST) @Nullable WorkloadCost serveCost) {
-    _brokerCost = brokerCost;
-    _serverCost = serveCost;
+  @JsonPropertyDescription("Enforcement period in milliseconds")
+  private long _enforcementPeriodMillis;
+
+  public EnforcementProfile(@JsonProperty(CPU_COST) double cpuCost, @JsonProperty(MEMORY_COST) double memoryCost,
+      @JsonProperty(ENFORCEMENT_PERIOD_MILLIS) @Nullable Integer enforcementPeriodMillis) {
+    _cpuCost = cpuCost;
+    _memoryCost = memoryCost;
+    _enforcementPeriodMillis = enforcementPeriodMillis != null
+        ? enforcementPeriodMillis
+        : DEFAULT_ENFORCEMENT_PERIOD_MILLIS;
   }
 
-  public WorkloadCost getBrokerCost() {
-    return _brokerCost;
+  public double getCpuCost() {
+    return _cpuCost;
   }
 
-  public WorkloadCost getServerCost() {
-    return _serverCost;
+  public double getMemoryCost() {
+    return _memoryCost;
   }
 
-  public void setBrokerCost(WorkloadCost brokerCost) {
-    _brokerCost = brokerCost;
+  public long getEnforcementPeriodMillis() {
+    return _enforcementPeriodMillis;
   }
 
-  public void setServerCost(WorkloadCost serverCost) {
-    _serverCost = serverCost;
+  public void setCpuCost(double cpuCost) {
+    _cpuCost = cpuCost;
+  }
+
+  public void setMemoryCost(double memoryCost) {
+    _memoryCost = memoryCost;
+  }
+
+  public void setEnforcementPeriodMillis(long enforcementPeriodMillis) {
+    _enforcementPeriodMillis = enforcementPeriodMillis;
   }
 }

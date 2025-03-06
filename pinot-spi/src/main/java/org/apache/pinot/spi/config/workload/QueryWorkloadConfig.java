@@ -21,40 +21,36 @@ package org.apache.pinot.spi.config.workload;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class WorkloadConfig extends BaseJsonConfig {
+public class QueryWorkloadConfig extends BaseJsonConfig {
 
-  private static final String WORKLOAD_ID = "id";
-  private static final String ENFORCEMENT_PROFILE = "enforcementProfile";
+  public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
+  public static final String NODE_CONFIGS = "nodeConfigs";
+  public static final String LEAF_NODE = "leafNode";
+  public static final String NON_LEAF_NODE = "nonLeafNode";
 
-  @JsonPropertyDescription("Unique identifier for the workload")
-  private String _workloadName;
+  @JsonPropertyDescription("Describes the workload name for the query workload")
+  private String _queryWorkloadName;
 
-  @JsonPropertyDescription("Enforcement profile for the workload")
-  private EnforcementProfile _enforcementProfile;
+  @JsonPropertyDescription("Describes the list of node configs")
+  private List<NodeConfig> _nodeConfigs;
+  ;
 
   @JsonCreator
-  public WorkloadConfig(@JsonProperty(value = WORKLOAD_ID, required = true) String workloadId,
-      @JsonProperty(value = ENFORCEMENT_PROFILE, required = true) EnforcementProfile enforcementProfile) {
-    _workloadName = workloadId;
-    _enforcementProfile = enforcementProfile;
+  public QueryWorkloadConfig(@JsonProperty(QUERY_WORKLOAD_NAME) String queryWorkloadName,
+      @JsonProperty(NODE_CONFIGS) List<NodeConfig> nodeConfigs) {
+    _queryWorkloadName = queryWorkloadName;
+    _nodeConfigs = nodeConfigs;
   }
 
-  public String getWorkloadName() {
-    return _workloadName;
+  public String getQueryWorkloadName() {
+    return _queryWorkloadName;
   }
 
-  public EnforcementProfile getEnforcementProfile() {
-    return _enforcementProfile;
-  }
-
-  public void setWorkloadName(String workloadName) {
-    _workloadName = workloadName;
-  }
-
-  public void setEnforcementProfile(EnforcementProfile enforcementProfile) {
-    _enforcementProfile = enforcementProfile;
+  public List<NodeConfig> getNodeConfigs() {
+    return _nodeConfigs;
   }
 }

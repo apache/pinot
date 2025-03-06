@@ -27,6 +27,7 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -68,6 +69,9 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RefreshDatabaseConfigMessageHandler(new DatabaseConfigRefreshMessage(message), context);
       case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
         return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
+      case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
+          LOGGER.info("Received QueryWorkloadRefreshMessage, but no-op for now");
+        return null;
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
