@@ -52,7 +52,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
-import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -64,7 +63,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.util.TableSizeReader;
-import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -677,12 +675,11 @@ public class TableRebalancer {
       int segmentsUnchanged = 0;
       int totalExistingSegments = 0;
       RebalanceSummaryResult.ServerStatus serverStatus = RebalanceSummaryResult.ServerStatus.ADDED;
-      Set<String> intersection = new HashSet<>();
       if (existingServersToSegmentMap.containsKey(server)) {
         Set<String> segmentSetForServer = existingServersToSegmentMap.get(server);
         totalExistingSegments = segmentSetForServer.size();
         existingSegmentSet.addAll(segmentSetForServer);
-        intersection.addAll(segmentSetForServer);
+        Set<String> intersection = new HashSet<>(segmentSetForServer);
         intersection.retainAll(newSegmentSet);
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
@@ -691,34 +688,25 @@ public class TableRebalancer {
       } else {
         serversAdded.add(server);
       }
-      newSegmentSet.removeAll(intersection);
-      Set<String> removedSegmentSet = new HashSet<>(existingSegmentSet);
-      removedSegmentSet.removeAll(intersection);
+      newSegmentSet.removeAll(existingSegmentSet);
       int segmentsAdded = newSegmentSet.size();
       if (segmentsAdded > 0) {
         serversGettingNewSegments.add(server);
       }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
-      int segmentsDeleted = removedSegmentSet.size();
-
-      long diskUtilizationGain = getSegmentsSizeInBytes(newSegmentSet, tableNameWithType, currentAssignment);
-      long diskUtilizationLoss = getSegmentsSizeInBytes(removedSegmentSet, tableNameWithType, currentAssignment);
-      DiskUsageInfo diskUsage = getDiskUsageInfoOfInstance(server);
+      int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
-          totalNewSegments, totalExistingSegments, diskUsage.getUsedSpaceBytes() + diskUtilizationGain - diskUtilizationLoss,
-          diskUsage.getUsedSpaceBytes(), diskUsage.getTotalSpaceBytes(),
-          segmentsAdded, segmentsDeleted, segmentsUnchanged, instanceToTagsMap.getOrDefault(server, null)));
+          totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
+          instanceToTagsMap.getOrDefault(server, null)));
     }
 
     for (Map.Entry<String, Set<String>> entry : existingServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
       if (!serverSegmentChangeInfoMap.containsKey(server)) {
         serversRemoved.add(server);
-        // TODO: determine disk usage for removed servers
         serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
-            RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(),
-            -1, -1, -1, 0, entry.getValue().size(), 0,
+            RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
             instanceToTagsMap.getOrDefault(server, null)));
       }
     }
@@ -997,18 +985,6 @@ public class TableRebalancer {
         return Pair.of(instancePartitions, true);
       }
     }
-  }
-
-  private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
-    return ResourceUtilizationInfo.getDiskUsageInfo(instanceId);
-  }
-
-  private long getSegmentsSizeInBytes(Set<String> segments, String tableNameWithType, Map<String, Map<String, String>> currentAssignment) {
-    // TODO: for more accurate size calculation, use segment API to get each segment size
-    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableNameWithType);
-    long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
-        : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
-    return averageSegmentSizeInBytes * segments.size();
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
