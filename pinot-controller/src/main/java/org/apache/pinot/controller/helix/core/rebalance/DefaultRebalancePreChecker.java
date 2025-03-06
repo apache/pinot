@@ -48,15 +48,18 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
   public static final String DISK_UTILIZATION = "diskUtilization";
-  public static final short DEFAULT_DISK_UTILIZATION_THRESHOLD_PERCENTAGE = 90;
+
+  private static double _diskUtilizationThreshold;
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
   protected ExecutorService _executorService;
 
   @Override
-  public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService) {
+  public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService,
+      double diskUtilizationThreshold) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
+    _diskUtilizationThreshold = diskUtilizationThreshold;
   }
 
   @Override
@@ -75,7 +78,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check if all servers involved in the rebalance have enough disk space
     String diskUtilizationMessage =
         checkDiskUtilization(tableNameWithType, tableFacts._currentAssignment, tableFacts._targetAssignment,
-            tableFacts._tableSubTypeSizeDetails, DEFAULT_DISK_UTILIZATION_THRESHOLD_PERCENTAGE);
+            tableFacts._tableSubTypeSizeDetails, _diskUtilizationThreshold);
     preCheckResult.put(DISK_UTILIZATION, diskUtilizationMessage);
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
@@ -201,7 +204,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   private RebalancePreCheckerResult checkDiskUtilization(String tableNameWithType, Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment,
-      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, short thresholdPercentage) {
+      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold) {
     boolean isDiskUtilSafe = true;
     StringBuilder message = new StringBuilder("UNSAFE. Servers with unsafe disk util footprint: ");
     String sep = "";
@@ -249,12 +252,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
       long diskUtilizationFootprint = diskUsage.getUsedSpaceBytes() + diskUtilizationGain;
-      short diskUtilizationFootprintPercentage =
-          ((short) ((diskUtilizationFootprint * 100) / diskUsage.getTotalSpaceBytes()));
+      double diskUtilizationFootprintRate =
+          (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
 
-      if (diskUtilizationFootprintPercentage >= thresholdPercentage) {
+      if (diskUtilizationFootprintRate >= threshold) {
         isDiskUtilSafe = false;
-        message.append(sep).append(server).append(String.format(" (%d%%)", diskUtilizationFootprintPercentage));
+        message.append(sep)
+            .append(server)
+            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRate * 100)));
         sep = ", ";
       }
     }

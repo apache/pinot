@@ -27,7 +27,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public interface RebalancePreChecker {
-  void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService);
+  void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService,
+      double diskUtilizationThreshold);
 
   class TableFacts {
     public String _rebalanceJobId;
