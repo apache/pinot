@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.function;
 
 import java.util.Iterator;
 import java.util.List;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
