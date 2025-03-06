@@ -1094,6 +1094,35 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
+   * An instance is reporting that it cannot build segment due to non-recoverable error, usually due to size too large.
+   * Reduce the segment "segment.flush.threshold.size" to its half value.
+   */
+  public void reduceSegmentSizeAndReset(LLCSegmentName llcSegmentName, int prevNumRows) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+    // reduce the segment size to its half
+    String segmentName = llcSegmentName.getSegmentName();
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
+
+    Stat stat = new Stat();
+    SegmentZKMetadata prevSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    Preconditions.checkState(prevSegmentZKMetadata.getStatus() == Status.IN_PROGRESS,
+        "Segment status for segment: %s should be IN_PROGRESS, found: %s", segmentName,
+        prevSegmentZKMetadata.getStatus());
+
+    int prevTargetNumRows = prevSegmentZKMetadata.getSizeThresholdToFlushSegment();
+    int newNumRows = Math.min(prevNumRows / 2, prevTargetNumRows / 2);
+    prevSegmentZKMetadata.setSizeThresholdToFlushSegment(newNumRows);
+
+    persistSegmentZKMetadata(realtimeTableName, prevSegmentZKMetadata, stat.getVersion());
+    _helixResourceManager.resetSegment(
+        realtimeTableName, segmentName, null);
+    LOGGER.info("Reduced segment size of {} from prevTarget {} prevActual {} to {}",
+        segmentName, prevTargetNumRows, prevNumRows, newNumRows);
+    _controllerMetrics.addMeteredTableValue(
+        realtimeTableName, ControllerMeter.SEGMENT_SIZE_AUTO_REDUCTION, 1L);
+  }
+
+  /**
    * Returns the latest LLC realtime segment ZK metadata for each partition.
    *
    * @param realtimeTableName Realtime table name

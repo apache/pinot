@@ -267,6 +267,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentBuildDescriptor _segmentBuildDescriptor;
+  private boolean _segmentCannotBuild = false;
   private final StreamConsumerFactory _streamConsumerFactory;
   private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
@@ -868,6 +869,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   // We could not build the segment. Go into error state.
                   _state = State.ERROR;
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
+                  if (_segmentCannotBuild) {
+                    _segmentLogger.error(
+                        "Found non-recoverable segment build error for {}, from offset {} to {},"
+                            + "sending notifyCannotBuild event.",
+                        _segmentNameStr, _startOffset, _currentOffset);
+                    notifySegmentCannotBuild();
+                  }
                   break;
                 }
                 if (commitSegment(response.getControllerVipUrl())) {
@@ -1113,6 +1121,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         FileUtils.deleteQuietly(tempSegmentFolder);
         _realtimeTableDataManager.addSegmentError(_segmentNameStr,
             new SegmentErrorInfo(now(), "Could not build segment", e));
+        if (e instanceof IllegalStateException) {
+          // Precondition checks fail, the segment build would fail consistently
+          _segmentCannotBuild = true;
+        }
         return null;
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
@@ -1208,6 +1220,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _realtimeTableDataManager.replaceConsumingSegment(_segmentNameStr);
     removeSegmentFile();
     return true;
+  }
+
+  @VisibleForTesting
+  void notifySegmentCannotBuild() {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+
+    _protocolHandler.segmentCannotBuild(params);
   }
 
   @VisibleForTesting
