@@ -344,6 +344,9 @@ public class MultistageGroupByExecutor {
         // compliant results. However, if the query option to skip empty groups is set, we avoid this step for
         // improved performance.
         generateGroupByKeys(block);
+        for (int i = 0; i < _aggFunctions.length; i++) {
+          _aggregateResultHolders[i].ensureCapacity(_groupIdGenerator.getNumGroups());
+        }
       }
     }
   }
