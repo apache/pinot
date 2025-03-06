@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
