@@ -66,9 +66,6 @@ public class RebalanceSummaryResult {
     private final ServerStatus _serverStatus;
     private final int _totalSegmentsAfterRebalance;
     private final int _totalSegmentsBeforeRebalance;
-    private final long _diskUsedAfterRebalance;
-    private final long _diskUsedBeforeRebalance;
-    private final long _diskTotalSpace;
     private final int _segmentsAdded;
     private final int _segmentsDeleted;
     private final int _segmentsUnchanged;
@@ -89,18 +86,12 @@ public class RebalanceSummaryResult {
     public ServerSegmentChangeInfo(@JsonProperty("serverStatus") ServerStatus serverStatus,
         @JsonProperty("totalSegmentsAfterRebalance") int totalSegmentsAfterRebalance,
         @JsonProperty("totalSegmentsBeforeRebalance") int totalSegmentsBeforeRebalance,
-        @JsonProperty("diskUsedAfterRebalance") long diskUsedAfterRebalance,
-        @JsonProperty("diskUsedBeforeRebalance") long diskUsedBeforeRebalance,
-        @JsonProperty("diskTotalSpace") long diskTotalSpace,
         @JsonProperty("segmentsAdded") int segmentsAdded, @JsonProperty("segmentsDeleted") int segmentsDeleted,
         @JsonProperty("segmentsUnchanged") int segmentsUnchanged,
         @JsonProperty("tagList") @Nullable List<String> tagList) {
       _serverStatus = serverStatus;
       _totalSegmentsAfterRebalance = totalSegmentsAfterRebalance;
       _totalSegmentsBeforeRebalance = totalSegmentsBeforeRebalance;
-      _diskUsedAfterRebalance = diskUsedAfterRebalance;
-      _diskUsedBeforeRebalance = diskUsedBeforeRebalance;
-      _diskTotalSpace = diskTotalSpace;
       _segmentsAdded = segmentsAdded;
       _segmentsDeleted = segmentsDeleted;
       _segmentsUnchanged = segmentsUnchanged;
@@ -120,21 +111,6 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public int getTotalSegmentsBeforeRebalance() {
       return _totalSegmentsBeforeRebalance;
-    }
-
-    @JsonProperty
-    public long getDiskUsedAfterRebalance() {
-      return _diskUsedAfterRebalance;
-    }
-
-    @JsonProperty
-    public long getDiskUsedBeforeRebalance() {
-      return _diskUsedBeforeRebalance;
-    }
-
-    @JsonProperty
-    public long getDiskTotalSpace() {
-      return _diskTotalSpace;
     }
 
     @JsonProperty
