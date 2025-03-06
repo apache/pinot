@@ -79,20 +79,6 @@ public class GroovyStaticAnalyzerConfig {
     return _methodDefinitionAllowed;
   }
 
-  public ZNRecord toZNRecord() throws JsonProcessingException {
-    ZNRecord record = new ZNRecord("groovySecurityConfiguration");
-    record.setSimpleField("staticAnalyzerConfig", toJson());
-    return record;
-  }
-
-  public static GroovyStaticAnalyzerConfig fromZNRecord(ZNRecord zr) throws JsonProcessingException {
-    Preconditions.checkArgument(zr.getId().equals("groovySecurityConfiguration"),
-        "Expected ZNRecord with ID \"groovySecurityConfiguration\" but got {}", zr.getId());
-
-    final String configJson = zr.getSimpleField("staticAnalyzerConfig");
-    return fromJson(configJson);
-  }
-
   public String toJson() throws JsonProcessingException {
     return JsonUtils.objectToString(this);
   }

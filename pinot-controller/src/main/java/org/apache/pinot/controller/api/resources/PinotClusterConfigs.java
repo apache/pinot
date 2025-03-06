@@ -215,24 +215,21 @@ public class PinotClusterConfigs {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Server error updating configuration")
   })
-  public SuccessResponse setGroovyStaticAnalysisConfig(String body) {
+  public SuccessResponse setGroovyStaticAnalysisConfig(Map<String, GroovyStaticAnalyzerConfig> configMap) {
     try {
-      JsonNode jsonNode = JsonUtils.stringToJsonNode(body);
-      Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
-      Map<String, String> properties = new TreeMap<>();
-      while (fieldNamesIterator.hasNext()) {
-        String key = fieldNamesIterator.next();
-        if (!GROOVY_STATIC_ANALYZER_CONFIG_LIST.contains(key)) {
-          throw new IOException(String.format("Invalid groovy static analysis config: %s. Valid configs are: %s",
-              key, GROOVY_STATIC_ANALYZER_CONFIG_LIST));
-        }
-        JsonNode valueNode = jsonNode.get(key);
-        properties.put(key, valueNode.isNull() ? null : valueNode.toString());
-      }
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope =
           new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
               _pinotHelixResourceManager.getHelixClusterName()).build();
+      Map<String, String> properties = new TreeMap<>();
+      for (Map.Entry<String, GroovyStaticAnalyzerConfig> entry : configMap.entrySet()) {
+        String key = entry.getKey();
+        if (!GROOVY_STATIC_ANALYZER_CONFIG_LIST.contains(key)) {
+          throw new IOException(String.format("Invalid groovy static analysis config: %s. Valid configs are: %s",
+              key, GROOVY_STATIC_ANALYZER_CONFIG_LIST));
+        }
+        properties.put(key, entry.getValue().toJson());
+      }
       admin.setConfig(configScope, properties);
       return new SuccessResponse("Updated Groovy Static Analyzer config.");
     } catch (IOException e) {

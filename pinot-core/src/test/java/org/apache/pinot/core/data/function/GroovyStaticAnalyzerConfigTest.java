@@ -107,14 +107,6 @@ public class GroovyStaticAnalyzerConfigTest {
     Assert.assertEquals(List.of("method1", "method2"), decodedConfig.getDisallowedMethodNames());
   }
 
-  @Test(dataProvider = "config_provider")
-  public void testToZnRecord(GroovyStaticAnalyzerConfig config)
-      throws Exception {
-    ZNRecord zr = config.toZNRecord();
-    GroovyStaticAnalyzerConfig znConfig = GroovyStaticAnalyzerConfig.fromZNRecord(zr);
-    Assert.assertTrue(equals(znConfig, config));
-  }
-
   @DataProvider(name = "config_provider")
   Iterator<GroovyStaticAnalyzerConfig> configProvider() {
     return List.of(
