@@ -68,7 +68,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,20 +197,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return columnOperationsMap;
     }
 
-    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
+    // Get all physical columns, excluding virtual columns like $docId, $hostName and $segmentName.
+    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     for (String column : existingAllColumns) {
       if (_schema != null && !_schema.hasColumn(column)) {
         // _schema will be null only in tests
-        if (!CommonConstants.Segment.BuiltInVirtualColumn.ALL_VIRTUAL_COLUMNS.contains(column)) {
-          // Skip logs for virtual columns as they are known not to be in the schema in most cases. Note that virtual
-          // columns may be in the schema if it's extended by addBuiltInVirtualColumnsToSegmentSchema() method. So we
-          // just check them here to skip logs and don't skip them for cases when they are in the schema.
-          LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column,
-              segmentName);
-        }
+        LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column, segmentName);
         continue;
       }
       boolean existingHasDict = existingDictColumns.contains(column);
