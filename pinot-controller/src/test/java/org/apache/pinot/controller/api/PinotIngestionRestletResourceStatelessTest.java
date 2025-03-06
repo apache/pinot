@@ -59,7 +59,8 @@ import static org.testng.Assert.assertTrue;
  * Tests for the ingestion restlet
  *
  */
-public class PinotIngestionRestletResourceStatelessTest extends ControllerTest implements HttpHandler {
+@Test(groups = "stateless")
+public class PinotIngestionRestletResourceStatelessTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private File _inputFile;
@@ -97,7 +98,7 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest i
     _dummyServer = HttpServer.create();
     _dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
     _dummyServer.start();
-    _dummyServer.createContext("/mock/ingestion", this);
+    _dummyServer.createContext("/mock/ingestion", new SegmentAsCsvFileFromPublicUriHandler());
   }
 
   @Test
@@ -160,15 +161,17 @@ public class PinotIngestionRestletResourceStatelessTest extends ControllerTest i
     }
   }
 
-  @Override
-  public void handle(HttpExchange exchange)
-      throws IOException {
-    exchange.sendResponseHeaders(200, 0);
-    OutputStream out = exchange.getResponseBody();
-    OutputStreamWriter writer = new OutputStreamWriter(out);
-    writer.append(_fileContent);
-    writer.flush();
-    out.flush();
-    out.close();
+  private class SegmentAsCsvFileFromPublicUriHandler implements HttpHandler {
+    @Override
+    public void handle(HttpExchange exchange)
+        throws IOException {
+      exchange.sendResponseHeaders(200, 0);
+      OutputStream out = exchange.getResponseBody();
+      OutputStreamWriter writer = new OutputStreamWriter(out);
+      writer.append(_fileContent);
+      writer.flush();
+      out.flush();
+      out.close();
+    }
   }
 }
