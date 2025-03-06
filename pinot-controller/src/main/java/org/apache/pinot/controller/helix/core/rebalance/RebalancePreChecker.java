@@ -22,11 +22,32 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
 public interface RebalancePreChecker {
   void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService);
-  Map<String, RebalancePreCheckerResult> check(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig);
+
+  class TableFacts {
+    public String _rebalanceJobId;
+    public String _tableNameWithType;
+    public TableConfig _tableConfig;
+    public Map<String, Map<String, String>> _currentAssignment;
+    public Map<String, Map<String, String>> _targetAssignment;
+    public TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+
+    public TableFacts(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
+        Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+        TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
+      _rebalanceJobId = rebalanceJobId;
+      _tableNameWithType = tableNameWithType;
+      _tableConfig = tableConfig;
+      _currentAssignment = currentAssignment;
+      _targetAssignment = targetAssignment;
+      _tableSubTypeSizeDetails = tableSubTypeSizeDetails;
+    }
+  }
+
+  Map<String, RebalancePreCheckerResult> check(TableFacts tableFacts);
 }

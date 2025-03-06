@@ -52,7 +52,6 @@ import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
-import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -64,7 +63,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.util.TableSizeReader;
-import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -220,20 +218,13 @@ public class TableRebalancer {
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement);
 
-    // Perform pre-checks if enabled
-    Map<String, RebalancePreCheckerResult> preChecksResult = null;
-    if (preChecks) {
-      if (!dryRun) {
-        // Dry-run must be enabled to run pre-checks
-        String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
-            + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
-        LOGGER.error(errorMsg);
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
-            null);
-      }
-      if (_rebalancePreChecker != null) {
-        preChecksResult = _rebalancePreChecker.check(rebalanceJobId, tableNameWithType, tableConfig);
-      }
+    // Dry-run must be enabled to run pre-checks
+    if (preChecks && !dryRun) {
+      String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
+          + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
+      LOGGER.error(errorMsg);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
+          null);
     }
 
     // Fetch ideal state
@@ -246,21 +237,21 @@ public class TableRebalancer {
           "For rebalanceId: %s, caught exception while fetching IdealState for table: %s, aborting the rebalance",
           rebalanceJobId, tableNameWithType), e);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-          "Caught exception while fetching IdealState: " + e, null, null, null, preChecksResult, null);
+          "Caught exception while fetching IdealState: " + e, null, null, null, null, null);
     }
     if (currentIdealState == null) {
       onReturnFailure(
           String.format("For rebalanceId: %s, cannot find the IdealState for table: %s, aborting the rebalance",
               rebalanceJobId, tableNameWithType), null);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, "Cannot find the IdealState for table",
-          null, null, null, preChecksResult, null);
+          null, null, null, null, null);
     }
     if (!currentIdealState.isEnabled() && !downtime) {
       onReturnFailure(String.format(
           "For rebalanceId: %s, cannot rebalance disabled table: %s without downtime, aborting the rebalance",
           rebalanceJobId, tableNameWithType), null);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-          "Cannot rebalance disabled table without downtime", null, null, null, preChecksResult, null);
+          "Cannot rebalance disabled table without downtime", null, null, null, null, null);
     }
 
     LOGGER.info("For rebalanceId: {}, processing instance partitions for table: {}", rebalanceJobId, tableNameWithType);
@@ -278,7 +269,7 @@ public class TableRebalancer {
           "For rebalanceId: %s, caught exception while fetching/calculating instance partitions for table: %s, "
               + "aborting the rebalance", rebalanceJobId, tableNameWithType), e);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-          "Caught exception while fetching/calculating instance partitions: " + e, null, null, null, preChecksResult,
+          "Caught exception while fetching/calculating instance partitions: " + e, null, null, null, null,
           null);
     }
 
@@ -299,7 +290,7 @@ public class TableRebalancer {
               + "aborting the rebalance", rebalanceJobId, tableNameWithType), e);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Caught exception while fetching/calculating tier instance partitions: " + e, null,
-          null, null, preChecksResult, null);
+          null, null, null, null);
     }
 
     LOGGER.info("For rebalanceId: {}, calculating the target assignment for table: {}", rebalanceJobId,
@@ -317,7 +308,7 @@ public class TableRebalancer {
               + "rebalance", rebalanceJobId, tableNameWithType), e);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Caught exception while calculating target assignment: " + e, instancePartitionsMap,
-          tierToInstancePartitionsMap, null, preChecksResult, null);
+          tierToInstancePartitionsMap, null, null, null);
     }
 
     boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
@@ -325,10 +316,20 @@ public class TableRebalancer {
             + "segmentAssignmentUnchanged: {} for table: {}", rebalanceJobId, instancePartitionsUnchanged,
         tierInstancePartitionsUnchanged, segmentAssignmentUnchanged, tableNameWithType);
 
+    TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails = fetchTableSizeDetails(tableNameWithType);
+
+    Map<String, RebalancePreCheckerResult> preChecksResult = null;
+    if (preChecks && _rebalancePreChecker != null) {
+      // TODO: consider making an error or warning log when pre-checks are enabled but the pre-checker is not set
+      RebalancePreChecker.TableFacts tableFacts = new RebalancePreChecker.TableFacts(rebalanceJobId, tableNameWithType,
+          tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails);
+      preChecksResult = _rebalancePreChecker.check(tableFacts);
+    }
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
     // is expected or not based on the summary results
     RebalanceSummaryResult summaryResult =
-        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId);
+        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId,
+            tableSubTypeSizeDetails);
 
     if (segmentAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
@@ -592,28 +593,28 @@ public class TableRebalancer {
     }
   }
 
-  private long calculateTableSizePerReplicaInBytes(String tableNameWithType) {
-    long tableSizePerReplicaInBytes = -1;
+  private TableSizeReader.TableSubTypeSizeDetails fetchTableSizeDetails(String tableNameWithType) {
     if (_tableSizeReader == null) {
       LOGGER.warn("tableSizeReader is null, cannot calculate table size for table {}!", tableNameWithType);
-      return tableSizePerReplicaInBytes;
+      return null;
     }
     LOGGER.info("Fetching the table size for rebalance summary for table: {}", tableNameWithType);
     try {
       // TODO: Consider making the timeoutMs for fetching table size via table rebalancer configurable
-      TableSizeReader.TableSubTypeSizeDetails tableSizeDetails =
-          _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
-      tableSizePerReplicaInBytes = tableSizeDetails._reportedSizePerReplicaInBytes;
+      return _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
     } catch (InvalidConfigException e) {
       LOGGER.error("Caught exception while trying to fetch table size details for table: {}", tableNameWithType, e);
     }
-    LOGGER.info("Fetched the table size (per replica size: {}) for rebalance summary for table: {}",
-        tableSizePerReplicaInBytes, tableNameWithType);
-    return tableSizePerReplicaInBytes;
+    return null;
+  }
+
+  private long calculateTableSizePerReplicaInBytes(TableSizeReader.TableSubTypeSizeDetails tableSizeDetails) {
+    return tableSizeDetails == null ? -1 : tableSizeDetails._reportedSizePerReplicaInBytes;
   }
 
   private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, String tableNameWithType, String rebalanceJobId) {
+      Map<String, Map<String, String>> targetAssignment, String tableNameWithType, String rebalanceJobId,
+      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
     LOGGER.info("Calculating rebalance summary for table: {} with rebalanceJobId: {}",
         tableNameWithType, rebalanceJobId);
     int existingReplicationFactor = 0;
@@ -666,12 +667,11 @@ public class TableRebalancer {
       int segmentsUnchanged = 0;
       int totalExistingSegments = 0;
       RebalanceSummaryResult.ServerStatus serverStatus = RebalanceSummaryResult.ServerStatus.ADDED;
-      Set<String> intersection = new HashSet<>();
       if (existingServersToSegmentMap.containsKey(server)) {
         Set<String> segmentSetForServer = existingServersToSegmentMap.get(server);
         totalExistingSegments = segmentSetForServer.size();
         existingSegmentSet.addAll(segmentSetForServer);
-        intersection.addAll(segmentSetForServer);
+        Set<String> intersection = new HashSet<>(segmentSetForServer);
         intersection.retainAll(newSegmentSet);
         segmentsUnchanged = intersection.size();
         segmentsNotMoved += segmentsUnchanged;
@@ -680,34 +680,25 @@ public class TableRebalancer {
       } else {
         serversAdded.add(server);
       }
-      newSegmentSet.removeAll(intersection);
-      Set<String> removedSegmentSet = new HashSet<>(existingSegmentSet);
-      removedSegmentSet.removeAll(intersection);
+      newSegmentSet.removeAll(existingSegmentSet);
       int segmentsAdded = newSegmentSet.size();
       if (segmentsAdded > 0) {
         serversGettingNewSegments.add(server);
       }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
-      int segmentsDeleted = removedSegmentSet.size();
-
-      long diskUtilizationGain = getSegmentsSizeInBytes(newSegmentSet, tableNameWithType, currentAssignment);
-      long diskUtilizationLoss = getSegmentsSizeInBytes(removedSegmentSet, tableNameWithType, currentAssignment);
-      DiskUsageInfo diskUsage = getDiskUsageInfoOfInstance(server);
+      int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
-          totalNewSegments, totalExistingSegments, diskUsage.getUsedSpaceBytes() + diskUtilizationGain - diskUtilizationLoss,
-          diskUsage.getUsedSpaceBytes(), diskUsage.getTotalSpaceBytes(),
-          segmentsAdded, segmentsDeleted, segmentsUnchanged, instanceToTagsMap.getOrDefault(server, null)));
+          totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
+          instanceToTagsMap.getOrDefault(server, null)));
     }
 
     for (Map.Entry<String, Set<String>> entry : existingServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
       if (!serverSegmentChangeInfoMap.containsKey(server)) {
         serversRemoved.add(server);
-        // TODO: determine disk usage for removed servers
         serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
-            RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(),
-            -1, -1, -1, 0, entry.getValue().size(), 0,
+            RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
             instanceToTagsMap.getOrDefault(server, null)));
       }
     }
@@ -722,7 +713,7 @@ public class TableRebalancer {
 
     int totalSegmentsToBeMoved = newNumberSegmentsTotal - segmentsNotMoved;
 
-    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableNameWithType);
+    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableSubTypeSizeDetails);
     long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
@@ -986,18 +977,6 @@ public class TableRebalancer {
         return Pair.of(instancePartitions, true);
       }
     }
-  }
-
-  private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
-    return ResourceUtilizationInfo.getDiskUsageInfo(instanceId);
-  }
-
-  private long getSegmentsSizeInBytes(Set<String> segments, String tableNameWithType, Map<String, Map<String, String>> currentAssignment) {
-    // TODO: for more accurate size calculation, use segment API to get each segment size
-    long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableNameWithType);
-    long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
-        : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
-    return averageSegmentSizeInBytes * segments.size();
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,

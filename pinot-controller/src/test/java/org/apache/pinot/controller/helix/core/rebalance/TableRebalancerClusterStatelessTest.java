@@ -219,7 +219,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertEquals(preCheckResult.size(), 2);
+    assertEquals(preCheckResult.size(), 3);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
