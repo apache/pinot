@@ -94,7 +94,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
-    preChecker.init(_helixResourceManager, executorService);
+    preChecker.init(_helixResourceManager, executorService, _controllerConfig.getDiskUtilizationThreshold());
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
         _helixResourceManager.getTableSizeReader());
     TableConfig tableConfig =
