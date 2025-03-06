@@ -82,7 +82,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     schemaWithReplicas.setSchemaName(DEDUP_WITH_REPLICAS_SCHEMA);
     addSchema(schemaWithReplicas);
     TableConfig tableConfigWithReplication =
-        createDedupTableConfigWithReplication(_avroFiles.get(0), "id", getNumKafkaPartitions());
+        createDedupTableWithReplicas(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfigWithReplication);
     waitForDocsLoaded(600_000L, true, DEDUP_TABLE_WITH_REPLICAS);
   }
@@ -90,7 +90,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   /**
    * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
    */
-  protected TableConfig createDedupTableConfigWithReplication(File sampleAvroFile, String primaryKeyColumn,
+  protected TableConfig createDedupTableWithReplicas(File sampleAvroFile, String primaryKeyColumn,
       int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
@@ -190,7 +190,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   //tests the query results when metadataTTL is set with RF>1.
   @Test
-  public void testValuesWithReplication() {
+  public void testValuesWithReplicas() {
     assertEquals(getCurrentCountStarResult(DEDUP_TABLE_WITH_REPLICAS), getCountStarResult());
 
     // Validate the older value persist
