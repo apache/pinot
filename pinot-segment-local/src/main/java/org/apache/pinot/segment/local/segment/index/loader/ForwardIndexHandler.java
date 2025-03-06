@@ -68,6 +68,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,7 +205,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     for (String column : existingAllColumns) {
       if (_schema != null && !_schema.hasColumn(column)) {
         // _schema will be null only in tests
-        LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column, segmentName);
+        if (!CommonConstants.Segment.BuiltInVirtualColumn.ALL_COLUMNS.contains(column)) {
+          // Skip logs for virtual columns as they are known not to be in the schema.
+          LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column,
+              segmentName);
+        }
         continue;
       }
       boolean existingHasDict = existingDictColumns.contains(column);

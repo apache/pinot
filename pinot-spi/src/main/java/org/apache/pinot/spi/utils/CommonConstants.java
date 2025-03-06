@@ -22,6 +22,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -1340,6 +1341,7 @@ public class CommonConstants {
       public static final String DOCID = "$docId";
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
+      public static final Set<String> ALL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
     }
   }
 
