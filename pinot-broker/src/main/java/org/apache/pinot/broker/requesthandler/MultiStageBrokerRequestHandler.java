@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -204,6 +205,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           }
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
+          Map<String, String> extraFields = queryPlanResult.getExtraFields();
           TableAuthorizationResult tableAuthorizationResult =
               hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
           if (!tableAuthorizationResult.hasAccess()) {
@@ -213,7 +215,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             }
             throw new WebApplicationException("Permission denied. " + failureMessage, Response.Status.FORBIDDEN);
           }
-          return constructMultistageExplainPlan(query, plan);
+          return constructMultistageExplainPlan(query, plan, extraFields);
         case SELECT:
         default:
           try {
@@ -263,7 +265,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
     Set<QueryServerInstance> servers = new HashSet<>();
-    for (DispatchablePlanFragment planFragment: dispatchableSubPlan.getQueryStageMap().values()) {
+    for (DispatchablePlanFragment planFragment : dispatchableSubPlan.getQueryStageMap().values()) {
       servers.addAll(planFragment.getServerInstances());
     }
 
@@ -521,12 +523,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
-  private BrokerResponse constructMultistageExplainPlan(String sql, String plan) {
+  private BrokerResponse constructMultistageExplainPlan(String sql, String plan, Map<String, String> extraFields) {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(new Object[]{sql, plan});
-    DataSchema multistageExplainResultSchema = new DataSchema(new String[]{"SQL", "PLAN"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
+    int totalFieldCount = extraFields.size() + 2;
+    String[] fieldNames = new String[totalFieldCount];
+    Object[] fieldValues = new Object[totalFieldCount];
+    fieldNames[0] = "SQL";
+    fieldValues[0] = sql;
+    fieldNames[1] = "PLAN";
+    fieldValues[1] = plan;
+    int i = 2;
+    for (Map.Entry<String, String> entry : extraFields.entrySet()) {
+      fieldNames[i] = entry.getKey().toUpperCase();
+      fieldValues[i] = entry.getValue();
+      i++;
+    }
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[totalFieldCount];
+    Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
+    DataSchema multistageExplainResultSchema = new DataSchema(fieldNames, columnDataTypes);
+    List<Object[]> rows = new ArrayList<>(1);
+    rows.add(fieldValues);
     brokerResponse.setResultTable(new ResultTable(multistageExplainResultSchema, rows));
     return brokerResponse;
   }
