@@ -319,7 +319,7 @@ public class TableRebalancer {
             String.format("For rebalanceId: %s, instance unchanged and table: %s is already balanced", rebalanceJobId,
                 tableNameWithType));
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
-            instancePartitionsMap,tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       } else {
         if (dryRun) {
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
