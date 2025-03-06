@@ -33,6 +33,7 @@ import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -72,6 +73,13 @@ public class PinotCatalog implements Schema {
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
 
+    if (tableName == null) {
+      LogicalTable logicalTable = _tableCache.getLogicalTable(name);
+      if (logicalTable != null) {
+        tableName = logicalTable.getTableName();
+      }
+    }
+
     if (tableName != null) {
       if (_resolvedTables == null) {
         _resolvedTables = new HashSet<>();
@@ -99,6 +107,11 @@ public class PinotCatalog implements Schema {
         result.add(DatabaseUtils.removeDatabasePrefix(tableName, _databaseName));
       }
     }
+
+    for (LogicalTable logicalTable: _tableCache.getLogicalTables()) {
+      result.add(logicalTable.getTableName());
+    }
+
     return result;
   }
 

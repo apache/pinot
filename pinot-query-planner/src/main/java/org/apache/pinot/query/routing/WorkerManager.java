@@ -373,7 +373,19 @@ public class WorkerManager {
   // --------------------------------------------------------------------------
   // Non-partitioned leaf stage assignment
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Non-partitioned leaf stage assignment
+  // --------------------------------------------------------------------------
   private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    if (metadata.isLogicalTable()) {
+      assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
+    } else {
+      assignWorkersToNonPartitionedLeafFragmentForPhysicalTable(metadata, context);
+    }
+  }
+
+  private void assignWorkersToNonPartitionedLeafFragmentForPhysicalTable(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
     Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
@@ -421,6 +433,68 @@ public class WorkerManager {
     }
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+  }
+
+  private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    Map<ServerInstance, Map<String, Map<String, List<String>>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
+
+    for (String tableName : metadata.getPhysicalTableNames()) {
+      Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
+      Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
+
+      // acquire time boundary info if it is a hybrid table.
+      if (routingTableMap.size() > 1) {
+        TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(
+            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName)));
+        if (timeBoundaryInfo != null) {
+          metadata.setTimeBoundaryInfo(timeBoundaryInfo);
+        } else {
+          // remove offline table routing if no time boundary info is acquired.
+          routingTableMap.remove(TableType.OFFLINE.name());
+        }
+      }
+
+      // extract all the instances associated to each table type
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+      for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+        String tableType = routingEntry.getKey();
+        RoutingTable routingTable = routingEntry.getValue();
+        // for each server instance, attach all table types and their associated segment list.
+        Map<ServerInstance, ServerRouteInfo> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
+        for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+          Map<String, List<String>> tableTypeToSegmentListMap =
+              serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+          // TODO: support optional segments for multi-stage engine.
+          Preconditions.checkState(
+              tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
+              "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+        }
+
+        // attach unavailable segments to metadata
+        if (!routingTable.getUnavailableSegments().isEmpty()) {
+          metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
+        }
+      }
+      for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
+        Map<String, Map<String, List<String>>> logicalTableSegmentsMap =
+            serverInstanceToLogicalSegmentsMap.computeIfAbsent(entry.getKey(), k -> new HashMap<>());
+        logicalTableSegmentsMap.put(tableName, entry.getValue());
+      }
+    }
+
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, Map<String, Map<String, List<String>>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, Map<String, Map<String, List<String>>>> entry
+        : serverInstanceToLogicalSegmentsMap.entrySet()) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
+    }
+
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    metadata.setWorkerIdToLogicalTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
   }
 
   /**
