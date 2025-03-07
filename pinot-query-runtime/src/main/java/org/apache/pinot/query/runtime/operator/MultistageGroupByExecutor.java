@@ -71,16 +71,9 @@ public class MultistageGroupByExecutor {
   // because they use the zero based integer indexes to store results.
   private final GroupIdGenerator _groupIdGenerator;
 
-  public MultistageGroupByExecutor(
-      int[] groupKeyIds,
-      AggregationFunction[] aggFunctions,
-      int[] filterArgIds,
-      int maxFilterArgId,
-      AggType aggType,
-      boolean leafReturnFinalResult,
-      DataSchema resultSchema,
-      Map<String, String> opChainMetadata,
-      @Nullable PlanNode.NodeHint nodeHint) {
+  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
+      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
+      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -248,10 +241,7 @@ public class MultistageGroupByExecutor {
     return rows;
   }
 
-  private Object[] getRow(
-      Iterator<GroupIdGenerator.GroupKey> groupKeyIterator,
-      int numKeys,
-      int numFunctions,
+  private Object[] getRow(Iterator<GroupIdGenerator.GroupKey> groupKeyIterator, int numKeys, int numFunctions,
       ColumnDataType[] resultStoredTypes) {
     GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
     int groupId = groupKey._groupId;
@@ -293,60 +283,64 @@ public class MultistageGroupByExecutor {
 
   private void processAggregate(TransferableBlock block) {
     if (_maxFilterArgId < 0) {
-      // No filter for any aggregation function
-      int[] intKeys = generateGroupByKeys(block);
-      for (int i = 0; i < _aggFunctions.length; i++) {
-        AggregationFunction aggFunction = _aggFunctions[i];
-        Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
-        GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
-        groupByResultHolder.ensureCapacity(_groupIdGenerator.getNumGroups());
-        aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
-      }
+      processAggregateWithoutFilter(block);
     } else {
-      // Some aggregation functions have filter, cache the matching rows
-      int[] intKeys = null;
-      RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
-      int[] numMatchedRowsArray = new int[_maxFilterArgId + 1];
-      int[][] filteredIntKeysArray = new int[_maxFilterArgId + 1][];
-      for (int i = 0; i < _aggFunctions.length; i++) {
-        AggregationFunction aggFunction = _aggFunctions[i];
-        int filterArgId = _filterArgIds[i];
-        if (filterArgId < 0) {
-          // No filter for this aggregation function
-          if (intKeys == null) {
-            intKeys = generateGroupByKeys(block);
-          }
-          Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
-          GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
-          groupByResultHolder.ensureCapacity(_groupIdGenerator.getNumGroups());
-          aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
-        } else {
-          // Need to filter the block before aggregation
-          RoaringBitmap matchedBitmap = matchedBitmaps[filterArgId];
-          if (matchedBitmap == null) {
-            matchedBitmap = AggregateOperator.getMatchedBitmap(block, filterArgId);
-            matchedBitmaps[filterArgId] = matchedBitmap;
-            int numMatchedRows = matchedBitmap.getCardinality();
-            numMatchedRowsArray[filterArgId] = numMatchedRows;
-            filteredIntKeysArray[filterArgId] = generateGroupByKeys(block, numMatchedRows, matchedBitmap);
-          }
-          int numMatchedRows = numMatchedRowsArray[filterArgId];
-          int[] filteredIntKeys = filteredIntKeysArray[filterArgId];
-          Map<ExpressionContext, BlockValSet> blockValSetMap =
-              AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, numMatchedRows, matchedBitmap);
-          GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
-          groupByResultHolder.ensureCapacity(_groupIdGenerator.getNumGroups());
-          aggFunction.aggregateGroupBySV(numMatchedRows, filteredIntKeys, groupByResultHolder, blockValSetMap);
+      processAggregateWithFilter(block);
+    }
+  }
+
+  private void processAggregateWithoutFilter(TransferableBlock block) {
+    int[] intKeys = generateGroupByKeys(block);
+    int numGroups = _groupIdGenerator.getNumGroups();
+    for (int i = 0; i < _aggFunctions.length; i++) {
+      AggregationFunction aggFunction = _aggFunctions[i];
+      Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
+      GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+      groupByResultHolder.ensureCapacity(numGroups);
+      aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+    }
+  }
+
+  private void processAggregateWithFilter(TransferableBlock block) {
+    // In the first loop, generate all the group keys, cache the matching rows
+    int[] intKeys = _filteredAggregationsSkipEmptyGroups ? null : generateGroupByKeys(block);
+    RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
+    int[] numMatchedRowsArray = new int[_maxFilterArgId + 1];
+    int[][] filteredIntKeysArray = new int[_maxFilterArgId + 1][];
+    for (int filterArgId : _filterArgIds) {
+      if (filterArgId < 0) {
+        // No filter for this aggregation function
+        if (intKeys == null) {
+          intKeys = generateGroupByKeys(block);
+        }
+      } else {
+        // Need to filter the block before aggregation
+        if (matchedBitmaps[filterArgId] == null) {
+          RoaringBitmap matchedBitmap = AggregateOperator.getMatchedBitmap(block, filterArgId);
+          matchedBitmaps[filterArgId] = matchedBitmap;
+          int numMatchedRows = matchedBitmap.getCardinality();
+          numMatchedRowsArray[filterArgId] = numMatchedRows;
+          filteredIntKeysArray[filterArgId] = generateGroupByKeys(block, numMatchedRows, matchedBitmap);
         }
       }
-      if (intKeys == null && !_filteredAggregationsSkipEmptyGroups) {
-        // _groupIdGenerator should still have all the groups even if there are only filtered aggregates for SQL
-        // compliant results. However, if the query option to skip empty groups is set, we avoid this step for
-        // improved performance.
-        generateGroupByKeys(block);
-        for (int i = 0; i < _aggFunctions.length; i++) {
-          _aggregateResultHolders[i].ensureCapacity(_groupIdGenerator.getNumGroups());
-        }
+    }
+
+    // In the second loop, aggregate the values
+    int numGroups = _groupIdGenerator.getNumGroups();
+    for (int i = 0; i < _aggFunctions.length; i++) {
+      AggregationFunction aggFunction = _aggFunctions[i];
+      GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+      groupByResultHolder.ensureCapacity(numGroups);
+      int filterArgId = _filterArgIds[i];
+      if (filterArgId < 0) {
+        Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
+        aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+      } else {
+        Map<ExpressionContext, BlockValSet> blockValSetMap =
+            AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, numMatchedRowsArray[filterArgId],
+                matchedBitmaps[filterArgId]);
+        aggFunction.aggregateGroupBySV(numMatchedRowsArray[filterArgId], filteredIntKeysArray[filterArgId],
+            groupByResultHolder, blockValSetMap);
       }
     }
   }
