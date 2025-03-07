@@ -548,7 +548,7 @@ public class InstanceAssignmentTest {
 
     // Instances should be assigned to 3 replica-groups with a round-robin fashion, each with 2 instances
     InstancePartitions instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, (Boolean) null);
 
     InstancePartitions instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, null, true);
@@ -574,7 +574,7 @@ public class InstanceAssignmentTest {
     // Leverage the latest instancePartitions from last computation as the parameter.
     // Data movement is minimized so that: i2 -> i10, i6 -> i11
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
@@ -587,7 +587,7 @@ public class InstanceAssignmentTest {
 
     // Forced minimized data movement should be the same as minimized data movement
     assertEquals(instancePartitionsForcedMinimize, instancePartitions);
-    // Without forcedMinimizeDataMovement set to true, the data movement is not minimized and should be different
+    // Without minimizeDataMovement set to true, the data movement is not minimized and should be different
     assertNotEquals(instancePartitionsNotMinimize, instancePartitions);
 
     // Add 2 more instances to the ZK and increase the number of instances per partition from 2 to 3.
@@ -610,7 +610,7 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
@@ -638,7 +638,7 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
@@ -669,7 +669,7 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
@@ -700,7 +700,7 @@ public class InstanceAssignmentTest {
     tableConfigNotMinimized.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfigNotMinimized));
 
     instancePartitions =
-        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, false);
+        driver.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs, instancePartitions, (Boolean) null);
 
     instancePartitionsForcedMinimize =
         driverNotMinimized.assignInstances(InstancePartitionsType.OFFLINE, instanceConfigs,
