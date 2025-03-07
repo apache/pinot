@@ -317,13 +317,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
       String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
-      //onQueryStart(requestId, clientRequestId, query);
       try {
         queryResults =
             _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimer.getRemainingTime(),
-                queryOptions, () -> {
-                  onQueryStart(requestId, clientRequestId, query);
-                });
+                queryOptions, () -> onQueryRunning(requestId, clientRequestId, query));
       } catch (TimeoutException e) {
         for (String table : tableNames) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);

@@ -755,19 +755,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (isQueryCancellationEnabled()) {
       // Start to track the running query for cancellation just before sending it out to servers to avoid any
       // potential failures that could happen before sending it out, like failures to calculate the routing table etc.
-      // TODO: Even tracking the query as late as here, a potential race condition between calling cancel API and
-      //       query being sent out to servers can still happen. If cancel request arrives earlier than query being
-      //       sent out to servers, the servers miss the cancel request and continue to run the queries. The users
-      //       can always list the running queries and cancel query again until it ends. Just that such race
-      //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
-      //       servers takes time, but will address later if needed.
       String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
-      onQueryStart(
-          requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
+      final Map<ServerInstance, ServerRouteInfo> finalOfflineRoutingTable = offlineRoutingTable;
+      final Map<ServerInstance, ServerRouteInfo> finalRealtimeRoutingTable = realtimeRoutingTable;
       try {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-            requestContext);
+            requestContext, () -> onQueryRunning(requestId, clientRequestId, query,
+                new QueryServers(query, finalOfflineRoutingTable, finalRealtimeRoutingTable)));
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
         onQueryFinish(requestId);
@@ -776,7 +771,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } else {
       brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
           offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-          requestContext);
+          requestContext, null);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -1008,8 +1003,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   @Override
-  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
-    super.onQueryStart(requestId, clientRequestId, query, extras);
+  protected void onQueryRunning(long requestId, String clientRequestId, String query, Object... extras) {
+    super.onQueryRunning(requestId, clientRequestId, query, extras);
     if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
@@ -2020,7 +2015,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+      ServerStats serverStats, RequestContext requestContext, @Nullable Runnable runningHandler)
       throws Exception;
 
   private String getGlobalQueryId(long requestId) {

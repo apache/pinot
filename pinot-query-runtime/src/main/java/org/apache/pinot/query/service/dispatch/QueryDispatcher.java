@@ -146,7 +146,7 @@ public class QueryDispatcher {
   }
 
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<String, String> queryOptions, Runnable beforeReduce)
+      Map<String, String> queryOptions, @Nullable Runnable beforeReduce)
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
