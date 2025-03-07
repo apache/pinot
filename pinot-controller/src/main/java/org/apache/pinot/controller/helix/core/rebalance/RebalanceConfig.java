@@ -83,9 +83,9 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
 
-  // Whether to enforce Minimal Data Movement Algorithm (only effective if instance assignment config is set, and if
-  // bootstrap is false). If set to false, the minimizeDataMovement flag in the table config will be used to determine
-  // whether to run the Minimal Data Movement Algorithm.
+  // Whether to run Minimal Data Movement Algorithm, overriding the minimizeDataMovement flag in table config. If set
+  // to values other than "true" or "false" (case-insensitive), the minimizeDataMovement flag in table config will be
+  // used to determine whether to run the Minimal Data Movement Algorithm.
   @JsonProperty("minimizeDataMovement")
   @ApiModelProperty(example = "TRUE")
   private String _minimizeDataMovement = "TRUE";
@@ -261,15 +261,14 @@ public class RebalanceConfig {
 
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks
-        + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming
-        + ", _minimizeDataMovement=" + _minimizeDataMovement + ", _bootstrap="
-        + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas=" + _minAvailableReplicas
-        + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
-        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
-        + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
-        + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs="
-        + _retryInitialDelayInMs + '}';
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
+        + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
+        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
+        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs="
+        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
+        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
+        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
+        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
