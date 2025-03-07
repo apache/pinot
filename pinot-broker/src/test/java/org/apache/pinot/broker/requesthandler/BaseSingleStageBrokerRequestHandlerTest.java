@@ -200,6 +200,9 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               ServerStats serverStats, RequestContext requestContext, @Nullable Runnable runningHandler)
               throws Exception {
             testRequestId[0] = requestId;
+            if (runningHandler != null) {
+              runningHandler.run();
+            }
             latch.await();
             return null;
           }
