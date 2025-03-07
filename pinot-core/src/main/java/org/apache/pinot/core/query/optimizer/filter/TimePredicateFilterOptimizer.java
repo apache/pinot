@@ -435,8 +435,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       return;
     }
 
-    Long lowerMillis = null;
-    Long upperMillis = null;
+    long lowerMillis;
+    long upperMillis;
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
     List<Expression> operands = new ArrayList<>(dateTruncOperands);
