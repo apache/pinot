@@ -222,8 +222,9 @@ public class SegmentDeletionManager {
       URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
       if (pinotFS.exists(segmentMetadataUri)) {
         LOGGER.info("Deleting segment metadata {} from {}", segmentId, segmentMetadataUri);
-        // TODO: check if the deletion was successful and add a warning here.
-        pinotFS.delete(segmentMetadataUri, true);
+        if (!pinotFS.delete(segmentMetadataUri, true)) {
+          LOGGER.warn("Could not delete segment metadata: {} from: {}", segmentId, segmentMetadataUri);
+        }
       }
     } catch (IOException e) {
       LOGGER.warn("Could not delete segment metadata {} from {}", segmentId, segmentFileUri, e);
