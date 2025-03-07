@@ -86,9 +86,9 @@ public class RebalanceConfig {
   // Whether to enforce Minimal Data Movement Algorithm (only effective if instance assignment config is set, and if
   // bootstrap is false). If set to false, the minimizeDataMovement flag in the table config will be used to determine
   // whether to run the Minimal Data Movement Algorithm.
-  @JsonProperty("minimizeDataMovement")
-  @ApiModelProperty(example = "false")
-  private boolean _minimizeDataMovement = false;
+  @JsonProperty("forceMinimizeDataMovement")
+  @ApiModelProperty(example = "true")
+  private boolean _forceMinimizeDataMovement = true;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -251,18 +251,19 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
-  public boolean isMinimizeDataMovement() {
-    return _minimizeDataMovement;
+  public boolean isForceMinimizeDataMovement() {
+    return _forceMinimizeDataMovement;
   }
 
-  public void setMinimizeDataMovement(boolean minimizeDataMovement) {
-    _minimizeDataMovement = minimizeDataMovement;
+  public void setForceMinimizeDataMovement(boolean forceMinimizeDataMovement) {
+    _forceMinimizeDataMovement = forceMinimizeDataMovement;
   }
 
   @Override
   public String toString() {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks
-        + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _bootstrap="
+        + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming
+        + ", _forceMinimizeDataMovement=" + _forceMinimizeDataMovement + ", _bootstrap="
         + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas=" + _minAvailableReplicas
         + ", _bestEfforts=" + _bestEfforts + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
@@ -277,6 +278,7 @@ public class RebalanceConfig {
     rc._preChecks = cfg._preChecks;
     rc._reassignInstances = cfg._reassignInstances;
     rc._includeConsuming = cfg._includeConsuming;
+    rc._forceMinimizeDataMovement = cfg._forceMinimizeDataMovement;
     rc._bootstrap = cfg._bootstrap;
     rc._downtime = cfg._downtime;
     rc._minAvailableReplicas = cfg._minAvailableReplicas;
