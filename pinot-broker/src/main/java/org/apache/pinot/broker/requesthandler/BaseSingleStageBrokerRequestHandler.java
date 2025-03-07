@@ -90,6 +90,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -515,9 +516,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
-    if (handlerContext._disableGroovy) {
-      rejectGroovyQuery(serverPinotQuery);
-    }
+    validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
     if (handlerContext._useApproximateFunction) {
       handleApproximateFunctionOverride(serverPinotQuery);
     }
@@ -1429,45 +1428,59 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * Verifies that no groovy is present in the PinotQuery when disabled.
    */
   @VisibleForTesting
-  static void rejectGroovyQuery(PinotQuery pinotQuery) {
+  static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
-      rejectGroovyQuery(expression);
+      validateGroovyScript(expression, disableGroovy);
     }
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (orderByList != null) {
       for (Expression expression : orderByList) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        rejectGroovyQuery(expression.getFunctionCall().getOperands().get(0));
+        validateGroovyScript(expression.getFunctionCall().getOperands().get(0), disableGroovy);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      rejectGroovyQuery(havingExpression);
+      validateGroovyScript(havingExpression, disableGroovy);
     }
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      rejectGroovyQuery(filterExpression);
+      validateGroovyScript(filterExpression, disableGroovy);
     }
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
-        rejectGroovyQuery(expression);
+        validateGroovyScript(expression, disableGroovy);
       }
     }
   }
 
-  private static void rejectGroovyQuery(Expression expression) {
+  private static void validateGroovyScript(Expression expression, boolean disableGroovy) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
     }
     if (function.getOperator().equals("groovy")) {
-      throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
+      if (disableGroovy) {
+        throw new BadQueryRequestException("Groovy transform functions are disabled for queries");
+      } else {
+        groovySecureAnalysis(function);
+      }
     }
     for (Expression operandExpression : function.getOperands()) {
-      rejectGroovyQuery(operandExpression);
+      validateGroovyScript(operandExpression, disableGroovy);
     }
+  }
+
+  private static void groovySecureAnalysis(Function function) {
+    List<Expression> operands = function.getOperands();
+    if (operands == null || operands.size() < 2) {
+      throw new BadQueryRequestException("Groovy transform function must have at least 2 argument");
+    }
+    // second argument in the groovy function is groovy script
+    String script = operands.get(1).getLiteral().getStringValue();
+    GroovyFunctionEvaluator.parseGroovyScript(String.format("groovy({%s})", script));
   }
 
   /**
