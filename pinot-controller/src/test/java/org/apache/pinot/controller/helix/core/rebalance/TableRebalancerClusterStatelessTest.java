@@ -181,6 +181,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       diskUsageInfoMap.put(instanceId, diskUsageInfo);
     }
 
+    ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
+
     // Rebalance in dry-run summary mode with added servers
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
@@ -334,7 +336,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
-    ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
     // Try dry-run summary mode
     // No need to reassign instances because instances should be automatically assigned when updating the table config
