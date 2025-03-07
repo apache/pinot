@@ -901,7 +901,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(true);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -925,7 +924,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -942,7 +940,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Check if the instance assignment is the same as the one without minimizeDataMovement flag set
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(false);
     RebalanceResult rebalanceResultWithoutMinimized = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -1005,7 +1002,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(true);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -1035,7 +1031,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -1069,7 +1064,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Try dry-run summary mode
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setForceMinimizeDataMovement(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
