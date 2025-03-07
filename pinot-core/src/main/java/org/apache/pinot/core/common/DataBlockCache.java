@@ -406,4 +406,11 @@ public class DataBlockCache {
   public void addDataSource(String fullColumnKeyName, DataSource keyDataSource) {
     _dataFetcher.addDataSource(fullColumnKeyName, keyDataSource);
   }
+
+  /**
+   * Close the data block cache and release all resources.
+   */
+  public void close() {
+    _dataFetcher.close();
+  }
 }
