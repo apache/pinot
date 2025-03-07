@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -114,6 +116,12 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     byte[] value = new byte[numBytesPerValue];
     _dataBuffer.copyTo(startOffset, value, 0, numBytesPerValue);
     return value;
+  }
+
+  @Override
+  public HashValue128 get128BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return Hashing.murmur3_128().hashBytesTo128Bits(buffer, 0, length);
   }
 
   @Override
