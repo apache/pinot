@@ -29,7 +29,6 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -132,17 +131,5 @@ public class OpChainExecutionContext {
   @Nullable
   public ThreadExecutionContext getParentContext() {
     return _parentContext;
-  }
-
-  public void registerInMdc() {
-    LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
-    LoggerConstants.WORKER_ID_KEY.registerInMdcIfNotSet(String.valueOf(_workerMetadata.getWorkerId()));
-    LoggerConstants.STAGE_ID_KEY.registerInMdcIfNotSet(String.valueOf(_stageMetadata.getStageId()));
-  }
-
-  public void unregisterFromMDC() {
-    LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
-    LoggerConstants.WORKER_ID_KEY.unregisterFromMdc();
-    LoggerConstants.STAGE_ID_KEY.unregisterFromMdc();
   }
 }
