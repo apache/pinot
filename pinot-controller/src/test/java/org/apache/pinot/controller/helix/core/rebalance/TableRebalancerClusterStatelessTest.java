@@ -1029,6 +1029,35 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tableConfig.setInstanceAssignmentConfigMap(Map.of("OFFLINE", instanceAssignmentConfig));
 
     // Try dry-run summary mode
+
+    // without minimize data movement, it's supposed to add more than one server
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement("false");
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
+
+    // note: this assertion may fail due to instance assignment algorithm changed in the future.
+    // right now, rebalance without minimizing data movement adds more than one server and remove some servers in the
+    // testing setup like this.
+    assertTrue(rebalanceServerInfo.getServersAdded().size() > 1);
+    assertEquals(rebalanceServerInfo.getServersAdded().size() - rebalanceServerInfo.getServersRemoved().size(), 1);
+
+    // use default table config's minimizeDataMovement flag, should be equivalent to without minimize data movement
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinimizeDataMovement("value other than true and false, namely default");
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
+
+    assertTrue(rebalanceServerInfo.getServersAdded().size() > 1);
+    assertEquals(rebalanceServerInfo.getServersAdded().size() - rebalanceServerInfo.getServersRemoved().size(), 1);
+
+    // with minimize data movement, we should add 1 server only
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
@@ -1037,10 +1066,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
 
-    // with minimize data movement, we should add 1 server only
     assertEquals(rebalanceServerInfo.getServersAdded().size(), 1);
     assertEquals(rebalanceServerInfo.getServersRemoved().size(), 0);
 
+    // rebalance without dry-run
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setMinimizeDataMovement("true");
