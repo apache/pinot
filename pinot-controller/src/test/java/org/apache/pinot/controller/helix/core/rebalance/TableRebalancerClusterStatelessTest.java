@@ -533,6 +533,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNull(rebalanceResult.getPreChecksResult());
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    for (int i = 0; i < numServersToAdd; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
     executorService.shutdown();
   }
 
@@ -619,6 +626,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).toLowerCase().startsWith("unsafe"));
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance("preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    for (int i = 0; i < numServersToAdd; i++) {
+      stopAndDropFakeInstance("preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
+    executorService.shutdown();
   }
 
   /**
