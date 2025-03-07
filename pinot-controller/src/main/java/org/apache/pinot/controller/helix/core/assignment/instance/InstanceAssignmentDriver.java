@@ -104,13 +104,13 @@ public class InstanceAssignmentDriver {
   private InstancePartitions getInstancePartitions(String instancePartitionsName,
       InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
       @Nullable InstancePartitions existingInstancePartitions,
-      @Nullable InstancePartitions preConfiguredInstancePartitions, @Nullable Boolean minimizeDataMovementFlag) {
+      @Nullable InstancePartitions preConfiguredInstancePartitions, @Nullable Boolean minimizeDataMovementOverride) {
     String tableNameWithType = _tableConfig.getTableName();
 
     // minimizeDataMovement might be set back to false within InstanceTagPoolSelector and InstancePartitionSelector
     // if existingInstancePartitions is null.
     boolean minimizeDataMovement =
-        minimizeDataMovementFlag == null ? instanceAssignmentConfig.isMinimizeDataMovement() : minimizeDataMovementFlag;
+        minimizeDataMovementOverride == null ? instanceAssignmentConfig.isMinimizeDataMovement() : minimizeDataMovementOverride;
     LOGGER.info("Starting {} instance assignment for table {}, instanceAssignmentConfig.isMinimizeDataMovement()={}, "
             + "minimizeDataMovement={}", instancePartitionsName, tableNameWithType,
         instanceAssignmentConfig.isMinimizeDataMovement(), minimizeDataMovement);
