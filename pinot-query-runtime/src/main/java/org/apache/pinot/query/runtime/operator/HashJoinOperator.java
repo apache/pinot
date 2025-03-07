@@ -24,7 +24,6 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
@@ -95,8 +94,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable()
-      throws ProcessingException {
+  protected void buildRightTable() {
     LOGGER.trace("Building hash table for join operator");
     long startTime = System.currentTimeMillis();
     int numRows = 0;
@@ -106,7 +104,7 @@ public class HashJoinOperator extends BaseJoinOperator {
       // Row based overflow check.
       if (rows.size() + numRows > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwProcessingExceptionForJoinRowLimitExceeded(
+          throwForJoinRowLimitExceeded(
               "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
           // Just fill up the buffer.
@@ -137,8 +135,7 @@ public class HashJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException {
+  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -154,8 +151,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockUniqueKeys(TransferableBlock leftBlock)
-      throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockUniqueKeys(TransferableBlock leftBlock) {
     List<Object[]> leftRows = leftBlock.getContainer();
     ArrayList<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -183,8 +179,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockDuplicateKeys(TransferableBlock leftBlock)
-      throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockDuplicateKeys(TransferableBlock leftBlock) {
     List<Object[]> leftRows = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
@@ -223,8 +218,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     return rows;
   }
 
-  private void handleUnmatchedLeftRow(Object[] leftRow, List<Object[]> rows)
-      throws ProcessingException {
+  private void handleUnmatchedLeftRow(Object[] leftRow, List<Object[]> rows) {
     if (needUnmatchedLeftRows()) {
       if (isMaxRowsLimitReached(rows.size())) {
         return;

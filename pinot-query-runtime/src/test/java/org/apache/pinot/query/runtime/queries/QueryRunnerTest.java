@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -203,9 +204,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
       //   In some cases there is no prefix.
       String exceptionMessage = e.getMessage();
+      boolean isFromQueryDispatcher = Pattern.compile("^Received \\d+ errors? from servers?.*", Pattern.MULTILINE)
+          .matcher(exceptionMessage)
+          .find();
       Assert.assertTrue(
-          exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
-              "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
+          exceptionMessage.startsWith("Error occurred during stage submission")
+              || exceptionMessage.equals(expectedError)
+              || isFromQueryDispatcher,
           "Exception message didn't start with proper heading: " + exceptionMessage);
       Assert.assertTrue(exceptionMessage.contains(expectedError),
           "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);

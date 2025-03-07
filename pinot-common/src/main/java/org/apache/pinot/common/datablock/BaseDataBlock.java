@@ -33,7 +33,6 @@ import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.datatable.DataTableUtils;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -385,11 +384,6 @@ public abstract class BaseDataBlock implements DataBlock {
       stringDictionary[i] = DataTableUtils.decodeString(buffer);
     }
     return stringDictionary;
-  }
-
-  @Override
-  public void addException(ProcessingException processingException) {
-    _errCodeToExceptionMap.put(processingException.getErrorCode(), processingException.getMessage());
   }
 
   @Override

@@ -27,13 +27,13 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -99,8 +99,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
       }
     }
 
@@ -109,8 +109,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       if (_multiStageBrokerRequestHandler != null) {
         requestHandler = _multiStageBrokerRequestHandler;
       } else {
-        return new BrokerResponseNative(QueryException.getException(QueryException.INTERNAL_ERROR,
-            "V2 Multi-Stage query engine not enabled."));
+        return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
       }
     }
 

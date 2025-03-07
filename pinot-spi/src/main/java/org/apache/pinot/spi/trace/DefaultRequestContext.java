@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -176,8 +177,8 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
-  public void setErrorCode(int errorCode) {
-    _errorCode = errorCode;
+  public void setErrorCode(QueryErrorCode errorCode) {
+    _errorCode = errorCode.getId();
   }
 
   @Override

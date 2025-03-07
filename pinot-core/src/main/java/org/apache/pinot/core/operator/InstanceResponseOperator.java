@@ -32,7 +32,8 @@ import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -128,9 +129,9 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       return _combineOperator.nextBlock();
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      return new ExceptionResultsBlock(new QueryCancelledException(
-          "Cancelled while combining results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
-          e));
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION,
+          "Cancelled while combining results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg));
+      return new ExceptionResultsBlock(errMsg);
     } finally {
       releaseAll();
     }
