@@ -1231,10 +1231,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
-    // MultistageGroupByExecutor
+    // MultistageGroupByExecutor. This will use a "DIRECT" aggregation.
     String sqlQuery = "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
         + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
         + "AirlineID";
@@ -1253,7 +1253,35 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+      throws Exception {
+    // Query written this way with a CTE and limit will be planned such that the multi-stage group by executor will be
+    // used for both leaf and final aggregation
+    String aggregates1 = "COUNT(*) FILTER (WHERE Origin = 'garbage')";
+    String aggregates2 = aggregates1 + ", COUNT(*)";
+    String queryTemplate = "SET mseMaxInitialResultHolderCapacity = 1;\n"
+        + "WITH tmp AS (SELECT * FROM mytable WHERE AirlineID > 20000 LIMIT 10000)\n"
+        + "SELECT AirlineID, %s FROM tmp GROUP BY AirlineID";
+    String query1 = String.format(queryTemplate, aggregates1);
+    String query2 = String.format(queryTemplate, aggregates2);
+    for (String query : new String[]{query1, query2}) {
+      JsonNode result = postQuery(query);
+      assertNoError(result);
+      // Ensure that result set is not empty
+      assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+      // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+      JsonNode rows = result.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i).get(1).asInt(), 0);
+        // Ensure that the main filter was applied
+        assertTrue(rows.get(i).get(0).asInt() > 20000);
+      }
+    }
+  }
+
+  @Test
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
     // MultistageGroupByExecutor
