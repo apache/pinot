@@ -34,6 +34,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
@@ -88,7 +89,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return;
     }
 
-    // Did not understand
     // Manage normal table retention except segment lineage cleanup.
     // The reason of separating the logic is that REFRESH only table will be skipped in the first part,
     // whereas the segment lineage cleanup needs to be handled.
@@ -148,6 +148,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           offlineTableName);
       segmentsToDelete = getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentsPresentInZK);
+      _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.UNTRACKED_SEGMENTS_COUNT,
+          segmentsToDelete.size());
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
           offlineTableName);
@@ -187,7 +189,12 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     URI tableDataUri = URIUtils.getUri(_pinotHelixResourceManager.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
 
+    long startTimeMs = System.currentTimeMillis();
+
     List<FileMetadata> deepstoreFiles = pinotFS.listFilesWithMetadata(tableDataUri, false);
+    long listEndTimeMs = System.currentTimeMillis();
+    LOGGER.info("Found: {} segments in deepstore for table: {}. Time taken to list segments: {} ms",
+        deepstoreFiles.size(), tableNameWithType, listEndTimeMs - startTimeMs);
 
     for (FileMetadata fileMetadata : deepstoreFiles) {
       if (fileMetadata.isDirectory()) {
@@ -199,13 +206,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         continue;
       }
 
-      // determine whether the segment should be perged or not based on the last modified time of the file
+      // determine whether the segment should be purged or not based on the last modified time of the file
       long lastModifiedTime = fileMetadata.getLastModifiedTime();
 
-      if (retentionStrategy.isPurgeable(segmentName, tableNameWithType, lastModifiedTime)) {
+      if (retentionStrategy.isPurgeable(tableNameWithType, segmentName, lastModifiedTime)) {
         segmentsToDelete.add(segmentName);
       }
     }
+    long endTimeMs = System.currentTimeMillis();
+    LOGGER.info(
+        "Took: {} ms to filter segments to delete from deepstore for table: {} that don't have a corresponding entry "
+            + "in property store",
+        endTimeMs - startTimeMs, tableNameWithType);
+    LOGGER.info(
+        "Deleting: {} segments from deep store for table: {} as they have no corresponding entry in the property "
+            + "store.", segmentsToDelete.size(), tableNameWithType);
 
     return segmentsToDelete;
   }
@@ -235,6 +250,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           realtimeTableName);
       segmentsToDelete = getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentsPresentInZK);
+      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.UNTRACKED_SEGMENTS_COUNT,
+          segmentsToDelete.size());
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
           realtimeTableName);
