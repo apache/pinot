@@ -140,7 +140,7 @@ public class ZkStarter {
   /**
    * Starts an empty local Zk instance on the default port
    */
-  public static ZookeeperInstance startLocalZkServer() {
+  public synchronized static ZookeeperInstance startLocalZkServer() {
     return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
   }
 

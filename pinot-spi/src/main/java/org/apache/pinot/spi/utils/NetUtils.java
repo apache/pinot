@@ -125,6 +125,7 @@ public class NetUtils {
   public static int findOpenPort(int basePort) {
     while (!available(basePort)) {
       basePort++;
+      // Add error handling for the case that no port is available
     }
     return basePort;
   }

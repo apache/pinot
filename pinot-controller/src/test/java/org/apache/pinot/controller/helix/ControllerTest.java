@@ -29,6 +29,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -92,10 +94,10 @@ import static org.testng.Assert.*;
 
 public class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
-  public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
-  public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
-      "test-controller-local-temp-dir" + System.currentTimeMillis()).getAbsolutePath();
+  public final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
+      "test-controller-data-dir-" + getClass().getSimpleName() + System.currentTimeMillis()).getAbsolutePath();
+  public final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
+      "test-controller-local-temp-dir-" + getClass().getSimpleName() + System.currentTimeMillis()).getAbsolutePath();
   public static final String BROKER_INSTANCE_ID_PREFIX = "Broker_localhost_";
   public static final String SERVER_INSTANCE_ID_PREFIX = "Server_localhost_";
   public static final String MINION_INSTANCE_ID_PREFIX = "Minion_localhost_";
@@ -115,6 +117,7 @@ public class ControllerTest {
   public static final ControllerTest DEFAULT_INSTANCE = new ControllerTest();
 
   protected static HttpClient _httpClient;
+  private static Lock controllerStarterLock = new ReentrantLock();
 
   protected final String _clusterName = getClass().getSimpleName();
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
@@ -246,7 +249,12 @@ public class ControllerTest {
 
   public void startController()
       throws Exception {
-    startController(getDefaultControllerConfiguration());
+    controllerStarterLock.lock();
+    try {
+      startController(getDefaultControllerConfiguration());
+    } finally {
+      controllerStarterLock.unlock();
+    }
   }
 
   public void startControllerWithSwagger()
