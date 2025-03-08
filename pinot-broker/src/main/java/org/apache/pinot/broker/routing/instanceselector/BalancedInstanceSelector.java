@@ -19,10 +19,7 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -66,20 +63,16 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
         // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
         // not been updated (we update all components for routing in sequence)
-        if (candidates == null) {
+        Optional<SegmentInstanceCandidate> candidate = _adaptiveServerSelector.choose(candidates, queryOptions);
+        if (candidate.isEmpty()) {
           continue;
         }
-        List<String> candidateInstances = new ArrayList<>(candidates.size());
-        for (SegmentInstanceCandidate candidate : candidates) {
-          candidateInstances.add(candidate.getInstance());
-        }
-        String selectedInstance = _adaptiveServerSelector.select(candidateInstances);
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
         // broker or server can skip it upon any issue to process it.
-        if (candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
-          segmentToSelectedInstanceMap.put(segment, selectedInstance);
+        if (candidate.get().isOnline()) {
+          segmentToSelectedInstanceMap.put(segment, candidate.get().getInstance());
         } else {
-          optionalSegmentToInstanceMap.put(segment, selectedInstance);
+          optionalSegmentToInstanceMap.put(segment, candidate.get().getInstance());
         }
       }
     } else {

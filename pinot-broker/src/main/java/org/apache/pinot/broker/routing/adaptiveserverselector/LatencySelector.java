@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -104,5 +103,15 @@ public class LatencySelector implements AdaptiveServerSelector {
     });
 
     return pairList;
+  }
+
+  @Override
+  public Optional<SegmentInstanceCandidate> choose(List<SegmentInstanceCandidate> servers, Map<String, String> queryOptions) {
+    return AdaptiveServerSelector.select(servers, _serverRoutingStatsManager::fetchEMALatencyForServer, queryOptions);
+  }
+
+  @Override
+  public List<String> rank(List<SegmentInstanceCandidate> serverCandidates,Map<String, String> queryOptions) {
+    return AdaptiveServerSelector.rankServers(serverCandidates, _serverRoutingStatsManager::fetchEMALatencyForServer, queryOptions);
   }
 }
