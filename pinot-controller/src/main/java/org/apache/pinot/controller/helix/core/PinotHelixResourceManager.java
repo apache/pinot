@@ -280,7 +280,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        controllerConf.getDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -289,7 +289,7 @@ public class PinotHelixResourceManager {
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
         RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
-        controllerConf.getDiskUtilizationThreshold());
+        controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   /**
