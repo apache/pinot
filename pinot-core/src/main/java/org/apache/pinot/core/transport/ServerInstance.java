@@ -26,9 +26,19 @@ import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 public final class ServerInstance {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public enum RoutingType {
     NETTY, GRPC, NETTY_TLS
@@ -46,6 +56,7 @@ public final class ServerInstance {
   private final int _queryServicePort;
   private final int _queryMailboxPort;
   private final String _adminEndpoint;
+  private final int _group;
 
   /**
    * By default (auto joined instances), server instance name is of format: {@code Server_<hostname>_<port>}, e.g.
@@ -79,6 +90,7 @@ public final class ServerInstance {
     _queryMailboxPort = instanceConfig.getRecord().getIntField(Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
         INVALID_PORT);
     _adminEndpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig, _hostname, CommonConstants.HTTP_PROTOCOL);
+    _group = extractGroup(instanceConfig);
   }
 
   @VisibleForTesting
@@ -91,6 +103,7 @@ public final class ServerInstance {
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
     _adminEndpoint = null;
+    _group = -1;
   }
 
   public String getInstanceId() {
@@ -122,6 +135,10 @@ public final class ServerInstance {
 
   public int getNettyTlsPort() {
     return _nettyTlsPort;
+  }
+
+  public int getGroup() {
+    return _group;
   }
 
   // Does not require TLS until all servers guaranteed to be on TLS
@@ -172,5 +189,19 @@ public final class ServerInstance {
   @Override
   public String toString() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  int extractGroup(InstanceConfig instanceConfig) {
+    Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
+    if (pools == null || pools.isEmpty()) {
+      return -1;
+    }
+    Set<String> groups = new HashSet<>(pools.values());
+    if (groups.size() != 1) {
+      LOGGER.warn("Instance: {} belongs to multiple groups: {}", _instanceId, groups);
+      return -1;
+    }
+    return Integer.parseInt(groups.iterator().next());
   }
 }

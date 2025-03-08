@@ -30,12 +30,19 @@ import javax.annotation.concurrent.Immutable;
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
-
-  private int replicaGroup = -1;
+  private final int _group;
 
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
     _online = online;
+    // no group
+    _group = -1;
+  }
+
+  public SegmentInstanceCandidate(String instance, boolean online, int group) {
+    _instance = instance;
+    _online = online;
+    _group = group;
   }
 
   public String getInstance() {
@@ -47,6 +54,6 @@ public class SegmentInstanceCandidate {
   }
 
   public int getReplicaGroup() {
-    return replicaGroup;
+    return _group;
   }
 }
