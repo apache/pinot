@@ -3485,7 +3485,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
         + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
-        + "            LogicalTableScan(table=[[default, mytable]])\n");
+        + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: AggregateProjectMergeRule -> Time:*\n"
         + "Rule: Project -> Time:*\n"
@@ -3512,7 +3512,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject\\(.*\\)\n"
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
-            + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
+            + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
     assertEquals(response2Json.get("rows").get(0).get(2).asText(),
         "Rule Execution Times\n"
