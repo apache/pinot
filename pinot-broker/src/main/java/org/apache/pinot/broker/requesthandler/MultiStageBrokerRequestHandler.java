@@ -378,6 +378,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
 
+      // Track number of queries with number of groups limit reached
+      for (String table : tableNames) {
+        if (brokerResponse.isNumGroupsLimitReached()) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
+              1);
+        }
+      }
+
       // Set total query processing time
       // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
