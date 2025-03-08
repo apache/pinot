@@ -21,6 +21,7 @@ package org.apache.pinot.calcite.rel.rules;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -35,7 +36,6 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.mapping.IntPair;
@@ -46,6 +46,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.slf4j.Logger;
@@ -95,9 +96,9 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       return new LogicalJoin(join.getCluster(), clusterTraitSet.plus(trait), join.getLeft(), join.getRight(),
           join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
           ImmutableList.copyOf(join.getSystemFieldList()));
-    } else if (relNode instanceof LogicalTableScan) {
-      LogicalTableScan tableScan = (LogicalTableScan) relNode;
-      return new LogicalTableScan(tableScan.getCluster(), clusterTraitSet.plus(trait), tableScan.getTable());
+    } else if (relNode instanceof PinotLogicalTableScan) {
+      PinotLogicalTableScan tableScan = (PinotLogicalTableScan) relNode;
+      return tableScan.copy(clusterTraitSet.plus(trait), Collections.emptyList());
     } else {
       return relNode.copy(clusterTraitSet.plus(trait), relNode.getInputs());
     }
