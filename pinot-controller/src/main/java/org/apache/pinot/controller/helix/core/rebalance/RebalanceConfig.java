@@ -256,15 +256,8 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
-  public Boolean getMinimizeDataMovement() {
-    switch (_minimizeDataMovement) {
-      case ENABLE:
-        return true;
-      case DISABLE:
-        return false;
-      default:
-        return null;
-    }
+  public MinimizeDataMovementOptions getMinimizeDataMovement() {
+    return _minimizeDataMovement;
   }
 
   public void setMinimizeDataMovement(MinimizeDataMovementOptions minimizeDataMovement) {
