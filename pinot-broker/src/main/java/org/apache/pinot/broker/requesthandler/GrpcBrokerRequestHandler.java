@@ -89,7 +89,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+      ServerStats serverStats, RequestContext requestContext, @Nullable Runnable runningHandler)
       throws Exception {
     // TODO: Add servers queried/responded stats
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -103,6 +103,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       assert realtimeRoutingTable != null;
       sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
+    }
+    if (runningHandler != null) {
+      runningHandler.run();
     }
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =

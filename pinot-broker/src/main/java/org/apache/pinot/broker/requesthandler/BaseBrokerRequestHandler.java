@@ -294,7 +294,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
   }
 
-  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+  protected void onQueryRunning(long requestId, String clientRequestId, String query, Object... extras) {
     if (isQueryCancellationEnabled()) {
       _queriesById.put(requestId, query);
       if (StringUtils.isNotBlank(clientRequestId)) {

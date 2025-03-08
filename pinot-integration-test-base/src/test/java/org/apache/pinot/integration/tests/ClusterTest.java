@@ -572,6 +572,12 @@ public abstract class ClusterTest extends ControllerTest {
     return null; // TODO
   }
 
+  public JsonNode getActiveQueries()
+    throws Exception {
+    URI queriesURI = URI.create(getControllerRequestURLBuilder().forActiveQueries());
+    return JsonUtils.stringToJsonNode(_httpClient.sendGetRequest(queriesURI).getResponse());
+  }
+
   private Map<String, String> getExtraQueryPropertiesForController() {
     if (!useMultiStageQueryEngine()) {
       return Map.of();

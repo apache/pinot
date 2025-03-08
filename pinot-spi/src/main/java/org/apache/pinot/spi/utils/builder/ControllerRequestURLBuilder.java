@@ -619,6 +619,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "clientQuery", clientRequestId);
   }
 
+  public String forActiveQueries() {
+    return StringUtil.join("/", _baseUrl, "queries");
+  }
+
   public String forExternalView(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "externalview");
   }

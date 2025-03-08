@@ -311,18 +311,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     }
 
-    String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
-    onQueryStart(requestId, clientRequestId, query);
-
     try {
       Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
+      String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
       try {
         queryResults =
             _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimer.getRemainingTime(),
-                queryOptions);
+                queryOptions, () -> onQueryRunning(requestId, clientRequestId, query));
       } catch (TimeoutException e) {
         for (String table : tableNames) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);

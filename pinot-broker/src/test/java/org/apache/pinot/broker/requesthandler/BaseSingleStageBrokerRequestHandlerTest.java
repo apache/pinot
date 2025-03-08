@@ -197,9 +197,12 @@ public class BaseSingleStageBrokerRequestHandlerTest {
               @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
               @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
-              ServerStats serverStats, RequestContext requestContext)
+              ServerStats serverStats, RequestContext requestContext, @Nullable Runnable runningHandler)
               throws Exception {
             testRequestId[0] = requestId;
+            if (runningHandler != null) {
+              runningHandler.run();
+            }
             latch.await();
             return null;
           }
