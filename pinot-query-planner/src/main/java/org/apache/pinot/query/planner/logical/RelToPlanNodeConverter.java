@@ -41,7 +41,6 @@ import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
@@ -56,6 +55,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -107,8 +107,8 @@ public final class RelToPlanNodeConverter {
    */
   public PlanNode toPlanNode(RelNode node) {
     PlanNode result;
-    if (node instanceof LogicalTableScan) {
-      result = convertLogicalTableScan((LogicalTableScan) node);
+    if (node instanceof PinotLogicalTableScan) {
+      result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
     } else if (node instanceof LogicalProject) {
       result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
@@ -289,7 +289,7 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), RexExpressionUtils.fromRexNode(node.getCondition()));
   }
 
-  private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
+  private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
     String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
