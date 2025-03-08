@@ -36,7 +36,7 @@ public class ResourceUtilizationInfo {
   private static Map<String, DiskUsageInfo> _instanceDiskUsageInfo = new HashMap<>();
 
   public static DiskUsageInfo getDiskUsageInfo(String instanceId) {
-    return _instanceDiskUsageInfo.get(instanceId);
+    return _instanceDiskUsageInfo.getOrDefault(instanceId, new DiskUsageInfo(instanceId));
   }
 
   public static void setDiskUsageInfo(Map<String, DiskUsageInfo> newDiskUsageInfo) {
