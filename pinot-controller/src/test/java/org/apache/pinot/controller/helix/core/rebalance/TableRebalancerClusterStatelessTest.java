@@ -902,7 +902,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     RebalanceSummaryResult rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
@@ -925,7 +925,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
@@ -941,7 +941,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("default");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DEFAULT);
     RebalanceResult rebalanceResultWithoutMinimized = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     assertEquals(rebalanceResult.getInstanceAssignment(), rebalanceResultWithoutMinimized.getInstanceAssignment());
@@ -949,7 +949,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     // Should see the added server in the instance assignment
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
@@ -1003,7 +1003,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     RebalanceSummaryResult rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
@@ -1034,7 +1034,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("false");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DISABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
@@ -1049,7 +1049,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("value other than true and false, namely default");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DEFAULT);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
@@ -1061,7 +1061,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
@@ -1072,7 +1072,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // rebalance without dry-run
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(),
@@ -1094,7 +1094,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     rebalanceServerInfo = rebalanceResult.getRebalanceSummaryResult().getServerInfo();
@@ -1105,7 +1105,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
-    rebalanceConfig.setMinimizeDataMovement("true");
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertEquals(rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE).getNumReplicaGroups(),

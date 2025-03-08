@@ -84,11 +84,16 @@ public class RebalanceConfig {
   private boolean _bestEfforts = false;
 
   // Whether to run Minimal Data Movement Algorithm, overriding the minimizeDataMovement flag in table config. If set
-  // to values other than "true" or "false" (case-insensitive), the minimizeDataMovement flag in table config will be
-  // used to determine whether to run the Minimal Data Movement Algorithm.
+  // to default, the minimizeDataMovement flag in table config will be used to determine whether to run the Minimal
+  // Data Movement Algorithm.
+  @ApiModel
+  public enum MinimizeDataMovementOptions {
+    ENABLE, DISABLE, DEFAULT
+  }
+
   @JsonProperty("minimizeDataMovement")
-  @ApiModelProperty(example = "TRUE")
-  private String _minimizeDataMovement = "TRUE";
+  @ApiModelProperty(dataType = "string", allowableValues = "ENABLE, DISABLE, DEFAULT", example = "ENABLE")
+  private MinimizeDataMovementOptions _minimizeDataMovement = MinimizeDataMovementOptions.ENABLE;
 
   // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
   // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
@@ -251,11 +256,18 @@ public class RebalanceConfig {
     _retryInitialDelayInMs = retryInitialDelayInMs;
   }
 
-  public String getMinimizeDataMovement() {
-    return _minimizeDataMovement;
+  public Boolean getMinimizeDataMovement() {
+    switch (_minimizeDataMovement) {
+      case ENABLE:
+        return true;
+      case DISABLE:
+        return false;
+      default:
+        return null;
+    }
   }
 
-  public void setMinimizeDataMovement(String minimizeDataMovement) {
+  public void setMinimizeDataMovement(MinimizeDataMovementOptions minimizeDataMovement) {
     _minimizeDataMovement = minimizeDataMovement;
   }
 

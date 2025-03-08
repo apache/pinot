@@ -191,10 +191,7 @@ public class TableRebalancer {
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
     long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
     long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
-    String minimizeDataMovementStr = rebalanceConfig.getMinimizeDataMovement();
-    Boolean minimizeDataMovement =
-        minimizeDataMovementStr.toLowerCase().matches("^(true|false)$") ? Boolean.valueOf(minimizeDataMovementStr)
-            : null;
+    Boolean minimizeDataMovement = rebalanceConfig.getMinimizeDataMovement();
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
