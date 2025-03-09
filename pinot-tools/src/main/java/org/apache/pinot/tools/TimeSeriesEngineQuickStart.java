@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
@@ -65,6 +66,7 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
         "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
     configs.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
         SimpleTimeSeriesBuilderFactory.class.getName());
+    configs.put(ControllerConf.RESOURCE_UTILIZATION_CHECKER_FREQUENCY, "-1");
     return configs;
   }
 

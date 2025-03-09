@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
@@ -50,6 +51,7 @@ public class RealtimeQuickStart extends QuickStartBase {
   protected Map<String, Object> getConfigOverrides() {
     Map<String, Object> configOverrides = new HashMap<>();
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(ControllerConf.RESOURCE_UTILIZATION_CHECKER_FREQUENCY, "-1");
     return configOverrides;
   }
 
