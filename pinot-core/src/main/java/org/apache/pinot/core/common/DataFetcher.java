@@ -45,7 +45,7 @@ import org.apache.pinot.spi.utils.MapUtils;
  * and garbage collection.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DataFetcher {
+public class DataFetcher implements AutoCloseable {
   // Thread local (reusable) buffer for single-valued column dictionary Ids
   private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
@@ -598,6 +598,7 @@ public class DataFetcher {
   /**
    * Close the DataFetcher and release all resources (specifically, the ForwardIndexReaderContext off-heap buffers).
    */
+  @Override
   public void close() {
     try {
       for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {

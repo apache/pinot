@@ -444,7 +444,6 @@ public class VarByteChunkForwardIndexReaderV4
     @Override
     public void close() {
       CleanerUtil.cleanQuietly(_decompressedBuffer);
-      _decompressedBuffer = null;
     }
   }
 }
