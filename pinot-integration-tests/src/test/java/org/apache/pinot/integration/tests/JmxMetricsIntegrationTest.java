@@ -166,9 +166,8 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     executorService.submit(() -> {
       while (true) {
         try {
-          postQuery(
-              "SET useMultiStageEngine=true; SELECT AirlineID, AVG(ArrDelay) FILTER (WHERE ArrDelay > 0) FROM mytable"
-                  + " GROUP BY AirlineID;");
+          postQuery("SET useMultiStageEngine=true; "
+              + "SELECT sleep(ActualElapsedTime+60000) FROM mytable WHERE ActualElapsedTime > 0 limit 1");
         } catch (Exception e) {
           LOGGER.warn("Caught exception while running query", e);
           break;
