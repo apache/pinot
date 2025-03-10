@@ -122,9 +122,10 @@ public abstract class QueryScheduler {
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
+    @Nullable
+    QueryThreadContext.Memento memento = QueryThreadContext.isInitialized() ? QueryThreadContext.createMemento() : null;
     return ListenableFutureTask.create(() -> {
-      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
-        queryRequest.registerOnQueryThreadLocal();
+      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(memento)) {
         return processQueryAndSerialize(queryRequest, executorService);
       }
     });
