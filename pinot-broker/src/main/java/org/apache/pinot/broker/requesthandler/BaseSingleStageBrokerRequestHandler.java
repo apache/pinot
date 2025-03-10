@@ -940,10 +940,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (e instanceof BadQueryRequestException) {
         LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
             e.getMessage());
-        requestContext.setErrorCode(QueryErrorCode.UNKNOWN);
+        requestContext.setErrorCode(QueryErrorCode.UNKNOWN_COLUMN);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
         return new CompileResult(
-            new BrokerResponseNative(QueryErrorCode.UNKNOWN, e.getMessage()));
+            new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
       }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());

@@ -3006,7 +3006,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       JsonNode jsonNode = postQuery(pinotQuery);
       JsonNode exceptions = jsonNode.get("exceptions");
       assertFalse(exceptions.isEmpty());
-      assertEquals(exceptions.get(0).get("errorCode").asInt(), 710);
+      assertEquals(exceptions.get(0).get("errorCode").asInt(), QueryErrorCode.UNKNOWN_COLUMN.getId());
     }
     {
       //test same alias name with column name
