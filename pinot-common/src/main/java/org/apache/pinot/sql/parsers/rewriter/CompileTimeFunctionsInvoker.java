@@ -24,8 +24,8 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
@@ -92,7 +92,7 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return expression;
     }
     try {
-      FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+      QueryFunctionInvoker invoker = new QueryFunctionInvoker(functionInfo);
       Object result;
       if (invoker.getMethod().isVarArgs()) {
         result = invoker.invoke(new Object[]{arguments});
