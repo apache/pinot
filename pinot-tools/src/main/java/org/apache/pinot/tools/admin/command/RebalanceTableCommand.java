@@ -64,6 +64,11 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       description = "Whether to reassign CONSUMING segments for real-time table (true by default)")
   private boolean _includeConsuming = true;
 
+  @CommandLine.Option(names = {"-minimizeDataMovement"}, description = "Whether to enable, disable minimize data "
+      + "movement algorithm, or use table's default config")
+  private RebalanceConfig.MinimizeDataMovementOptions _minimizeDataMovement =
+      RebalanceConfig.MinimizeDataMovementOptions.ENABLE;
+
   @CommandLine.Option(names = {"-bootstrap"},
       description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"
           + " all segments in a round-robin fashion as if adding new segments to an empty table, false by default)")
@@ -110,8 +115,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       throws Exception {
     PinotTableRebalancer tableRebalancer =
         new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _preChecks, _reassignInstances, _includeConsuming,
-            _bootstrap, _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _externalViewCheckIntervalInMs,
-            _externalViewStabilizationTimeoutInMs);
+            _minimizeDataMovement, _bootstrap, _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts,
+            _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
         .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);
