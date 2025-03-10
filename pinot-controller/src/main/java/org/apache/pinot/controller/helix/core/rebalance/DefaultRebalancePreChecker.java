@@ -58,11 +58,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     Map<String, String> preCheckResult = new HashMap<>();
     // Check for reload status
-    Boolean needsReload = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType);
-    preCheckResult.put(NEEDS_RELOAD_STATUS, needsReload == null ? "error" : String.valueOf(needsReload));
+    String needsReloadMessage = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType);
+    preCheckResult.put(NEEDS_RELOAD_STATUS, needsReloadMessage);
     // Check whether minimizeDataMovement is set in TableConfig
-    boolean isMinimizeDataMovement = checkIsMinimizeDataMovement(rebalanceJobId, tableNameWithType, tableConfig);
-    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, String.valueOf(isMinimizeDataMovement));
+    String isMinimizeDataMovementMessage = checkIsMinimizeDataMovement(rebalanceJobId, tableNameWithType, tableConfig);
+    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, String.valueOf(isMinimizeDataMovementMessage));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -74,14 +74,15 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    * TODO: Add an API to check for whether segments in deep store are up to date with the table configs and schema
    *       and add a pre-check here to call that API.
    */
-  private Boolean checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType) {
+  private String checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType) {
     LOGGER.info("Fetching whether reload is needed for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
     Boolean needsReload = null;
+    String needsReloadMessage;
     if (_executorService == null) {
       LOGGER.warn("Executor service is null, skipping needsReload check for table: {} rebalanceJobId: {}",
           tableNameWithType, rebalanceJobId);
-      return needsReload;
+      return "WARNING: could not determine needReload status, run manually";
     }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
       TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
@@ -93,10 +94,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
               + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
-      if (needsReload) {
-        return needsReload;
-      }
-      if (failedResponses > 0) {
+      if (!needsReload && failedResponses > 0) {
         LOGGER.warn("Received {} failed responses from servers and needsReload is false from returned responses, "
             + "check needsReload status manually", failedResponses);
         needsReload = null;
@@ -105,37 +103,81 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       LOGGER.warn("Caught exception while trying to fetch reload status from servers", e);
     }
 
-    return needsReload;
+    needsReloadMessage = needsReload == null ? "WARNING: could not determine needReload status, run manually"
+        : !needsReload ? "PASS: no need to reload" : "WARNING: reload needed prior to running rebalance";
+    return needsReloadMessage;
   }
 
   /**
    * Checks if minimize data movement is set for the given table in the TableConfig
    */
-  private boolean checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
+  private String checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
       TableConfig tableConfig) {
     LOGGER.info("Checking whether minimizeDataMovement is set for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
-        InstanceAssignmentConfig instanceAssignmentConfig =
-            InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
-        return instanceAssignmentConfig.isMinimizeDataMovement();
+        boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
+            InstancePartitionsType.OFFLINE);
+        InstanceAssignmentConfig instanceAssignmentConfig;
+        String instanceAssignmentStatusMessage;
+        if (isInstanceAssignmentAllowed) {
+          instanceAssignmentConfig =
+              InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
+          instanceAssignmentStatusMessage = instanceAssignmentConfig.isMinimizeDataMovement()
+              ? "PASS: minimizeDataMovement is enabled"
+              : "WARNING: minimizeDataMovement is not enabled but instance assignment is allowed";
+        } else {
+          instanceAssignmentStatusMessage = "PASS: instance assignment not allowed, no need for minimizeDataMovement";
+        }
+        return instanceAssignmentStatusMessage;
       } else {
-        InstanceAssignmentConfig instanceAssignmentConfigConsuming =
-            InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.CONSUMING);
+        boolean isInstanceAssignmentAllowedConsuming = InstanceAssignmentConfigUtils.allowInstanceAssignment(
+            tableConfig, InstancePartitionsType.CONSUMING);
+        InstanceAssignmentConfig instanceAssignmentConfigConsuming = null;
+        if (isInstanceAssignmentAllowedConsuming) {
+          instanceAssignmentConfigConsuming =
+              InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.CONSUMING);
+        }
         // For REALTIME tables need to check for both CONSUMING and COMPLETED segments if relocation is enabled
         if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
-          return instanceAssignmentConfigConsuming.isMinimizeDataMovement();
+          String instanceAssignmentStatusMessage;
+          if (isInstanceAssignmentAllowedConsuming) {
+            instanceAssignmentStatusMessage = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+                ? "PASS: minimizeDataMovement is enabled"
+                : "WARNING: minimizeDataMovement is not enabled but instance assignment is allowed";
+          } else {
+            instanceAssignmentStatusMessage = "PASS: instance assignment not allowed, no need for minimizeDataMovement";
+          }
+          return instanceAssignmentStatusMessage;
         }
 
-        InstanceAssignmentConfig instanceAssignmentConfigCompleted =
-            InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
-        return instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-            && instanceAssignmentConfigCompleted.isMinimizeDataMovement();
+        boolean isInstanceAssignmentAllowedCompleted = InstanceAssignmentConfigUtils.allowInstanceAssignment(
+            tableConfig, InstancePartitionsType.COMPLETED);
+        InstanceAssignmentConfig instanceAssignmentConfigCompleted = null;
+        if (isInstanceAssignmentAllowedCompleted) {
+          instanceAssignmentConfigCompleted =
+              InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
+        }
+
+        String instanceAssignmentStatusMessage;
+        if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
+          instanceAssignmentStatusMessage = "PASS: instance assignment not allowed, no need for minimizeDataMovement";
+        } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
+          instanceAssignmentStatusMessage = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+              && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
+              ? "PASS: minimizeDataMovement is enabled"
+              : "WARNING: minimizeDataMovement may not enabled for consuming or completed but instance assignment"
+                  + "is allowed for both";
+        } else {
+          instanceAssignmentStatusMessage = "WARNING: minimizeDataMovement may not enabled for consuming or "
+              + "completed but instance assignment is allowed for at least one";
+        }
+        return instanceAssignmentStatusMessage;
       }
     } catch (IllegalStateException e) {
       LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
-      return false;
+      return "WARNING: got exception when fetching instance assignment, check manually";
     }
   }
 }

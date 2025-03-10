@@ -224,8 +224,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS), "error");
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT), "false");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS),
+        "WARNING: could not determine needReload status, run manually");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
+        "PASS: instance assignment not allowed, no need for minimizeDataMovement");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
