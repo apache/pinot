@@ -43,14 +43,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
@@ -666,8 +665,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
-        : QueryException.SQL_PARSING_ERROR_CODE;
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING.getId()
+        : QueryErrorCode.SQL_PARSING.getId();
     Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
@@ -1231,10 +1230,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
-    // MultistageGroupByExecutor
+    // MultistageGroupByExecutor. This will use a "DIRECT" aggregation.
     String sqlQuery = "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
         + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
         + "AirlineID";
@@ -1253,7 +1252,35 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+      throws Exception {
+    // Query written this way with a CTE and limit will be planned such that the multi-stage group by executor will be
+    // used for both leaf and final aggregation
+    String aggregates1 = "COUNT(*) FILTER (WHERE Origin = 'garbage')";
+    String aggregates2 = aggregates1 + ", COUNT(*)";
+    String queryTemplate = "SET mseMaxInitialResultHolderCapacity = 1;\n"
+        + "WITH tmp AS (SELECT * FROM mytable WHERE AirlineID > 20000 LIMIT 10000)\n"
+        + "SELECT AirlineID, %s FROM tmp GROUP BY AirlineID";
+    String query1 = String.format(queryTemplate, aggregates1);
+    String query2 = String.format(queryTemplate, aggregates2);
+    for (String query : new String[]{query1, query2}) {
+      JsonNode result = postQuery(query);
+      assertNoError(result);
+      // Ensure that result set is not empty
+      assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+      // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+      JsonNode rows = result.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i).get(1).asInt(), 0);
+        // Ensure that the main filter was applied
+        assertTrue(rows.get(i).get(0).asInt() > 20000);
+      }
+    }
+  }
+
+  @Test
+  public void testDirectFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
     // MultistageGroupByExecutor
@@ -1351,7 +1378,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed only as table prefix. Will
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1393,7 +1420,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
         null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1401,7 +1428,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1409,7 +1436,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_VALIDATION_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1420,7 +1447,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1559,12 +1586,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Iterator<JsonNode> exIterator = exceptionsJson.iterator();
     assertTrue(exIterator.hasNext(), "Expected a timeout exception but did not find one");
     ObjectNode exception = (ObjectNode) exIterator.next();
-    assertEquals(exception.get(ProcessingException._Fields.ERROR_CODE.getFieldName()).asInt(),
-        QueryException.BROKER_TIMEOUT_ERROR_CODE);
-    assertEquals(exception.get(ProcessingException._Fields.MESSAGE.getFieldName()).asText(),
-        QueryException.BROKER_TIMEOUT_ERROR.getMessage());
+    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.BROKER_TIMEOUT.getId());
+    assertEquals(exception.get("message").asText(), QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
   }
 
+  @Test
   public void testNumServersQueried() throws Exception {
     String query = "select * from mytable limit 10";
     JsonNode jsonNode = postQuery(query);
@@ -1599,9 +1625,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result, expectedValue);
   }
 
-  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, int errorCode) {
+  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, QueryErrorCode errorCode) {
     long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(result, errorCode);
+    assertEquals(result, errorCode.getId());
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,

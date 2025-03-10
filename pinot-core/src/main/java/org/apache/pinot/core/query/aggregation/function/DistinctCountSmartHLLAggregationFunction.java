@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
@@ -31,9 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -61,6 +64,9 @@ import org.roaringbitmap.RoaringBitmap;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAggregationFunction<Object, Integer> {
+  // Use empty IntOpenHashSet as a placeholder for empty result
+  private static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
+
   private final int _threshold;
   private final int _log2m;
 
@@ -625,8 +631,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAgg
   public Object extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      // Use empty IntOpenHashSet as a placeholder for empty result
-      return new IntOpenHashSet();
+      return EMPTY_PLACEHOLDER;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -647,8 +652,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAgg
   public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      // NOTE: Return an empty IntOpenHashSet for empty result.
-      return new IntOpenHashSet();
+      return EMPTY_PLACEHOLDER;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -718,6 +722,20 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseSingleInputAgg
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
+    if (o instanceof HyperLogLog) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLog.getValue(),
+          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize((HyperLogLog) o));
+    }
+    return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
+  }
+
+  @Override
+  public Object deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override

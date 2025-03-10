@@ -60,7 +60,6 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -78,6 +77,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
@@ -465,7 +465,7 @@ public class PinotClientRequest {
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
     }
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
@@ -482,8 +482,8 @@ public class PinotClientRequest {
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
-          new UnsupportedOperationException("Unsupported SQL type - " + sqlType + ", this API only supports DQL.")));
+      return new BrokerResponseNative(QueryErrorCode.SQL_PARSING,
+          "Unsupported SQL type - " + sqlType + ", this API only supports DQL.");
     }
     switch (sqlType) {
       case DQL:
@@ -492,8 +492,7 @@ public class PinotClientRequest {
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
               httpHeaders);
         } catch (Exception e) {
-          LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
-              QueryException.getTruncatedStackTrace(e));
+          LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
           throw e;
         }
       case DML:
@@ -503,13 +502,11 @@ public class PinotClientRequest {
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
-          LOGGER.error("Error handling DML request:\n{}\nException: {}", sqlRequestJson,
-              QueryException.getTruncatedStackTrace(e));
+          LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
         }
       default:
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
-            new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
     }
   }
 

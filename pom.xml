@@ -172,15 +172,15 @@
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
-    <audienceannotations.version>0.15.0</audienceannotations.version>
+    <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.31</aws.sdk.version>
-    <azure.sdk.version>1.2.31</azure.sdk.version>
+    <aws.sdk.version>2.30.36</aws.sdk.version>
+    <azure.sdk.version>1.2.32</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <sslcontext.kickstart.version>9.0.0</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
@@ -232,8 +232,8 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
-    <grpc.version>1.70.0</grpc.version>
-    <google.cloud.libraries.version>26.55.0</google.cloud.libraries.version>
+    <grpc.version>1.71.0</grpc.version>
+    <google.cloud.libraries.version>26.56.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
@@ -253,7 +253,7 @@
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
-    <curator.version>5.7.1</curator.version>
+    <curator.version>5.8.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
@@ -277,11 +277,10 @@
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.16.0</mockito-core.version>
     <equalsverifier.version>3.19.1</equalsverifier.version>
-    <testcontainers.version>1.20.5</testcontainers.version>
+    <testcontainers.version>1.20.6</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
-    <fmpp.version>0.9.16</fmpp.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
@@ -788,7 +787,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.0</version>
+        <version>3.49.1</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -1376,8 +1375,8 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
-        <version>1.2.0</version>
+        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+        <version>1.3.0</version>
       </dependency>
 
       <!-- Metrics -->
@@ -2051,11 +2050,6 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
-      <dependency>
-        <groupId>net.sourceforge.fmpp</groupId>
-        <artifactId>fmpp</artifactId>
-        <version>${fmpp.version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2454,7 +2448,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.3</version>
+            <version>10.21.4</version>
           </dependency>
         </dependencies>
         <executions>

@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -91,7 +90,7 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   @Override
   public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+      return shuttingDown(queryRequest);
     }
 
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
@@ -112,13 +111,13 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
     } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for query {} table {}, message: {}", queryRequest.getRequestId(),
           queryRequest.getTableNameWithType(), e.getMessage());
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
+      return outOfCapacity(queryRequest);
     } catch (Exception e) {
       // We should not throw any other exception other than OutOfCapacityException. Signal that there's an issue with
       // the scheduler if any other exception is thrown.
       LOGGER.error("Internal error for query {} table {}, message {}", queryRequest.getRequestId(),
           queryRequest.getTableNameWithType(), e.getMessage());
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+      return shuttingDown(queryRequest);
     }
     return schedQueryContext.getResultFuture();
   }
@@ -216,8 +215,8 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = _secondaryQueryQ.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      queryContext.setResultFuture(
-          immediateErrorResponse(queryContext.getQueryRequest(), QueryException.SERVER_SCHEDULER_DOWN_ERROR));
+      ListenableFuture<byte[]> serverShuttingDown = shuttingDown(queryContext.getQueryRequest());
+      queryContext.setResultFuture(serverShuttingDown);
     }
   }
 }
