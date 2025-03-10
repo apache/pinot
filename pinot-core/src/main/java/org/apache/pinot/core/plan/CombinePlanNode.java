@@ -28,15 +28,18 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.combine.AggregationCombineOperator;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
+import org.apache.pinot.core.operator.combine.DistinctCountCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -131,6 +134,16 @@ public class CombinePlanNode implements PlanNode {
       if (QueryContextUtils.isAggregationQuery(_queryContext)) {
         if (_queryContext.getGroupByExpressions() == null) {
           // Aggregation only
+          AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+          assert aggregationFunctions != null;
+          if (aggregationFunctions.length == 1) {
+            AggregationFunctionType functionType = aggregationFunctions[0].getType();
+            // TODO: Support DISTINCTSUM and DISTINCTAVG
+            if (functionType == AggregationFunctionType.DISTINCTCOUNT
+                || functionType == AggregationFunctionType.DISTINCTCOUNTMV) {
+              return new DistinctCountCombineOperator(operators, _queryContext, _executorService);
+            }
+          }
           return new AggregationCombineOperator(operators, _queryContext, _executorService);
         } else {
           // Aggregation group-by
