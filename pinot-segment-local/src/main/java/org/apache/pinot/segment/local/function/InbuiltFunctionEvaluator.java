@@ -245,7 +245,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while executing function: " + this, e);
+        throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
     }
 
@@ -271,7 +271,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while executing function: " + this, e);
+        throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
     }
 

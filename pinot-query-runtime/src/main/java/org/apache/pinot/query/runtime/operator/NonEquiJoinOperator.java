@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -59,8 +58,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable()
-      throws ProcessingException {
+  protected void buildRightTable() {
     LOGGER.trace("Building right table for join operator");
     long startTime = System.currentTimeMillis();
     TransferableBlock rightBlock = _rightInput.nextBlock();
@@ -70,7 +68,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
       // Row based overflow check.
       if (rows.size() + numRowsInRightTable > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwProcessingExceptionForJoinRowLimitExceeded(
+          throwForJoinRowLimitExceeded(
               "Cannot build in memory right table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
           // Just fill up the buffer.
@@ -100,8 +98,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException {
+  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
     ArrayList<Object[]> rows = new ArrayList<>();
     for (Object[] leftRow : leftBlock.getContainer()) {
       // NOTE: Empty key selector will always give same hash code.
