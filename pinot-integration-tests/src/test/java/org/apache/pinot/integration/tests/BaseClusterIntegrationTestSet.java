@@ -530,6 +530,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private void testQueryException(String query, QueryErrorCode errorCode)
       throws Exception {
     JsonNode jsonObject = postQuery(query);
+    assertTrue(jsonObject.has("exceptions"), "Response does not contain exceptions: " + jsonObject);
+    assertFalse(jsonObject.get("exceptions").isEmpty(), "Response does not contain exceptions: " + jsonObject);
     assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode.getId());
   }
 

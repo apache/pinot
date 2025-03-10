@@ -49,7 +49,8 @@ import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -76,10 +77,8 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultistageGroupByExecutor _groupByExecutor;
 
   @Nullable
-  private TransferableBlock _eosBlock;
+  private MseBlock.Eos _eosBlock;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
-
-  private boolean _hasConstructedAggregateBlock;
 
   private final boolean _errorOnNumGroupsLimit;
 
@@ -196,25 +195,22 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    if (_hasConstructedAggregateBlock) {
-      assert _eosBlock != null;
+  protected MseBlock getNextBlock() {
+    if (_eosBlock != null) {
       return _eosBlock;
     }
-    TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
-    // returning upstream error block if finalBlock contains error.
-    if (finalBlock.isErrorBlock()) {
+    MseBlock.Eos finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+    _eosBlock = finalBlock;
+
+    if (finalBlock.isError()) {
       return finalBlock;
     }
-    assert finalBlock.isSuccessfulEndOfStreamBlock() : "Final block must be EOS block";
-    _eosBlock = updateEosBlock(finalBlock, _statMap);
     return produceAggregatedBlock();
   }
 
-  private TransferableBlock produceAggregatedBlock() {
-    _hasConstructedAggregateBlock = true;
+  private MseBlock produceAggregatedBlock() {
     if (_aggregationExecutor != null) {
-      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW, _aggFunctions);
+      return new RowHeapDataBlock(_aggregationExecutor.getResult(), _resultSchema, _aggFunctions);
     } else {
       List<Object[]> rows;
       if (_comparator != null) {
@@ -226,7 +222,7 @@ public class AggregateOperator extends MultiStageOperator {
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
-        TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW, _aggFunctions);
+        MseBlock dataBlock = new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           if (_errorOnNumGroupsLimit) {
             _input.earlyTerminate();
@@ -241,19 +237,24 @@ public class AggregateOperator extends MultiStageOperator {
     }
   }
 
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
   /**
    * Consumes the input blocks as a group by
    *
    * @return the last block, which must always be either an error or the end of the stream
    */
-  private TransferableBlock consumeGroupBy() {
-    TransferableBlock block = _input.nextBlock();
-    while (block.isDataBlock()) {
-      _groupByExecutor.processBlock(block);
+  private MseBlock.Eos consumeGroupBy() {
+    MseBlock block = _input.nextBlock();
+    while (block.isData()) {
+      _groupByExecutor.processBlock((MseBlock.Data) block);
       sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
-    return block;
+    return (MseBlock.Eos) block;
   }
 
   /**
@@ -261,14 +262,14 @@ public class AggregateOperator extends MultiStageOperator {
    *
    * @return the last block, which must always be either an error or the end of the stream
    */
-  private TransferableBlock consumeAggregation() {
-    TransferableBlock block = _input.nextBlock();
-    while (block.isDataBlock()) {
-      _aggregationExecutor.processBlock(block);
+  private MseBlock.Eos consumeAggregation() {
+    MseBlock block = _input.nextBlock();
+    while (block.isData()) {
+      _aggregationExecutor.processBlock((MseBlock.Data) block);
       sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
-    return block;
+    return (MseBlock.Eos) block;
   }
 
   private AggregationFunction<?, ?>[] getAggFunctions(List<RexExpression.FunctionCall> aggCalls) {
@@ -323,11 +324,11 @@ public class AggregateOperator extends MultiStageOperator {
     return groupKeyIds;
   }
 
-  static RoaringBitmap getMatchedBitmap(TransferableBlock block, int filterArgId) {
+  static RoaringBitmap getMatchedBitmap(MseBlock.Data block, int filterArgId) {
     Preconditions.checkArgument(filterArgId >= 0, "Got negative filter argument id: %s", filterArgId);
     RoaringBitmap matchedBitmap = new RoaringBitmap();
-    if (block.isContainerConstructed()) {
-      List<Object[]> rows = block.getContainer();
+    if (block.isRowHeap()) {
+      List<Object[]> rows = block.asRowHeap().getRows();
       int numRows = rows.size();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if ((int) rows.get(rowId)[filterArgId] == 1) {
@@ -335,7 +336,7 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
     } else {
-      DataBlock dataBlock = block.getDataBlock();
+      DataBlock dataBlock = block.asSerialized().getDataBlock();
       int numRows = dataBlock.getNumberOfRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         if (dataBlock.getInt(rowId, filterArgId) == 1) {
@@ -347,7 +348,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction<?, ?> aggFunction,
-      TransferableBlock block) {
+      MseBlock.Data block) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
@@ -356,8 +357,8 @@ public class AggregateOperator extends MultiStageOperator {
     DataSchema dataSchema = block.getDataSchema();
     assert dataSchema != null;
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    if (block.isContainerConstructed()) {
-      List<Object[]> rows = block.getContainer();
+    if (block.isRowHeap()) {
+      List<Object[]> rows = block.asRowHeap().getRows();
       for (ExpressionContext expression : expressions) {
         String identifier = expression.getIdentifier();
         if (identifier != null) {
@@ -367,7 +368,7 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
     } else {
-      DataBlock dataBlock = block.getDataBlock();
+      DataBlock dataBlock = block.asSerialized().getDataBlock();
       for (ExpressionContext expression : expressions) {
         String identifier = expression.getIdentifier();
         if (identifier != null) {
@@ -380,7 +381,7 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   static Map<ExpressionContext, BlockValSet> getFilteredBlockValSetMap(AggregationFunction<?, ?> aggFunction,
-      TransferableBlock block, int numMatchedRows, RoaringBitmap matchedBitmap) {
+      MseBlock.Data block, int numMatchedRows, RoaringBitmap matchedBitmap) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
@@ -389,8 +390,8 @@ public class AggregateOperator extends MultiStageOperator {
     DataSchema dataSchema = block.getDataSchema();
     assert dataSchema != null;
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    if (block.isContainerConstructed()) {
-      List<Object[]> rows = block.getContainer();
+    if (block.isRowHeap()) {
+      List<Object[]> rows = block.asRowHeap().getRows();
       for (ExpressionContext expression : expressions) {
         String identifier = expression.getIdentifier();
         if (identifier != null) {
@@ -401,7 +402,7 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
     } else {
-      DataBlock dataBlock = block.getDataBlock();
+      DataBlock dataBlock = block.asSerialized().getDataBlock();
       for (ExpressionContext expression : expressions) {
         String identifier = expression.getIdentifier();
         if (identifier != null) {
@@ -415,21 +416,21 @@ public class AggregateOperator extends MultiStageOperator {
     return blockValSetMap;
   }
 
-  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunction, TransferableBlock block) {
+  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggFunction, MseBlock.Data block) {
     ExpressionContext firstArgument = aggFunction.getInputExpressions().get(0);
     Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
         "Expected the first argument to be IDENTIFIER, got: %s", firstArgument.getType());
     int colId = fromIdentifierToColId(firstArgument.getIdentifier());
     int numRows = block.getNumRows();
-    if (block.isContainerConstructed()) {
+    if (block.isRowHeap()) {
       Object[] values = new Object[numRows];
-      List<Object[]> rows = block.getContainer();
+      List<Object[]> rows = block.asRowHeap().getRows();
       for (int rowId = 0; rowId < numRows; rowId++) {
         values[rowId] = rows.get(rowId)[colId];
       }
       return values;
     } else {
-      return DataBlockExtractUtils.extractAggResult(block.getDataBlock(), colId, aggFunction);
+      return DataBlockExtractUtils.extractAggResult(block.asSerialized().getDataBlock(), colId, aggFunction);
     }
   }
 

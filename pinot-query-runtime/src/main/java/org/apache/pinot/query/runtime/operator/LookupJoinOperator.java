@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
@@ -32,10 +31,10 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -128,30 +127,28 @@ public class LookupJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
-      TransferableBlock leftBlock = _leftInput.nextBlock();
-      if (leftBlock.isErrorBlock()) {
+      MseBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isEos()) {
         return leftBlock;
       }
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        MultiStageQueryStats leftStats = leftBlock.getQueryStats();
-        assert leftStats != null;
-        leftStats.mergeInOrder(_rightInput.getQueryStats(), getOperatorType(), _statMap);
-        return leftBlock;
-      }
-      assert leftBlock.isDataBlock();
-      List<Object[]> rows = buildJoinedRows(leftBlock);
+      List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
       sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
-        return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(rows, _resultSchema);
       }
     }
   }
 
-  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock) {
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  private List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -163,8 +160,8 @@ public class LookupJoinOperator extends MultiStageOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock) {
-    List<Object[]> container = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockDefault(MseBlock.Data leftBlock) {
+    List<Object[]> container = leftBlock.asRowHeap().getRows();
     ArrayList<Object[]> rows = new ArrayList<>(container.size());
 
     for (Object[] leftRow : container) {
@@ -187,8 +184,8 @@ public class LookupJoinOperator extends MultiStageOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
-    List<Object[]> container = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
+    List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
     for (Object[] leftRow : container) {
       if (_rightTable.containsKey(getKey(leftRow))) {
@@ -198,8 +195,8 @@ public class LookupJoinOperator extends MultiStageOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) {
-    List<Object[]> container = leftBlock.getContainer();
+  private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
+    List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
     for (Object[] leftRow : container) {
       if (!_rightTable.containsKey(getKey(leftRow))) {
