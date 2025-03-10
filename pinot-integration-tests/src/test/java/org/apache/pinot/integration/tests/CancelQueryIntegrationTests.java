@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import static org.testng.Assert.*;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -43,6 +41,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
 
 /**
  * Integration test that checks the query cancellation feature.
