@@ -145,7 +145,13 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      try {
+        return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      } finally {
+        if (isQueryCancellationEnabled()) {
+          _serversByQuery.remove(requestId);
+        }
+      }
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, servers);

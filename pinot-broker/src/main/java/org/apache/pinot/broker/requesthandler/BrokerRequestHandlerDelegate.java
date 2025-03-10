@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
@@ -132,8 +133,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public Map<Long, String> getRunningQueries() {
-    // Both engines share the same request Id generator, so the query will have unique ids across the two engines.
-    Map<Long, String> queries = _singleStageBrokerRequestHandler.getRunningQueries();
+    // Both engines share the same request ID generator, so the query will have unique IDs across the two engines.
+    Map<Long, String> queries = new HashMap<>(_singleStageBrokerRequestHandler.getRunningQueries());
     if (_multiStageBrokerRequestHandler != null) {
       queries.putAll(_multiStageBrokerRequestHandler.getRunningQueries());
     }
