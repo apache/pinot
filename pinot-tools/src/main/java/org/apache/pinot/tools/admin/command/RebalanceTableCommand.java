@@ -140,12 +140,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
             + "myTable_OFFLINE -dryRun");
     System.out.println();
 
-    System.out.println("Rebalance table in dry-run mode with pre-checks");
-    System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
-            + "myTable_OFFLINE -dryRun -preChecks");
-    System.out.println();
-
     System.out.println("Rebalance table with instances reassigned");
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
