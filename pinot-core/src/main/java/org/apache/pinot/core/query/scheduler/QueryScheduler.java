@@ -28,11 +28,9 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -43,7 +41,8 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,7 +147,7 @@ public abstract class QueryScheduler {
         // For not handled exceptions
         _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
         instanceResponse = new InstanceResponseBlock();
-        instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
+        instanceResponse.addException(QueryErrorCode.INTERNAL, e.getMessage());
       }
 
       long requestId = queryRequest.getRequestId();
@@ -173,7 +172,7 @@ public abstract class QueryScheduler {
             ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
 
         instanceResponse = new InstanceResponseBlock();
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
+        instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
@@ -223,10 +222,11 @@ public abstract class QueryScheduler {
       responseByte = instanceResponse.toDataTable().toBytes();
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      String errMsg =
+      String userMsg =
           "Cancelled while building data table" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg);
-      LOGGER.error(errMsg);
-      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(errMsg, e)));
+      LOGGER.error(userMsg);
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
+      instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
       instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
       return serializeResponse(queryRequest, instanceResponse);
     } catch (Exception e) {
@@ -247,10 +247,18 @@ public abstract class QueryScheduler {
    * query can not be executed.
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
-      ProcessingException error) {
+      QueryErrorCode errorCode) {
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-    instanceResponse.addException(error);
+    instanceResponse.addException(errorCode, errorCode.getDefaultMessage());
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
+  }
+
+  protected ListenableFuture<byte[]> shuttingDown(ServerQueryRequest queryRequest) {
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_SHUTTING_DOWN);
+  }
+
+  protected ListenableFuture<byte[]> outOfCapacity(ServerQueryRequest queryRequest) {
+    return immediateErrorResponse(queryRequest, QueryErrorCode.SERVER_OUT_OF_CAPACITY);
   }
 }

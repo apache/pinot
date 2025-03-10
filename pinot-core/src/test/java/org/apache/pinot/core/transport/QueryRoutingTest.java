@@ -25,11 +25,9 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -39,6 +37,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
@@ -210,10 +209,7 @@ public class QueryRoutingTest {
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-    Exception exception = new UnsupportedOperationException("Caught exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, exception);
-    dataTable.addException(processingException);
+    dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
     String serverId = SERVER_INSTANCE.getInstanceId();
     // Start the server
@@ -255,10 +251,7 @@ public class QueryRoutingTest {
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-    Exception exception = new UnsupportedOperationException("Caught exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, exception);
-    dataTable.addException(processingException);
+    dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test error message");
     byte[] responseBytes = dataTable.toBytes();
     String serverId = SERVER_INSTANCE.getInstanceId();
     // Start the server
@@ -299,13 +292,8 @@ public class QueryRoutingTest {
     long requestId = 123;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-    Exception exception = new UnsupportedOperationException("Caught exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, exception);
-    ProcessingException processingServerException =
-        QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, exception);
-    dataTable.addException(processingServerException);
-    dataTable.addException(processingException);
+    dataTable.addException(QueryErrorCode.QUERY_CANCELLATION, "Test cancellation error message");
+    dataTable.addException(QueryErrorCode.SERVER_TABLE_MISSING, "Test table missing error message");
     byte[] responseBytes = dataTable.toBytes();
     String serverId = SERVER_INSTANCE.getInstanceId();
     // Start the server
