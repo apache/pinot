@@ -34,8 +34,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -44,6 +46,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.SegmentUtils.getPartitionIdFromRealtimeSegmentName;
 
 
 public class SegmentPreloadUtils {
@@ -190,5 +194,36 @@ public class SegmentPreloadUtils {
     ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), tableNameWithType)
         .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
     return segmentMetadataMap;
+  }
+
+  public static boolean loadedPrevSegment(String segmentNameStr, TableDataManager realtimeTableDataManager) {
+    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment(realtimeTableDataManager.getTableName(), realtimeTableDataManager.getHelixManager());
+    String instanceId = getInstanceId(realtimeTableDataManager);
+    LLCSegmentName currentSegment = LLCSegmentName.of(segmentNameStr);
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (!isSegmentOnlineOnRequestedInstance(segmentName, instanceId, instanceStateMap)) {
+        continue;
+      }
+      Integer partitionId = getPartitionIdFromRealtimeSegmentName(segmentName);
+      if (partitionId != currentSegment.getPartitionGroupId()) {
+        continue;
+      }
+      LLCSegmentName otherSegment = LLCSegmentName.of(segmentName);
+      if (otherSegment.getSequenceNumber() < currentSegment.getSequenceNumber()) {
+        SegmentDataManager segmentDataManager = null;
+        try {
+          segmentDataManager = realtimeTableDataManager.acquireSegment(otherSegment.getSegmentName());
+        } finally {
+          if (segmentDataManager != null) {
+            realtimeTableDataManager.releaseSegment(segmentDataManager);
+          }
+        }
+        if (segmentDataManager == null) {
+          return false;
+        }
+      }
+    }
   }
 }

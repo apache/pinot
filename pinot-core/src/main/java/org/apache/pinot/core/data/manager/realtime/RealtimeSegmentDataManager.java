@@ -64,6 +64,7 @@ import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -761,6 +762,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
+        if (_realtimeTableDataManager.isDedupEnabled()) {
+          while(!SegmentPreloadUtils.loadedPrevSegment(_segmentNameStr, _realtimeTableDataManager)) {
+            Thread.sleep(10_000);
+          }
+        }
+
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -921,6 +928,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       if (!_shouldStop) {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
+    }
+  }
+
+  private boolean loadedPrevSegment() {
+    if (SegmentPreloadUtils.loadedPrevSegment()) {
+
     }
   }
 
