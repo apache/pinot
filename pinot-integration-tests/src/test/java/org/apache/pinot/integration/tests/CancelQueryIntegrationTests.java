@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests;
 
+import static org.testng.Assert.*;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -40,8 +42,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 /**
@@ -193,7 +193,9 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
           fail("No exception should be thrown", e);
         }
       }
-    }, 500);
+    }, useMultiStageQueryEngine ? 5000 : 500); // TODO: horrible because we have a potential race condition for MSE,
+                                               // it will be addressed once we refactor the submit&reduce processing
+                                               // so we can track running queries more properly
 
     JsonNode result = postQuery(sqlQuery);
     // ugly: error message differs from SSQE to MSQE
