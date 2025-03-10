@@ -24,7 +24,19 @@ import org.slf4j.MDC;
 
 public enum LoggerConstants {
 
-  QUERY_ID_KEY("pinot.query.id"),
+  /**
+   * The request id of the query.
+   *
+   * See {@link org.apache.pinot.spi.query.QueryThreadContext#getRequestId()} to know more about this value and its
+   * meaning.
+   */
+  REQUEST_ID_KEY("pinot.query.id"),
+  /**
+   * The correlation or query id of the query.
+   *
+   * See {@link org.apache.pinot.spi.query.QueryThreadContext#getCid()} to know more about this value and its meaning.
+   */
+  CORRELATION_ID_KEY("pinot.query.cid"),
   /**
    * The MSE worker id of the query.
    */

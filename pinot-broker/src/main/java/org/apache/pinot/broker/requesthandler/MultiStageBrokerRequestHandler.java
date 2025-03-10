@@ -86,6 +86,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -147,6 +148,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryCompileExecutor.shutdown();
     _queryDispatcher.shutdown();
+  }
+
+  @Override
+  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+    super.onQueryStart(requestId, clientRequestId, query, extras);
+    QueryThreadContext.setQueryEngine("mse");
   }
 
   @Override

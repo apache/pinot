@@ -100,6 +100,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -252,6 +253,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String globalQueryId = getGlobalQueryId(queryId);
     List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
+      // TODO: how should we add the cid here? Maybe as a query param?
+      //  we can get the cid from QueryThreadContext
       serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
@@ -1006,6 +1009,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Override
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
     super.onQueryStart(requestId, clientRequestId, query, extras);
+    QueryThreadContext.setQueryEngine("sse");
     if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
