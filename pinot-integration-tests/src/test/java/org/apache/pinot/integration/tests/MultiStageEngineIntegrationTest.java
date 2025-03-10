@@ -1600,8 +1600,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   @Test
   public void testSearchLiteralFilter() throws Exception {
-    String sqlQuery = "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) "
-        + "SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
+    String sqlQuery =
+        "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
+            + "CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
     JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + sqlQuery);
     assertTrue(explainPlan.get("resultTable").get("rows").get(0).get(1).asText().contains("SEARCH"));
 
@@ -1609,6 +1610,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(result);
     assertEquals(result.get("resultTable").get("rows").size(), 1);
     assertEquals(result.get("resultTable").get("rows").get(0).get(0).asLong(), 1692057600000L);
+
+    sqlQuery =
+        "SELECT * FROM (SELECT CASE WHEN Carrier = 'garbage' THEN 'val1' ELSE 'val2' END as val FROM mytable) WHERE "
+            + "val in ('val1', 'val2') LIMIT 1";
+    explainPlan = postQuery("EXPLAIN PLAN FOR " + sqlQuery);
+    assertTrue(explainPlan.get("resultTable").get("rows").get(0).get(1).asText().contains("SEARCH"));
+
+    result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(result.get("resultTable").get("rows").size(), 1);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), "val2");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
