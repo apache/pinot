@@ -431,33 +431,28 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
-    if (dateTruncOperands.get(1).isSetLiteral()) {
-      return;
-    }
-
     long lowerMillis;
     long upperMillis;
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
-    // Create a defensive copy of operands since the list might be modified elsewhere
-    List<Expression> operands = new ArrayList<>(dateTruncOperands);
-    String unit = operands.get(0).getLiteral().getStringValue();
-    String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
+    String unit = dateTruncOperands.get(0).getLiteral().getStringValue();
+    String inputTimeUnit = (dateTruncOperands.size() >= 3) ? dateTruncOperands.get(2).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
-    if (operands.size() >= 4) {
-      if (!operands.get(3).getLiteral().getStringValue().equals("UTC")) {
+    if (dateTruncOperands.size() >= 4) {
+      if (!dateTruncOperands.get(3).getLiteral().getStringValue().equals("UTC")) {
         // Leave query unoptimized if working with non-UTC time zones
         return;
       }
     }
     ISOChronology chronology = ISOChronology.getInstanceUTC();
-    String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
+    String outputTimeUnit = (dateTruncOperands.size() == 5) ? dateTruncOperands.get(4).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
+
     switch (filterKind) {
-      case EQUALS:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
-        upperMillis = dateTruncCeil(operands);
-        lowerMillis = dateTruncFloor(operands);
+      case EQUALS: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
         // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
         // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the filter is
         // impossible and is converted to an impossible filter that is optimized away downstream
@@ -469,56 +464,62 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           return;
         }
         break;
-      case GREATER_THAN:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
-        lowerMillis = dateTruncCeil(operands);
+      }
+      case GREATER_THAN: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         lowerInclusive = false;
         upperMillis = Long.MAX_VALUE;
         break;
-      case GREATER_THAN_OR_EQUAL:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
-        lowerMillis = dateTruncFloor(operands);
+      }
+      case GREATER_THAN_OR_EQUAL: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
         upperMillis = Long.MAX_VALUE;
         // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
         // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the equality portion
         // of the filter is impossible and is converted to a regular greater than filter
         if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
           lowerInclusive = false;
-          lowerMillis = dateTruncCeil(operands);
+          lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         }
         break;
-      case LESS_THAN:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
+      }
+      case LESS_THAN: {
+        long timeValue = getLongValue(filterOperands.get(1));
         lowerMillis = Long.MIN_VALUE;
         upperInclusive = false;
-        upperMillis = dateTruncFloor(operands);
+        upperMillis = dateTruncFloor(timeValue, outputTimeUnit);
         // If the roundFloor of the upperMillis does not equal upperMillis, this implies that upperMillis (the literal
         // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the maximum value
         // that will truncate to a value lower than the literal will be equal to the ceiling of the inverse
         if (upperMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(upperMillis)) {
           upperInclusive = true;
-          upperMillis = dateTruncCeil(operands);
+          upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         }
         break;
-      case LESS_THAN_OR_EQUAL:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
+      }
+      case LESS_THAN_OR_EQUAL: {
+        long timeValue = getLongValue(filterOperands.get(1));
         lowerMillis = Long.MIN_VALUE;
-        upperMillis = dateTruncCeil(operands);
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         break;
-      case BETWEEN:
-        operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
-        lowerMillis = dateTruncFloor(operands);
+      }
+      case BETWEEN: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
         // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
         // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the lowerMillis must
         // be equal to the ceiling (non-inclusive) of the inverse
         if (TimeUnit.valueOf(outputTimeUnit).convert(lowerMillis, TimeUnit.MILLISECONDS)
             != getLongValue(filterOperands.get(1))) {
           lowerInclusive = false;
-          lowerMillis = dateTruncCeil(operands);
+          lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         }
-        operands.set(1, getExpression(getLongValue(filterOperands.get(2)), new DateTimeFormatSpec("TIMESTAMP")));
-        upperMillis = dateTruncCeil(operands);
+        timeValue = getLongValue(filterOperands.get(2));
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
         break;
+      }
       default:
         throw new IllegalStateException();
     }
@@ -579,10 +580,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper function to find the floor of acceptable values truncating to a specified value
    * Computes floor inverse of date trunc function
    */
-  private long dateTruncFloor(List<Expression> operands) {
-    long timeValue = getLongValue(operands.get(1));
-    String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
-        : TimeUnit.MILLISECONDS.name();
+  private long dateTruncFloor(long timeValue, String outputTimeUnit) {
     return TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
   }
 
@@ -590,9 +588,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper function that finds the maximum value (ceiling) that truncates to specified value
    * Computes ceiling inverse of date trunc function
    */
-  private long dateTruncCeil(List<Expression> operands) {
-    String unit = operands.get(0).getLiteral().getStringValue();
-    return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(dateTruncFloor(operands))
+  private long dateTruncCeil(String unit, long timeValue, String outputTimeUnit) {
+    long floorMillis = dateTruncFloor(timeValue, outputTimeUnit);
+    return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(floorMillis)
         + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;
   }
 }
