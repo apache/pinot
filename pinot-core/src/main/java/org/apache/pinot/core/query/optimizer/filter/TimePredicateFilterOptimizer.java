@@ -439,6 +439,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     long upperMillis;
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
+    // Create a defensive copy of operands since the list might be modified elsewhere
     List<Expression> operands = new ArrayList<>(dateTruncOperands);
     String unit = operands.get(0).getLiteral().getStringValue();
     String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
