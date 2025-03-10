@@ -1588,6 +1588,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         QueryException.BROKER_TIMEOUT_ERROR.getMessage());
   }
 
+  @Test
   public void testNumServersQueried() throws Exception {
     String query = "select * from mytable limit 10";
     JsonNode jsonNode = postQuery(query);
@@ -1595,6 +1596,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNotNull(numServersQueried);
     assertTrue(numServersQueried.isInt());
     assertTrue(numServersQueried.asInt() > 0);
+  }
+
+  @Test
+  public void testSearchLiteralFilter() throws Exception {
+    String sqlQuery = "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) "
+        + "SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
+    JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + sqlQuery);
+    assertTrue(explainPlan.get("resultTable").get("rows").get(0).get(1).asText().contains("SEARCH"));
+
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(result.get("resultTable").get("rows").size(), 1);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asLong(), 1692057600000L);
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)

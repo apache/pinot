@@ -271,20 +271,6 @@
           "\nLogicalValues(tuples=[[]])",
           "\n"
         ]
-      },
-      {
-        "description": "AND filter on constants is simplified",
-        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM a GROUP BY __ts) SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts",
-        "output": [
-          "Execution Plan",
-          "\nLogicalProject(__ts=[1692057600000:BIGINT])",
-          "\n  PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
-          "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
-          "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
-          "\n          LogicalTableScan(table=[[default, a]])",
-          "\n"
-        ]
       }
     ]
   }
