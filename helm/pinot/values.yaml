@@ -697,6 +697,33 @@ minionStateless:
   #  - name: PINOT_CUSTOM_ENV
   #    value: custom-value
 
+  # Auto-scaling configuration for minion stateless
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    # CPU-based autoscaling (optional)
+    cpuTargetPercentage: 80
+    # Memory-based autoscaling (optional)
+    memoryTargetPercentage: 80
+    # Task queue based autoscaling (recommended)
+    taskQueueMetric:
+      enabled: true
+      # The Prometheus metric name for pending tasks
+      metricName: "pinot_controller_TOTAL_PENDING_MINION_TASKS"
+      # Labels to select the specific metric
+      selectorLabels: {}
+      # Target value is tasks per minion - e.g., 5 means scale to have ~5 tasks per minion
+      targetValue: 5
+    # Fine-tuning autoscaling behavior
+    scaleUpStabilizationWindowSeconds: 0
+    scaleUpPercentValue: 100
+    scaleUpPodsValue: 4
+    scaleUpPeriodSeconds: 15
+    scaleDownStabilizationWindowSeconds: 300
+    scaleDownPercentValue: 25
+    scaleDownPeriodSeconds: 15
+
   # Extra configs will be appended to pinot-minion.conf file
   extra:
     configs: |-

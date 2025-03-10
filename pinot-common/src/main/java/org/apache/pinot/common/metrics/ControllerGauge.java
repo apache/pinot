@@ -190,7 +190,13 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
 
   // Resource utilization is within limits or not for a table
-  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false);
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  // Total number of pending minion tasks across all task types
+  TOTAL_PENDING_MINION_TASKS("Tasks", true),
+
+  // Number of pending minion tasks per task type
+  PENDING_MINION_TASKS_PER_TYPE("Tasks", false);
 
   private final String _gaugeName;
   private final String _unit;

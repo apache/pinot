@@ -1,0 +1,82 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+{{- if and .Values.minionStateless.enabled .Values.minionStateless.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "pinot.minionStateless.fullname" . }}
+  namespace: {{ include "pinot.namespace" . }}
+  labels:
+    {{- include "pinot.minionStatelessLabels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "pinot.minionStateless.fullname" . }}
+  minReplicas: {{ .Values.minionStateless.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.minionStateless.autoscaling.maxReplicas }}
+  metrics:
+  {{- if .Values.minionStateless.autoscaling.cpuTargetPercentage }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.minionStateless.autoscaling.cpuTargetPercentage }}
+  {{- end }}
+  {{- if .Values.minionStateless.autoscaling.memoryTargetPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.minionStateless.autoscaling.memoryTargetPercentage }}
+  {{- end }}
+  {{- if .Values.minionStateless.autoscaling.taskQueueMetric.enabled }}
+  - type: External
+    external:
+      metric:
+        name: {{ .Values.minionStateless.autoscaling.taskQueueMetric.metricName | default "pinot_controller_TOTAL_PENDING_MINION_TASKS" }}
+        selector:
+          matchLabels:
+            {{- toYaml .Values.minionStateless.autoscaling.taskQueueMetric.selectorLabels | nindent 12 }}
+      target:
+        type: AverageValue
+        averageValue: {{ .Values.minionStateless.autoscaling.taskQueueMetric.targetValue }}
+  {{- end }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.minionStateless.autoscaling.scaleUpStabilizationWindowSeconds | default 0 }}
+      policies:
+      - type: Percent
+        value: {{ .Values.minionStateless.autoscaling.scaleUpPercentValue | default 100 }}
+        periodSeconds: {{ .Values.minionStateless.autoscaling.scaleUpPeriodSeconds | default 15 }}
+      - type: Pods
+        value: {{ .Values.minionStateless.autoscaling.scaleUpPodsValue | default 4 }}
+        periodSeconds: {{ .Values.minionStateless.autoscaling.scaleUpPeriodSeconds | default 15 }}
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.minionStateless.autoscaling.scaleDownStabilizationWindowSeconds | default 300 }}
+      policies:
+      - type: Percent
+        value: {{ .Values.minionStateless.autoscaling.scaleDownPercentValue | default 100 }}
+        periodSeconds: {{ .Values.minionStateless.autoscaling.scaleDownPeriodSeconds | default 15 }}
+      selectPolicy: Max
+{{- end }}

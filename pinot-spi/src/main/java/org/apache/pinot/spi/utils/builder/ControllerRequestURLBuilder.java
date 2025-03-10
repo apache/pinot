@@ -626,4 +626,25 @@ public class ControllerRequestURLBuilder {
   public String forIdealState(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "idealstate");
   }
+
+  // Minion API Endpoints
+  public String forMinionInstances() {
+    return StringUtil.join("/", _baseUrl, "minions", "instances");
+  }
+
+  public String forTaggedMinionInstances() {
+    return StringUtil.join("/", _baseUrl, "minions", "instances", "tagged");
+  }
+
+  public String forTaggedMinionInstances(String tag) {
+    return StringUtil.join("/", _baseUrl, "minions", "instances", "tagged") + "?tag=" + tag;
+  }
+
+  public String forMinionTaskCount() {
+    return StringUtil.join("/", _baseUrl, "minions", "taskcount");
+  }
+
+  public String forMinionTaskCountByType(String taskType) {
+    return StringUtil.join("/", _baseUrl, "minions", "taskcount", taskType);
+  }
 }
