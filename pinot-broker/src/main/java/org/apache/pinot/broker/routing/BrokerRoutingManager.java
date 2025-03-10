@@ -637,6 +637,18 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
+  @Nullable
+  public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    if (routingEntry == null) {
+      return null;
+    }
+    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, tableNameWithType,
+        requestId);
+    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
+        selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
+  }
+
   private Map<ServerInstance, ServerRouteInfo> getServerInstanceToSegmentsMap(String tableNameWithType,
       InstanceSelector.SelectionResult selectionResult) {
     Map<ServerInstance, ServerRouteInfo> merged = new HashMap<>();
@@ -867,6 +879,22 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         }
       }
       return new ArrayList<>(selectedSegments);
+    }
+
+    InstanceSelector.SelectionResult calculateRouting(BrokerRequest brokerRequest, String tableNameWithType,
+        long requestId) {
+      Set<String> selectedSegments = _segmentSelector.select(brokerRequest, tableNameWithType);
+      int numTotalSelectedSegments = selectedSegments.size();
+      int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
+      if (!selectedSegments.isEmpty()) {
+        InstanceSelector.SelectionResult selectionResult =
+            _instanceSelector.select(brokerRequest, new ArrayList<>(selectedSegments), requestId);
+        selectionResult.setNumPrunedSegments(numPrunedSegments);
+        return selectionResult;
+      } else {
+        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
+            Collections.emptyList(), numPrunedSegments);
+      }
     }
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.routing;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,6 +28,15 @@ import java.util.List;
 public class ServerRouteInfo {
   private final List<String> _segments;
   private final List<String> _optionalSegments;
+
+  /**
+   * No-argument constructor for ServerRouteInfo.
+   * Initializes the lists to empty arrays.
+   */
+  public ServerRouteInfo() {
+    _segments = new ArrayList<>();
+    _optionalSegments = new ArrayList<>();
+  }
 
   /**
    * Constructor for ServerRouteInfo.
@@ -55,5 +65,15 @@ public class ServerRouteInfo {
    */
   public List<String> getOptionalSegments() {
     return _optionalSegments;
+  }
+
+  /**
+   * Merges another ServerRouteInfo into this one by adding all segments and optional segments.
+   *
+   * @param other The other ServerRouteInfo to merge.
+   */
+  public void merge(ServerRouteInfo other) {
+    _segments.addAll(other.getSegments());
+    _optionalSegments.addAll(other.getOptionalSegments());
   }
 }

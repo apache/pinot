@@ -57,6 +57,10 @@ public class DispatchablePlanMetadata implements Serializable {
   // Info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
   private boolean _requiresSingletonInstance;
 
+  private boolean _isLogicalTable = false;
+  private List<String> _physicalTableNames;
+  private Map<Integer, Map<String, Map<String, List<String>>>> _workerIdToLogicalTableSegmentsMap;
+
   // TODO: Change the following maps to lists
 
   // --------------------------------------------------------------------------
@@ -177,5 +181,30 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
     _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
+  }
+
+  public boolean isLogicalTable() {
+    return _isLogicalTable;
+  }
+
+  public void setLogicalTable(boolean logicalTable) {
+    _isLogicalTable = logicalTable;
+  }
+
+  public List<String> getPhysicalTableNames() {
+    return _physicalTableNames;
+  }
+
+  public void setPhysicalTableNames(List<String> physicalTableNames) {
+    _physicalTableNames = physicalTableNames;
+  }
+
+  public void setWorkerIdToLogicalTableSegmentsMap(Map<Integer, Map<String, Map<String, List<String>>>>
+      workerIdToLogicalTableSegmentsMap) {
+    _workerIdToLogicalTableSegmentsMap = workerIdToLogicalTableSegmentsMap;
+  }
+
+  public Map<Integer, Map<String, Map<String, List<String>>>> getWorkerIdToLogicalTableSegmentsMap() {
+    return _workerIdToLogicalTableSegmentsMap;
   }
 }
