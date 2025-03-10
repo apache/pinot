@@ -217,17 +217,21 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setPreChecks(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    Map<String, String> preCheckResult = rebalanceResult.getPreChecksResult();
+    Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
     assertEquals(preCheckResult.size(), 2);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS),
-        "WARNING: could not determine needReload status, run manually");
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
-        "PASS: instance assignment not allowed, no need for minimizeDataMovement");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.ERROR);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
+        "Could not determine needReload status, run manually");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
+        "Instance assignment not allowed, no need for minimizeDataMovement");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
