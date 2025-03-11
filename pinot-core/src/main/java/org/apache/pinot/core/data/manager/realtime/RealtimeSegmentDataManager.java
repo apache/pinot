@@ -1657,8 +1657,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // reload segment metadata to get latest status
         segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
 
-        if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
-          // segment has already been uploaded by another server.
+        if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          // it's certain at this point that there is a pending consuming -> online transition message.
+          // hence return from here and handle pending message instead.
           _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
               _segmentNameStr);
           throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
