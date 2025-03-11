@@ -24,10 +24,10 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelRule;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.immutables.value.Value;
@@ -47,7 +47,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
   public static PinotImplicitTableHintRule withWorkerManager(WorkerManager workerManager) {
     return new PinotImplicitTableHintRule(ImmutablePinotImplicitTableHintRule.Config.builder()
-        .operandSupplier(b0 -> b0.operand(PinotLogicalTableScan.class).anyInputs())
+        .operandSupplier(b0 -> b0.operand(TableScan.class).anyInputs())
         .workerManager(workerManager)
         .build()
     );
@@ -55,7 +55,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    PinotLogicalTableScan tableScan = call.rel(0);
+    TableScan tableScan = call.rel(0);
 
     // we don't want to apply this rule if the explicit hint is complete
     return !isHintComplete(getTableOptionHint(tableScan));
@@ -63,7 +63,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    PinotLogicalTableScan tableScan = call.rel(0);
+    TableScan tableScan = call.rel(0);
 
     String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
     @Nullable
@@ -97,14 +97,14 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Get the table option hint from the table scan, if any.
    */
   @Nullable
-  private static RelHint getTableOptionHint(PinotLogicalTableScan tableScan) {
+  private static RelHint getTableOptionHint(TableScan tableScan) {
     return PinotHintStrategyTable.getHint(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
   }
 
   /**
    * Returns a new node which is a copy of the given table scan with the new table options hint.
    */
-  private static RelNode withNewTableOptions(PinotLogicalTableScan tableScan, TableOptions tableOptions) {
+  private static RelNode withNewTableOptions(TableScan tableScan, TableOptions tableOptions) {
     ArrayList<RelHint> newHints = new ArrayList<>(tableScan.getHints());
 
     newHints.removeIf(relHint -> relHint.hintName.equals(PinotHintOptions.TABLE_HINT_OPTIONS));
@@ -130,7 +130,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Any explicit hint will override the implicit hint obtained from the table partition info.
    */
   private static TableOptions calculateTableOptions(
-      @Nullable RelHint relHint, TableOptions implicitTableOptions, PinotLogicalTableScan tableScan) {
+      @Nullable RelHint relHint, TableOptions implicitTableOptions, TableScan tableScan) {
     if (relHint == null) {
       return implicitTableOptions;
     }
@@ -150,7 +150,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   /**
    * Returns a table options hint with the partition key overridden by the hint, if any.
    */
-  private static ImmutableTableOptions overridePartitionKey(ImmutableTableOptions base, PinotLogicalTableScan tableScan,
+  private static ImmutableTableOptions overridePartitionKey(ImmutableTableOptions base, TableScan tableScan,
       Map<String, String> kvOptions) {
     String partitionKey = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY));
     if (partitionKey == null || partitionKey.equals(base.getPartitionKey())) {
@@ -164,7 +164,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Returns a table options hint with the partition function overridden by the hint, if any.
    */
   private static ImmutableTableOptions overridePartitionFunction(ImmutableTableOptions base,
-      PinotLogicalTableScan tableScan, Map<String, String> kvOptions) {
+      TableScan tableScan, Map<String, String> kvOptions) {
     String partitionFunction = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION));
     if (partitionFunction == null || partitionFunction.equals(base.getPartitionFunction())) {
       return base;
@@ -178,7 +178,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Returns a table options hint with the partition parallelism overridden by the hint, if any.
    */
   private static ImmutableTableOptions overridePartitionParallelism(ImmutableTableOptions base,
-      PinotLogicalTableScan tableScan, Map<String, String> kvOptions) {
+      TableScan tableScan, Map<String, String> kvOptions) {
     String partitionParallelismStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
     if (partitionParallelismStr == null) {
       return base;
@@ -198,7 +198,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Returns a table options hint with the partition size overridden by the hint, if any.
    */
   private static ImmutableTableOptions overridePartitionSize(ImmutableTableOptions base,
-      PinotLogicalTableScan tableScan, Map<String, String> kvOptions) {
+      TableScan tableScan, Map<String, String> kvOptions) {
     String partitionSizeStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
     if (partitionSizeStr == null) {
       return base;

@@ -37,7 +37,8 @@ public class PinotLogicalTableScan extends TableScan {
     super(cluster, traitSet, hints, table);
   }
 
-  @Override public RelNode withHints(List<RelHint> hintList) {
+  @Override
+  public RelNode withHints(List<RelHint> hintList) {
     return new PinotLogicalTableScan(getCluster(), traitSet, hintList, table);
   }
 
