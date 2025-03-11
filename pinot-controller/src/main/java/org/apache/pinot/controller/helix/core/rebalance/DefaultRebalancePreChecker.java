@@ -59,12 +59,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
     // Check for reload status
-    RebalancePreCheckerResult needsReloadMessage = checkReloadNeededOnServers(rebalanceJobId, tableNameWithType);
-    preCheckResult.put(NEEDS_RELOAD_STATUS, needsReloadMessage);
+    preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType));
     // Check whether minimizeDataMovement is set in TableConfig
-    RebalancePreCheckerResult isMinimizeDataMovementMessage = checkIsMinimizeDataMovement(rebalanceJobId,
-        tableNameWithType, tableConfig);
-    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, isMinimizeDataMovementMessage);
+    preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
+        tableNameWithType, tableConfig));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -80,12 +78,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     LOGGER.info("Fetching whether reload is needed for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
     Boolean needsReload = null;
-    String needsReloadMessage;
     if (_executorService == null) {
       LOGGER.warn("Executor service is null, skipping needsReload check for table: {} rebalanceJobId: {}",
           tableNameWithType, rebalanceJobId);
-      return new RebalancePreCheckerResult(RebalancePreCheckerResult.PreCheckStatus.WARNING,
-          "Could not determine needReload status, run manually");
+      return RebalancePreCheckerResult.warning("Could not determine needReload status, run manually");
     }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
       TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
@@ -106,13 +102,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       LOGGER.warn("Caught exception while trying to fetch reload status from servers", e);
     }
 
-    needsReloadMessage = needsReload == null ? "Could not determine needReload status, run manually"
-        : !needsReload ? "No need to reload" : "Reload needed prior to running rebalance";
-    RebalancePreCheckerResult.PreCheckStatus preCheckStatus = needsReload == null
-        ? RebalancePreCheckerResult.PreCheckStatus.ERROR
-        : !needsReload
-            ? RebalancePreCheckerResult.PreCheckStatus.PASS : RebalancePreCheckerResult.PreCheckStatus.WARNING;
-    return new RebalancePreCheckerResult(preCheckStatus, needsReloadMessage);
+    return needsReload == null
+        ? RebalancePreCheckerResult.error("Could not determine needReload status, run manually")
+        : !needsReload ? RebalancePreCheckerResult.pass("No need to reload")
+            : RebalancePreCheckerResult.warning("Reload needed prior to running rebalance");
   }
 
   /**
@@ -127,21 +120,19 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
             InstancePartitionsType.OFFLINE);
         InstanceAssignmentConfig instanceAssignmentConfig;
-        String instanceAssignmentStatusMessage;
-        RebalancePreCheckerResult.PreCheckStatus preCheckStatus;
+        RebalancePreCheckerResult rebalancePreCheckerResult;
         if (isInstanceAssignmentAllowed) {
           instanceAssignmentConfig =
               InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
-          instanceAssignmentStatusMessage = instanceAssignmentConfig.isMinimizeDataMovement()
-              ? "minimizeDataMovement is enabled"
-              : "minimizeDataMovement is not enabled but instance assignment is allowed";
-          preCheckStatus = instanceAssignmentConfig.isMinimizeDataMovement()
-              ? RebalancePreCheckerResult.PreCheckStatus.PASS : RebalancePreCheckerResult.PreCheckStatus.WARNING;
+          rebalancePreCheckerResult = instanceAssignmentConfig.isMinimizeDataMovement()
+              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
+              : RebalancePreCheckerResult.warning("minimizeDataMovement is not enabled but instance assignment "
+                  + "is allowed");
         } else {
-          instanceAssignmentStatusMessage = "Instance assignment not allowed, no need for minimizeDataMovement";
-          preCheckStatus = RebalancePreCheckerResult.PreCheckStatus.PASS;
+          rebalancePreCheckerResult =
+              RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
         }
-        return new RebalancePreCheckerResult(preCheckStatus, instanceAssignmentStatusMessage);
+        return rebalancePreCheckerResult;
       } else {
         boolean isInstanceAssignmentAllowedConsuming = InstanceAssignmentConfigUtils.allowInstanceAssignment(
             tableConfig, InstancePartitionsType.CONSUMING);
@@ -152,19 +143,17 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         }
         // For REALTIME tables need to check for both CONSUMING and COMPLETED segments if relocation is enabled
         if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
-          String instanceAssignmentStatusMessage;
-          RebalancePreCheckerResult.PreCheckStatus preCheckStatus;
+          RebalancePreCheckerResult rebalancePreCheckerResult;
           if (isInstanceAssignmentAllowedConsuming) {
-            instanceAssignmentStatusMessage = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-                ? "minimizeDataMovement is enabled"
-                : "minimizeDataMovement is not enabled but instance assignment is allowed";
-            preCheckStatus = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-                ? RebalancePreCheckerResult.PreCheckStatus.PASS : RebalancePreCheckerResult.PreCheckStatus.WARNING;
+            rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+                ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
+                : RebalancePreCheckerResult.warning("minimizeDataMovement is not enabled but instance assignment "
+                    + "is allowed");
           } else {
-            instanceAssignmentStatusMessage = "Instance assignment not allowed, no need for minimizeDataMovement";
-            preCheckStatus = RebalancePreCheckerResult.PreCheckStatus.PASS;
+            rebalancePreCheckerResult =
+                RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
           }
-          return new RebalancePreCheckerResult(preCheckStatus, instanceAssignmentStatusMessage);
+          return rebalancePreCheckerResult;
         }
 
         boolean isInstanceAssignmentAllowedCompleted = InstanceAssignmentConfigUtils.allowInstanceAssignment(
@@ -175,31 +164,25 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
               InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
         }
 
-        String instanceAssignmentStatusMessage;
-        RebalancePreCheckerResult.PreCheckStatus preCheckStatus;
+        RebalancePreCheckerResult rebalancePreCheckerResult;
         if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
-          instanceAssignmentStatusMessage = "Instance assignment not allowed, no need for minimizeDataMovement";
-          preCheckStatus = RebalancePreCheckerResult.PreCheckStatus.PASS;
+          rebalancePreCheckerResult =
+              RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
         } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
-          instanceAssignmentStatusMessage = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+          rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
               && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
-              ? "minimizeDataMovement is enabled"
-              : "minimizeDataMovement may not enabled for consuming or completed but instance assignment is allowed "
-                  + "for both";
-          preCheckStatus = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-              && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
-              ? RebalancePreCheckerResult.PreCheckStatus.PASS : RebalancePreCheckerResult.PreCheckStatus.WARNING;
+              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
+              : RebalancePreCheckerResult.warning("minimizeDataMovement may not enabled for consuming or completed "
+                  + "but instance assignment is allowed for both");
         } else {
-          instanceAssignmentStatusMessage = "minimizeDataMovement may not enabled for consuming or "
-              + "completed but instance assignment is allowed for at least one";
-          preCheckStatus = RebalancePreCheckerResult.PreCheckStatus.WARNING;
+          rebalancePreCheckerResult = RebalancePreCheckerResult.warning("minimizeDataMovement may not enabled for "
+              + "consuming or completed but instance assignment is allowed for at least one");
         }
-        return new RebalancePreCheckerResult(preCheckStatus, instanceAssignmentStatusMessage);
+        return rebalancePreCheckerResult;
       }
     } catch (IllegalStateException e) {
       LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
-      return new RebalancePreCheckerResult(RebalancePreCheckerResult.PreCheckStatus.ERROR,
-          "Got exception when fetching instance assignment, check manually");
+      return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
     }
   }
 }

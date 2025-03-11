@@ -49,6 +49,18 @@ public class RebalancePreCheckerResult {
     _message = message;
   }
 
+  public static RebalancePreCheckerResult pass(@Nullable String message) {
+    return new RebalancePreCheckerResult(PreCheckStatus.PASS, message);
+  }
+
+  public static RebalancePreCheckerResult warning(@Nullable String message) {
+    return new RebalancePreCheckerResult(PreCheckStatus.WARNING, message);
+  }
+
+  public static RebalancePreCheckerResult error(@Nullable String message) {
+    return new RebalancePreCheckerResult(PreCheckStatus.ERROR, message);
+  }
+
   @JsonProperty
   public PreCheckStatus getPreCheckStatus() {
     return _preCheckStatus;
