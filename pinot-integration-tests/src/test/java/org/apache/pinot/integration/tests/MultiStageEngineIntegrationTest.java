@@ -1600,6 +1600,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(numServersQueried.asInt() > 0);
   }
 
+  @Test
+  public void testPolymorphicScalarArrayFunctions() throws Exception {
+    String query = "select ARRAY_LENGTH(ARRAY[1,2,3]);";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 3);
+
+    query = "select ARRAY_LENGTH(SPLIT('abc,xyz', ','));";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 2);
+  }
+
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {
     checkQueryResultForDBTest(column, tableName, null, null);
