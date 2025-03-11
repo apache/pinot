@@ -30,9 +30,9 @@ public class SegmentCompletionConfig {
   public static final String DEFAULT_FSM_SCHEME_KEY =
       CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.default";
   public static final String DEFAULT_PAUSELESS_FSM_SCHEME_KEY =
-      CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.pauseless";
+      CommonConstants.Controller.PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION + ".fsm.scheme.pauselessDefault";
   public static final String DEFAULT_FSM_SCHEME = "default";
-  public static final String DEFAULT_PAUSELESS_FSM_SCHEME = "pauseless";
+  public static final String DEFAULT_PAUSELESS_FSM_SCHEME = "pauselessDefault";
   private final Map<String, String> _fsmSchemes = new HashMap<>();
   private final String _defaultFsmScheme;
   private final String _defaultPauselessFsmScheme;
