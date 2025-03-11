@@ -83,7 +83,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
-import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
