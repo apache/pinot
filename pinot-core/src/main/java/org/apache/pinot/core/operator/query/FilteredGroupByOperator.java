@@ -48,6 +48,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -56,6 +58,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 @SuppressWarnings("rawtypes")
 public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilteredGroupByOperator.class);
   private static final String EXPLAIN_NAME = "GROUP_BY_FILTERED";
 
   private final QueryContext _queryContext;
@@ -166,6 +169,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
+    if (groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningThreshold()) {
+      LOGGER.warn("Query exceeded the number of groups threshold: {} (actual: {}).",
+          _queryContext.getNumGroupsWarningThreshold(), groupKeyGenerator.getNumKeys());
+    }
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -182,6 +189,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroups(groupKeyGenerator.getNumKeys());
         return resultsBlock;
       }
     }
@@ -190,6 +198,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroups(groupKeyGenerator.getNumKeys());
     return resultsBlock;
   }
 

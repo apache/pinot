@@ -44,6 +44,7 @@ public class ExecutionStats {
   private static final String MIN_CONSUMING_FRESHNESS_TIME_MS = "minConsumingFreshnessTimeMs";
   private static final String TOTAL_DOCS = "totalDocs";
   private static final String NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String NUM_GROUPS = "numGroups";
   private static final String BROKER_REDUCE_TIME_MS = "brokerReduceTimeMs";
   private static final String TIME_USED_MS = "timeUsedMs";
   private static final String PARTIAL_RESULT = "partialResult";
@@ -111,6 +112,10 @@ public class ExecutionStats {
     return _brokerResponse.has(NUM_GROUPS_LIMIT_REACHED) && _brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
   }
 
+  public int getNumGroups() {
+    return _brokerResponse.has(NUM_GROUPS) ? _brokerResponse.get(NUM_GROUPS).asInt() : 0;
+  }
+
   public boolean isPartialResult() {
     return _brokerResponse.has(PARTIAL_RESULT) && _brokerResponse.get(PARTIAL_RESULT).asBoolean();
   }
@@ -138,6 +143,7 @@ public class ExecutionStats {
     map.put(MIN_CONSUMING_FRESHNESS_TIME_MS, getMinConsumingFreshnessTimeMs() + "ms");
     map.put(TOTAL_DOCS, getTotalDocs());
     map.put(NUM_GROUPS_LIMIT_REACHED, isNumGroupsLimitReached());
+    map.put(NUM_GROUPS, getNumGroups());
     map.put(BROKER_REDUCE_TIME_MS, getBrokerReduceTimeMs() + "ms");
     map.put(TIME_USED_MS, getTimeUsedMs() + "ms");
     map.put(PARTIAL_RESULT, isPartialResult());

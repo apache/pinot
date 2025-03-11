@@ -278,6 +278,12 @@ public class QueryLogger {
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._queryEngine.getName());
       }
+    },
+    NUM_GROUPS("numGroups") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getNumGroups());
+      }
     };
 
     public final String _entryName;
