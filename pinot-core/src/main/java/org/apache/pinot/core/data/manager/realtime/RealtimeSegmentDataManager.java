@@ -931,12 +931,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private boolean loadedPrevSegment() {
-    if (SegmentPreloadUtils.loadedPrevSegment()) {
-
-    }
-  }
-
   private boolean startSegmentCommit() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
@@ -1665,7 +1659,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES);
+      long startTimeMs = System.currentTimeMillis();
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
+        _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
+            System.currentTimeMillis() - startTimeMs);
+      }
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
