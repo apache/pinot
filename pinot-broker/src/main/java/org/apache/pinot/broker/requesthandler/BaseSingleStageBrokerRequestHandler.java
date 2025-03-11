@@ -79,8 +79,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
@@ -343,6 +341,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _rawTableName = null;
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
+
+    public CompileResult(String tableName, BrokerResponse errorOrLiteralOnlyBrokerResponse) {
+      _pinotQuery = null;
+      _serverPinotQuery = null;
+      _schema = null;
+      _tableName = tableName;
+      _rawTableName = null;
+      _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
+    }
   }
 
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
@@ -360,6 +367,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
        * If the compileRequest method sets the BrokerResponse field, then it is either an error response or
        * a literal-only query. In either case, we can return the response directly.
        */
+      if (compileResult._errorOrLiteralOnlyBrokerResponse.getExceptionsSize() > 0
+          && compileResult._errorOrLiteralOnlyBrokerResponse.getExceptions().get(0).getErrorCode()
+          == QueryErrorCode.UNKNOWN_COLUMN.getId() && compileResult._tableName != null) {
+        // If the error is due to schema mismatch, first check if table permissions are in place
+        // to not leak schema information.
+        AuthorizationResult authorizationResult =
+            hasTableAccess(requesterIdentity, Set.of(compileResult._tableName), requestContext, httpHeaders);
+        if (!authorizationResult.hasAccess()) {
+          throwAccessDeniedError(requestId, query, requestContext, compileResult._tableName, authorizationResult);
+        }
+      }
       return compileResult._errorOrLiteralOnlyBrokerResponse;
     }
 
@@ -368,24 +386,38 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String rawTableName = compileResult._rawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
+    String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+
     long compilationEndTimeNs = System.nanoTime();
     // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
 
-    // Second-stage table-level access control
-    // TODO: Modify AccessControl interface to directly take PinotQuery
-    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
-    BrokerRequest serverBrokerRequest =
-        serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
-    AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
-
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
-        System.nanoTime() - compilationEndTimeNs);
-
+    AuthorizationResult authorizationResult =
+        hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
     if (!authorizationResult.hasAccess()) {
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
+
+    // Validate QPS
+    if (hasExceededQPSQuota(database, Set.of(tableName), requestContext)) {
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
+    }
+
+    // Validate the request
+    try {
+      validateRequest(serverPinotQuery, _queryResponseLimit);
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
+      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
+    }
+
+    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
+    BrokerRequest serverBrokerRequest =
+        serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
 
     // Get the tables hit by the request
     String offlineTableName = null;
@@ -443,34 +475,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
     if (handlerContext._useApproximateFunction) {
       handleApproximateFunctionOverride(serverPinotQuery);
-    }
-
-    // Validate QPS quota
-    String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
-    if (!_queryQuotaManager.acquireDatabase(database)) {
-      String errorMessage =
-          String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
-      LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
-    }
-    if (!_queryQuotaManager.acquire(tableName)) {
-      String errorMessage =
-          String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
-      LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
-      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
-    }
-
-    // Validate the request
-    try {
-      validateRequest(serverPinotQuery, _queryResponseLimit);
-    } catch (Exception e) {
-      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
-      requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
-      return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
     }
 
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
@@ -923,13 +927,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestContext.setTableName(rawTableName);
 
-    AuthorizationResult authorizationResult =
-        accessControl.authorize(httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
-
-    if (!authorizationResult.hasAccess()) {
-      throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
-    }
-
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -942,8 +939,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             e.getMessage());
         requestContext.setErrorCode(QueryErrorCode.UNKNOWN_COLUMN);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
-        return new CompileResult(
-            new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
+        return new CompileResult(tableName, new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
       }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
