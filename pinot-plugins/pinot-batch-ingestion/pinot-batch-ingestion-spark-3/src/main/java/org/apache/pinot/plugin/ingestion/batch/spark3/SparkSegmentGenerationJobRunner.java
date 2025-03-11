@@ -163,9 +163,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         stagingDirURI = new File(stagingDir).toURI();
       }
       if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
-        throw new RuntimeException(
-            String.format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
-                stagingDirURI, outputDirURI));
+        throw new RuntimeException("The scheme of staging directory URI [" + stagingDirURI + "] and output directory "
+            + "URI [" + outputDirURI + "] has to be same.");
       }
       outputDirFS.mkdir(stagingDirURI);
     }
@@ -198,12 +197,12 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           List<String> siblingFiles = localDirIndex.get(parentPath);
           Collections.sort(siblingFiles);
           for (int i = 0; i < siblingFiles.size(); i++) {
-            pathAndIdxList.add(String.format("%s %d", siblingFiles.get(i), i));
+            pathAndIdxList.add(siblingFiles.get(i) + " " + i);
           }
         }
       } else {
         for (int i = 0; i < filteredFiles.size(); i++) {
-          pathAndIdxList.add(String.format("%s %d", filteredFiles.get(i), i));
+          pathAndIdxList.add(filteredFiles.get(i) + " " + i);
         }
       }
       int numDataFiles = pathAndIdxList.size();

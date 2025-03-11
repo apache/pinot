@@ -39,7 +39,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -50,7 +49,6 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -64,6 +62,7 @@ import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -121,7 +120,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
       } catch (TimeoutException e) {
         brokerResponse.getExceptions()
-            .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+            .add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, e.getMessage()));
       }
     }
 
@@ -322,10 +321,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
                       values[colId] = ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
                       break;
                     case OBJECT:
-                      // TODO: Move ser/de into AggregationFunction interface
                       CustomObject customObject = dataTable.getCustomObject(rowId, colId);
                       if (customObject != null) {
-                        values[colId] = ObjectSerDeUtils.deserialize(customObject);
+                        assert _aggregationFunctions != null;
+                        values[colId] =
+                            _aggregationFunctions[colId - _numGroupByExpressions].deserializeIntermediateResult(
+                                customObject);
                       }
                       break;
                     // Add other aggregation intermediate result / group-by column type supports here

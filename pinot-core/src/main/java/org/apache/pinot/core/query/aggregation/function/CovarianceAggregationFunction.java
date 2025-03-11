@@ -22,9 +22,11 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -173,13 +175,24 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
   @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.DOUBLE;
+  public SerializedIntermediateResult serializeIntermediateResult(CovarianceTuple covarianceTuple) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.CovarianceTuple.getValue(),
+        ObjectSerDeUtils.COVARIANCE_TUPLE_OBJECT_SER_DE.serialize(covarianceTuple));
+  }
+
+  @Override
+  public CovarianceTuple deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.COVARIANCE_TUPLE_OBJECT_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.DOUBLE;
   }
 
   @Override

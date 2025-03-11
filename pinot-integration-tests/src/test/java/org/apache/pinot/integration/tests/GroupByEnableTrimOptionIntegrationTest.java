@@ -90,13 +90,13 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     super.overrideBrokerConf(brokerConf);
 
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_GROUP_TRIM, "true");
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM, "true");
   }
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
     super.overrideServerConf(serverConf);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE, "3");
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE, "3");
   }
 
   @Test

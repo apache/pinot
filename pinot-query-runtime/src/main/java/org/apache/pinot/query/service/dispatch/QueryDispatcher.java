@@ -20,6 +20,7 @@ package org.apache.pinot.query.service.dispatch;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
@@ -44,10 +45,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -55,6 +55,7 @@ import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -79,6 +80,7 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -104,7 +106,6 @@ public class QueryDispatcher {
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
-  private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
   @Nullable
   private final TlsConfig _tlsConfig;
@@ -144,7 +145,13 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      try {
+        return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      } finally {
+        if (isQueryCancellationEnabled()) {
+          _serversByQuery.remove(requestId);
+        }
+      }
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, servers);
@@ -158,7 +165,7 @@ public class QueryDispatcher {
     long requestId = context.getRequestId();
     List<PlanNode> planNodes = new ArrayList<>();
 
-    List<DispatchablePlanFragment> plans = Collections.singletonList(fragment);
+    Set<DispatchablePlanFragment> plans = Collections.singleton(fragment);
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       SendRequest<List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
@@ -199,8 +206,7 @@ public class QueryDispatcher {
       Map<String, String> queryOptions)
       throws Exception {
     SendRequest<Worker.QueryResponse> requestSender = DispatchClient::submit;
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    List<DispatchablePlanFragment> plansWithoutRoot = stagePlans.subList(1, stagePlans.size());
+    Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
     execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, serversOut,
         (response, serverInstance) -> {
       if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
@@ -217,23 +223,34 @@ public class QueryDispatcher {
     }
   }
 
-  public boolean checkConnectivityToInstance(String instanceId) {
-    String hostnamePort = _instanceIdToHostnamePortMap.get(instanceId);
-    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+  public FailureDetector.ServerState checkConnectivityToInstance(ServerInstance serverInstance) {
+    String hostname = serverInstance.getHostname();
+    int port = serverInstance.getQueryServicePort();
+    String hostnamePort = String.format("%s_%d", hostname, port);
 
+    DispatchClient client = _dispatchClientMap.get(hostnamePort);
+    // Could occur if the cluster is only serving single-stage queries
     if (client == null) {
-      LOGGER.warn("No DispatchClient found for server with instanceId: {}", instanceId);
-      return false;
+      LOGGER.debug("No DispatchClient found for server with instanceId: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", serverInstance.getInstanceId());
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", serverInstance.getInstanceId(),
+          connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 
   private boolean isQueryCancellationEnabled() {
     return _serversByQuery != null;
   }
 
-  private <E> void execute(long requestId, List<DispatchablePlanFragment> stagePlans,
+  private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans,
       long timeoutMs, Map<String, String> queryOptions,
       SendRequest<E> sendRequest, Set<QueryServerInstance> serverInstancesOut,
       BiConsumer<E, QueryServerInstance> resultConsumer)
@@ -241,7 +258,8 @@ public class QueryDispatcher {
 
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
 
-    List<StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstancesOut, deadline);
+    Map<DispatchablePlanFragment, StageInfo> stageInfos =
+        serializePlanFragments(stagePlans, serverInstancesOut, deadline);
 
     if (serverInstancesOut.isEmpty()) {
       throw new RuntimeException("No server instances to dispatch query to");
@@ -261,8 +279,7 @@ public class QueryDispatcher {
               serverInstance);
         }
       };
-      Worker.QueryRequest requestBuilder =
-          createRequest(serverInstance, stagePlans, stageInfos, protoRequestMetadata);
+      Worker.QueryRequest requestBuilder = createRequest(serverInstance, stageInfos, protoRequestMetadata);
       DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
 
       try {
@@ -322,11 +339,12 @@ public class QueryDispatcher {
   }
 
   private static Worker.QueryRequest createRequest(QueryServerInstance serverInstance,
-      List<DispatchablePlanFragment> stagePlans, List<StageInfo> stageInfos, ByteString protoRequestMetadata) {
+      Map<DispatchablePlanFragment, StageInfo> stageInfos, ByteString protoRequestMetadata) {
     Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
     requestBuilder.setVersion(CommonConstants.MultiStageQueryRunner.PlanVersions.V1);
-    for (int i = 0; i < stagePlans.size(); i++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(i);
+
+    for (Map.Entry<DispatchablePlanFragment, StageInfo> entry : stageInfos.entrySet()) {
+      DispatchablePlanFragment stagePlan = entry.getKey();
       List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
       if (workerIds != null) { // otherwise this server doesn't need to execute this stage
         List<WorkerMetadata> stageWorkerMetadataList = stagePlan.getWorkerMetadataList();
@@ -336,21 +354,18 @@ public class QueryDispatcher {
         }
         List<Worker.WorkerMetadata> protoWorkerMetadataList =
             QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
-        StageInfo stageInfo = stageInfos.get(i);
+        StageInfo stageInfo = entry.getValue();
 
-        //@formatter:off
         Worker.StagePlan requestStagePlan = Worker.StagePlan.newBuilder()
             .setRootNode(stageInfo._rootNode)
             .setStageMetadata(
                 Worker.StageMetadata.newBuilder()
-                    // this is a leak from submitAndReduce (id may be different in explain), but it's fine for now
-                    .setStageId(i + 1)
+                    .setStageId(stagePlan.getPlanFragment().getFragmentId())
                     .addAllWorkerMetadata(protoWorkerMetadataList)
                     .setCustomProperty(stageInfo._customProperty)
                     .build()
             )
             .build();
-        //@formatter:on
         requestBuilder.addStagePlan(requestStagePlan);
       }
     }
@@ -368,18 +383,22 @@ public class QueryDispatcher {
     return requestMetadata;
   }
 
-  private List<StageInfo> serializePlanFragments(List<DispatchablePlanFragment> stagePlans,
+  private Map<DispatchablePlanFragment, StageInfo> serializePlanFragments(
+      Set<DispatchablePlanFragment> stagePlans,
       Set<QueryServerInstance> serverInstances, Deadline deadline)
       throws InterruptedException, ExecutionException, TimeoutException {
-    List<CompletableFuture<StageInfo>> stageInfoFutures = new ArrayList<>(stagePlans.size());
+    List<CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>>> stageInfoFutures =
+        new ArrayList<>(stagePlans.size());
     for (DispatchablePlanFragment stagePlan : stagePlans) {
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
-      stageInfoFutures.add(CompletableFuture.supplyAsync(() -> serializePlanFragment(stagePlan), _executorService));
+      stageInfoFutures.add(
+          CompletableFuture.supplyAsync(() -> Pair.of(stagePlan, serializePlanFragment(stagePlan)), _executorService));
     }
-    List<StageInfo> stageInfos = new ArrayList<>(stagePlans.size());
+    Map<DispatchablePlanFragment, StageInfo> stageInfos = Maps.newHashMapWithExpectedSize(stagePlans.size());
     try {
-      for (CompletableFuture<StageInfo> future : stageInfoFutures) {
-        stageInfos.add(future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS));
+      for (CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>> future : stageInfoFutures) {
+        Pair<DispatchablePlanFragment, StageInfo> pair = future.get();
+        stageInfos.put(pair.getKey(), pair.getValue());
       }
     } finally {
       for (CompletableFuture<?> future : stageInfoFutures) {
@@ -436,7 +455,6 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     String hostnamePort = String.format("%s_%d", hostname, port);
-    _instanceIdToHostnamePortMap.put(queryServerInstance.getInstanceId(), hostnamePort);
     return _dispatchClientMap.computeIfAbsent(hostnamePort, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
@@ -459,7 +477,7 @@ public class QueryDispatcher {
     long startTimeMs = System.currentTimeMillis();
     long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
-    DispatchablePlanFragment stagePlan = subPlan.getQueryStageList().get(0);
+    DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
     PlanFragment planFragment = stagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
 
@@ -518,14 +536,19 @@ public class QueryDispatcher {
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
-      String errorMessage = "Received error query execution result block: " + queryExceptions;
-      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
-        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
-        throw queryInfoException;
-      }
 
-      throw new RuntimeException(errorMessage);
+      if (queryExceptions.size() == 1) {
+        Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(error.getKey());
+        throw errorCode.asException("Received 1 error from servers: " + error.getValue());
+      } else {
+        Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
+            .max(QueryDispatcher::compareErrors)
+            .orElseThrow();
+        throw QueryErrorCode.fromErrorCode(highestPriorityError.getKey())
+            .asException("Received " + queryExceptions.size() + " errors from servers. "
+                + "The one with highest priority is: " + highestPriorityError.getValue());
+      }
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
@@ -534,12 +557,24 @@ public class QueryDispatcher {
         System.currentTimeMillis() - startTimeMs);
   }
 
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<Integer, String> entry1, Map.Entry<Integer, String> entry2) {
+    int errorCode1 = entry1.getKey();
+    int errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode1;
+    }
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode2;
+    }
+    return Integer.compare(errorCode1, errorCode2);
+  }
+
   public void shutdown() {
     for (DispatchClient dispatchClient : _dispatchClientMap.values()) {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
-    _instanceIdToHostnamePortMap.clear();
     _mailboxService.shutdown();
     _executorService.shutdown();
   }

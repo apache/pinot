@@ -28,7 +28,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
  * Config for SegmentPruner.
  */
 public class SegmentPrunerConfig {
-  public static final String SEGMENT_PRUNER_NAMES_KEY = "class";
+  @Deprecated
+  public static final String SEGMENT_PRUNER_NAMES_KEY = Server.CLASS;
 
   private final int _numSegmentPruners;
   private final List<String> _segmentPrunerNames;
@@ -36,7 +37,7 @@ public class SegmentPrunerConfig {
 
   public SegmentPrunerConfig(PinotConfiguration segmentPrunerConfig) {
     List<String> segmentPrunerNames =
-        segmentPrunerConfig.getProperty(SEGMENT_PRUNER_NAMES_KEY, Server.DEFAULT_QUERY_EXECUTOR_PRUNER_CLASS);
+        segmentPrunerConfig.getProperty(Server.CLASS, Server.DEFAULT_QUERY_EXECUTOR_PRUNER_CLASS);
     _numSegmentPruners = segmentPrunerNames.size();
     _segmentPrunerNames = new ArrayList<>(_numSegmentPruners);
     _segmentPrunerConfigs = new ArrayList<>(_numSegmentPruners);

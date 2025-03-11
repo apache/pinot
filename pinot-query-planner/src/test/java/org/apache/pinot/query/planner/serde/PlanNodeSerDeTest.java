@@ -32,7 +32,7 @@ public class PlanNodeSerDeTest extends QueryEnvironmentTestBase {
   @Test(dataProvider = "testQueryDataProvider")
   public void testQueryStagePlanSerDe(String query) {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStageList()) {
+    for (DispatchablePlanFragment dispatchablePlanFragment : dispatchableSubPlan.getQueryStages()) {
       PlanNode stagePlan = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
       PlanNode deserializedStagePlan = PlanNodeDeserializer.process(PlanNodeSerializer.process(stagePlan));
       assertEquals(stagePlan, deserializedStagePlan);

@@ -330,15 +330,54 @@ public class RexExpressionUtils {
     Sarg sarg = searchArgument.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
+      }
       return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges());
+      }
       return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
           toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
+      if (leftOperand instanceof RexLiteral) {
+        return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
+      }
       Set<Range> ranges = sarg.rangeSet.asRanges();
       return convertRangesToOr(dataType, leftOperand, ranges);
     }
+  }
+
+  private static RexExpression evaluateLiteralIn(RexLiteral leftOperand, Set<Range> ranges) {
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.lowerEndpoint().equals(leftVal)) {
+        return RexExpression.Literal.TRUE;
+      }
+    }
+    return RexExpression.Literal.FALSE;
+  }
+
+  private static RexExpression evaluateLiteralNotIn(RexLiteral leftOperand, Set<Range> ranges) {
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.lowerEndpoint().equals(leftVal)) {
+        return RexExpression.Literal.FALSE;
+      }
+    }
+    return RexExpression.Literal.TRUE;
+  }
+
+  private static RexExpression evaluateLiteralOrRanges(RexLiteral leftOperand, Set<Range> ranges) {
+    Comparable leftVal = leftOperand.getValue();
+    for (Range range : ranges) {
+      if (range.contains(leftVal)) {
+        return RexExpression.Literal.TRUE;
+      }
+    }
+    return RexExpression.Literal.FALSE;
   }
 
   private static RexExpression convertRangesToOr(ColumnDataType dataType, RexNode leftOperand, Set<Range> ranges) {

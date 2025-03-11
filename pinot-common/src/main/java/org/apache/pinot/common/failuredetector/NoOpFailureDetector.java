@@ -35,7 +35,7 @@ public class NoOpFailureDetector implements FailureDetector {
   }
 
   @Override
-  public void registerUnhealthyServerRetrier(Function<String, Boolean> unhealthyServerRetrier) {
+  public void registerUnhealthyServerRetrier(Function<String, ServerState> unhealthyServerRetrier) {
   }
 
   @Override

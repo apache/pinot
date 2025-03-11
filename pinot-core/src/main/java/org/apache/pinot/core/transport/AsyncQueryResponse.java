@@ -28,9 +28,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -120,7 +120,7 @@ public class AsyncQueryResponse implements QueryResponse {
       // If Server response has exceptions in Datatable set the latency for timeout value.
       for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
         // Check if the exceptions received are server side exceptions
-        if (!QueryException.isClientError(exception.getKey())) {
+        if (!QueryErrorCode.fromErrorCode(exception.getKey()).isClientError()) {
           return true;
         }
       }

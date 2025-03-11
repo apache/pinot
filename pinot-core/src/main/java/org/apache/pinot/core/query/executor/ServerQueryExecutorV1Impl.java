@@ -35,7 +35,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -61,7 +60,7 @@ import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.config.QueryExecutorConfig;
+import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
 import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -81,10 +80,14 @@ import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.executor.MdcExecutor;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,10 +113,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throws ConfigurationException {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
-    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
     LOGGER.info("Trying to build SegmentPrunerService");
-    _segmentPrunerService = new SegmentPrunerService(queryExecutorConfig.getPrunerConfig());
-    String planMakerClass = queryExecutorConfig.getPlanMakerClass();
+    _segmentPrunerService = new SegmentPrunerService(new SegmentPrunerConfig(config.subset(Server.PRUNER)));
+    String planMakerClass = config.getProperty(Server.PLAN_MAKER_CLASS, Server.DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS);
     LOGGER.info("Trying to build PlanMaker with class: {}", planMakerClass);
     try {
       _planMaker = PluginManager.get().createInstance(planMakerClass);
@@ -121,7 +123,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throw new RuntimeException("Caught exception while creating PlanMaker with class: " + planMakerClass);
     }
     _planMaker.init(config);
-    _defaultTimeoutMs = queryExecutorConfig.getTimeOut();
+    _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
         _enablePrefetch);
@@ -140,8 +142,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
+    MdcExecutor mdcExecutor = new MdcExecutor(executorService) {
+      @Override
+      protected boolean alreadyRegistered() {
+        return LoggerConstants.QUERY_ID_KEY.isRegistered();
+      }
+
+      @Override
+      protected void registerInMdc() {
+        queryRequest.registerInMdc();
+      }
+
+      @Override
+      protected void unregisterFromMdc() {
+        queryRequest.unregisterFromMdc();
+      }
+    };
+
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -150,7 +169,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, executorService, streamer);
+      return executeInternal(queryRequest, mdcExecutor, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
@@ -189,8 +208,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       String errorMessage = "Query scheduling took " + querySchedulingTimeMs + "ms (longer than query timeout of "
           + queryTimeoutMs + "ms) on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
-      instanceResponse.addException(
-          QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
+      instanceResponse.addException(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
     }
@@ -200,8 +218,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       String errorMessage = "Failed to find table: " + tableNameWithType + " on server: "
           + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
-      instanceResponse.addException(
-          QueryException.getException(QueryException.SERVER_TABLE_MISSING_ERROR, errorMessage));
+      instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
     }
@@ -322,10 +339,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
       // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
-      if (e instanceof BadQueryRequestException) {
-        LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
-      } else if (e instanceof QueryCancelledException) {
+      if (e instanceof QueryCancelledException) {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);
         } else {
@@ -334,12 +348,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // NOTE most likely the onFailure() callback registered on query future in InstanceRequestHandler would
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e));
+        instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION,
+            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e);
+      } else if (e instanceof QueryException) {
+        LOGGER.info("Caught QueryException while processing requestId: {}, {}", requestId, e.getMessage());
+        instanceResponse.addException(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
-            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e));
+        instanceResponse.addException(QueryErrorCode.QUERY_EXECUTION,
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -371,9 +388,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
               .collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
-        instanceResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,
+        instanceResponse.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
             numMissingSegments + " segments " + missingSegments + " missing on server: "
-                + _instanceDataManager.getInstanceId()));
+                + _instanceDataManager.getInstanceId());
         _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
       }
     }
