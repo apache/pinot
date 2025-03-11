@@ -35,7 +35,7 @@ public class BrokerGrpcRequestBuilder {
     return this;
   }
 
-  public BrokerGrpcRequestBuilder setCorrelationId(String cid) {
+  public BrokerGrpcRequestBuilder setCid(String cid) {
     _cid = cid;
     return this;
   }
