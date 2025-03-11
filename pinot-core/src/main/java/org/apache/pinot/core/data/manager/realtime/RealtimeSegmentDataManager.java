@@ -1657,19 +1657,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
         _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
             System.currentTimeMillis() - startTimeMs);
+
         // check if both dedup and upsert are disabled
         if (!(realtimeTableDataManager.isDedupEnabled() || realtimeTableDataManager.isUpsertEnabled())) {
-          // reload segment metadata to get latest status
-          segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
-          if (segmentZKMetadata == null) {
-            _segmentLogger.error("segmentZKMetadata does not exists for segment: {}", _segmentNameStr);
-            throw new RuntimeException("segmentZKMetadata does not exists.");
-          }
-          if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
-            // it's certain at this point that there is a pending consuming -> online transition message.
-            // hence return from here and handle pending message instead.
-            _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
-                _segmentNameStr);
+          if (isSegmentOnline()) {
+            // if segment is online, no need to wait.
             throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
           }
         }
@@ -1734,6 +1726,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }).start();
       throw t;
     }
+  }
+
+  private boolean isSegmentOnline() {
+    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
+
+    if (segmentZKMetadata == null) {
+      _segmentLogger.error("segmentZKMetadata does not exists for segment: {}", _segmentNameStr);
+      throw new RuntimeException("segmentZKMetadata does not exists.");
+    }
+
+    if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      // it's certain at this point that there is a pending consuming -> online transition message.
+      // hence return from here and handle pending message instead.
+      _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
+          _segmentNameStr);
+      return true;
+    }
+
+    return false;
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
