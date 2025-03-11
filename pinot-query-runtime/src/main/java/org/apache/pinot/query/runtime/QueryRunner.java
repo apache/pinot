@@ -74,6 +74,7 @@ import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -184,6 +185,12 @@ public class QueryRunner {
             )
         )
     );
+
+    int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(config);
+    if (hardLimit > 0) {
+      _executorService = new HardLimitExecutor(hardLimit, _executorService);
+    }
+
     _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
