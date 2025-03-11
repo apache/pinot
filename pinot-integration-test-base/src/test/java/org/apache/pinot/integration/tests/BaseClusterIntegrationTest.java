@@ -619,9 +619,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
     uploadSegments(tableConfig.getTableName(), _tarDir);
 
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L, timeoutMs,
-        "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(), true, Duration.ofMillis(timeoutMs / 10));
-
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
+        timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
+        true, Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()

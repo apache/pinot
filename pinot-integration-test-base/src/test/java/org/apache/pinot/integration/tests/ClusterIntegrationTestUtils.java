@@ -345,12 +345,12 @@ public class ClusterIntegrationTestUtils {
     buildSegmentFromFile(avroFile, tableConfig, schema, segmentNamePostfix, segmentDir, tarDir, FileFormat.AVRO);
   }
 
-  public static void buildSegmentFromFile(File avroFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
+  public static void buildSegmentFromFile(File file, TableConfig tableConfig, org.apache.pinot.spi.data.Schema schema,
+      String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setFormat(fileFormat);
-    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setInputFilePath(file.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);

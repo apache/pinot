@@ -79,9 +79,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String PRIMARY_TABLE_DATA_PATH = "baseballStats_data.csv";
   private static final String PRIMARY_TABLE_SCHEMA_PATH = "baseballStats_schema.json";
   private static final String PRIMARY_TABLE_TABLE_CONFIG_PATH = "baseballStats_offline_table_config.json";
+  private static final Integer PRIMARY_NUMBER_OF_RECORDS = 97889;
   private static final String DIM_TABLE_DATA_PATH = "data/dimBaseballTeams.csv";
   private static final String DIM_TABLE_SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String DIM_TABLE_TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
+  private static final Integer DIM_NUMBER_OF_RECORDS = 52;
 
   @Override
   protected String getSchemaFileName() {
@@ -1615,15 +1617,18 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     addSchema(lookupTableSchema);
     TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
     addTableConfig(tableConfig);
-    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV, 52, 60_000);
+    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
 
     Schema primaryTableSchema = createSchema(PRIMARY_TABLE_SCHEMA_PATH);
     addSchema(primaryTableSchema);
     TableConfig primaryTableConfig = createTableConfig(PRIMARY_TABLE_TABLE_CONFIG_PATH);
     addTableConfig(primaryTableConfig);
-    createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV, 97889, 60_000);
+    createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV,
+        PRIMARY_NUMBER_OF_RECORDS, 60_000);
 
-    String query = "select /*+ joinOptions(join_strategy='lookup') */ yearID, teamName from baseballStats join dimBaseballTeams ON baseballStats.teamID = dimBaseballTeams.teamID where playerId = 'aardsda01'";
+    String query = "select /*+ joinOptions(join_strategy='lookup') */ yearID, teamName from baseballStats "
+        + "join dimBaseballTeams ON baseballStats.teamID = dimBaseballTeams.teamID where playerId = 'aardsda01'";
     JsonNode jsonNode = postQuery(query);
     long result = jsonNode.get("resultTable").get("rows").size();
     assertEquals(result, 3);
