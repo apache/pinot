@@ -34,9 +34,10 @@ public class SegmentCompletionFSMFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionFSMFactory.class);
   private static final Map<String, Class<? extends SegmentCompletionFSM>> FSM_CLASS_MAP = new HashMap<>();
 
-  // Static block to register the default FSM
+  // Static block to register the default FSM and pauseless FSM
   static {
     register(SegmentCompletionConfig.DEFAULT_FSM_SCHEME, BlockingSegmentCompletionFSM.class);
+    register(SegmentCompletionConfig.DEFAULT_PAUSELESS_FSM_SCHEME, PauselessSegmentCompletionFSM.class);
   }
 
   /**
