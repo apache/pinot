@@ -162,8 +162,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             });
       } catch (ExecutionException | InterruptedException | TimeoutException | RuntimeException e) {
         LOGGER.error("Caught exception while submitting request: {}", requestId, e);
-        String errorMsg = "Caught exception while submitting request: " + e.getMessage();responseObserver.onNext(Worker.QueryResponse.newBuilder()
-            .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,errorMsg)
+        String errorMsg = "Caught exception while submitting request: " + e.getMessage();
+        responseObserver.onNext(Worker.QueryResponse.newBuilder()
+            .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
                 .build());
         responseObserver.onCompleted();
         return;
@@ -218,8 +219,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       } catch (ExecutionException | InterruptedException | TimeoutException | RuntimeException e) {
         long requestId = QueryThreadContext.getRequestId();
         LOGGER.error("Caught exception while submitting request: {}", requestId, e);
-        String errorMsg = "Caught exception while submitting request: " + e.getMessage();responseObserver.onNext(Worker.ExplainResponse.newBuilder()
-            .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR,errorMsg)
+        String errorMsg = "Caught exception while submitting request: " + e.getMessage();
+        responseObserver.onNext(Worker.ExplainResponse.newBuilder()
+            .putMetadata(CommonConstants.Explain.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
                 .build());
         responseObserver.onCompleted();
         return;
