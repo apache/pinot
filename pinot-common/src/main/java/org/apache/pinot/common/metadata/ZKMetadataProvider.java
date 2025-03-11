@@ -306,8 +306,8 @@ public class ZKMetadataProvider {
     return PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX;
   }
 
-  public static String constructPropertyStorePathForWorkloadConfig(String workloadName) {
-    return StringUtil.join( "/", PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX, workloadName);
+  public static String constructPropertyStorePathForQueryWorkloadConfig(String workloadName) {
+    return StringUtil.join("/", PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX, workloadName);
   }
 
   @Deprecated
@@ -877,7 +877,7 @@ public class ZKMetadataProvider {
   @Nullable
   public static QueryWorkloadConfig getQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String workloadName) throws Exception {
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForWorkloadConfig(workloadName),
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForQueryWorkloadConfig(workloadName),
         null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
@@ -888,7 +888,7 @@ public class ZKMetadataProvider {
   public static boolean setQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
       QueryWorkloadConfig queryWorkloadConfig) throws Exception {
 
-    String path = constructPropertyStorePathForWorkloadConfig(queryWorkloadConfig.getQueryWorkloadName());
+    String path = constructPropertyStorePathForQueryWorkloadConfig(queryWorkloadConfig.getQueryWorkloadName());
     boolean isNewConfig = !propertyStore.exists(path, AccessOption.PERSISTENT);
     ZNRecord znRecord = isNewConfig ? new ZNRecord(queryWorkloadConfig.getQueryWorkloadName())
         : propertyStore.get(path, null, AccessOption.PERSISTENT);
@@ -900,7 +900,7 @@ public class ZKMetadataProvider {
   }
 
   public static void deleteQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String workloadName) {
-    String propertyStorePath = constructPropertyStorePathForWorkloadConfig(workloadName);
+    String propertyStorePath = constructPropertyStorePathForQueryWorkloadConfig(workloadName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }

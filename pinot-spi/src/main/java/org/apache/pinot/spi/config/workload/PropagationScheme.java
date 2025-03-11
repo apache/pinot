@@ -31,15 +31,15 @@ public class PropagationScheme extends BaseJsonConfig {
     TABLE("table"),
     TENANT("tenant");
 
-    private final String value;
+    private final String _value;
 
     Type(String value) {
-      this.value = value;
+      _value = value;
     }
 
     @JsonValue
     public String getJsonValue() {
-      return value;
+      return _value;
     }
 
     @JsonCreator
@@ -49,7 +49,7 @@ public class PropagationScheme extends BaseJsonConfig {
       }
       String normalized = value.toLowerCase().trim();
       for (Type type : Type.values()) {
-        if (type.value.equals(normalized)) {
+        if (type.getJsonValue().equals(normalized)) {
           return type;
         }
       }
@@ -62,6 +62,7 @@ public class PropagationScheme extends BaseJsonConfig {
 
   @JsonPropertyDescription("Describes the type of propagation scheme")
   private Type _propagationType;
+
   @JsonPropertyDescription("Describes the values of the propagation scheme")
   private List<String> _values;
 
@@ -87,5 +88,4 @@ public class PropagationScheme extends BaseJsonConfig {
   public void setValues(List<String> values) {
     _values = values;
   }
-
 }

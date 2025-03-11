@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.workload.NodeConfig;
@@ -68,9 +67,11 @@ public class WorkloadConfigUtils {
 
     znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadConfig.getQueryWorkloadName());
     try {
-      znRecord.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, JsonUtils.objectToString(queryWorkloadConfig.getNodeConfigs()));
+      znRecord.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS,
+          JsonUtils.objectToString(queryWorkloadConfig.getNodeConfigs()));
     } catch (Exception e) {
-      String errorMessage = String.format("Failed to convert QueryWorkloadConfig : %s to ZNRecord", queryWorkloadConfig);
+      String errorMessage = String.format("Failed to convert QueryWorkloadConfig : %s to ZNRecord",
+          queryWorkloadConfig);
       throw new RuntimeException(errorMessage, e);
     }
   }

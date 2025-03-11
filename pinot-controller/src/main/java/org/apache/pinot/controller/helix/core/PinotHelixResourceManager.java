@@ -4651,17 +4651,18 @@ public class PinotHelixResourceManager {
     _propagationManager.propagate(queryWorkloadConfig);
   }
 
-  public void sendQueryWorkloadRefreshMessage(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage, Set<String> instances) {
+  public void sendQueryWorkloadRefreshMessage(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
+      Set<String> instances) {
     for (String instance : instances) {
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
       recipientCriteria.setInstanceName(instance);
       recipientCriteria.setSessionSpecific(true);
-      int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria, queryWorkloadRefreshMessage, null, -1);
+      int numMessagesSent = _helixZkManager.getMessagingService().send(recipientCriteria,
+          queryWorkloadRefreshMessage, null, -1);
       if (numMessagesSent > 0) {
        LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
-      }
-      else {
+      } else {
         LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
       }
     }

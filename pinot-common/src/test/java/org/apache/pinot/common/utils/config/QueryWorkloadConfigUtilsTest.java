@@ -58,14 +58,17 @@ public class QueryWorkloadConfigUtilsTest {
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100);
 
     // Leaf node
-    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of("value1", "value2"));
+    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+        List.of("value1", "value2"));
     NodeConfig leafNodeConfig = new NodeConfig(validEnforcementProfile, leafPropagationScheme);
 
     // Non-leaf node
-    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, List.of("value3", "value4"));
+    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
+        List.of("value3", "value4"));
     NodeConfig nonLeafNodeConfig = new NodeConfig(validEnforcementProfile, nonLeafPropagationScheme);
 
-    Map<NodeConfig.Type, NodeConfig> nodeConfigs = Map.of(NodeConfig.Type.LEAF_NODE, leafNodeConfig, NodeConfig.Type.NON_LEAF_NODE, nonLeafNodeConfig);
+    Map<NodeConfig.Type, NodeConfig> nodeConfigs = Map.of(NodeConfig.Type.LEAF_NODE, leafNodeConfig,
+        NodeConfig.Type.NON_LEAF_NODE, nonLeafNodeConfig);
     QueryWorkloadConfig validQueryWorkloadConfig = new QueryWorkloadConfig("workloadId", nodeConfigs);
 
     // Valid scenario: NODE_CONFIGS field is a JSON array string
@@ -76,11 +79,14 @@ public class QueryWorkloadConfigUtilsTest {
 
     // Null propagation scheme
     NodeConfig nodeConfigWithoutPropagationScheme = new NodeConfig(validEnforcementProfile, null);
-    Map<NodeConfig.Type, NodeConfig> nodeConfigsWithoutPropagation = Map.of(NodeConfig.Type.LEAF_NODE, nodeConfigWithoutPropagationScheme);
+    Map<NodeConfig.Type, NodeConfig> nodeConfigsWithoutPropagation = Map.of(NodeConfig.Type.LEAF_NODE,
+        nodeConfigWithoutPropagationScheme);
     ZNRecord znRecordNullPropagation = new ZNRecord("workloadId");
     znRecordNullPropagation.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, "workloadId");
-    znRecordNullPropagation.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, JsonUtils.objectToString(nodeConfigsWithoutPropagation));
-    QueryWorkloadConfig expectedQueryWorkloadConfigNullPropagation = new QueryWorkloadConfig("workloadId", nodeConfigsWithoutPropagation);
+    znRecordNullPropagation.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS,
+        JsonUtils.objectToString(nodeConfigsWithoutPropagation));
+    QueryWorkloadConfig expectedQueryWorkloadConfigNullPropagation = new QueryWorkloadConfig("workloadId",
+        nodeConfigsWithoutPropagation);
     data.add(new Object[] { znRecordNullPropagation, expectedQueryWorkloadConfigNullPropagation, false });
 
     // Missing NODE_CONFIGS field
@@ -119,12 +125,15 @@ public class QueryWorkloadConfigUtilsTest {
 
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100);
     // Leaf node
-    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of("value1", "value2"));
+    PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+        List.of("value1", "value2"));
     NodeConfig leafNodeConfig = new NodeConfig(validEnforcementProfile, leafPropagationScheme);
     // Non-leaf node
-    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, List.of("value3", "value4"));
+    PropagationScheme nonLeafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
+        List.of("value3", "value4"));
     NodeConfig nonLeafNodeConfig = new NodeConfig(validEnforcementProfile, nonLeafPropagationScheme);
-    Map<NodeConfig.Type, NodeConfig> nodeConfigs = Map.of(NodeConfig.Type.LEAF_NODE, leafNodeConfig, NodeConfig.Type.NON_LEAF_NODE, nonLeafNodeConfig);
+    Map<NodeConfig.Type, NodeConfig> nodeConfigs = Map.of(NodeConfig.Type.LEAF_NODE, leafNodeConfig,
+        NodeConfig.Type.NON_LEAF_NODE, nonLeafNodeConfig);
     QueryWorkloadConfig validQueryWorkloadConfig = new QueryWorkloadConfig("workloadId", nodeConfigs);
 
     // 1) Valid scenario
@@ -139,8 +148,10 @@ public class QueryWorkloadConfigUtilsTest {
 
     // 2) Null propagation scheme in both nodes
     NodeConfig nodeConfigWithoutPropagation = new NodeConfig(validEnforcementProfile, null);
-    Map<NodeConfig.Type, NodeConfig> nodeConfigsWithoutPropagation = Map.of(NodeConfig.Type.LEAF_NODE, nodeConfigWithoutPropagation, NodeConfig.Type.NON_LEAF_NODE, nodeConfigWithoutPropagation);
-    QueryWorkloadConfig configWithoutPropagation = new QueryWorkloadConfig("noPropagation", nodeConfigsWithoutPropagation);
+    Map<NodeConfig.Type, NodeConfig> nodeConfigsWithoutPropagation = Map.of(NodeConfig.Type.LEAF_NODE,
+        nodeConfigWithoutPropagation, NodeConfig.Type.NON_LEAF_NODE, nodeConfigWithoutPropagation);
+    QueryWorkloadConfig configWithoutPropagation = new QueryWorkloadConfig("noPropagation",
+        nodeConfigsWithoutPropagation);
 
     String nodeConfigsNoPropagationJson = JsonUtils.objectToString(nodeConfigsWithoutPropagation);
 

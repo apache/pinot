@@ -32,15 +32,15 @@ public class NodeConfig extends BaseJsonConfig {
     LEAF_NODE("leafNode"),
     NON_LEAF_NODE("nonLeafNode");
 
-    private final String jsonValue;
+    private final String _value;
 
     Type(String jsonValue) {
-      this.jsonValue = jsonValue;
+      _value = jsonValue;
     }
 
     @JsonValue
     public String getJsonValue() {
-      return jsonValue;
+      return _value;
     }
 
     @JsonCreator
@@ -51,7 +51,7 @@ public class NodeConfig extends BaseJsonConfig {
       // Normalize the input to lower case and trim spaces
       String normalized = value.toLowerCase().trim();
       for (Type type : Type.values()) {
-        if (type.jsonValue.toLowerCase().equals(normalized)) {
+        if (type.getJsonValue().toLowerCase().equals(normalized)) {
           return type;
         }
       }

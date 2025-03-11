@@ -78,9 +78,11 @@ public class PinotQueryWorkloadConfigRestletResource {
     try {
       LOGGER.info("Received request to get all queryWorkloadConfigs");
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getQueryWorkloadConfigs();
-      return JsonUtils.objectToString(queryWorkloadConfigs);
+      String response = JsonUtils.objectToString(queryWorkloadConfigs);
+      LOGGER.info("Successfully fetched all queryWorkloadConfigs");
+      return response;
     } catch (Exception e) {
-      String errorMessage = String.format("Caught exception while getting all workload configs, error: %s", e);
+      String errorMessage = String.format("Error while getting all workload configs, error: %s", e);
       throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
@@ -103,12 +105,14 @@ public class PinotQueryWorkloadConfigRestletResource {
         throw new ControllerApplicationException(LOGGER, "Workload config not found for workload: " + queryWorkloadName,
             Response.Status.NOT_FOUND, null);
       }
-      return queryWorkloadConfig.toJsonString();
+      String response = queryWorkloadConfig.toJsonString();
+      LOGGER.info("Successfully fetched workload config for workload: {}", queryWorkloadName);
+      return response;
     } catch (Exception e) {
       if (e instanceof ControllerApplicationException) {
         throw (ControllerApplicationException) e;
       } else {
-        String errorMessage = String.format("Caught exception while getting workload config for workload: %s, error: %s",
+        String errorMessage = String.format("Error while getting workload config for workload: %s, error: %s",
             queryWorkloadName, e);
         throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
       }
@@ -131,7 +135,7 @@ public class PinotQueryWorkloadConfigRestletResource {
       LOGGER.info(successMessage);
       return Response.ok().entity(successMessage).build();
     } catch (Exception e) {
-      String errorMessage = String.format("Caught exception when updating query workload request: %s, error: %s",
+      String errorMessage = String.format("Error when updating query workload request: %s, error: %s",
           requestString, e);
       throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -152,7 +156,7 @@ public class PinotQueryWorkloadConfigRestletResource {
       LOGGER.info(successMessage);
       return Response.ok().entity(successMessage).build();
     } catch (Exception e) {
-      String errorMessage = String.format("Caught exception when deleting query workload for workload: %s, error: %s",
+      String errorMessage = String.format("Error when deleting query workload for workload: %s, error: %s",
           queryWorkloadName, e);
       throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
     }

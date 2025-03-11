@@ -50,8 +50,10 @@ public class PropagationManager {
       switch (propagationType) {
         case TABLE:
           _tablePropagationStrategy.propagate(refreshMessage, nodeType, nodeConfig);
+          break;
         case TENANT:
           _tenantPropagationStrategy.propagate(refreshMessage, nodeType, nodeConfig);
+          break;
         default:
           throw new IllegalArgumentException("Unsupported propagation type: " + propagationType);
       }
