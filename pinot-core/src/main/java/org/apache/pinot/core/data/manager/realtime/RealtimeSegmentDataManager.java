@@ -1654,7 +1654,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Acquire semaphore to create stream consumers
     try {
       long startTimeMs = System.currentTimeMillis();
-      while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(1, TimeUnit.MINUTES)) {
         _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
             System.currentTimeMillis() - startTimeMs);
 
