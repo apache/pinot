@@ -610,6 +610,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * @param tableNameWithType Table name with type
    * @return Whether the given table is enabled
    */
+  @Override
   public boolean isTableDisabled(String tableNameWithType) {
     RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
     if (routingEntry == null) {
@@ -638,6 +639,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   @Nullable
+  @Override
   public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
     RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
     if (routingEntry == null) {

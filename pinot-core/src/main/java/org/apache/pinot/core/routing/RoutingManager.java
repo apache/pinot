@@ -47,6 +47,8 @@ public interface RoutingManager {
    */
   Map<String, ServerInstance> getEnabledServerInstanceMap();
 
+  boolean isTableDisabled(String tableNameWithType);
+
   /**
    * Get the {@link RoutingTable} for a specific broker request.
    *
@@ -55,6 +57,9 @@ public interface RoutingManager {
    */
   @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
+
+  @Nullable
+  RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId);
 
   /**
    * Returns the segments that are relevant for the given broker request. Returns {@code null} if the table does not

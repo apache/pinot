@@ -30,23 +30,23 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.QueryRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.query.planner.physical.table.HybridTableRoute;
+import org.apache.pinot.query.planner.physical.table.PhysicalTableRoute;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class LogicalQueryRouteInfo extends QueryRouteInfo {
-  private final List<LogicalTableUtils.LogicalTableRequests> _routeInfos;
+  private final HybridTableRoute _hybridTableRoute;
 
   public LogicalQueryRouteInfo(String brokerId, long requestId, String rawTableName,
       BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
-      List<LogicalTableUtils.LogicalTableRequests> routeInfos,
-      int numPrunedSegments, long timeoutMs, RequestContext requestContext) {
+      HybridTableRoute hybridTableRoute, long timeoutMs, RequestContext requestContext) {
     super(brokerId, requestId, rawTableName, originalBrokerRequest, serverBrokerRequest, rawTableName,
-        serverBrokerRequest, null, rawTableName, serverBrokerRequest, null, numPrunedSegments, timeoutMs,
+        serverBrokerRequest, null, rawTableName, serverBrokerRequest, null, 0, timeoutMs,
         requestContext);
-    _routeInfos = routeInfos;
-    _numPrunedSegments = 0;
+    _hybridTableRoute = hybridTableRoute;
   }
 
   @Override
@@ -54,34 +54,32 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
     Map<ServerInstance, List<TableRouteInfo>> offlineTableRouteInfo = new HashMap<>();
     Map<ServerInstance, List<TableRouteInfo>> realtimeTableRouteInfo = new HashMap<>();
 
-    for (LogicalTableUtils.LogicalTableRequests routeInfo : _routeInfos) {
-      if (routeInfo._offlineRoutingTable != null) {
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo._offlineRoutingTable.entrySet()) {
-          TableRouteInfo tableRouteInfo = new TableRouteInfo();
-          tableRouteInfo.setTableName(routeInfo._hybridTableName.getOfflineTableName());
-          tableRouteInfo.setSegments(entry.getValue().getSegments());
-          if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
-            tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
-          }
-
-          offlineTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
+    for (PhysicalTableRoute physicalTableRoute : _hybridTableRoute.getOfflineTableRoutes()) {
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
+        TableRouteInfo tableRouteInfo = new TableRouteInfo();
+        tableRouteInfo.setTableName(physicalTableRoute.getTableName());
+        tableRouteInfo.setSegments(entry.getValue().getSegments());
+        if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
+          tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
         }
+
+        offlineTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
       }
+      _numPrunedSegments += physicalTableRoute.getNumPrunedSegments();
+    }
 
-      if (routeInfo._realtimeRoutingTable != null) {
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeInfo._realtimeRoutingTable.entrySet()) {
-          TableRouteInfo tableRouteInfo = new TableRouteInfo();
-          tableRouteInfo.setTableName(routeInfo._hybridTableName.getRealtimeTableName());
-          tableRouteInfo.setSegments(entry.getValue().getSegments());
-          if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
-            tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
-          }
-
-          realtimeTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
+    for (PhysicalTableRoute physicalTableRoute : _hybridTableRoute.getRealtimeTableRoutes()) {
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
+        TableRouteInfo tableRouteInfo = new TableRouteInfo();
+        tableRouteInfo.setTableName(physicalTableRoute.getTableName());
+        tableRouteInfo.setSegments(entry.getValue().getSegments());
+        if (CollectionUtils.isNotEmpty(entry.getValue().getOptionalSegments())) {
+          tableRouteInfo.setOptionalSegments(entry.getValue().getOptionalSegments());
         }
-      }
 
-      _numPrunedSegments += routeInfo._numPrunedSegmentsTotal;
+        realtimeTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
+      }
+      _numPrunedSegments += physicalTableRoute.getNumPrunedSegments();
     }
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
 
