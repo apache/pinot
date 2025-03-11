@@ -21,7 +21,7 @@ package org.apache.pinot.spi.config.workload;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -29,19 +29,16 @@ public class QueryWorkloadConfig extends BaseJsonConfig {
 
   public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
   public static final String NODE_CONFIGS = "nodeConfigs";
-  public static final String LEAF_NODE = "leafNode";
-  public static final String NON_LEAF_NODE = "nonLeafNode";
 
-  @JsonPropertyDescription("Describes the workload name for the query workload")
+  @JsonPropertyDescription("Describes the name for the query workload, this should be unique across the zk cluster")
   private String _queryWorkloadName;
 
-  @JsonPropertyDescription("Describes the list of node configs")
-  private List<NodeConfig> _nodeConfigs;
-  ;
+  @JsonPropertyDescription("Describes the node configs for the query workload")
+  private Map<NodeConfig.Type, NodeConfig> _nodeConfigs;
 
   @JsonCreator
   public QueryWorkloadConfig(@JsonProperty(QUERY_WORKLOAD_NAME) String queryWorkloadName,
-      @JsonProperty(NODE_CONFIGS) List<NodeConfig> nodeConfigs) {
+      @JsonProperty(NODE_CONFIGS) Map<NodeConfig.Type, NodeConfig> nodeConfigs) {
     _queryWorkloadName = queryWorkloadName;
     _nodeConfigs = nodeConfigs;
   }
@@ -50,7 +47,7 @@ public class QueryWorkloadConfig extends BaseJsonConfig {
     return _queryWorkloadName;
   }
 
-  public List<NodeConfig> getNodeConfigs() {
+  public Map<NodeConfig.Type, NodeConfig> getNodeConfigs() {
     return _nodeConfigs;
   }
 }

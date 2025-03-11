@@ -27,12 +27,10 @@ import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 public class QueryWorkloadRefreshMessage extends Message {
   public static final String REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE = "REFRESH_QUERY_WORKLOAD";
 
-  private static final String QUERY_WORKLOAD_KEY = "queryWorkloadName";
-
   /**
    * Constructor for the sender.
    */
-  public QueryWorkloadRefreshMessage(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
+  public QueryWorkloadRefreshMessage(QueryWorkloadConfig queryWorkloadConfig) {
     super(Message.MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
@@ -51,7 +49,7 @@ public class QueryWorkloadRefreshMessage extends Message {
     }
   }
 
-  public QueryWorkloadConfig getQueryWorkloadConfig() throws Exception {
+  public QueryWorkloadConfig getQueryWorkloadConfig() {
     return WorkloadConfigUtils.fromZNRecord(getRecord());
   }
 }

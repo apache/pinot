@@ -59,12 +59,8 @@ public class NodeConfig extends BaseJsonConfig {
     }
   }
 
-  private static final String NODE_TYPE = "nodeType";
   private static final String ENFORCEMENT_PROFILE = "enforcementProfile";
   private static final String PROPAGATION_SCHEME = "propagationScheme";
-
-  @JsonPropertyDescription("Describes the type of the node")
-  private Type _type;
 
   @JsonPropertyDescription("Describes the enforcement profile for the node")
   private EnforcementProfile _enforcementProfile;
@@ -74,16 +70,10 @@ public class NodeConfig extends BaseJsonConfig {
 
   @JsonCreator
   public NodeConfig(
-      @JsonProperty(NODE_TYPE) Type type,
       @JsonProperty(ENFORCEMENT_PROFILE) EnforcementProfile enforcementProfile,
       @JsonProperty(PROPAGATION_SCHEME) @Nullable PropagationScheme propagationScheme) {
-    _type = type;
     _enforcementProfile = enforcementProfile;
     _propagationScheme = propagationScheme;
-  }
-
-  public Type getNodeType() {
-    return _type;
   }
 
   public EnforcementProfile getEnforcementProfile() {
@@ -100,9 +90,5 @@ public class NodeConfig extends BaseJsonConfig {
 
   public void setPropagationScheme(PropagationScheme propagationScheme) {
     _propagationScheme = propagationScheme;
-  }
-
-  public void setNodeType(Type type) {
-    _type = type;
   }
 }

@@ -161,6 +161,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.workload.PropagationManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -176,8 +177,6 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
-import org.apache.pinot.spi.config.workload.NodeConfig;
-import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -247,6 +246,7 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private final PropagationManager _propagationManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -276,6 +276,7 @@ public class PinotHelixResourceManager {
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService);
+    _propagationManager = new PropagationManager(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -3425,7 +3426,7 @@ public class PinotHelixResourceManager {
   }
 
 
-  public List<String> getServerInstancesConfigsFor(String tableName) {
+  public List<String> getServerInstancesFor(String tableName) {
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
     Set<String> serverInstances = new HashSet<>();
@@ -4636,52 +4637,18 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public QueryWorkloadConfig getQueryWorkloadConfig(String workload) throws Exception {
-    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, workload);
+  public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, queryWorkloadName);
   }
 
   public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
     if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
-      throw new RuntimeException("Failed to set workload config for workload: "
+      throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
           + queryWorkloadConfig.getQueryWorkloadName());
     }
-    QueryWorkloadRefreshMessage refreshMessage = new QueryWorkloadRefreshMessage(queryWorkloadConfig);
-    Set<String> allInstances = getInstancesForPropagation(queryWorkloadConfig.getNodeConfigs());
-    sendQueryWorkloadRefreshMessage(refreshMessage, allInstances);
-  }
-
-  // TODO: Have an interface for this
-  public Set<String> getInstancesForPropagation(List<NodeConfig> nodeConfigs) {
-    Set<String> instances = new HashSet<>();
-    for (NodeConfig nodeConfig : nodeConfigs) {
-      NodeConfig.Type nodeType = nodeConfig.getNodeType();
-      PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
-      PropagationScheme.Type type = propagationScheme.getType();
-      if (type == PropagationScheme.Type.TABLE && nodeType == NodeConfig.Type.NON_LEAF_NODE) {
-        List<String> tables = propagationScheme.getValues();
-        for (String table : tables) {
-          instances.addAll(getBrokerInstancesFor(table));
-        }
-      } else if (type == PropagationScheme.Type.TABLE && nodeType == NodeConfig.Type.LEAF_NODE) {
-        List<String> tables = propagationScheme.getValues();
-        for (String table : tables) {
-          instances.addAll(getAllInstancesForServerTenant(table));
-        }
-      } else if (type == PropagationScheme.Type.TENANT && nodeType == NodeConfig.Type.NON_LEAF_NODE) {
-        List<String> tenants = propagationScheme.getValues();
-        for (String tenant : tenants) {
-          instances.addAll(getAllInstancesForBrokerTenant(tenant));
-        }
-      } else if (type == PropagationScheme.Type.TENANT && nodeType == NodeConfig.Type.LEAF_NODE) {
-        List<String> tenants = propagationScheme.getValues();
-        for (String tenant : tenants) {
-          instances.addAll(getAllInstancesForServerTenant(tenant));
-        }
-      } else {
-        throw new IllegalArgumentException("Unsupported propagation scheme type: " + type);
-      }
-    }
-    return instances;
+    // Propagate the query workload config to all nodes in the query workload config
+    // TODO: Add support for propagating for specific instances where they has been a change in the NodeConfig
+    _propagationManager.propagate(queryWorkloadConfig);
   }
 
   public void sendQueryWorkloadRefreshMessage(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage, Set<String> instances) {

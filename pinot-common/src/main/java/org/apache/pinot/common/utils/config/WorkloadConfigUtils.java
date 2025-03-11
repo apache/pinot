@@ -20,7 +20,8 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-import java.util.List;
+import java.io.IOException;
+import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
@@ -37,18 +38,20 @@ public class WorkloadConfigUtils {
    * @param znRecord The ZNRecord containing workload config data.
    * @return A QueryWorkloadConfig object.
    */
-  public static QueryWorkloadConfig fromZNRecord(ZNRecord znRecord) throws Exception {
+  public static QueryWorkloadConfig fromZNRecord(ZNRecord znRecord) {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
-    Preconditions.checkNotNull(znRecord.getSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME),
-        "queryWorkloadName cannot be null");
-    Preconditions.checkNotNull(znRecord.getSimpleField(QueryWorkloadConfig.NODE_CONFIGS),
-        "nodeConfigs cannot be null");
-
     String queryWorkloadName = znRecord.getSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME);
+    Preconditions.checkNotNull(queryWorkloadName, "queryWorkloadName cannot be null");
     String nodeConfigsJson = znRecord.getSimpleField(QueryWorkloadConfig.NODE_CONFIGS);
-    List<NodeConfig> nodeConfigs = JsonUtils.stringToObject(nodeConfigsJson, new TypeReference<List<NodeConfig>>() {
-    });
-    return new QueryWorkloadConfig(queryWorkloadName, nodeConfigs);
+    Preconditions.checkNotNull(nodeConfigsJson, "nodeConfigs cannot be null");
+    try {
+      Map<NodeConfig.Type, NodeConfig> nodeConfigs = JsonUtils.stringToObject(nodeConfigsJson, new TypeReference<>() {
+      });
+      return new QueryWorkloadConfig(queryWorkloadName, nodeConfigs);
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to convert ZNRecord : %s to QueryWorkloadConfig", znRecord);
+      throw new RuntimeException(errorMessage, e);
+    }
   }
 
   /**
@@ -57,14 +60,18 @@ public class WorkloadConfigUtils {
    * @param queryWorkloadConfig The QueryWorkloadConfig object to convert.
    * @param znRecord The ZNRecord to update.
    */
-  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, QueryWorkloadConfig queryWorkloadConfig)
-      throws Exception {
+  public static void updateZNRecordWithWorkloadConfig(ZNRecord znRecord, QueryWorkloadConfig queryWorkloadConfig) {
     Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
     Preconditions.checkNotNull(queryWorkloadConfig, "QueryWorkloadConfig cannot be null");
     Preconditions.checkNotNull(queryWorkloadConfig.getQueryWorkloadName(), "QueryWorkload cannot be null");
     Preconditions.checkNotNull(queryWorkloadConfig.getNodeConfigs(), "NodeConfigs cannot be null");
 
     znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadConfig.getQueryWorkloadName());
-    znRecord.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, JsonUtils.objectToString(queryWorkloadConfig.getNodeConfigs()));
+    try {
+      znRecord.setSimpleField(QueryWorkloadConfig.NODE_CONFIGS, JsonUtils.objectToString(queryWorkloadConfig.getNodeConfigs()));
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to convert QueryWorkloadConfig : %s to ZNRecord", queryWorkloadConfig);
+      throw new RuntimeException(errorMessage, e);
+    }
   }
 }

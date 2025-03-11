@@ -90,17 +90,17 @@ public class PinotQueryWorkloadConfigRestletResource {
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/queryWorkloadConfigs/{workloadName}")
+  @Path("/queryWorkloadConfigs/{queryWorkloadName}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_QUERY_WORKLOAD_CONFIG)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Get query workload config", notes = "Get workload configs for the workload name")
-  public String getQueryWorkloadConfig(@PathParam("workloadName") String workloadName,
+  public String getQueryWorkloadConfig(@PathParam("queryWorkloadName") String queryWorkloadName,
       @Context HttpHeaders httpHeaders) {
     try {
-      LOGGER.info("Received request to get workload config for workload: {}", workloadName);
-      QueryWorkloadConfig queryWorkloadConfig = _pinotHelixResourceManager.getQueryWorkloadConfig(workloadName);
+      LOGGER.info("Received request to get workload config for workload: {}", queryWorkloadName);
+      QueryWorkloadConfig queryWorkloadConfig = _pinotHelixResourceManager.getQueryWorkloadConfig(queryWorkloadName);
       if (queryWorkloadConfig == null) {
-        throw new ControllerApplicationException(LOGGER, "Workload config not found for workload: " + workloadName,
+        throw new ControllerApplicationException(LOGGER, "Workload config not found for workload: " + queryWorkloadName,
             Response.Status.NOT_FOUND, null);
       }
       return queryWorkloadConfig.toJsonString();
@@ -109,7 +109,7 @@ public class PinotQueryWorkloadConfigRestletResource {
         throw (ControllerApplicationException) e;
       } else {
         String errorMessage = String.format("Caught exception while getting workload config for workload: %s, error: %s",
-            workloadName, e);
+            queryWorkloadName, e);
         throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
       }
     }
@@ -139,21 +139,21 @@ public class PinotQueryWorkloadConfigRestletResource {
 
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/queryWorkloadConfigs/{workloadName}")
+  @Path("/queryWorkloadConfigs/{queryWorkloadName}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_QUERY_WORKLOAD_CONFIG)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete query workload config", notes = "Delete workload config for the workload name")
-  public Response deleteQueryWorkloadConfig(@PathParam("workloadName") String workloadName,
+  public Response deleteQueryWorkloadConfig(@PathParam("queryWorkloadName") String queryWorkloadName,
       @Context HttpHeaders httpHeaders) {
     try {
-      _pinotHelixResourceManager.deleteQueryWorkloadConfig(workloadName);
+      _pinotHelixResourceManager.deleteQueryWorkloadConfig(queryWorkloadName);
       String successMessage = String.format("Query Workload config deleted successfully for workload: %s",
-          workloadName);
+          queryWorkloadName);
       LOGGER.info(successMessage);
       return Response.ok().entity(successMessage).build();
     } catch (Exception e) {
       String errorMessage = String.format("Caught exception when deleting query workload for workload: %s, error: %s",
-          workloadName, e);
+          queryWorkloadName, e);
       throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }

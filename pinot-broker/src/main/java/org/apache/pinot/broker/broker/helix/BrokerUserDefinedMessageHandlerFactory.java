@@ -70,8 +70,7 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
       case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
         return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
       case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
-          LOGGER.info("Received QueryWorkloadRefreshMessage, but no-op for now");
-        return null;
+        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -233,6 +232,30 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
+    }
+  }
+
+  private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
+    final String _queryWorkloadName;
+
+    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
+        NotificationContext context) {
+      super(queryWorkloadRefreshMessage, context);
+      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadConfig().getQueryWorkloadName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      // TODO: Add logic to invoke the query workload manager to refresh the query workload config
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
+      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
+          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 }

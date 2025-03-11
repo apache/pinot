@@ -79,8 +79,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
       case QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE:
-        LOGGER.info("Received query workload refresh message on server: {}", message);
-        return new DefaultMessageHandler(message, _metrics, context);
+        return new QueryWorkloadRefreshMessageHandler(new QueryWorkloadRefreshMessage(message), context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -289,6 +288,30 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     @Override
     public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
       _logger.error("onError: {}, {}", errorType, errorCode, e);
+    }
+  }
+
+  private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
+    final String _queryWorkloadName;
+
+    QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
+        NotificationContext context) {
+      super(queryWorkloadRefreshMessage, context);
+      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadConfig().getQueryWorkloadName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      // TODO: Add logic to invoke the query workload manager to refresh the query workload config
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
+      LOGGER.error("Got error while refreshing query workload config for query workload: {} (error code: {},"
+          + " error type: {})", _queryWorkloadName, errorCode, errorType, e);
     }
   }
 }
