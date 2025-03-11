@@ -51,13 +51,18 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
           + " changes to the cluster, false by default)")
   private boolean _dryRun = false;
 
+  @CommandLine.Option(names = {"-preChecks"},
+      description = "Whether to enable pre-checks for table, must be in dry-run mode to enable"
+          + " changes to the cluster, false by default)")
+  private boolean _preChecks = false;
+
   @CommandLine.Option(names = {"-reassignInstances"},
-      description = "Whether to reassign instances before reassigning segments (false by default)")
-  private boolean _reassignInstances = false;
+      description = "Whether to reassign instances before reassigning segments (true by default)")
+  private boolean _reassignInstances = true;
 
   @CommandLine.Option(names = {"-includeConsuming"},
-      description = "Whether to reassign CONSUMING segments for real-time table (false by default)")
-  private boolean _includeConsuming = false;
+      description = "Whether to reassign CONSUMING segments for real-time table (true by default)")
+  private boolean _includeConsuming = true;
 
   @CommandLine.Option(names = {"-bootstrap"},
       description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"
@@ -70,8 +75,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @CommandLine.Option(names = {"-minAvailableReplicas"},
       description = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
-          + "number of replicas allowed to be unavailable if value is negative (1 by default)")
-  private int _minAvailableReplicas = 1;
+          + "number of replicas allowed to be unavailable if value is negative (-1 by default)")
+  private int _minAvailableReplicas = -1;
 
   @CommandLine.Option(names = {"-lowDiskMode"}, description =
       "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
@@ -104,8 +109,8 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   public boolean execute()
       throws Exception {
     PinotTableRebalancer tableRebalancer =
-        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
-            _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _externalViewCheckIntervalInMs,
+        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _preChecks, _reassignInstances, _includeConsuming,
+            _bootstrap, _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _externalViewCheckIntervalInMs,
             _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
@@ -131,6 +136,12 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
             + "myTable_OFFLINE -dryRun");
+    System.out.println();
+
+    System.out.println("Rebalance table in dry-run mode with pre-checks");
+    System.out.println(
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -dryRun -preChecks");
     System.out.println();
 
     System.out.println("Rebalance table with instances reassigned");
