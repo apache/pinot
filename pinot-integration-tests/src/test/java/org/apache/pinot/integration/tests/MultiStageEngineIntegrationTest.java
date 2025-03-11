@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
@@ -74,6 +75,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String DATABASE_NAME = "db1";
   private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
+
+  private static final String PRIMARY_TABLE_DATA_PATH = "baseballStats_data.csv";
+  private static final String PRIMARY_TABLE_SCHEMA_PATH = "baseballStats_schema.json";
+  private static final String PRIMARY_TABLE_TABLE_CONFIG_PATH = "baseballStats_offline_table_config.json";
+  private static final String DIM_TABLE_DATA_PATH = "data/dimBaseballTeams.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
 
   @Override
   protected String getSchemaFileName() {
@@ -1598,6 +1606,30 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNotNull(numServersQueried);
     assertTrue(numServersQueried.isInt());
     assertTrue(numServersQueried.asInt() > 0);
+  }
+
+  @Test
+  public void testLookupJoin() throws Exception {
+
+    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(lookupTableSchema);
+    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    addTableConfig(tableConfig);
+    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV, 52, 60_000);
+
+    Schema primaryTableSchema = createSchema(PRIMARY_TABLE_SCHEMA_PATH);
+    addSchema(primaryTableSchema);
+    TableConfig primaryTableConfig = createTableConfig(PRIMARY_TABLE_TABLE_CONFIG_PATH);
+    addTableConfig(primaryTableConfig);
+    createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV, 97889, 60_000);
+
+    String query = "select /*+ joinOptions(join_strategy='lookup') */ yearID, teamName from baseballStats join dimBaseballTeams ON baseballStats.teamID = dimBaseballTeams.teamID where playerId = 'aardsda01'";
+    JsonNode jsonNode = postQuery(query);
+    long result = jsonNode.get("resultTable").get("rows").size();
+    assertEquals(result, 3);
+
+    dropOfflineTable("baseballStats");
+    dropOfflineTable("dimBaseballTeams");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
