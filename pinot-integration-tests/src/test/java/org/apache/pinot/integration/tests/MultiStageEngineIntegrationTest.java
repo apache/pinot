@@ -43,14 +43,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
@@ -666,8 +665,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
-        : QueryException.SQL_PARSING_ERROR_CODE;
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING.getId()
+        : QueryErrorCode.SQL_PARSING.getId();
     Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
@@ -1374,7 +1373,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed only as table prefix. Will
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1416,7 +1415,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
         null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1424,7 +1423,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1432,7 +1431,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_VALIDATION_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1443,7 +1442,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1582,10 +1581,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Iterator<JsonNode> exIterator = exceptionsJson.iterator();
     assertTrue(exIterator.hasNext(), "Expected a timeout exception but did not find one");
     ObjectNode exception = (ObjectNode) exIterator.next();
-    assertEquals(exception.get(ProcessingException._Fields.ERROR_CODE.getFieldName()).asInt(),
-        QueryException.BROKER_TIMEOUT_ERROR_CODE);
-    assertEquals(exception.get(ProcessingException._Fields.MESSAGE.getFieldName()).asText(),
-        QueryException.BROKER_TIMEOUT_ERROR.getMessage());
+    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.BROKER_TIMEOUT.getId());
+    assertEquals(exception.get("message").asText(), QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
   }
 
   @Test
@@ -1623,6 +1620,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), "val2");
   }
 
+  @Test
+  public void testPolymorphicScalarArrayFunctions() throws Exception {
+    String query = "select ARRAY_LENGTH(ARRAY[1,2,3]);";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 3);
+
+    query = "select ARRAY_LENGTH(SPLIT('abc,xyz', ','));";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 2);
+  }
+
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {
     checkQueryResultForDBTest(column, tableName, null, null);
@@ -1648,9 +1658,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result, expectedValue);
   }
 
-  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, int errorCode) {
+  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, QueryErrorCode errorCode) {
     long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(result, errorCode);
+    assertEquals(result, errorCode.getId());
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
