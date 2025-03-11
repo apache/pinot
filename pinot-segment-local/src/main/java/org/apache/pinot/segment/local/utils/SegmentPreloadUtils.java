@@ -225,5 +225,6 @@ public class SegmentPreloadUtils {
         }
       }
     }
+    return true;
   }
 }
