@@ -1657,15 +1657,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
         _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
             System.currentTimeMillis() - startTimeMs);
-        // reload segment metadata to get latest status
-        segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
+        // check if dedup is enabled or upsert is enabled
+        if (!(realtimeTableDataManager.isDedupEnabled() || realtimeTableDataManager.isUpsertEnabled())) {
+          // reload segment metadata to get latest status
+          segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
 
-        if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
-          // it's certain at this point that there is a pending consuming -> online transition message.
-          // hence return from here and handle pending message instead.
-          _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
-              _segmentNameStr);
-          throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
+          if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+            // it's certain at this point that there is a pending consuming -> online transition message.
+            // hence return from here and handle pending message instead.
+            _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
+                _segmentNameStr);
+            throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
+          }
         }
       }
       _acquiredConsumerSemaphore.set(true);
