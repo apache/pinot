@@ -1660,7 +1660,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
         // check if both dedup and upsert are disabled
         if (!(realtimeTableDataManager.isDedupEnabled() || realtimeTableDataManager.isUpsertEnabled())) {
-          if (isSegmentOnline()) {
+          if (!isSegmentInProgress()) {
             // if segment is online, no need to wait.
             throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
           }
@@ -1728,7 +1728,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private boolean isSegmentOnline() {
+  private boolean isSegmentInProgress() {
     SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
 
     if (segmentZKMetadata == null) {
@@ -1739,12 +1739,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
       // it's certain at this point that there is a pending consuming -> online/offline transition message.
       // hence return from here and handle pending message instead.
-      _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
+      _segmentLogger.warn("segment: {} status must be IN_PROGRESS. Skipping creation of RealtimeSegmentDataManager",
           _segmentNameStr);
-      return true;
+      return false;
     }
 
-    return false;
+    return true;
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
