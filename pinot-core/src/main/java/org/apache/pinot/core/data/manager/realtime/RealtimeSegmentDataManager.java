@@ -1737,7 +1737,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
 
     if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
-      // it's certain at this point that there is a pending consuming -> online transition message.
+      // it's certain at this point that there is a pending consuming -> online/offline transition message.
       // hence return from here and handle pending message instead.
       _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
           _segmentNameStr);
