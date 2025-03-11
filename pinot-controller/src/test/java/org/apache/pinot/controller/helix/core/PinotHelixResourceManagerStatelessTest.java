@@ -85,6 +85,7 @@ import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -717,6 +718,82 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         throw e;
       }
     });
+  }
+
+  /**
+   * Tests the validation of table task minion instance tag config for existing table
+   * Primarily validates cases where minion is not present and table config is being updated
+   */
+  @Test
+  public void testValidateTableTaskMinionInstanceTagConfigExistingTable() {
+
+    // Setup required mocks on HelixResourceManager
+    ControllerConf cfg = new ControllerConf();
+    cfg.setZkStr("localhost:2181");
+    cfg.setHelixClusterName("cluster01");
+    PinotHelixResourceManager helixResourceManagerSpy = Mockito.spy(new PinotHelixResourceManager(cfg));
+    Mockito.doReturn(List.of()).when(helixResourceManagerSpy).getAllMinionInstanceConfigs(); // No minion instances are present
+
+    Map<String, String> taskConfig =
+        Map.of( "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1", "minionInstanceTag", "minionTenant");
+
+    // Create an updatedTableConfig with the same task config
+    TableConfig updatedTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
+    updatedTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfig)));
+
+    // Return null when asked for existing table config. Validation should fail as no minion instances are present and there is no existing table
+    Mockito.doReturn(null).when(helixResourceManagerSpy).getTableConfig(updatedTableConfig.getTableName());
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        helixResourceManagerSpy.validateTableTaskMinionInstanceTagConfig(updatedTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
+
+    // Create a table with a task config and return it when asked for existing table config
+    TableConfig existingTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).build();
+    existingTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfig)));
+    Mockito.doReturn(existingTableConfig).when(helixResourceManagerSpy).getTableConfig(updatedTableConfig.getTableName());
+
+    // Task config should be validated successfully as its minion instance tag is same as existing table config
+    helixResourceManagerSpy.validateTableTaskMinionInstanceTagConfig(updatedTableConfig);
+
+    // Create an updatedTableConfig with different minion instance tag
+    Map<String, String> updatedTaskConfig =
+        Map.of( "schedule", "0 */30 * ? * *", "tableMaxNumTasks", "1", "minionInstanceTag", "anotherMinionTenant");
+    updatedTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, updatedTaskConfig)));
+
+    // Validation should fail as minion instance tag is different
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        helixResourceManagerSpy.validateTableTaskMinionInstanceTagConfig(updatedTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
+
+    // Create a new TaskType with the same minion instance tag
+    updatedTableConfig.setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of(MinionConstants.MergeRollupTask.TASK_TYPE, taskConfig)));
+    // Validation should fail as a new task should check for minion instance tag
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        helixResourceManagerSpy.validateTableTaskMinionInstanceTagConfig(updatedTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
+
   }
 
   private void untagMinions() {

@@ -1881,8 +1881,18 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Validates if a minion instance is configured for each task type in the table config.
+   * This is useful to verify when a new table (or task) is created to not miss out on the task execution.
+   * It is also useful when a task's minion instance type or schedule is updated.
+   * <p>
+   * However, given minion instances are designed to be scaled down when not needed,
+   * we don't require the validation when any other part of the table config is updated.
+   */
   @VisibleForTesting
-  void validateTableTaskMinionInstanceTagConfig(TableConfig tableConfig) {
+  void validateTableTaskMinionInstanceTagConfig(TableConfig newTableConfig) {
+
+    TableConfig currentTableConfig = getTableConfig(newTableConfig.getTableName());
 
     List<InstanceConfig> allMinionWorkerInstanceConfigs = getAllMinionInstanceConfigs();
 
@@ -1890,13 +1900,28 @@ public class PinotHelixResourceManager {
     Set<String> minionInstanceTagSet = allMinionWorkerInstanceConfigs.stream().map(InstanceConfig::getTags)
         .collect(HashSet::new, Set::addAll, Set::addAll);
 
-    if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().getTaskTypeConfigsMap() != null) {
-      tableConfig.getTaskConfig().getTaskTypeConfigsMap().forEach((taskType, taskTypeConfig) -> {
+    if (newTableConfig.getTaskConfig() != null && newTableConfig.getTaskConfig().getTaskTypeConfigsMap() != null) {
+      newTableConfig.getTaskConfig().getTaskTypeConfigsMap().forEach((taskType, taskTypeConfig) -> {
+
         String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
             CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+        String schedule = taskTypeConfig.getOrDefault(PinotTaskManager.SCHEDULE_KEY, "");
+
+        if (currentTableConfig != null && currentTableConfig.getTaskConfig() != null
+            && currentTableConfig.getTaskConfig().isTaskTypeEnabled(taskType)) {
+          Map<String, String> currentTaskConfig = currentTableConfig.getTaskConfig().getConfigsForTaskType(taskType);
+          String currentTaskInstanceTag = currentTaskConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
+              CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+          String currentSchedule = currentTaskConfig.getOrDefault(PinotTaskManager.SCHEDULE_KEY, "");
+          if (currentTaskInstanceTag.equals(taskInstanceTag) && currentSchedule.equals(schedule)) {
+            // No change in task instance tag or schedule, pass validation even if minion instance is not found
+            return;
+          }
+        }
+
         if (!minionInstanceTagSet.contains(taskInstanceTag)) {
           throw new InvalidTableConfigException("Failed to find minion instances with tag: " + taskInstanceTag
-              + " for table: " + tableConfig.getTableName());
+              + " for table: " + newTableConfig.getTableName());
         }
       });
     }
