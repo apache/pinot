@@ -341,15 +341,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _rawTableName = null;
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
     }
-
-    public CompileResult(String tableName, BrokerResponse errorOrLiteralOnlyBrokerResponse) {
-      _pinotQuery = null;
-      _serverPinotQuery = null;
-      _schema = null;
-      _tableName = tableName;
-      _rawTableName = null;
-      _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
-    }
   }
 
   protected BrokerResponse doHandleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
@@ -367,17 +358,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
        * If the compileRequest method sets the BrokerResponse field, then it is either an error response or
        * a literal-only query. In either case, we can return the response directly.
        */
-      if (compileResult._errorOrLiteralOnlyBrokerResponse.getExceptionsSize() > 0
-          && compileResult._errorOrLiteralOnlyBrokerResponse.getExceptions().get(0).getErrorCode()
-          == QueryErrorCode.UNKNOWN_COLUMN.getId() && compileResult._tableName != null) {
-        // If the error is due to schema mismatch, first check if table permissions are in place
-        // to not leak schema information.
-        AuthorizationResult authorizationResult =
-            hasTableAccess(requesterIdentity, Set.of(compileResult._tableName), requestContext, httpHeaders);
-        if (!authorizationResult.hasAccess()) {
-          throwAccessDeniedError(requestId, query, requestContext, compileResult._tableName, authorizationResult);
-        }
-      }
       return compileResult._errorOrLiteralOnlyBrokerResponse;
     }
 
@@ -935,11 +915,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     } catch (Exception e) {
       // Throw exceptions with column in-existence error.
       if (e instanceof BadQueryRequestException) {
+        if (tableName != null) {
+          // First check if table permissions are in place to not leak schema information.
+          AuthorizationResult authorizationResult =
+              hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
+          if (!authorizationResult.hasAccess()) {
+            throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+          }
+        }
         LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
             e.getMessage());
         requestContext.setErrorCode(QueryErrorCode.UNKNOWN_COLUMN);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
-        return new CompileResult(tableName, new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
+        return new CompileResult(new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
       }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
