@@ -610,6 +610,9 @@ public class CommonConstants {
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
+      // QueryWorkload can be applied to a collection of queries and it is unique across helix cluster.
+      // When specified in the query, based on node characteristics, the query will be routed to the appropriate node.
+      public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
     }
 
     public static class FailureDetector {

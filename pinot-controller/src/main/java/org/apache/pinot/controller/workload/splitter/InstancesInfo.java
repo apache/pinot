@@ -16,19 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.workload;
+package org.apache.pinot.controller.workload.splitter;
 
-import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
-import org.apache.pinot.spi.config.workload.NodeConfig;
+import java.util.Set;
 
 
-public interface PropagationStrategy {
-  /**
-   * Propagates the given refresh message based on the node configurations.
-   *
-   * @param refreshMessage The refresh message to propagate.
-   * @param nodeType The type of the node.
-   * @param nodeConfig The node configuration.
-   */
-  void propagate(QueryWorkloadRefreshMessage refreshMessage, NodeConfig.Type nodeType, NodeConfig nodeConfig);
+public class InstancesInfo {
+
+  Set<String> _instances;
+
+  public InstancesInfo(Set<String> instances) {
+    _instances = instances;
+  }
+
+  public Set<String> getInstances() {
+    return _instances;
+  }
+
+  public void setInstances(Set<String> instances) {
+    _instances = instances;
+  }
+
+  public long getInstanceCount() {
+    return _instances.size();
+  }
 }

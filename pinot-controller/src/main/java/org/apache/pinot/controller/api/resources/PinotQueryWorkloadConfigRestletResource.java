@@ -24,7 +24,10 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -32,6 +35,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -40,16 +44,20 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.workload.splitter.InstancesInfo;
+import org.apache.pinot.controller.workload.selector.QueryWorkloadInstanceSelectorHandler;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.workload.InstanceCost;
+import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.*;
 
 @Api(tags = Constants.QUERY_WORKLOAD_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -114,6 +122,81 @@ public class PinotQueryWorkloadConfigRestletResource {
       } else {
         String errorMessage = String.format("Error while getting workload config for workload: %s, error: %s",
             queryWorkloadName, e);
+        throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    }
+  }
+
+
+  /**
+   * API to get all workload configs associated with the instance
+   * @param instanceName Helix instance name
+   * @param nodeTypeString  {@link NodeConfig.Type} string representation of the instance
+   * @return Map of workload name to instance cost
+   * <p>
+   * Example request:
+   * /queryWorkloadConfigs/instance/Server_localhost_1234?nodeType=LEAF_NODE
+   * <p>
+   * Example response:
+   * {
+   *  "workload1": {
+   *    "cpu": 100,
+   *    "memory":100
+   *  },
+   *  "workload2": {
+   *    "cpu": 50,
+   *    "memory": 50
+   *  }
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/queryWorkloadConfigs/instance/{instanceName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE_QUERY_WORKLOAD_CONFIG)
+  @Authenticate(AccessType.READ)
+  @ApiOperation(value = "Get all workload configs associated with the instance",
+      notes = "Get all workload configs associated with the instance")
+  public String getQueryWorkloadConfigForInstance(@PathParam("instanceName") String instanceName,
+      @QueryParam("nodeType") String nodeTypeString, @Context HttpHeaders httpHeaders) {
+    try {
+      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getQueryWorkloadConfigs();
+      if (queryWorkloadConfigs == null) {
+        throw new ControllerApplicationException(LOGGER, "No Workload configs found",
+            Response.Status.NOT_FOUND, null);
+      }
+      Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
+      NodeConfig.Type instanceNodeType = NodeConfig.Type.forValue(nodeTypeString);
+      QueryWorkloadInstanceSelectorHandler
+          queryWorkloadInstanceSelectorHandler = _pinotHelixResourceManager.getQueryWorkloadInstanceSelectorHandler();
+      // Loop through each workload config, and check if the instance is part of the workload
+      // If it is, get the instance cost for the instance and add it to the map
+      // TODO: This currently makes multiple calls to zk, to improve performance for this
+      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
+        Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
+        for (Map.Entry<NodeConfig.Type, NodeConfig> entry : nodeConfigs.entrySet()) {
+          NodeConfig.Type nodeType = entry.getKey();
+          NodeConfig nodeConfig = entry.getValue();
+          if (nodeType == instanceNodeType) {
+            Set<String> instances = queryWorkloadInstanceSelectorHandler.resolveInstances(nodeType, nodeConfig);
+            InstancesInfo instancesInfo = new InstancesInfo(instances);
+            InstanceCost instanceCost = _pinotHelixResourceManager.getCostSplitter().getInstanceCost(nodeConfig,
+                instancesInfo, instanceName);
+            if (instanceCost != null) {
+              workloadToInstanceCostMap.put(queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
+            }
+          }
+        }
+      }
+      if (workloadToInstanceCostMap.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "No workload configs found for instance: " + instanceName,
+            Response.Status.NOT_FOUND, null);
+      }
+      return JsonUtils.objectToString(workloadToInstanceCostMap);
+    } catch (Exception e) {
+      if (e instanceof ControllerApplicationException) {
+        throw (ControllerApplicationException) e;
+      } else {
+        String errorMessage = String.format("Error while getting workload config for instance: %s, error: %s",
+            instanceName, e);
         throw new ControllerApplicationException(LOGGER, errorMessage, Response.Status.INTERNAL_SERVER_ERROR, e);
       }
     }

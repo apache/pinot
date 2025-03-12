@@ -20,23 +20,31 @@ package org.apache.pinot.common.messages;
 
 import java.util.UUID;
 import org.apache.helix.model.Message;
-import org.apache.pinot.common.utils.config.WorkloadConfigUtils;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * Message to refresh the query workload on the instances.
+ * This message include the host level cost for each instance.
+ */
 public class QueryWorkloadRefreshMessage extends Message {
   public static final String REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE = "REFRESH_QUERY_WORKLOAD";
+  public static final String INSTANCE_COST = "instanceCost";
 
   /**
    * Constructor for the sender.
    */
-  public QueryWorkloadRefreshMessage(QueryWorkloadConfig queryWorkloadConfig) {
+  public QueryWorkloadRefreshMessage(String queryWorkloadName, InstanceCost instanceCost) {
     super(Message.MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
-    // Set the query workload config
-    WorkloadConfigUtils.updateZNRecordWithWorkloadConfig(getRecord(), queryWorkloadConfig);
+    ZNRecord znRecord = getRecord();
+    znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadName);
+    znRecord.setSimpleField(INSTANCE_COST, instanceCost.toString());
   }
 
   /**
@@ -49,7 +57,15 @@ public class QueryWorkloadRefreshMessage extends Message {
     }
   }
 
-  public QueryWorkloadConfig getQueryWorkloadConfig() {
-    return WorkloadConfigUtils.fromZNRecord(getRecord());
+  public String getQueryWorkloadName() {
+    return getRecord().getSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME);
+  }
+
+  public InstanceCost getInstanceCost() {
+    try {
+      return JsonUtils.stringToObject(getRecord().getSimpleField(INSTANCE_COST), InstanceCost.class);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to parse instance cost from message", e);
+    }
   }
 }

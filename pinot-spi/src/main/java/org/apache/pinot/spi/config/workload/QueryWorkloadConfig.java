@@ -24,7 +24,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
-
+/**
+ * Class to represent the query workload configuration.
+ * A QueryWorkload is applied to a collection of queries at the Helix Cluster Level, queries specify the workload they
+ * belong to by specifying the query workload name in the query options
+ */
 public class QueryWorkloadConfig extends BaseJsonConfig {
 
   public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";

@@ -44,6 +44,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -293,11 +294,13 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
     final String _queryWorkloadName;
+    final InstanceCost _instanceCost;
 
     QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
         NotificationContext context) {
       super(queryWorkloadRefreshMessage, context);
-      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadConfig().getQueryWorkloadName();
+      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
+      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
     }
 
     @Override
