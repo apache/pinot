@@ -251,6 +251,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           case NUM_GROUPS_LIMIT_REACHED:
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
             break;
+          case NUM_GROUPS:
+            _statMap.merge(StatKey.NUM_GROUPS, Integer.parseInt(entry.getValue()));
+            break;
           case TIME_USED_MS:
             _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
             break;
@@ -676,6 +679,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS(StatMap.Type.INT),
     NUM_RESIZES(StatMap.Type.INT, null),
     RESIZE_TIME_MS(StatMap.Type.LONG, null),
     THREAD_CPU_TIME_NS(StatMap.Type.LONG, null),
