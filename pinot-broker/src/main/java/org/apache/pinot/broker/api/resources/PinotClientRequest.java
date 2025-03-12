@@ -400,8 +400,6 @@ public class PinotClientRequest {
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
     try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
-      long reqId = Long.parseLong(id);
-      QueryThreadContext.setIds(reqId, id);
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient && _requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
         String resp = "Cancelled client query: " + id;
@@ -409,12 +407,16 @@ public class PinotClientRequest {
           resp += " with responses from servers: " + serverResponses;
         }
         return resp;
-      } else if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        String resp = "Cancelled query: " + id;
-        if (verbose) {
-          resp += " with responses from servers: " + serverResponses;
+      } else {
+        long reqId = Long.parseLong(id);
+        if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+          QueryThreadContext.setIds(reqId, id);
+          String resp = "Cancelled query: " + id;
+          if (verbose) {
+            resp += " with responses from servers: " + serverResponses;
+          }
+          return resp;
         }
-        return resp;
       }
     } catch (NumberFormatException e) {
       Response.status(Response.Status.BAD_REQUEST).entity(String.format("Invalid internal query id: %s", id));
