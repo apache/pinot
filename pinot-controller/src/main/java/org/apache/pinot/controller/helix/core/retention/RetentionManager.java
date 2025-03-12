@@ -116,6 +116,8 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
     String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    int untrackedSegmentsDeletionBatchSize = validationConfig.getUntrackedSegmentsDeletionBatchSize();
+
     RetentionStrategy retentionStrategy;
     try {
       retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
@@ -128,19 +130,21 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
 
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
-      manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
+      manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize);
     } else {
-      manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
+      manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize);
     }
   }
 
-  private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
+  private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy,
+      int untrackedSegmentsDeletionBatchSize) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
 
     // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
     // SegmentZkMetadata is missing for those segments
     List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentZKMetadataList);
+        getSegmentsToDeleteFromDeepstore(offlineTableName, retentionStrategy, segmentZKMetadataList,
+            untrackedSegmentsDeletionBatchSize);
 
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       if (retentionStrategy.isPurgeable(offlineTableName, segmentZKMetadata)) {
@@ -153,13 +157,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy) {
+  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy,
+      int untrackedSegmentsDeletionBatchSize) {
     List<SegmentZKMetadata> segmentZKMetadataList = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // fetch those segments that are beyond the retention period and don't have an entry in ZK i.e.
     // SegmentZkMetadata is missing for those segments
     List<String> segmentsToDelete =
-        getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentZKMetadataList);
+        getSegmentsToDeleteFromDeepstore(realtimeTableName, retentionStrategy, segmentZKMetadataList,
+            untrackedSegmentsDeletionBatchSize);
 
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
@@ -214,10 +220,20 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   }
 
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
-      List<SegmentZKMetadata> segmentZKMetadataList) {
+      List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize) {
+    List<String> segmentsToDelete = new ArrayList<>();
+
+    if (untrackedSegmentsDeletionBatchSize <= 0) {
+      // return an empty list in case untracked segment deletion is not configured
+      LOGGER.info(
+          "Not scanning deep store for untracked segments for table: {} as untrackedSegmentsDeletionBatchSize is set "
+              + "to: {}",
+          tableNameWithType, untrackedSegmentsDeletionBatchSize);
+      return segmentsToDelete;
+    }
+
     List<String> segmentsPresentInZK =
         segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
-    List<String> segmentsToDelete = new ArrayList<>();
     try {
       LOGGER.info("Fetch segments present in deep store that are beyond retention period for table: {}",
           tableNameWithType);
@@ -225,10 +241,17 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           findUntrackedSegmentsToDeleteFromDeepstore(tableNameWithType, retentionStrategy, segmentsPresentInZK);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.UNTRACKED_SEGMENTS_COUNT,
           segmentsToDelete.size());
+
+      if (segmentsToDelete.size() > untrackedSegmentsDeletionBatchSize) {
+        LOGGER.info("Truncating segments to delete from {} to {} for table: {}",
+            segmentsToDelete.size(), untrackedSegmentsDeletionBatchSize, tableNameWithType);
+        segmentsToDelete = segmentsToDelete.subList(0, untrackedSegmentsDeletionBatchSize);
+      }
     } catch (IOException e) {
       LOGGER.warn("Unable to fetch segments from deep store that are beyond retention period for table: {}",
           tableNameWithType);
     }
+
     return segmentsToDelete;
   }
 
