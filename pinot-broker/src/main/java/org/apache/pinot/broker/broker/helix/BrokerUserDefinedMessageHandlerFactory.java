@@ -32,6 +32,7 @@ import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -237,11 +238,13 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
 
   private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
     final String _queryWorkloadName;
+    final InstanceCost _instanceCost;
 
     QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
         NotificationContext context) {
       super(queryWorkloadRefreshMessage, context);
-      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadConfig().getQueryWorkloadName();
+      _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
+      _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
     }
 
     @Override

@@ -100,6 +100,7 @@ public class Actions {
     public static final String GET_RESPONSE_STORE = "GetResponseStore";
     public static final String DELETE_RESPONSE_STORE = "DeleteResponseStore";
     public static final String GET_QUERY_WORKLOAD_CONFIG = "GetQueryWorkloadConfig";
+    public static final String GET_INSTANCE_QUERY_WORKLOAD_CONFIG = "GetInstanceQueryWorkloadConfig";
     public static final String UPDATE_QUERY_WORKLOAD_CONFIG = "UpdateQueryWorkloadConfig";
     public static final String DELETE_QUERY_WORKLOAD_CONFIG = "DeleteQueryWorkloadConfig";
     public static final String GET_GROOVY_STATIC_ANALYZER_CONFIG = "GetGroovyStaticAnalyzerConfig";
