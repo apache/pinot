@@ -608,7 +608,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     HttpPost request = new HttpPost("https://localhost:" + port + "/query/sql");
     request.addHeader(CLIENT_HEADER);
     request.setEntity(
-        new StringEntity(String.format("{\"sql\":\"%s\", \"queryOptions\": \"useMultistageEngine=true\"}", query)));
+        new StringEntity("{\"sql\":\"" + query + "\", \"queryOptions\": \"useMultistageEngine=true\"}"));
     return request;
   }
 

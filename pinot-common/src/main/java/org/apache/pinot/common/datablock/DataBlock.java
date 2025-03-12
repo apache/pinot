@@ -25,9 +25,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -41,9 +41,11 @@ public interface DataBlock {
 
   int getNumberOfColumns();
 
-  void addException(ProcessingException processingException);
-
   void addException(int errCode, String errMsg);
+
+  default void addException(QueryErrorCode errCode, String errMsg) {
+    addException(errCode.getId(), errMsg);
+  }
 
   Map<Integer, String> getExceptions();
 
@@ -84,6 +86,7 @@ public interface DataBlock {
 
   Map<String, Object> getMap(int rowId, int colId);
 
+  @Nullable
   CustomObject getCustomObject(int rowId, int colId);
 
   @Nullable

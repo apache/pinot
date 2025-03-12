@@ -18,32 +18,124 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
+
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 /**
  * Tests Groovy functions for transforming schema columns
  */
 public class GroovyFunctionEvaluatorTest {
+  @Test
+  public void testLegalGroovyScripts()
+      throws JsonProcessingException {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+    );
+
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"),
+        false);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
+
+    for (String script : scripts) {
+      GroovyFunctionEvaluator.parseGroovyScript(script);
+      GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+      GenericRow row = new GenericRow();
+      Object result = groovyFunctionEvaluator.evaluate(row);
+      assertEquals(2, result);
+    }
+  }
+
+  @Test
+  public void testIllegalGroovyScripts()
+      throws JsonProcessingException {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
+    List<String> scripts = List.of(
+        "Groovy({\"ls\".execute()})",
+        "Groovy({[\"ls\"].execute()})",
+        "Groovy({System.exit(5)})",
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.md5() == "
+            + "\"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} }})",
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.reverse() == (\"ti\" + \"xe\")) "
+            + "{method.invoke(System, 10)} }})",
+        "groovy({def args = [\"QuickStart\", \"-type\", \"REALTIME\"] as String[]; "
+            + "org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2})",
+        "Groovy({return [\"bash\", \"-c\", \"env\"].execute().text})"
+    );
+
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"),
+        false);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
+
+    for (String script : scripts) {
+      try {
+        GroovyFunctionEvaluator.parseGroovyScript(script);
+        fail("Groovy analyzer failed to catch malicious script");
+      } catch (Exception ignored) {
+      }
+    }
+  }
+
+  @Test
+  public void testUpdatingConfiguration()
+      throws JsonProcessingException {
+    // TODO: Figure out how to test this with the singleton initializer
+    // These tests would pass by default but the configuration will be updated so that they fail
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+    );
+
+    GroovyStaticAnalyzerConfig config =
+        new GroovyStaticAnalyzerConfig(List.of(), List.of(), List.of(), List.of(), false);
+    GroovyFunctionEvaluator.setGroovyStaticAnalyzerConfig(config);
+
+    for (String script : scripts) {
+      try {
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+        GenericRow row = new GenericRow();
+        groovyFunctionEvaluator.evaluate(row);
+        fail(String.format("Groovy analyzer failed to catch malicious script: %s", script));
+      } catch (Exception ignored) {
+      }
+    }
+  }
 
   @Test(dataProvider = "groovyFunctionEvaluationDataProvider")
   public void testGroovyFunctionEvaluation(String transformFunction, List<String> arguments, GenericRow genericRow,
       Object expectedResult) {
 
     GroovyFunctionEvaluator groovyExpressionEvaluator = new GroovyFunctionEvaluator(transformFunction);
-    Assert.assertEquals(groovyExpressionEvaluator.getArguments(), arguments);
+    assertEquals(groovyExpressionEvaluator.getArguments(), arguments);
 
     Object result = groovyExpressionEvaluator.evaluate(genericRow);
-    Assert.assertEquals(result, expectedResult);
+    assertEquals(result, expectedResult);
   }
 
   @DataProvider(name = "groovyFunctionEvaluationDataProvider")
@@ -108,20 +200,26 @@ public class GroovyFunctionEvaluatorTest {
     GenericRow genericRow9 = new GenericRow();
     genericRow9.putValue("ArrTime", 101);
     genericRow9.putValue("ArrTimeV2", null);
-    entries.add(new Object[]{"Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
-        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101});
+    entries.add(new Object[]{
+        "Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
+        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101
+    });
 
     GenericRow genericRow10 = new GenericRow();
     String jello = "Jello";
     genericRow10.putValue("jello", jello);
-    entries.add(new Object[]{"Groovy({jello != null ? jello.length() : \"Jello\" }, jello)",
-        Lists.newArrayList("jello"), genericRow10, 5});
+    entries.add(new Object[]{
+        "Groovy({jello != null ? jello.length() : \"Jello\" }, jello)",
+        Lists.newArrayList("jello"), genericRow10, 5
+    });
 
     //Invalid groovy script
     GenericRow genericRow11 = new GenericRow();
     genericRow11.putValue("nullValue", null);
-    entries.add(new Object[]{"Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)",
-        Lists.newArrayList("nullValue"), genericRow11, null});
+    entries.add(new Object[]{
+        "Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)",
+        Lists.newArrayList("nullValue"), genericRow11, null
+    });
     return entries.toArray(new Object[entries.size()][]);
   }
 }

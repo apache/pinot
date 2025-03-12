@@ -200,6 +200,11 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public int getNumValuesMV(int docId, ReaderContext context) {
+    return ByteBuffer.wrap(context.getValue(docId)).getInt();
+  }
+
+  @Override
   public void close()
       throws IOException {
     _chunkDecompressor.close();

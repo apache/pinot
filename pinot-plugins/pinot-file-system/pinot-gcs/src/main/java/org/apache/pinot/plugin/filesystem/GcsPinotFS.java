@@ -395,7 +395,7 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     try {
       if (!exists(segmentUri)) {
-        return forceDelete;
+        return false;
       }
       if (existsDirectoryOrBucket(segmentUri)) {
         if (!forceDelete && !isEmptyDirectory(segmentUri)) {

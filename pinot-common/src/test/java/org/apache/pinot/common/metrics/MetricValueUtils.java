@@ -115,7 +115,7 @@ public class MetricValueUtils {
     } else if (metrics instanceof MinionMetrics) {
       metricPrefix = "pinot.minion.";
     } else {
-      throw new RuntimeException(String.format("unsupported AbstractMetrics type: %s", metrics.getClass().toString()));
+      throw new RuntimeException("unsupported AbstractMetrics type: " + metrics.getClass().toString());
     }
     return metrics.getMetricsRegistry().allMetrics()
         .get(new YammerMetricName(new MetricName(metrics.getClass(), metricPrefix + metricName)));

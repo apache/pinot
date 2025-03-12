@@ -242,7 +242,8 @@ public class ResourceManagerAccountingTest {
       } catch (ExecutionException e) {
         Assert.assertFalse(futures[i].get().isCancelled());
         Assert.assertTrue(futures[i].get().isDone());
-        Assert.assertEquals(e.getMessage(), "org.apache.pinot.spi.exception.EarlyTerminationException");
+        Assert.assertTrue(e.getMessage().contains("EarlyTerminationException"),
+            "Error message should contain EarlyTerminationException, found: " + e.getMessage());
         return;
       }
     }

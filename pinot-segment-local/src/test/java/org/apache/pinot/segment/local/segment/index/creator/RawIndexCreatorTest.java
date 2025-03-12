@@ -31,7 +31,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -96,7 +95,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
       .build();
   //@formatter:on
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setNoDictionaryColumns(SCHEMA.getDimensionNames()).build();
+      .setNoDictionaryColumns(SCHEMA.getDimensionNames())
+      .build();
   private static final Random RANDOM = new Random();
 
   private RecordReader _recordReader;
@@ -207,8 +207,9 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   public void testStringMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (
+        ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.STRING,
+            false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(STRING_MV_COLUMN).getMaxNumberOfMultiValues();
@@ -239,9 +240,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   public void testBytesMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
-    try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.BYTES);
-        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.BYTES,
+        false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();
