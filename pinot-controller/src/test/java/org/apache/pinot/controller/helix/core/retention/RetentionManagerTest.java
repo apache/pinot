@@ -131,7 +131,8 @@ public class RetentionManagerTest {
         File segmentFile = new File(_tableDir, segmentName);
         createFileWithContent(segmentFile, "extra segment " + i + " data");
         setFileModificationTime(segmentFile, timeUnit.toMillis(pastTimeStamp));
-        if(i < untrackedSegmentsDeletionBatchSize) {
+        if (i < untrackedSegmentsDeletionBatchSize) {
+          // Add segments to the removed list till we reach untrackedSegmentsDeletionBatchSize
           removedSegments.add(segmentName);
         }
       }
@@ -148,6 +149,11 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
 
     // Use appropriate setup based on test case
+    // In case of untrackedSegmentsDeletionBatchSize < untrackedSegmentsInDeepstoreSize, we cannot guarantee which
+    // files/ segments will be picked for deletion as there is not ordering/ sorting done before selecting
+    // untrackedSegmentsDeletionBatchSize out of untrackedSegmentsInDeepstoreSize to delete.
+    // For the case untrackedSegmentsDeletionBatchSize < untrackedSegmentsInDeepstoreSize we just check the size of the
+    // segments that will get deleted.
     if (untrackedSegmentsDeletionBatchSize >= untrackedSegmentsInDeepstoreSize) {
       // Use original setup for the case when all the segments will be included
       setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
