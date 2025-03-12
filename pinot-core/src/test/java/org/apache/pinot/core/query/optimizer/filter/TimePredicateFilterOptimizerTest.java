@@ -184,7 +184,7 @@ public class TimePredicateFilterOptimizerTest {
     testInvalidFilterOptimizer("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') BETWEEN 453630 AND 453631");
     testInvalidFilterOptimizer("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND "
         + "39193718399999");
-    testDateTrunc("datetrunc('DAY', col) BETWEEN 1620777600000 AND 1621036799999",
+    testDateTrunc("dateTrunc('DAY', col) BETWEEN 1620777600000 AND 1621036799999",
         new Range("1620777600000", true, "1621036799999", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
         new Range("453630", true, "453632", true));
