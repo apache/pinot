@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -69,7 +70,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -310,7 +313,7 @@ public class TableRebalancer {
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
     // is expected or not based on the summary results
     RebalanceSummaryResult summaryResult =
-        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId);
+        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, rebalanceJobId, tableConfig);
 
     if (segmentAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
@@ -593,7 +596,8 @@ public class TableRebalancer {
   }
 
   private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, String tableNameWithType, String rebalanceJobId) {
+      Map<String, Map<String, String>> targetAssignment, String tableNameWithType, String rebalanceJobId,
+      TableConfig tableConfig) {
     LOGGER.info("Calculating rebalance summary for table: {} with rebalanceJobId: {}",
         tableNameWithType, rebalanceJobId);
     int existingReplicationFactor = 0;
@@ -633,6 +637,19 @@ public class TableRebalancer {
     Set<String> serversRemoved = new HashSet<>();
     Set<String> serversUnchanged = new HashSet<>();
     Set<String> serversGettingNewSegments = new HashSet<>();
+    TableNameBuilder tenantNameBuilder = TableNameBuilder.forType(tableConfig.getTableType());
+    Map<String, RebalanceSummaryResult.TenantInfo> tenantInfoMap = new HashMap<>();
+    String serverTenantName = tableConfig.getTenantConfig().getServer();
+    if (serverTenantName != null) {
+      String serverTenantNameWithType = tenantNameBuilder.tableNameWithType(serverTenantName);
+      tenantInfoMap.put(serverTenantNameWithType, new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType, null));
+    }
+    if (tableConfig.getTierConfigsList() != null) {
+      tableConfig.getTierConfigsList().forEach(tierConfig -> {
+        String tierTenantNameWithType = tenantNameBuilder.tableNameWithType(tierConfig.getServerTag());
+        tenantInfoMap.put(tierTenantNameWithType, new RebalanceSummaryResult.TenantInfo(tierTenantNameWithType, null));
+      });
+    }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
     int maxSegmentsAddedToServer = 0;
@@ -670,6 +687,20 @@ public class TableRebalancer {
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
           instanceToTagsMap.getOrDefault(server, null)));
+      List<String> serverTags = getServerTag(server);
+      // Since this is a server in the target assignment, it should contain at least one tag of the tenant or tier
+      // server tag. Note that if the server is tagged with multiple tenant or tier tags that are used in the table
+      // config, we will count it multiple times, i.e. the total segment count would not add up to the actual total.
+      assert serverTags != null;
+      for (Map.Entry<String, RebalanceSummaryResult.TenantInfo> tenantInfoEntry : tenantInfoMap.entrySet()) {
+        String tenantNameWithType = tenantInfoEntry.getKey();
+        RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoEntry.getValue();
+        if (serverTags.contains(tenantNameBuilder.tableNameWithType(tenantNameWithType))) {
+          tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+          tenantInfo.increaseNumSegmentsReceived(segmentsAdded);
+          tenantInfo.increaseNumServersParticipants(1);
+        }
+      }
     }
 
     for (Map.Entry<String, Set<String>> entry : existingServersToSegmentMap.entrySet()) {
@@ -710,7 +741,13 @@ public class TableRebalancer {
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
-    return new RebalanceSummaryResult(serverInfo, segmentInfo);
+    return new RebalanceSummaryResult(serverInfo, segmentInfo, new ArrayList<>(tenantInfoMap.values()));
+  }
+
+  private List<String> getServerTag(String serverName) {
+    InstanceConfig instanceConfig =
+        _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(serverName));
+    return instanceConfig.getTags();
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {
