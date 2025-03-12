@@ -38,10 +38,13 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 
 /**
- * The <code>ServerQueryRequest</code> class encapsulates the query related information as well as the query processing
- * context.
+ * The <code>ServerQueryRequest</code> class encapsulates the <b>SSE</b> query related information as well as the query
+ * processing context.
  * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
  * per segment basis.
+ *
+ * Please notice that although given the name of this class seems to indicate that it applies to all request, in fact it
+ * is only used for SSE queries or the leaf stages in MSE.
  */
 public class ServerQueryRequest {
   private final long _requestId;
@@ -86,7 +89,10 @@ public class ServerQueryRequest {
   }
 
   /**
-   * This is called from the grpc server to create a ServerQueryRequest from the grpc request.
+   * This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
+   *
+   * Notice that this is not used for MSE, which only build ServerQueryRequest using
+   * {@link #ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)}.
    */
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
       throws Exception {
