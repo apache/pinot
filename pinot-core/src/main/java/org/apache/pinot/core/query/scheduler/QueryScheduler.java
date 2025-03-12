@@ -115,7 +115,9 @@ public abstract class QueryScheduler {
   /**
    * Create a future task for the query
    * @param queryRequest incoming query request
-   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor
+   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor.
+   *                        This is not the executor that runs the returned future task but the one that can be
+   *                        internally used to parallelize query processing.
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
    * should be executed on a different executor service than {@code executorService} to avoid deadlock.
    */
