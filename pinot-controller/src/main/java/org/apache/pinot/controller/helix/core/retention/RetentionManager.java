@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -28,11 +30,14 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -44,9 +49,14 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -71,13 +81,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private final boolean _untrackedSegmentDeletionEnabled;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
+  private final boolean _isHybridTableRetentionStrategyEnabled;
+  private final BrokerServiceHelper _brokerServiceHelper;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
-      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics) {
+      LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
+      BrokerServiceHelper brokerServiceHelper) {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
+    _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
+    _brokerServiceHelper = brokerServiceHelper;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
 
@@ -136,7 +151,15 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize);
     } else {
-      manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
+      // hybrid table check should be performed before the realtime table check.
+      if (_isHybridTableRetentionStrategyEnabled && offlineTableConfig != null) {
+        // TODO: handle the orphan segment deletion for hybrid table
+        manageRetentionForHybridTable(tableConfig, offlineTableConfig);
+      } else {
+        manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy, untrackedSegmentsDeletionBatchSize);
+      }
     }
   }
 
@@ -196,6 +219,58 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
+    }
+  }
+
+  @VisibleForTesting
+  void manageRetentionForHybridTable(TableConfig realtimeTableConfig, TableConfig offlineTableConfig) {
+    LOGGER.info("Managing retention for hybrid table: {}", realtimeTableConfig.getTableName());
+    List<String> segmentsToDelete = new ArrayList<>();
+    String realtimeTableName = realtimeTableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    try {
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
+      Preconditions.checkState(schema != null, "Failed to get schema for table: " + offlineTableName);
+      String timeColumn = null;
+      SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
+      if (validationConfig != null) {
+        timeColumn = validationConfig.getTimeColumnName();
+      }
+      Preconditions.checkState(StringUtils.isNotEmpty(timeColumn),
+          "TimeColumn is null or empty for table: " + offlineTableName);
+      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+      Preconditions.checkState(dateTimeSpec != null, String.format(
+          "Failed to get DateTimeFieldSpec for time column: %s of table: %s", timeColumn, offlineTableName));
+      DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
+      TimeBoundaryInfo timeBoundaryInfo = _brokerServiceHelper.getTimeBoundaryInfo(offlineTableConfig);
+      Preconditions.checkState(timeBoundaryInfo != null,
+          "Failed to get time boundary info for table: " + offlineTableName);
+      long timeBoundaryMs = timeFormatSpec.fromFormatToMillis(timeBoundaryInfo.getTimeValue());
+      Preconditions.checkState(timeBoundaryMs > 0,
+          "Failed to determine a valid time boundary for table: " + offlineTableName);
+
+      // Iterate over all COMPLETED segments of the REALTIME table and check if they are eligible for deletion.
+      for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
+        // The segment should be in COMPLETED state
+        if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS
+            || segmentZKMetadata.getStatus() == Status.COMMITTING) {
+          continue;
+        }
+        // The segment should be older than the calculated time boundary
+        if (segmentZKMetadata.getEndTimeMs() < timeBoundaryMs) {
+          segmentsToDelete.add(segmentZKMetadata.getSegmentName());
+        }
+      }
+      LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
+      if (!segmentsToDelete.isEmpty()) {
+        _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
+      }
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 0);
+    } catch (Exception e) {
+      LOGGER.error("Exception while managing retention for hybrid table: {}", realtimeTableConfig.getTableName(), e);
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 1);
     }
   }
 

@@ -111,6 +111,7 @@ import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceM
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
@@ -860,8 +861,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager,
             _resourceUtilizationManager);
     periodicTasks.add(_taskManager);
-    _retentionManager =
-        new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
+    _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        brokerServiceHelper);
     periodicTasks.add(_retentionManager);
     _offlineSegmentIntervalChecker =
         new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,
