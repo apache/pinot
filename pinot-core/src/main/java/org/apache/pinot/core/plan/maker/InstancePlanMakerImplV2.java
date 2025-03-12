@@ -110,8 +110,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit on number of groups stored for each segment, beyond which no new group will be created
   private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
-  private int _numGroupsWarningThreshold = (int) Math.floor(
-      Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT * Server.DEFAULT_NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO);
+  private int _numGroupsWarningLimit = (int) Math.floor(
+      Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT * Server.DEFAULT_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR);
   // Used for SQL GROUP BY (server combine)
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
@@ -133,13 +133,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     Preconditions.checkState(_minInitialIndexedTableCapacity <= _numGroupsLimit,
         "Invalid configuration: minInitialIndexedTableCapacity: %d must be smaller or equal to numGroupsLimit: %d",
         _minInitialIndexedTableCapacity, _numGroupsLimit);
-    _numGroupsWarningThreshold = (int) Math.floor(
+    _numGroupsWarningLimit = (int) Math.floor(
         Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT * queryExecutorConfig.getProperty(
-            Server.NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO,
-            Server.DEFAULT_NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO));
-    Preconditions.checkState(_numGroupsWarningThreshold <= _numGroupsLimit,
-        "Invalid configuration: numGroupsWarningThreshold: %d must be smaller or equal to numGroupsLimit: %d",
-        _numGroupsWarningThreshold, _numGroupsLimit);
+            Server.NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR,
+            Server.DEFAULT_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR));
     _minSegmentGroupTrimSize = queryExecutorConfig.getProperty(Server.MIN_SEGMENT_GROUP_TRIM_SIZE,
         Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE);
     _minServerGroupTrimSize = queryExecutorConfig.getProperty(Server.MIN_SERVER_GROUP_TRIM_SIZE,
@@ -266,7 +263,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setNumGroupsLimit(_numGroupsLimit);
       }
       // Set numGroupsWarningThreshold
-      queryContext.setNumGroupsWarningThreshold(_numGroupsWarningThreshold);
+      queryContext.setNumGroupsWarningLimit(_numGroupsWarningLimit);
 
       // Set minSegmentGroupTrimSize
       Integer minSegmentGroupTrimSizeFromQuery = QueryOptionsUtils.getMinSegmentGroupTrimSize(queryOptions);

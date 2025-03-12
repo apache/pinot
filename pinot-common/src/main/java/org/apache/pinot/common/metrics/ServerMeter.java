@@ -149,6 +149,14 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
   /**
+   * Number of times the number of groups has reached the warning limit.
+   * It is increased at most one by one each time per stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
+   * by 2.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING("times", true),
+  /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.
    */

@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -118,9 +120,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
-    if (groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningThreshold()) {
-      LOGGER.warn("Query exceeded the number of groups threshold: {} (actual: {}).",
-           _queryContext.getNumGroupsWarningThreshold(), groupByExecutor.getNumGroups());
+
+    if (groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit()) {
+      LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
+          _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
     }
 
     // Trim the groups when iff:

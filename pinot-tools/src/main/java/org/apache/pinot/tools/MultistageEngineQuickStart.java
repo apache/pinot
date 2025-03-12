@@ -296,7 +296,6 @@ public class MultistageEngineQuickStart extends Quickstart {
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     configOverrides.put(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, true);
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, true);
-    configOverrides.put(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO, 0.2);
     return configOverrides;
   }
 

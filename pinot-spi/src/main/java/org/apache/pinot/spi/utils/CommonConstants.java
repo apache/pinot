@@ -827,10 +827,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_LIMIT;
     public static final int DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT = 100_000;
-    public static final String NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO = "num.groups.limit.warn.ratio";
-    public static final String CONFIG_OF_NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO =
-        QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO;
-    public static final double DEFAULT_NUM_GROUPS_LIMIT_WARNING_THRESHOLD_RATIO = 0.8;
+    public static final String NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR = "num.groups.limit.default.warn.factor";
+    public static final String CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR;
+    public static final double DEFAULT_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR = 1.5;
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_INITIAL_RESULT_HOLDER_CAPACITY;

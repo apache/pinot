@@ -25,6 +25,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -169,10 +171,14 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // Check if the groups limit is reached
     boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
-    if (groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningThreshold()) {
-      LOGGER.warn("Query exceeded the number of groups threshold: {} (actual: {}).",
-          _queryContext.getNumGroupsWarningThreshold(), groupKeyGenerator.getNumKeys());
+
+    if (groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningLimit()) {
+      LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
+          _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
+      ServerMetrics serverMetrics = ServerMetrics.get();
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
     }
+
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
