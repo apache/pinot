@@ -581,7 +581,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     List<String> unavailableSegments = routingTable._unavailableSegments;
     int numPrunedSegmentsTotal = routingTable._numPrunedSegmentsTotal;
     int numUnavailableSegments = unavailableSegments.size();
-    List<ProcessingException> errMsgs = new ArrayList<>();
+    List<ProcessingException> exceptions = new ArrayList<>();
 
     requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
@@ -597,7 +597,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       String realtimeRoutingPolicy = realtimeBrokerRequest != null ? getRoutingPolicy(realtimeTableConfig) : null;
       String offlineRoutingPolicy = offlineBrokerRequest != null ? getRoutingPolicy(offlineTableConfig) : null;
       errorMessage = addRoutingPolicyInErrMsg(errorMessage, realtimeRoutingPolicy, offlineRoutingPolicy);
-      errMsgs.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
+      exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
     }
 
@@ -609,20 +609,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     for (PhysicalTable disabled : hybridTable.getDisabledTables()) {
       String errorMessage = String.format("Table %s is disabled", disabled.getTableName());
       LOGGER.info("{}: {}", errorMessage, query);
-      errMsgs.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
+      exceptions.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
     }
 
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING, routingEndTimeNs - routingStartTimeNs);
 
     if (routingTable._hybridTableRoute.isEmpty()) {
-      if (!errMsgs.isEmpty()) {
-        ProcessingException firstException = errMsgs.get(0);
-        String logTail = errMsgs.size() > 1 ? (errMsgs.size()) + " exceptions found. Logging only the first one"
+      if (!exceptions.isEmpty()) {
+        ProcessingException firstException = exceptions.get(0);
+        String logTail = exceptions.size() > 1 ? (exceptions.size()) + " exceptions found. Logging only the first one"
             : "1 exception found";
         LOGGER.info("No server found for request {}: {}. {}", requestId, query, logTail, firstException);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-        return new BrokerResponseNative(errMsgs);
+        return new BrokerResponseNative(exceptions);
       } else {
         // When all segments have been pruned, we can just return an empty response.
         return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity, schema, query,
@@ -652,8 +652,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       String errorMessage = e.getMessage();
       LOGGER.info("{} {}: {}", errorMessage, requestId, query);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
-      errMsgs.add(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
-      return new BrokerResponseNative(errMsgs);
+      exceptions.add(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
+      return new BrokerResponseNative(exceptions);
     }
 
     // Set the maximum serialized response size per server, and ask server to directly return final response when only
@@ -744,7 +744,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
-    for (ProcessingException exception : errMsgs) {
+    for (ProcessingException exception : exceptions) {
       brokerResponse.addException(exception);
     }
     brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
