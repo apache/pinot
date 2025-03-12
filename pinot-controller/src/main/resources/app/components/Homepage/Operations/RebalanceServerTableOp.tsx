@@ -18,11 +18,31 @@
  */
 
 import React from 'react';
-import { DialogContent, DialogContentText, FormControl, FormControlLabel, Grid, Input, InputLabel, Switch, Tooltip} from '@material-ui/core';
+import {
+  DialogContentText,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  Input,
+  InputLabel,
+  Switch,
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon
+} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
-import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
+import {RebalanceServerDialogHeader} from "./RebalanceServer/RebalanceServerDialogHeader";
+import {RebalanceServerConfigurationSection} from "./RebalanceServer/RebalanceServerConfigurationSection";
+import Alert from "@material-ui/lab/Alert";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
+import {rebalanceServerOptions} from "./RebalanceServer/RebalanceServerOptions";
+import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
+import {RebalanceServerConfigurationOption} from "./RebalanceServer/RebalanceServerConfigurationOption";
 
 type Props = {
   tableType: string,
@@ -63,106 +83,53 @@ export default function RebalanceServerTableOp({
     <Dialog
       open={true}
       handleClose={hideModal}
-      title={(<>Rebalance Server <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>)}
+      title={<RebalanceServerDialogHeader />}
       handleSave={handleSave}
       showOkBtn={!rebalanceResponse}
     >
-      <DialogContent>
         {!rebalanceResponse ?
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={dryRun}
-                    onChange={() => setDryRun(!dryRun)}
-                    name="dryRun"
-                    color="primary"
-                  />
-                }
-                label="Dry Run"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={includeConsuming}
-                    onChange={() => setIncludeConsuming(!includeConsuming)} 
-                    name="includeConsuming"
-                    color="primary"
-                  />
-                }
-                label="Include Consuming"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={downtime}
-                    onChange={() => setDowntime(!downtime)} 
-                    name="downtime"
-                    color="primary"
-                  />
-                }
-                label="Downtime"
-              />
-              <br />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={lowDiskMode}
-                    onChange={() => setLowDiskMode(!lowDiskMode)} 
-                    name="lowDiskMode"
-                    color="primary"
-                  />
-                }
-                label="Low Disk Mode"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={reassignInstances}
-                    onChange={() => setReassignInstances(!reassignInstances)} 
-                    name="reassignInstances"
-                    color="primary"
-                  />
-                }
-                label="Reassign Instances"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={bootstrap}
-                    onChange={() => setBootstrap(!bootstrap)}
-                    name="bootstrap"
-                    color="primary"
-                  />
-                }
-                label="Bootstrap"
-              />
-              <br/>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={bestEfforts}
-                    onChange={() => setBestEfforts(!bestEfforts)} 
-                    name="bestEfforts"
-                    color="primary"
-                  />
-                }
-                label="Best Efforts"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth={true}>
-                <InputLabel htmlFor="my-input">Minimum Available Replicas</InputLabel>
-                <Input id="my-input" type="number" value={minAvailableReplicas} onChange={(e)=> setMinAvailableReplicas(e.target.value)}/>
-              </FormControl>
-            </Grid>
-          </Grid>
+          <Box flexDirection="column">
+            <RebalanceServerConfigurationSection sectionTitle={'Preparation'}>
+              <Alert color='info' icon={<InfoOutlinedIcon fontSize='small' />}>
+                <Typography variant='body2'>
+                  It is strongly recommended to run rebalance with these options enabled prior
+                  to running the actual rebalance.
+                  This is needed to verify that rebalance will do what's expected.
+                </Typography>
+                <List>
+                  {rebalanceServerOptions
+                      .filter(option => option.isStatsGatheringConfig)
+                      .map(option => (
+                          <ListItem key={option.name} style={{padding: 0}}>
+                            <ListItemIcon style={{minWidth: 30}}>
+                              <FiberManualRecordIcon color='primary' fontSize='small'/>
+                            </ListItemIcon>
+                            <ListItemText primaryTypographyProps={{variant: 'body2'}} primary={option.label} />
+                          </ListItem>
+                      ))
+                  }
+                </List>
+              </Alert>
+            </RebalanceServerConfigurationSection>
+            <RebalanceServerConfigurationSection sectionTitle={'Basic Options'}>
+              <Grid container spacing={2}>
+                {rebalanceServerOptions.filter(option => !option.isAdvancedConfig).map((option) => (
+                    <Grid item>
+                      <RebalanceServerConfigurationOption option={option} />
+                    </Grid>
+                ))}
+              </Grid>
+            </RebalanceServerConfigurationSection>
+            <RebalanceServerConfigurationSection sectionTitle={'Advanced Options'}>
+              <Grid container spacing={2}>
+                {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
+                    <Grid item>
+                      <RebalanceServerConfigurationOption option={option} />
+                    </Grid>
+                ))}
+              </Grid>
+            </RebalanceServerConfigurationSection>
+          </Box>
         : 
           <React.Fragment>
             <DialogContentText>
@@ -174,7 +141,6 @@ export default function RebalanceServerTableOp({
             />
           </React.Fragment>
         }
-      </DialogContent>
     </Dialog>
   );
 }

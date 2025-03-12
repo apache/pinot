@@ -27,7 +27,7 @@ const useStyles = makeStyles((theme) => ({
       minWidth: '600px'
     },
     "& .MuiDialogContent-root": {
-      padding: 8
+      padding: '10px 24px',
     }
   },
   dialogTitle: {
