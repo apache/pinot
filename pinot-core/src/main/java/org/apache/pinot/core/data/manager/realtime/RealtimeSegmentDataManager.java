@@ -1651,15 +1651,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
 
+    _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
+        : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+
     // Acquire semaphore to create stream consumers
     try {
       long startTimeMs = System.currentTimeMillis();
-      while (!_partitionGroupConsumerSemaphore.tryAcquire(1, TimeUnit.MINUTES)) {
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
         _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
             System.currentTimeMillis() - startTimeMs);
 
-        // check if both dedup and upsert are disabled
-        if (!(realtimeTableDataManager.isDedupEnabled() || realtimeTableDataManager.isUpsertEnabled())) {
+        if (_allowConsumptionDuringCommit) {
           if (!isSegmentInProgress()) {
             // if segment is online, no need to wait.
             throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
@@ -1693,8 +1695,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
-          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
