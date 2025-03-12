@@ -512,7 +512,7 @@ public class TableCache implements PinotConfigProvider {
     if (logicalTable == null) {
       return null;
     }
-    return getPhysicalTableSchema(logicalTable.getPhysicalTableNames().get(0));
+    return getPhysicalTableSchema(TableNameBuilder.extractRawTableName(logicalTable.getPhysicalTableNames().get(0)));
   }
 
   @Override

@@ -26,7 +26,7 @@ public class PhysicalTable {
   private final String _rawTableName;
   private final String _tableName;
   private final TableType _tableType;
-  private final TableConfig _tableConfig;
+  private TableConfig _tableConfig;
   private final boolean _isDisabled;
 
   public PhysicalTable(String rawTableName, String tableName, TableType tableType, TableConfig tableConfig,
@@ -56,5 +56,9 @@ public class PhysicalTable {
 
   public boolean isDisabled() {
     return _isDisabled;
+  }
+
+  public void setTableConfig(TableConfig tableConfig) {
+    _tableConfig = tableConfig;
   }
 }

@@ -32,22 +32,29 @@ public class HybridTableRoute {
 
   private final List<PhysicalTableRoute> _offlineTableRoutes;
   private final List<PhysicalTableRoute> _realtimeTableRoutes;
+  private final List<PhysicalTable> _tablesWithNoRouting;
   private final TimeBoundaryInfo _timeBoundaryInfo;
 
   public static HybridTableRoute from(HybridTable hybridTable, RoutingManager routingManager, BrokerRequest brokerRequest, long requestId) {
     List<PhysicalTableRoute> offlineTableRoutes = new ArrayList<>();
+    List<PhysicalTable> tablesWithNoRouting = new ArrayList<>();
     for (PhysicalTable physicalTable : hybridTable.getOfflineTables()) {
       PhysicalTableRoute route = PhysicalTableRoute.from(physicalTable.getTableName(), routingManager, brokerRequest, requestId);
       if (route != null) {
         offlineTableRoutes.add(route);
+      } else {
+        tablesWithNoRouting.add(physicalTable);
       }
     }
 
     List<PhysicalTableRoute> realtimeTableRoutes = new ArrayList<>();
     for (PhysicalTable physicalTable : hybridTable.getRealtimeTables()) {
-      PhysicalTableRoute route = PhysicalTableRoute.from(physicalTable.getTableName(), routingManager, brokerRequest, requestId);
+      PhysicalTableRoute route =
+          PhysicalTableRoute.from(physicalTable.getTableName(), routingManager, brokerRequest, requestId);
       if (route != null) {
         realtimeTableRoutes.add(route);
+      } else {
+        tablesWithNoRouting.add(physicalTable);
       }
     }
 
@@ -59,13 +66,15 @@ public class HybridTableRoute {
         offlineTableRoutes = List.of();
       }
     }
-    return new HybridTableRoute(offlineTableRoutes, realtimeTableRoutes, timeBoundaryInfo);
+    return new HybridTableRoute(offlineTableRoutes, realtimeTableRoutes, timeBoundaryInfo, tablesWithNoRouting);
   }
 
-  private HybridTableRoute(List<PhysicalTableRoute> offlineTableRoutes, List<PhysicalTableRoute> realtimeTableRoutes, TimeBoundaryInfo timeBoundaryInfo) {
+  private HybridTableRoute(List<PhysicalTableRoute> offlineTableRoutes, List<PhysicalTableRoute> realtimeTableRoutes,
+      TimeBoundaryInfo timeBoundaryInfo, List<PhysicalTable> tablesWithNoRouting) {
     _offlineTableRoutes = offlineTableRoutes;
     _realtimeTableRoutes = realtimeTableRoutes;
     _timeBoundaryInfo = timeBoundaryInfo;
+    _tablesWithNoRouting = tablesWithNoRouting;
   }
 
   public List<PhysicalTableRoute> getOfflineTableRoutes() {
@@ -78,6 +87,10 @@ public class HybridTableRoute {
 
   public TimeBoundaryInfo getTimeBoundaryInfo() {
     return _timeBoundaryInfo;
+  }
+
+  public List<PhysicalTable> getTablesWithNoRouting() {
+    return _tablesWithNoRouting;
   }
 
   public boolean isEmpty() {

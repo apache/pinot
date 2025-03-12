@@ -22,11 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.NoSuchElementException;
-import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -35,56 +31,32 @@ public class HybridTable {
   private final List<PhysicalTable> _offlineTables;
   private final List<PhysicalTable> _realtimeTables;
 
-  public static HybridTable from(String tableName, RoutingManager routingManager, TableCache tableCache)
-      throws TableNotFoundException {
+  public static HybridTable from(String tableName, RoutingManager routingManager) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != null) {
-      HybridTable hybridTable = from(List.of(tableName), routingManager, tableCache);
-      if (hybridTable.isEmpty()) {
-        // Check route and table config to throw the right exception.
-        if (tableCache.getTableConfig(tableName) == null) {
-          throw new TableNotFoundException("Table not found for request " + tableName);
-        }
-        throw new NoSuchElementException("No matches for table " + tableName);
-      }
-      return hybridTable;
+      return from(List.of(tableName), routingManager);
     } else {
       // Generate hybrid table with both offline and realtime.
       // Hybrid table (check both OFFLINE and REALTIME)
       String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      HybridTable hybridTable =
-          from(List.of(offlineTableNameToCheck, realtimeTableNameToCheck), routingManager, tableCache);
-      if (hybridTable.isEmpty()) {
-        // Check route and table config to throw the right exception.
-        if (!routingManager.routingExists(offlineTableNameToCheck) && !routingManager.routingExists(
-            realtimeTableNameToCheck)) {
-          throw new NoSuchElementException("No matches for table " + tableName);
-        }
-        throw new TableNotFoundException("Table not found for request " + tableName);
-      }
-      return hybridTable;
+      return from(List.of(offlineTableNameToCheck, realtimeTableNameToCheck), routingManager);
     }
   }
 
-  public static HybridTable from(Collection<String> physicalTableNames, RoutingManager routingManager,
-      TableCache tableCache)
-      throws TableNotFoundException {
+  public static HybridTable from(Collection<String> physicalTableNames, RoutingManager routingManager)  {
     List<PhysicalTable> offlineTables = new ArrayList<>();
     List<PhysicalTable> realtimeTables = new ArrayList<>();
     for (String physicalTableName : physicalTableNames) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
       Preconditions.checkNotNull(tableType);
       if (routingManager.routingExists(physicalTableName)) {
-        TableConfig tableConfig = tableCache.getTableConfig(physicalTableName);
-        if (tableConfig != null) {
-          if (tableType == TableType.OFFLINE) {
-            offlineTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, tableConfig,
-                routingManager.isTableDisabled(physicalTableName)));
-          } else {
-            realtimeTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, tableConfig,
-                routingManager.isTableDisabled(physicalTableName)));
-          }
+        if (tableType == TableType.OFFLINE) {
+          offlineTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, null,
+              routingManager.isTableDisabled(physicalTableName)));
+        } else {
+          realtimeTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, null,
+              routingManager.isTableDisabled(physicalTableName)));
         }
       }
     }
@@ -118,6 +90,13 @@ public class HybridTable {
     _offlineTables.stream().filter(PhysicalTable::isDisabled).forEach(disabledTables::add);
     _realtimeTables.stream().filter(PhysicalTable::isDisabled).forEach(disabledTables::add);
     return disabledTables;
+  }
+
+  public List<PhysicalTable> getAllPhysicalTables() {
+    List<PhysicalTable> allPhysicalTables = new ArrayList<>();
+    allPhysicalTables.addAll(_offlineTables);
+    allPhysicalTables.addAll(_realtimeTables);
+    return allPhysicalTables;
   }
 
   public boolean isHybrid() {
