@@ -401,12 +401,16 @@ public class PinotClientRequest {
       boolean verbose) {
     try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
-      if (isClient && _requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        String resp = "Cancelled client query: " + id;
-        if (verbose) {
-          resp += " with responses from servers: " + serverResponses;
+      if (isClient) {
+        long reqId = _requestHandler.getRequestIdByClientId(id).orElse(-1L);
+        QueryThreadContext.setIds(reqId, id);
+        if (_requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+          String resp = "Cancelled client query: " + id;
+          if (verbose) {
+            resp += " with responses from servers: " + serverResponses;
+          }
+          return resp;
         }
-        return resp;
       } else {
         long reqId = Long.parseLong(id);
         if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {

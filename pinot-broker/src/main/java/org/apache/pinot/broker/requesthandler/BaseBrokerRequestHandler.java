@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -287,17 +287,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
       throws Exception {
     Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
-    Optional<Long> requestId = _clientQueryIds.entrySet().stream()
-        .filter(e -> clientQueryId.equals(e.getValue()))
-        .map(Map.Entry::getKey)
-        .findFirst();
+    OptionalLong requestId = getRequestIdByClientId(clientQueryId);
     if (requestId.isPresent()) {
-      QueryThreadContext.setIds(requestId.get(), clientQueryId);
-      return cancelQuery(requestId.get(), timeoutMs, executor, connMgr, serverResponses);
+      return cancelQuery(requestId.getAsLong(), timeoutMs, executor, connMgr, serverResponses);
     } else {
       LOGGER.warn("Query cancellation cannot be performed due to unknown client query id: {}", clientQueryId);
       return false;
     }
+  }
+
+  @Override
+  public OptionalLong getRequestIdByClientId(String clientQueryId) {
+    return _clientQueryIds.entrySet().stream()
+        .filter(e -> clientQueryId.equals(e.getValue()))
+        .mapToLong(Map.Entry::getKey)
+        .findFirst();
   }
 
   @Nullable
