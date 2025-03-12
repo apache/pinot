@@ -8,8 +8,10 @@ import {
 
 type RebalanceServerConfigurationOptionSwitchProps = {
     option: RebalanceServerOption;
+    handleConfigChange: (config: { [key: string]: string | number | boolean }) => void;
 }
-export const RebalanceServerConfigurationOptionSwitch = ({option}: RebalanceServerConfigurationOptionSwitchProps) => {
+export const RebalanceServerConfigurationOptionSwitch = (
+    { option, handleConfigChange }: RebalanceServerConfigurationOptionSwitchProps) => {
     const [isChecked, setIsChecked] = useState<boolean>(option.defaultValue as boolean);
     return (
         <Box display='flex' flexDirection='column'>
@@ -17,7 +19,12 @@ export const RebalanceServerConfigurationOptionSwitch = ({option}: RebalanceServ
                 control={
                     <Switch
                         checked={isChecked}
-                        onChange={() => setIsChecked(isChecked => !isChecked)}
+                        onChange={() => {
+                            handleConfigChange({
+                                [option.name]: !isChecked
+                            })
+                            setIsChecked(isChecked => !isChecked)
+                        }}
                         name={option.name}
                         color="primary"
                     />

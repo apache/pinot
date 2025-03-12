@@ -56,20 +56,14 @@ export default function RebalanceServerTableOp({
   tableType
 }: Props) {
   const [rebalanceResponse, setRebalanceResponse] = React.useState(null)
-  const [dryRun, setDryRun] = React.useState(false);
-  const [reassignInstances, setReassignInstances] = React.useState(false);
-  const [includeConsuming, setIncludeConsuming] = React.useState(false);
-  const [bootstrap, setBootstrap] = React.useState(false);
-  const [downtime, setDowntime] = React.useState(false);
-  const [minAvailableReplicas, setMinAvailableReplicas] = React.useState("1");
-  const [bestEfforts, setBestEfforts] = React.useState(false);
-  const [lowDiskMode, setLowDiskMode] = React.useState(false);
+  const [rebalanceConfig, setRebalanceConfig] = React.useState(
+      rebalanceServerOptions.reduce((config, option) => ({ ...config, [option.name]: option.defaultValue }), {})
+  );
 
   const getData = () => {
     return {
       type: tableType,
-      dryRun, reassignInstances, includeConsuming, bootstrap, downtime, bestEfforts, lowDiskMode,
-      minAvailableReplicas: parseInt(minAvailableReplicas, 10)
+      ...rebalanceConfig,
     }
   };
 
@@ -78,6 +72,13 @@ export default function RebalanceServerTableOp({
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, data);
     setRebalanceResponse(response);
   };
+
+  const handleConfigChange = (config: { [key: string]: string | number | boolean }) => {
+    setRebalanceConfig({
+      ...rebalanceConfig,
+      ...config
+    });
+  }
 
   return (
     <Dialog
@@ -89,42 +90,41 @@ export default function RebalanceServerTableOp({
     >
         {!rebalanceResponse ?
           <Box flexDirection="column">
-            <RebalanceServerConfigurationSection sectionTitle={'Preparation'}>
+            <RebalanceServerConfigurationSection sectionTitle='Preparation'>
               <Alert color='info' icon={<InfoOutlinedIcon fontSize='small' />}>
                 <Typography variant='body2'>
-                  It is strongly recommended to run rebalance with these options enabled prior
-                  to running the actual rebalance.
+                  It is strongly recommended to run rebalance with these options enabled prior to running the actual rebalance.
                   This is needed to verify that rebalance will do what's expected.
                 </Typography>
                 <List>
                   {rebalanceServerOptions
                       .filter(option => option.isStatsGatheringConfig)
                       .map(option => (
-                          <ListItem key={option.name} style={{padding: 0}}>
-                            <ListItemIcon style={{minWidth: 30}}>
+                          <ListItem key={option.name} style={{ padding: 0 }}>
+                            <ListItemIcon style={{ minWidth: 30 }}>
                               <FiberManualRecordIcon color='primary' fontSize='small'/>
                             </ListItemIcon>
-                            <ListItemText primaryTypographyProps={{variant: 'body2'}} primary={option.label} />
+                            <ListItemText primaryTypographyProps={{ variant: 'body2' }} primary={option.label} />
                           </ListItem>
                       ))
                   }
                 </List>
               </Alert>
             </RebalanceServerConfigurationSection>
-            <RebalanceServerConfigurationSection sectionTitle={'Basic Options'}>
+            <RebalanceServerConfigurationSection sectionTitle='Basic Options'>
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => !option.isAdvancedConfig).map((option) => (
                     <Grid item>
-                      <RebalanceServerConfigurationOption option={option} />
+                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}
               </Grid>
             </RebalanceServerConfigurationSection>
-            <RebalanceServerConfigurationSection sectionTitle={'Advanced Options'}>
+            <RebalanceServerConfigurationSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
                     <Grid item>
-                      <RebalanceServerConfigurationOption option={option} />
+                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}
               </Grid>

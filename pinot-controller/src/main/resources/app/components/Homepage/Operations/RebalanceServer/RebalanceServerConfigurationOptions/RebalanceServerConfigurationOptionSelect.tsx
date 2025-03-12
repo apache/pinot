@@ -16,8 +16,11 @@ import {
 
 type RebalanceServerConfigurationOptionSelectProps = {
     option: RebalanceServerOption;
+    handleConfigChange: (config: { [key: string]: string | number | boolean }) => void;
 }
-export const RebalanceServerConfigurationOptionSelect = ({option}: RebalanceServerConfigurationOptionSelectProps) => {
+export const RebalanceServerConfigurationOptionSelect = (
+    { option, handleConfigChange }: RebalanceServerConfigurationOptionSelectProps
+) => {
     const [value, setValue] = useState<string>(option.defaultValue as string);
     return (
         <Box display='flex' flexDirection='column'>
@@ -26,7 +29,12 @@ export const RebalanceServerConfigurationOptionSelect = ({option}: RebalanceServ
                 <Select
                     id={`rebalance-server-number-select-${option.name}`}
                     value={value}
-                    onChange={(e) => setValue(e.target.value as string)}
+                    onChange={(e) => {
+                        handleConfigChange({
+                            [option.name]: e.target.value as string
+                        })
+                        setValue(e.target.value as string);
+                    }}
                 >
                     {option.allowedValues.map((allowedValue) => (<MenuItem key={allowedValue} value={allowedValue}>{allowedValue}</MenuItem>))}
                 </Select>

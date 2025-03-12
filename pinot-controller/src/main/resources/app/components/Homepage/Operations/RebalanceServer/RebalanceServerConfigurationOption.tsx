@@ -10,14 +10,15 @@ import {
     RebalanceServerConfigurationOptionSelect
 } from "./RebalanceServerConfigurationOptions/RebalanceServerConfigurationOptionSelect";
 
-export const RebalanceServerConfigurationOption = ({option}: {option: RebalanceServerOption}) => {
+export const RebalanceServerConfigurationOption = (
+    { option, handleConfigChange }: { option: RebalanceServerOption, handleConfigChange: (config: { [key: string]: string | number | boolean }) => void }) => {
     switch (option.type) {
         case "BOOL":
-            return <RebalanceServerConfigurationOptionSwitch option={option} />;
+            return <RebalanceServerConfigurationOptionSwitch option={option} handleConfigChange={handleConfigChange} />;
         case "INTEGER":
-            return <RebalanceServerConfigurationOptionInteger option={option} />;
+            return <RebalanceServerConfigurationOptionInteger option={option} handleConfigChange={handleConfigChange} />;
         case "SELECT":
-            return <RebalanceServerConfigurationOptionSelect option={option} />;
+            return <RebalanceServerConfigurationOptionSelect option={option} handleConfigChange={handleConfigChange} />;
         default:
             return null;
     }

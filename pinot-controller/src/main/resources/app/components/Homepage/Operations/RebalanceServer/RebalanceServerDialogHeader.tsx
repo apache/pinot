@@ -27,16 +27,16 @@ type LinkTextProps = {
 const LinkText = ({ text, link }: LinkTextProps) => {
     return (
         <Link href={link} target="_blank" rel="noopener">
-            <Typography style={{fontWeight: 'bold'}} variant="inherit">{text}</Typography>
+            <Typography style={{ fontWeight: 'bold' }} variant="inherit">{text}</Typography>
         </Link>
     );
 }
 export const RebalanceServerDialogHeader = () => {
     return (
         <Box>
-            <Typography style={{fontWeight: "bold"}} variant="h6">Rebalance Server</Typography>
+            <Typography style={{ fontWeight: "bold" }} variant="h6">Rebalance Server</Typography>
             <Typography variant="subtitle2">
-                Click <LinkText text={'here'} link={'https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers'} /> for more details
+                Click <LinkText text='here' link='https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-servers' /> for more details
             </Typography>
         </Box>
     );
