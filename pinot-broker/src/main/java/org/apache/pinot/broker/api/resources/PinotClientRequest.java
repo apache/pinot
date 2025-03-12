@@ -400,6 +400,8 @@ public class PinotClientRequest {
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
       boolean verbose) {
     try (QueryThreadContext.CloseableContext closeMe = QueryThreadContext.open()) {
+      long reqId = Long.parseLong(id);
+      QueryThreadContext.setIds(reqId, id);
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (isClient && _requestHandler.cancelQueryByClientId(id, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
         String resp = "Cancelled client query: " + id;
@@ -407,8 +409,7 @@ public class PinotClientRequest {
           resp += " with responses from servers: " + serverResponses;
         }
         return resp;
-      } else if (_requestHandler.cancelQuery(Long.parseLong(id), timeoutMs, _executor, _httpConnMgr, serverResponses)) {
-        QueryThreadContext.setIds(Long.parseLong(id), id);
+      } else if (_requestHandler.cancelQuery(reqId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
         String resp = "Cancelled query: " + id;
         if (verbose) {
           resp += " with responses from servers: " + serverResponses;
