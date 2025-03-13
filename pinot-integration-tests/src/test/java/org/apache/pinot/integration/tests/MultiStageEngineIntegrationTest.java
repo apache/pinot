@@ -29,9 +29,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -49,6 +51,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
@@ -74,6 +77,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String DATABASE_NAME = "db1";
   private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
+
+  private static final String PRIMARY_TABLE_DATA_PATH = "baseballStats_data.csv";
+  private static final String PRIMARY_TABLE_SCHEMA_PATH = "baseballStats_schema.json";
+  private static final String PRIMARY_TABLE_TABLE_CONFIG_PATH = "baseballStats_offline_table_config.json";
+  private static final Integer PRIMARY_NUMBER_OF_RECORDS = 97889;
+  private static final String DIM_TABLE_DATA_PATH = "dimBaseballTeams.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "dimBaseballTeams_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimBaseballTeams_config.json";
+  private static final Integer DIM_NUMBER_OF_RECORDS = 52;
 
   @Override
   protected String getSchemaFileName() {
@@ -1618,6 +1630,43 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testLookupJoin() throws Exception {
+
+    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(lookupTableSchema);
+    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    addTableConfig(tableConfig);
+    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
+
+    Schema primaryTableSchema = createSchema(PRIMARY_TABLE_SCHEMA_PATH);
+    addSchema(primaryTableSchema);
+    TableConfig primaryTableConfig = createTableConfig(PRIMARY_TABLE_TABLE_CONFIG_PATH);
+    addTableConfig(primaryTableConfig);
+    createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV,
+        PRIMARY_NUMBER_OF_RECORDS, 60_000);
+
+    String query = "select /*+ joinOptions(join_strategy='lookup') */ yearID, teamName from baseballStats "
+        + "join dimBaseballTeams ON baseballStats.teamID = dimBaseballTeams.teamID where playerId = 'aardsda01'";
+    JsonNode jsonNode = postQuery(query);
+    long result = jsonNode.get("resultTable").get("rows").size();
+    assertEquals(result, 3);
+
+    // Verify that LOOKUP_JOIN stage is present and HASH_JOIN stage is not present in the query plan
+    Set<String> stages = new HashSet<>();
+    JsonNode currentNode = jsonNode.get("stageStats").get("children");
+    while (currentNode != null) {
+      currentNode = currentNode.get(0);
+      stages.add(currentNode.get("type").asText());
+      currentNode = currentNode.get("children");
+    }
+    assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
+    assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
+
+    dropOfflineTable("baseballStats");
+    dropOfflineTable("dimBaseballTeams");
+  }
+
   public void testSearchLiteralFilter() throws Exception {
     String sqlQuery =
         "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "

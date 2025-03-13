@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
@@ -58,6 +59,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -277,6 +279,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected Schema createSchema(File schemaFile)
       throws IOException {
     return Schema.fromInputStream(new FileInputStream(schemaFile));
+  }
+
+  protected TableConfig createTableConfig(String tableConfigFileName)
+      throws IOException {
+    URL configPathUrl = getClass().getClassLoader().getResource(tableConfigFileName);
+    Assert.assertNotNull(configPathUrl);
+    return createTableConfig(new File(configPathUrl.getFile()));
   }
 
   protected TableConfig createTableConfig(File tableConfigFile)
@@ -598,6 +607,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected boolean injectTombstones() {
     return false;
+  }
+
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+    URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
+    assert dataPathUrl != null;
+    File file = new File(dataPathUrl.getFile());
+
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
+    uploadSegments(tableConfig.getTableName(), _tarDir);
+
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
+        timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
+        true, Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()
