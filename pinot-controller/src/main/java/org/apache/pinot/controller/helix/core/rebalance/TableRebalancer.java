@@ -33,7 +33,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -70,7 +69,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -670,7 +668,8 @@ public class TableRebalancer {
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
       String serverTenantNameWithType = tenantNameBuilder.tableNameWithType(serverTenantName);
-      tenantInfoMap.put(serverTenantNameWithType, new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType, null));
+      tenantInfoMap.put(serverTenantNameWithType,
+          new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType, null));
     }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {

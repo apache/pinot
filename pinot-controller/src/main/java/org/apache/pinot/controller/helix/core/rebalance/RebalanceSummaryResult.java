@@ -49,7 +49,8 @@ public class RebalanceSummaryResult {
    */
   @JsonCreator
   public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
-      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo, @JsonProperty("tenantsInfo") @Nullable List<TenantInfo> tenantsInfo) {
+      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo,
+      @JsonProperty("tenantsInfo") @Nullable List<TenantInfo> tenantsInfo) {
     _serverInfo = serverInfo;
     _segmentInfo = segmentInfo;
     _tenantsInfo = tenantsInfo;
