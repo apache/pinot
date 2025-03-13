@@ -294,7 +294,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _resourceManager = _controllerStarter.getHelixResourceManager();
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     _executorService = Executors.newFixedThreadPool(10);
-    preChecker.init(_helixResourceManager, _executorService);
+    preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
         _resourceManager.getTableSizeReader());
   }
@@ -878,9 +878,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, String> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 2);
+    assertEquals(preChecksResult.size(), 3);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
         String.valueOf(expectedMinimizeDataMovement));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS),
