@@ -29,6 +29,7 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -70,6 +71,14 @@ public class WindowResourceAccountingTest extends WindowFunnelTestBase {
 
     JsonNode response = postQuery(query);
     ThreadResourceUsageAccountant accountant = Tracing.getThreadAccountant();
+    assertEquals(getBrokerConf(0).getProperty(
+            CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME),
+        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
+    assertEquals(getServerConf(0).getProperty(
+            CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME),
+        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
+    assertEquals(accountant.getClass().getCanonicalName(),
+        AggregateByQueryIdAccountantFactoryForTest.AggregateByQueryIdAccountant.class.getCanonicalName());
     Map<String, ? extends QueryResourceTracker> queryMemUsage = accountant.getQueryResources();
     assertFalse(queryMemUsage.isEmpty());
     boolean foundRequestId = false;
