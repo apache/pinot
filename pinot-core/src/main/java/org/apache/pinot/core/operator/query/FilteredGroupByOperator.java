@@ -177,6 +177,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
       ServerMetrics serverMetrics = ServerMetrics.get();
       serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
     }
 
 

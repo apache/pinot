@@ -126,6 +126,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
           _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
       ServerMetrics serverMetrics = ServerMetrics.get();
       serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
     }
 
     // Trim the groups when iff:
