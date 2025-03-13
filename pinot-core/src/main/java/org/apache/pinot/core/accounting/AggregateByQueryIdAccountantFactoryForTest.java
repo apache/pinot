@@ -83,12 +83,14 @@ public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccount
     public void sampleThreadBytesAllocated() {
       super.sampleThreadBytesAllocated();
       ThreadExecutionContext context = getThreadExecutionContext();
-      QueryResourceTrackerImpl queryResourceTracker = _queryMemUsage.computeIfAbsent(context.getQueryId(), s -> new QueryResourceTrackerImpl(context.getQueryId()));
-      queryResourceTracker.setAllocatedBytes(queryResourceTracker.getAllocatedBytes() + getThreadEntry().getAllocatedBytes());
+      QueryResourceTrackerImpl queryResourceTracker =
+          _queryMemUsage.computeIfAbsent(context.getQueryId(), s -> new QueryResourceTrackerImpl(context.getQueryId()));
+      queryResourceTracker.setAllocatedBytes(
+          queryResourceTracker.getAllocatedBytes() + getThreadEntry().getAllocatedBytes());
     }
 
     @Override
-    public Map<String, ? extends QueryResourceTracker>  getQueryResources() {
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
       return _queryMemUsage;
     }
   }
