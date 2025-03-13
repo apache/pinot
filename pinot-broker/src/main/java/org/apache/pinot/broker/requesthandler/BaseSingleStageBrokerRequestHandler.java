@@ -295,7 +295,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    LOGGER.debug("SQL query for request {}: {}", requestId, query);
+    LOGGER.info("SQL query for request {}: {}", requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
