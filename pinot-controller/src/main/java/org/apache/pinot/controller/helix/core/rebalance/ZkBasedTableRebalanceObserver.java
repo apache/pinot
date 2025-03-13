@@ -116,9 +116,16 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           if (TableRebalanceProgressStats.progressStatsDiffer(
               _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), latestProgress)) {
+            TableRebalanceProgressStats.RebalanceProgressStats currentStepStats =
+                _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
+            int numAddedInLastStep =
+                currentStepStats._totalRemainingSegmentsToBeAdded - latestProgress._totalRemainingSegmentsToBeAdded;
+            int numDeletedInLastStep =
+                currentStepStats._totalRemainingSegmentsToBeDeleted - latestProgress._totalRemainingSegmentsToBeDeleted;
             _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(
-                updateOverallProgressStatsFromStep(_tableRebalanceProgressStats));
+                updateOverallProgressStatsFromStep(_tableRebalanceProgressStats, numAddedInLastStep,
+                    numDeletedInLastStep));
           }
           trackStatsInZk();
           updatedStatsInZk = true;
@@ -331,29 +338,24 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * Updates the overall progress stats based on the current step's progress stats. This should be called
    * during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
    * @param rebalanceProgressStats the rebalance stats
+   * @param numAddedInLastStep number of segments added since the last check
+   * @param numDeletedInLastStep number of segments deleted since the last check
    * @return the newly calculated overall progress stats
    */
   public static TableRebalanceProgressStats.RebalanceProgressStats updateOverallProgressStatsFromStep(
-      TableRebalanceProgressStats rebalanceProgressStats) {
-    TableRebalanceProgressStats.RebalanceProgressStats stepProgressStats =
-        rebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
+      TableRebalanceProgressStats rebalanceProgressStats, int numAddedInLastStep, int numDeletedInLastStep) {
     TableRebalanceProgressStats.RebalanceProgressStats overallProgressStats =
         rebalanceProgressStats.getRebalanceProgressStatsOverall();
 
     TableRebalanceProgressStats.RebalanceProgressStats newOverallProgressStats =
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
-    int numAddsProcessedInStep =
-        stepProgressStats._totalSegmentsToBeAdded - stepProgressStats._totalRemainingSegmentsToBeAdded;
-    int numDeletesProcessedInStep =
-        stepProgressStats._totalSegmentsToBeDeleted - stepProgressStats._totalRemainingSegmentsToBeDeleted;
-
     newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded;
     newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted;
     newOverallProgressStats._totalRemainingSegmentsToBeAdded =
-        overallProgressStats._totalRemainingSegmentsToBeAdded - numAddsProcessedInStep;
+        overallProgressStats._totalRemainingSegmentsToBeAdded - numAddedInLastStep;
     newOverallProgressStats._totalRemainingSegmentsToBeDeleted =
-        overallProgressStats._totalRemainingSegmentsToBeDeleted - numDeletesProcessedInStep;
+        overallProgressStats._totalRemainingSegmentsToBeDeleted - numDeletedInLastStep;
     newOverallProgressStats._percentageTotalSegmentsAddsRemaining = newOverallProgressStats._totalSegmentsToBeAdded == 0
         ? 0.0 : (double) newOverallProgressStats._totalRemainingSegmentsToBeAdded
         / newOverallProgressStats._totalSegmentsToBeAdded * 100.0;
