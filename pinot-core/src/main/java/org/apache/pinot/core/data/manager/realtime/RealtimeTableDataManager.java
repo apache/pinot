@@ -539,7 +539,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
-    SemaphoreCoordinator semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId,
+    SemaphoreCoordinator semaphoreCoordinator = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId,
         k -> new SemaphoreCoordinator(new Semaphore(1), isDedupEnabled()));
 
     // Create the segment data manager and register it
@@ -550,7 +550,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
-        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName, semaphore,
+        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator,
             partitionUpsertMetadataManager, partitionDedupMetadataManager, _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
@@ -641,11 +641,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      SemaphoreCoordinator semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SemaphoreCoordinator semaphoreCoordinator, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
+        indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator, _serverMetrics, partitionUpsertMetadataManager,
         partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
