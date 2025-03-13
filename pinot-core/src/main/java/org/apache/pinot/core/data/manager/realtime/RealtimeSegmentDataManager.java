@@ -892,8 +892,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       } catch (Throwable e) {
         if (_shouldStop) {
-          _segmentLogger.info("Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
-              e.toString());
+          if (_segmentLogger.isDebugEnabled()) {
+            _segmentLogger.debug("Caught exception in consumer thread after stop() is invoked, ignoring the exception",
+                e);
+          } else {
+            _segmentLogger.info(
+                "Caught exception in consumer thread after stop() is invoked: {}, ignoring the exception",
+                e.getMessage());
+          }
         } else {
           String errorMessage = "Exception while in work";
           _segmentLogger.error(errorMessage, e);

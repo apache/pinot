@@ -20,12 +20,22 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -38,6 +48,8 @@ import static org.testng.Assert.assertEquals;
 public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private List<File> _avroFiles;
+  private static final String DEDUP_TABLE_WITH_REPLICAS = "DedupTableWithReplicas_REALTIME";
+  private static final String DEDUP_WITH_REPLICAS_SCHEMA = "DedupTableWithReplicas";
 
   @BeforeClass
   public void setUp()
@@ -49,7 +61,8 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
-    startServer();
+    //Test the cases for RF>1
+    startServers(2);
 
     _avroFiles = unpackAvroData(_tempDir);
     startKafka();
@@ -59,8 +72,41 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     addSchema(schema);
     TableConfig tableConfig = createDedupTableConfig(_avroFiles.get(0), "id", getNumKafkaPartitions());
     addTableConfig(tableConfig);
-
     waitForAllDocsLoaded(600_000L);
+    createDedupConfigsWithReplicas();
+  }
+
+  public void createDedupConfigsWithReplicas()
+      throws IOException {
+    Schema schemaWithReplicas = createSchema(getSchemaFileName());
+    schemaWithReplicas.setSchemaName(DEDUP_WITH_REPLICAS_SCHEMA);
+    addSchema(schemaWithReplicas);
+    TableConfig tableConfigWithReplication =
+        createDedupTableWithReplicas(_avroFiles.get(0), "id", getNumKafkaPartitions());
+    addTableConfig(tableConfigWithReplication);
+    waitForDocsLoaded(600_000L, true, DEDUP_TABLE_WITH_REPLICAS);
+  }
+
+  /**
+   * Creates a new Dedup enabled table config with replication=2 and metadatTTL=30
+   */
+  protected TableConfig createDedupTableWithReplicas(File sampleAvroFile, String primaryKeyColumn,
+      int numPartitions) {
+    AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    DedupConfig dedupConfig =
+        new DedupConfig(true, HashFunction.NONE, null, new HashMap<>(), 30, getTimeColumnName(), true);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName("DedupTableWithReplicas_REALTIME")
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(2)
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 2)).setDedupConfig(dedupConfig)
+        .build();
   }
 
   @AfterClass
@@ -102,6 +148,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
     return 5;
   }
 
+  //Tests the query results for table with RF=1
   @Test
   public void testValues()
       throws Exception {
@@ -138,6 +185,19 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
               .getResultSet(0)
               .getString(0),
           "" + i);
+    }
+  }
+
+  //tests the query results when metadataTTL is set with RF>1.
+  @Test
+  public void testValuesWithReplicas() {
+    assertEquals(getCurrentCountStarResult(DEDUP_TABLE_WITH_REPLICAS), getCountStarResult());
+
+    // Validate the older value persist
+    for (int i = 0; i < getCountStarResult(); i++) {
+      Assert.assertEquals(
+          getPinotConnection().execute("SELECT name FROM " + DEDUP_TABLE_WITH_REPLICAS + " WHERE id = " + i)
+              .getResultSet(0).getString(0), "" + i);
     }
   }
 }

@@ -465,22 +465,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
-    } else {
-      if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-        _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
-        onConsumingToOnline(segmentName);
-      } else {
-        // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
-        // call completes.
-        // The server should replace the segment only after the CRC is set by COMMIT_END_METADATA and the segment is
-        // marked DONE.
-        // This ensures the segment's download URL is available before discarding the locally built copy, preventing
-        // data loss if COMMIT_END_METADATA fails.
-        if (zkMetadata.getStatus() == Status.DONE) {
-          replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
-        }
-      }
+      return;
+    }
+    if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+      _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
+      ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      onConsumingToOnline(segmentName);
+      return;
+    }
+    // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
+    // call completes.
+    // The server should replace the segment only after the CRC is set by COMMIT_END_METADATA and the segment is
+    // marked DONE.
+    // This ensures the segment's download URL is available before discarding the locally built copy, preventing
+    // data loss if COMMIT_END_METADATA fails.
+    if (zkMetadata.getStatus() == Status.DONE) {
+      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }
   }
 

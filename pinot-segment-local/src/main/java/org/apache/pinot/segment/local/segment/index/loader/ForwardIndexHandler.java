@@ -197,7 +197,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return columnOperationsMap;
     }
 
-    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
+    // Get all physical columns, excluding virtual columns like $docId, $hostName and $segmentName.
+    Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();

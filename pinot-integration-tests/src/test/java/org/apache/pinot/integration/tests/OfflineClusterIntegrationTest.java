@@ -3453,44 +3453,63 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
-    response1 = response1.replaceAll("docs:[0-9]+", "docs:*");
+    response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
+        .replaceAll("Time: \\d+\\.\\d+", "Time:*");
 
-    //@formatter:off
-    assertEquals(response1, "{"
-        + "\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
-        + "\"rows\":[["
-        + "\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
-        + "GROUP BY name ORDER BY 1\","
-        + "\"Execution Plan\\n"
-        + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
-        + "  PinotLogicalSortExchange("
-        + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
-        + "    LogicalProject(count=[$1], name=[$0])\\n"
-        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\\n"
-        + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
-        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\\n"
-        + "            LogicalTableScan(table=[[default, mytable]])\\n"
-        + "\"]]}");
-    //@formatter:on
+    JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(1).asText(), "PLAN");
+    assertEquals(response1Json.get("dataSchema").get("columnNames").get(2).asText(), "RULE_TIMINGS");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(1).asText(), "STRING");
+    assertEquals(response1Json.get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+
+    assertEquals(response1Json.get("rows").get(0).get(0).asText(),
+        "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name"
+            + " ORDER BY 1");
+    assertEquals(response1Json.get("rows").get(0).get(1).asText(), "Execution Plan\n"
+        + "LogicalSort(sort0=[$0], dir0=[ASC])\n"
+        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], "
+        + "isSortOnReceiver=[true])\n"
+        + "    LogicalProject(count=[$1], name=[$0])\n"
+        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
+        + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "            LogicalTableScan(table=[[default, mytable]])\n");
+    assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
+        + "Rule: AggregateProjectMergeRule -> Time:*\n"
+        + "Rule: Project -> Time:*\n"
+        + "Rule: AggregateRemoveRule -> Time:*\n"
+        + "Rule: SortRemoveRule -> Time:*\n");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
-    String response2 = postQuery(query2).get("resultTable").toString();
+    String response2 = postQuery(query2).get("resultTable").toString()
+        .replaceAll("Time: \\d+\\.\\d+", "Time: *");
 
-    //@formatter:off
-    Pattern pattern = Pattern.compile("\\{"
-        + "\"dataSchema\":\\{\"columnNames\":\\[\"SQL\",\"PLAN\"],\"columnDataTypes\":\\[\"STRING\",\"STRING\"]},"
-        + "\"rows\":\\[\\[\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
-        + "\"Execution Plan.."
-        + "LogicalProject\\(.*\\).."
-        + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\).."
-        + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)..\""
-        + "]]}");
-    //@formatter:on
-    boolean found = pattern.matcher(response2).find();
-    assertTrue(found, "Pattern " + pattern + " not found in " + response2);
+    JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(1).asText(), "PLAN");
+    assertEquals(response2Json.get("dataSchema").get("columnNames").get(2).asText(), "RULE_TIMINGS");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(1).asText(), "STRING");
+    assertEquals(response2Json.get("dataSchema").get("columnDataTypes").get(2).asText(), "STRING");
+    assertEquals(response2Json.get("rows").get(0).get(0).asText(),
+        "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0");
+    assertTrue(Pattern.compile(
+        "Execution Plan\n"
+            + "LogicalProject\\(.*\\)\n"
+            + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
+            + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
+    ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
+    assertEquals(response2Json.get("rows").get(0).get(2).asText(),
+        "Rule Execution Times\n"
+            + "Rule: Project -> Time: *\n"
+            + "Rule: FilterProjectTransposeRule -> Time: *\n"
+            + "Rule: Filter -> Time: *\n"
+            + "Rule: ProjectFilterTransposeRule -> Time: *\n");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
@@ -4016,7 +4035,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testResponseWithClientRequestId(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String clientRequestId = UUID.randomUUID().toString();
     String sqlQuery =
@@ -4037,13 +4056,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TableConfig tableConfig = getOfflineTableConfig();
 
-    // Ensure summary status is null if not enabled
+    // Ensure summary status is non-null always
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getRebalanceSummaryResult());
-
-    // Enable summary, nothing is set
-    rebalanceConfig.setSummary(true);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
         tableConfig.getReplication());
 
@@ -4054,19 +4069,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
         getNumServers() + 1, tableConfig.getReplication());
 
-    // Disable dry-run, summary still enabled
+    // Disable dry-run to do a real rebalance
     rebalanceConfig.setDryRun(false);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getRebalanceSummaryResult());
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-
-    // Disable summary along with dry-run to do a real rebalance
-    rebalanceConfig.setSummary(false);
     rebalanceConfig.setDowntime(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getRebalanceSummaryResult());
+    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers(),
+        getNumServers() + 1, tableConfig.getReplication());
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
 
@@ -4075,18 +4086,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Re-enable dry-run
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.DONE, true, getNumServers() + 1,
         getNumServers(), tableConfig.getReplication());
 
-    // Disable dry-run and summary to do a real rebalance
+    // Disable dry-run to do a real rebalance
     rebalanceConfig.setDryRun(false);
-    rebalanceConfig.setSummary(false);
     rebalanceConfig.setDowntime(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertNull(rebalanceResult.getRebalanceSummaryResult());
+    assertNotNull(rebalanceResult.getRebalanceSummaryResult());
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
@@ -4096,14 +4105,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful(),
         60_000L, "Failed to drop added server");
 
-    // Try dry-run with summary again
+    // Try dry-run again
     rebalanceConfig.setDryRun(true);
-    rebalanceConfig.setSummary(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
         tableConfig.getReplication());
 
-    // Try dry-run with summary and pre-checks
+    // Try dry-run with pre-checks
     rebalanceConfig.setPreChecks(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalanceDryRunSummary(rebalanceResult, RebalanceResult.Status.NO_OP, false, getNumServers(), getNumServers(),
