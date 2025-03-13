@@ -18,8 +18,15 @@
  */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**
@@ -55,4 +62,98 @@ public interface AdaptiveServerSelector {
    * @return List of servers along with their values ranked from best to worst.
    */
   List<Pair<String, Double>> fetchServerRankingsWithScores(List<String> serverCandidates);
+
+  Optional<SegmentInstanceCandidate> choose(List<SegmentInstanceCandidate> serverCandidates, Map<String, String> queryOptions);
+
+  List<String> rank(List<SegmentInstanceCandidate> serverCandidates, Map<String, String> queryOptions);
+
+  static SegmentInstanceCandidate selectSevers(List<SegmentInstanceCandidate> servers, Function<String, Double> scoreFunc) {
+    double minScore = Double.MAX_VALUE;
+    SegmentInstanceCandidate selectedServer = null;
+    // TODO: If two or more servers have the same score, break the tie intelligently.
+    for (SegmentInstanceCandidate server : servers) {
+      Double score = scoreFunc.apply(server.getInstance());
+      // No stats for this server. That means this server hasn't received any queries yet.
+      if (score == null) {
+        int randIdx = ThreadLocalRandom.current().nextInt(servers.size());
+        return servers.get(randIdx);
+      }
+      if (score < minScore) {
+        minScore = score;
+        selectedServer = server;
+      }
+    }
+    return selectedServer;
+  }
+
+  static Optional<SegmentInstanceCandidate> select(List<SegmentInstanceCandidate> candidates, Function<String, Double> scoreFunc, Map<String, String> queryOptions) {
+    if (candidates == null || candidates.isEmpty()) {
+      return Optional.empty();
+    }
+    List<Integer> groups = QueryOptionsUtils.getOrderedPreferredReplicas(queryOptions);
+    if (groups.isEmpty()) {
+        return Optional.of(selectSevers(candidates,scoreFunc));
+    }
+    Set<Integer> groupSet = new HashSet<>(groups);
+    Map<Integer, List<Integer>> groupToRankedServers = new HashMap<>();
+    for (int i = 0; i < candidates.size(); i++) {
+      int group = candidates.get(i).getReplicaGroup();
+      group = groupSet.contains(group) ? group : Integer.MAX_VALUE;
+      groupToRankedServers.computeIfAbsent(group, k -> new ArrayList<>()).add(i);
+    }
+    groups.add(Integer.MAX_VALUE);
+    for(int group : groups) {
+      List<Integer> instancesInGroup = groupToRankedServers.get(group);
+      if(instancesInGroup != null) {
+        return Optional.of(selectSevers(
+                instancesInGroup.stream().map(candidates::get).collect(Collectors.toList()),
+                scoreFunc));
+      }
+    }
+    assert false;
+    return Optional.empty();
+  }
+
+  static List<String> rankServers(List<SegmentInstanceCandidate> serverCandidates, Function<String, Double> scoreFunc, Map<String, String> queryOptions) {
+    if (serverCandidates == null || serverCandidates.isEmpty()) {
+          return Collections.emptyList();
+    }
+    List<Pair<Integer, Double>> serverRankListWithScores = new ArrayList<>();
+    int idx = 0;
+    for (SegmentInstanceCandidate candidate: serverCandidates) {
+      Double score = Optional.ofNullable(scoreFunc.apply(candidate.getInstance())).orElse(-1.0);
+      serverRankListWithScores.add(new ImmutablePair<>(idx, score));
+      idx++;
+    }
+    // Let's shuffle the list before sorting. This helps with randomly choosing different servers if there is a tie.
+    Collections.shuffle(serverRankListWithScores);
+    serverRankListWithScores.sort(Comparator.comparing(Pair::getRight));
+
+    List<Integer> groups = QueryOptionsUtils.getOrderedPreferredReplicas(queryOptions);
+    List<String> rankedServers = new ArrayList<>();
+    if (groups.isEmpty()) {
+      for (Pair<Integer, Double> entry : serverRankListWithScores) {
+        rankedServers.add(serverCandidates.get(entry.getLeft()).getInstance());
+      }
+      return rankedServers;
+    }
+    Set<Integer> groupSet = new HashSet<>(groups);
+    Map<Integer, List<Integer>> groupToRankedServers = new HashMap<>();
+    for (int i = 0; i < serverRankListWithScores.size(); i++) {
+      int pos = serverRankListWithScores.get(i).getLeft();
+      SegmentInstanceCandidate candidate = serverCandidates.get(pos);
+      int group = candidate.getReplicaGroup();
+      group = groupSet.contains(group) ? group : Integer.MAX_VALUE;
+      groupToRankedServers.computeIfAbsent(group, k -> new ArrayList<>()).add(pos);
+    }
+    groups.add(Integer.MAX_VALUE);
+    for(int group : groups) {
+      List<Integer> instancesInGroup = groupToRankedServers.get(group);
+      if(instancesInGroup != null) {
+        rankedServers.addAll(instancesInGroup.stream().map(pos ->
+                serverCandidates.get(pos).getInstance()).collect(Collectors.toList()));
+      }
+    }
+    return rankedServers;
+  }
 }
