@@ -4328,6 +4328,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     if (isSegmentsToBeMoved) {
       assertTrue(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved() > 0,
           "Segments to be moved should be > 0");
+      assertTrue(summaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted() > 0,
+          "Segments to be moved should be > 0");
       assertEquals(summaryResult.getSegmentInfo().getTotalEstimatedDataToBeMovedInBytes(),
           summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved()
               * summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes(),
