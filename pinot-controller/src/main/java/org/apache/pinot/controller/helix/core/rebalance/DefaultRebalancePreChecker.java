@@ -81,7 +81,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     if (_executorService == null) {
       LOGGER.warn("Executor service is null, skipping needsReload check for table: {} rebalanceJobId: {}",
           tableNameWithType, rebalanceJobId);
-      return RebalancePreCheckerResult.error("Could not determine needReload status, run manually");
+      return RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually");
     }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
       TableMetadataReader metadataReader = new TableMetadataReader(_executorService, connectionManager,
@@ -103,7 +103,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
 
     return needsReload == null
-        ? RebalancePreCheckerResult.error("Could not determine needReload status, run manually")
+        ? RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually")
         : !needsReload ? RebalancePreCheckerResult.pass("No need to reload")
             : RebalancePreCheckerResult.warning("Reload needed prior to running rebalance");
   }

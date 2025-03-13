@@ -227,7 +227,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.ERROR);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
-        "Could not determine needReload status, run manually");
+        "Could not determine needReload status, run needReload API manually");
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
