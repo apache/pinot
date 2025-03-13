@@ -135,8 +135,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
-    _queryCompileExecutor = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
-        new NamedThreadFactory("multi-stage-query-compile-executor"));
+    _queryCompileExecutor = QueryThreadContext.contextAwareExecutorService(
+            Executors.newFixedThreadPool(
+                Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
+                new NamedThreadFactory("multi-stage-query-compile-executor")));
   }
 
   @Override
