@@ -243,8 +243,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
-  private final Semaphore _partitionGroupConsumerSemaphore;
-  private final SemaphoreCoordinator _partitionGroupConsumerSemaphoreCoordinator;
+  private final SemaphoreCoordinator _partitionGroupSemaphoreCoordinator;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
   // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
@@ -1054,7 +1053,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   Semaphore getPartitionGroupConsumerSemaphore() {
-    return _partitionGroupConsumerSemaphore;
+    return _partitionGroupSemaphoreCoordinator.getSemaphore();
   }
 
   @VisibleForTesting
@@ -1064,12 +1063,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
-    if (_allowConsumptionDuringCommit) {
-      closeStreamConsumers();
-    }
+    closeStreamConsumers();
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
       _segmentLogger.warn("Table data manager is already shut down");
@@ -1254,10 +1248,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionGroupConsumerSemaphore.release();
+      _partitionGroupSemaphoreCoordinator.setNextSequenceNumber(
+          LLCSegmentName.of(_segmentNameStr).getSequenceNumber() + 1);
+      _partitionGroupSemaphoreCoordinator.release();
     }
-    _partitionGroupConsumerSemaphoreCoordinator.setNextSequenceNumber(
-        LLCSegmentName.of(_segmentNameStr).getSequenceNumber() + 1);
   }
 
   private void closePartitionGroupConsumer() {
@@ -1481,7 +1475,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closeStreamConsumers();
     cleanupMetrics();
     _realtimeSegment.offload();
-
   }
 
   @Override
@@ -1659,12 +1652,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
 
-    _partitionGroupConsumerSemaphoreCoordinator = partitionGroupConsumerSemaphoreCoordinator;
+    _partitionGroupSemaphoreCoordinator = partitionGroupConsumerSemaphoreCoordinator;
 
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupConsumerSemaphoreCoordinator.acquire(llcSegmentName);
-      _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphoreCoordinator.getSemaphore();
+      _partitionGroupSemaphoreCoordinator.acquire(llcSegmentName);
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
@@ -1698,7 +1690,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
-      _partitionGroupConsumerSemaphore.release();
+      _partitionGroupSemaphoreCoordinator.release();
       _acquiredConsumerSemaphore.set(false);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", t));
