@@ -538,6 +538,8 @@ public class CommonConstants {
         public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
 
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
+        // Not actually received as Query Option, but faked as one during MSE
+        public static final String NUM_GROUPS_WARNING_LIMIT = "numGroupsWarningLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
