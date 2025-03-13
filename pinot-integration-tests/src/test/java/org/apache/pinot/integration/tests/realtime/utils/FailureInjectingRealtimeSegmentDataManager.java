@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests.realtime.utils;
 
-import java.util.concurrent.Semaphore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
