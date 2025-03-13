@@ -244,6 +244,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
   private final Semaphore _partitionGroupConsumerSemaphore;
+  private final SemaphoreCoordinator _partitionGroupConsumerSemaphoreCoordinator;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
   // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
@@ -1255,6 +1256,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
       _partitionGroupConsumerSemaphore.release();
     }
+    _partitionGroupConsumerSemaphoreCoordinator.setNextSequenceNumber(
+        LLCSegmentName.of(_segmentNameStr).getSequenceNumber() + 1);
   }
 
   private void closePartitionGroupConsumer() {
@@ -1478,6 +1481,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closeStreamConsumers();
     cleanupMetrics();
     _realtimeSegment.offload();
+
   }
 
   @Override
@@ -1515,7 +1519,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public RealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, Semaphore partitionGroupConsumerSemaphore,
+      Schema schema, LLCSegmentName llcSegmentName, SemaphoreCoordinator partitionGroupConsumerSemaphoreCoordinator,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
@@ -1558,7 +1562,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
             _segmentZKMetadata.getStatus().toString());
-    _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
@@ -1656,9 +1659,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
 
+    _partitionGroupConsumerSemaphoreCoordinator = partitionGroupConsumerSemaphoreCoordinator;
+
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES);
+      _partitionGroupConsumerSemaphoreCoordinator.acquire(llcSegmentName);
+      _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphoreCoordinator.getSemaphore();
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
