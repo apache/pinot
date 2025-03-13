@@ -540,7 +540,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
     SemaphoreCoordinator semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId,
-        k -> new SemaphoreCoordinator(new Semaphore(1), true));
+        k -> new SemaphoreCoordinator(new Semaphore(1), isDedupEnabled()));
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =

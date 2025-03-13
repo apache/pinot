@@ -1560,6 +1560,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
             _segmentZKMetadata.getStatus().toString());
+    _partitionGroupSemaphoreCoordinator = partitionGroupConsumerSemaphoreCoordinator;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
     InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
@@ -1656,8 +1657,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
     }
-
-    _partitionGroupSemaphoreCoordinator = partitionGroupConsumerSemaphoreCoordinator;
 
     // Acquire semaphore to create stream consumers
     try {
