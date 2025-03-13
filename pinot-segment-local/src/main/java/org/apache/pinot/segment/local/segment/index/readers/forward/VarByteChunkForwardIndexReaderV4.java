@@ -339,7 +339,6 @@ public class VarByteChunkForwardIndexReaderV4
   private static final class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
-    private List<ByteRange> _ranges;
 
     UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       super(chunks, metadata, chunkStartOffset);
@@ -381,7 +380,7 @@ public class VarByteChunkForwardIndexReaderV4
 
   private static final class CompressedReaderContext extends ReaderContext {
 
-    private final ByteBuffer _decompressedBuffer;
+    private ByteBuffer _decompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
 
