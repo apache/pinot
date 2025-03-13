@@ -1644,7 +1644,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     dropOfflineTable("baseballStats");
     dropOfflineTable("dimBaseballTeams");
   }
-  
+
   public void testSearchLiteralFilter() throws Exception {
     String sqlQuery =
         "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
