@@ -85,7 +85,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       case IDEAL_STATE_CHANGE_TRIGGER:
         latest = getDifferenceBetweenTableRebalanceStates(targetState, currentState);
         latestProgress = calculateOverallProgressStats(targetState,
-            currentState,  rebalanceContext, Trigger.IDEAL_STATE_CHANGE_TRIGGER, _tableRebalanceProgressStats);
+            currentState, rebalanceContext, Trigger.IDEAL_STATE_CHANGE_TRIGGER, _tableRebalanceProgressStats);
         if (TableRebalanceProgressStats.statsDiffer(_tableRebalanceProgressStats.getCurrentToTargetConvergence(),
             latest) || TableRebalanceProgressStats.progressStatsDiffer(
             _tableRebalanceProgressStats.getRebalanceProgressStatsOverall(), latestProgress)) {
