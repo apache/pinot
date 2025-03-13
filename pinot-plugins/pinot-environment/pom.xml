@@ -38,6 +38,7 @@
 
   <modules>
     <module>pinot-azure</module>
+    <module>pinot-kubernetes</module>
   </modules>
 
   <dependencies>
