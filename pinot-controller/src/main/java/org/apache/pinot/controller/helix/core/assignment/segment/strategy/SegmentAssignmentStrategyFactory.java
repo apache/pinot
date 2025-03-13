@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.controller.helix.core.assignment.segment.strategy.custom.ZoneAwareSegmentAssignmentStrategy;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
@@ -92,6 +93,9 @@ public class SegmentAssignmentStrategyFactory {
       switch (assignmentStrategy) {
         case AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY:
           segmentAssignmentStrategy = new ReplicaGroupSegmentAssignmentStrategy();
+          break;
+        case AssignmentStrategy.ZONE_AWARE_SEGMENT_ASSIGNMENT_STRATEGY:
+          segmentAssignmentStrategy = new ZoneAwareSegmentAssignmentStrategy();
           break;
         case AssignmentStrategy.BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY:
         default:

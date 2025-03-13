@@ -1260,6 +1260,7 @@ public class CommonConstants {
       public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
       public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
       public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
+      public static final String ZONE_AWARE_SEGMENT_ASSIGNMENT_STRATEGY = "zoneaware";
     }
 
     public static class BuiltInVirtualColumn {
