@@ -150,7 +150,8 @@ public class PinotQueryRuleSets {
       PinotExchangeEliminationRule.INSTANCE,
 
       // Evaluate the Literal filter nodes
-      CoreRules.FILTER_REDUCE_EXPRESSIONS
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotTableScanConverterRule.INSTANCE
   );
   //@formatter:on
 }

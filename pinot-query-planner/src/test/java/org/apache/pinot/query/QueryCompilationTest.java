@@ -90,7 +90,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "    PinotLogicalExchange(distribution=[hash])\n"
         + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
-        + "          LogicalTableScan(table=[[default, a]])\n");
+        + "          PinotLogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
   }
 
@@ -592,13 +592,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "  \"rels\": [\n"
             + "    {\n"
             + "      \"id\": \"0\",\n"
-            + "      \"relOp\": \"LogicalTableScan\",\n"
+            + "      \"relOp\": \"org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan\",\n"
             + "      \"table\": [\n"
             + "        \"default\",\n"
             + "        \"a\"\n"
             + "      ],\n"
             + "      \"inputs\": [],\n"
-            + "      \"type\": \"LogicalTableScan\"\n"
+            + "      \"type\": \"PinotLogicalTableScan\"\n"
             + "    },\n"
             + "    {\n"
             + "      \"id\": \"1\",\n"
@@ -626,7 +626,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "digraph {\n"
             + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
             + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
-            + "\"LogicalTableScan\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+            + "\"PinotLogicalTableSca\\nn\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
             + "}\n"
         },
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
@@ -635,10 +635,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0])\n"
-            + "        LogicalTableScan(table=[[default, a]])\n"
+            + "        PinotLogicalTableScan(table=[[default, a]])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        LogicalTableScan(table=[[default, b]])\n"
+            + "        PinotLogicalTableScan(table=[[default, b]])\n"
         },
     };
     //@formatter:on
