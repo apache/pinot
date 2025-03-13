@@ -3164,6 +3164,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(_propertyStore.exists(configPath, 0));
   }
 
+  @Test
+  void testDualWithNotExistsTableSSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctQuery(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3826,6 +3835,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testNoTableQueryThroughJDBCClient()
       throws Exception {
     String query = "SELECT 1";
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
+  }
+
+  @Test
+  public void testNonExistingTableQueryThroughJDBCClient()
+      throws Exception {
+    String query = "SELECT 1 from nonExistingTable";
     java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);

@@ -327,6 +327,24 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  void testDual(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode queryResponse = postQuery("SELECT 1");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
+  @Test
+  void testDualWithNotExistsTableMSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertEquals(queryResponse.get("exceptions").get(0).get("errorCode").asInt(),
+        QueryErrorCode.QUERY_PLANNING.getId()); // TODO: The right error is TABLE_DOES_NOT_EXIST
+  }
+
   @Test
   public void testTimeFunc()
       throws Exception {
