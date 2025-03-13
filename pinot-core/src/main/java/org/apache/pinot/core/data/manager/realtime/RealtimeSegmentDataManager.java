@@ -1297,7 +1297,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     final Logger _logger;
     final ServerSegmentCompletionProtocolHandler _protocolHandler;
     final String _reason;
-
     private ConsumptionStopIndicator(StreamPartitionMsgOffset offset, String segmentName, String instanceId,
         ServerSegmentCompletionProtocolHandler protocolHandler, String reason, Logger logger) {
       _offset = offset;
