@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import org.apache.pinot.core.accounting.AggregateByQueryIdAccountantFactoryForTest;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -69,16 +70,18 @@ public class WindowResourceAccountingTest extends WindowFunnelTestBase {
 
     JsonNode response = postQuery(query);
     ThreadResourceUsageAccountant accountant = Tracing.getThreadAccountant();
-    Map<String, Long> queryMemUsage =
-        ((AggregateByQueryIdAccountantFactoryForTest.AggregateByQueryIdAccountant) accountant).getQueryMemUsage();
+    Map<String, ? extends QueryResourceTracker> queryMemUsage = accountant.getQueryResources();
     assertFalse(queryMemUsage.isEmpty());
     boolean foundRequestId = false;
+    String queryIdKey = null;
     for (String key : queryMemUsage.keySet()) {
       if (key.contains(response.get("requestId").asText())) {
         foundRequestId = true;
+        queryIdKey = key;
         break;
       }
     }
     assertTrue(foundRequestId);
+    assertTrue(queryMemUsage.get(queryIdKey).getAllocatedBytes() > 0);
   }
 }
