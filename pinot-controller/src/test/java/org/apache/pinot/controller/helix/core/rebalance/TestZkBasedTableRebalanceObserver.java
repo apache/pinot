@@ -55,14 +55,21 @@ public class TestZkBasedTableRebalanceObserver {
     source.put("segment2",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
-    observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target);
+    TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(-1,
+        source.keySet());
+    observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
     assertEquals(observer.getNumUpdatesToZk(), 1);
-    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source);
-    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, source);
-    assertEquals(observer.getNumUpdatesToZk(), 1);
-    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target);
-    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target);
+    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source, rebalanceContext);
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, source,
+        rebalanceContext);
+    // START_TRIGGER will set up the ZK progress stats to have the diff between source and target. When calling the
+    // triggers for IS and EV-IS, since source and source are compared, the diff will change, so ZK must be updated
     assertEquals(observer.getNumUpdatesToZk(), 3);
+    observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
+    observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target,
+        rebalanceContext);
+    // Both of the changes above will update ZK for progress stats
+    assertEquals(observer.getNumUpdatesToZk(), 5);
   }
 
   @Test
@@ -76,9 +83,9 @@ public class TestZkBasedTableRebalanceObserver {
     // Stats when there's nothing to rebalance
     TableRebalanceProgressStats.RebalanceStateStats stats =
         ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, target);
-    assertEquals(stats._segmentsToRebalance, 0);
-    assertEquals(stats._segmentsMissing, 0);
-    assertEquals(stats._percentSegmentsToRebalance, 0.0);
+    assertEquals(stats._uniqueSegmentsToRebalance, 0);
+    assertEquals(stats._segmentsMissingFromSource, 0);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 0.0);
 
     // Stats when there's something to converge
     Map<String, Map<String, String>> current = new TreeMap<>();
@@ -86,18 +93,18 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats._segmentsToRebalance, 2);
-    assertEquals(stats._percentSegmentsToRebalance, 100.0);
-    assertEquals(stats._replicasToRebalance, 4);
+    assertEquals(stats._uniqueSegmentsToRebalance, 2);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 100.0);
+    assertEquals(stats._totalSegmentsToRebalance, 4);
 
     // Stats when there are errors
     current = new TreeMap<>();
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ERROR));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats._segmentsToRebalance, 2);
-    assertEquals(stats._segmentsMissing, 1);
-    assertEquals(stats._replicasToRebalance, 3);
+    assertEquals(stats._uniqueSegmentsToRebalance, 2);
+    assertEquals(stats._segmentsMissingFromSource, 1);
+    assertEquals(stats._totalSegmentsToRebalance, 3);
 
     // Stats when partially converged
     current = new TreeMap<>();
@@ -106,6 +113,6 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats._percentSegmentsToRebalance, 50.0);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 50.0);
   }
 }

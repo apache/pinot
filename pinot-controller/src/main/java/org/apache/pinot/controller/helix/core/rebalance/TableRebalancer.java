@@ -400,9 +400,14 @@ public class TableRebalancer {
       }
     }
 
+    long estimatedAverageSegmentSizeInBytes = summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes();
+    Set<String> allOriginalSegmentsIdealState = currentAssignment.keySet();
+    TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+        estimatedAverageSegmentSizeInBytes, allOriginalSegmentsIdealState);
+
     // Record the beginning of rebalance
     _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
-        targetAssignment);
+        targetAssignment, rebalanceContext);
 
     // Calculate the min available replicas for no-downtime rebalance
     // NOTE:
@@ -460,7 +465,7 @@ public class TableRebalancer {
       IdealState idealState;
       try {
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
-            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
+            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes);
       } catch (Exception e) {
         String errorMsg = String.format(
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
@@ -553,8 +558,12 @@ public class TableRebalancer {
       }
 
       // Record change of current ideal state and the new target
+      rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
+          allOriginalSegmentsIdealState);
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
-          targetAssignment);
+          targetAssignment, rebalanceContext);
+      // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
+      allOriginalSegmentsIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
@@ -566,6 +575,15 @@ public class TableRebalancer {
       LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be "
               + "added/removed for each instance: {}", rebalanceJobId, tableNameWithType,
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
+
+      // Record change of current ideal state and the next assignment
+      _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
+          currentAssignment, nextAssignment, rebalanceContext);
+      if (_tableRebalanceObserver.isStopped()) {
+        return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+            "Rebalance has stopped already before updating the IdealState with the next assignment",
+            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
 
       // Reuse current IdealState to update the IdealState in cluster
       idealStateRecord.setMapFields(nextAssignment);
@@ -632,15 +650,15 @@ public class TableRebalancer {
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       existingReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
       newReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
     RebalanceSummaryResult.RebalanceChangeInfo replicationFactor
@@ -664,6 +682,7 @@ public class TableRebalancer {
     Set<String> serversGettingNewSegments = new HashSet<>();
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
+    int totalSegmentsToBeDeleted = 0;
     int maxSegmentsAddedToServer = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
@@ -695,6 +714,7 @@ public class TableRebalancer {
       }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
       int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
+      totalSegmentsToBeDeleted += segmentsDeleted;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
@@ -708,6 +728,7 @@ public class TableRebalancer {
         serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
             RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
             instanceToTagsMap.getOrDefault(server, null)));
+        totalSegmentsToBeDeleted += entry.getValue().size();
       }
     }
 
@@ -719,13 +740,13 @@ public class TableRebalancer {
     RebalanceSummaryResult.RebalanceChangeInfo numSegmentsAcrossAllReplicas
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumberSegmentsTotal, newNumberSegmentsTotal);
 
-    int totalSegmentsToBeMoved = newNumberSegmentsTotal - segmentsNotMoved;
+    int totalSegmentsToBeAddedd = newNumberSegmentsTotal - segmentsNotMoved;
 
     long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableSubTypeSizeDetails);
     long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
-        : ((long) totalSegmentsToBeMoved) * averageSegmentSizeInBytes;
+        : ((long) totalSegmentsToBeAddedd) * averageSegmentSizeInBytes;
 
     // Set some of the sets to null if they are empty to ensure they don't show up in the result
     RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(
@@ -733,9 +754,10 @@ public class TableRebalancer {
         serversGettingNewSegments, serverSegmentChangeInfoMap);
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
-    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
-        maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
-        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas);
+    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeAddedd,
+        totalSegmentsToBeDeleted, maxSegmentsAddedToServer, averageSegmentSizeInBytes,
+        totalEstimatedDataToBeMovedInBytes, replicationFactor, numSegmentsInSingleReplica,
+        numSegmentsAcrossAllReplicas);
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
@@ -988,7 +1010,8 @@ public class TableRebalancer {
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
-      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs)
+      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
+      long estimateAverageSegmentSizeInBytes)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1004,9 +1027,12 @@ public class TableRebalancer {
       // ExternalView might be null when table is just created, skipping check for this iteration
       if (externalView != null) {
         // Record external view and ideal state convergence status
+        Set<String> allOriginalSegmentsIdealState = idealState.getRecord().getMapFields().keySet();
+        TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+            estimateAverageSegmentSizeInBytes, allOriginalSegmentsIdealState);
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
-            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
+            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
         if (_tableRebalanceObserver.isStopped()) {
           throw new RuntimeException(
               String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
