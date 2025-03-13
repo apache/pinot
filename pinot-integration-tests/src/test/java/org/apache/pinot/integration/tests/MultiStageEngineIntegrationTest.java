@@ -328,6 +328,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  void testDual()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery("SELECT 1");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
+  /**
+   * This test is added because SSE engine supports it and is used in production.
+   * Make sure that the difference in support is well-documented.
+   */
+  @Test
+  void testDualWithNotExistsTableMSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertEquals(queryResponse.get("exceptions").get(0).get("errorCode").asInt(),
+        QueryErrorCode.QUERY_PLANNING.getId()); // TODO: The right error is TABLE_DOES_NOT_EXIST
+  }
+
+  @Test
   public void testTimeFunc()
       throws Exception {
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";

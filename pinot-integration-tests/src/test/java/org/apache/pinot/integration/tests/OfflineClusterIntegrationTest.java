@@ -3164,6 +3164,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(_propertyStore.exists(configPath, 0));
   }
 
+  @Test
+  void testDual()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT 1");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
+  @Test
+  void testDualWithNotExistsTableSSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testDistinctQuery(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -3485,7 +3503,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
         + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
-        + "            LogicalTableScan(table=[[default, mytable]])\n");
+        + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: AggregateProjectMergeRule -> Time:*\n"
         + "Rule: Project -> Time:*\n"
@@ -3512,7 +3530,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject\\(.*\\)\n"
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
-            + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
+            + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
     assertEquals(response2Json.get("rows").get(0).get(2).asText(),
         "Rule Execution Times\n"
@@ -3826,6 +3844,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testNoTableQueryThroughJDBCClient()
       throws Exception {
     String query = "SELECT 1";
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
+  }
+
+  @Test
+  public void testNonExistingTableQueryThroughJDBCClient()
+      throws Exception {
+    String query = "SELECT 1 from nonExistingTable";
     java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
