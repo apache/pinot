@@ -51,8 +51,8 @@ public class TableRebalanceProgressStats {
     // Derived
     public double _percentageTotalSegmentsAddsRemaining;
     public double _percentageTotalSegmentDeletesRemaining;
-    public long _estimatedTimeToCompleteAdds;
-    public long _estimatedTimeToCompleteDeletes;
+    public long _estimatedTimeToCompleteAddsInSeconds;
+    public long _estimatedTimeToCompleteDeletesInSeconds;
     public long _averageSegmentSizeInBytes;
     public long _totalEstimatedDataToBeMovedInBytes;
 
@@ -63,8 +63,8 @@ public class TableRebalanceProgressStats {
       _totalRemainingSegmentsToBeDeleted = 0;
       _percentageTotalSegmentsAddsRemaining = 0.0;
       _percentageTotalSegmentDeletesRemaining = 0.0;
-      _estimatedTimeToCompleteAdds = 0;
-      _estimatedTimeToCompleteDeletes = 0;
+      _estimatedTimeToCompleteAddsInSeconds = 0;
+      _estimatedTimeToCompleteDeletesInSeconds = 0;
       _averageSegmentSizeInBytes = 0;
       _totalEstimatedDataToBeMovedInBytes = 0;
     }
@@ -180,8 +180,8 @@ public class TableRebalanceProgressStats {
         || base._totalRemainingSegmentsToBeDeleted != compare._totalRemainingSegmentsToBeDeleted
         || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
         || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
-        || base._estimatedTimeToCompleteAdds != compare._estimatedTimeToCompleteAdds
-        || base._estimatedTimeToCompleteDeletes != compare._estimatedTimeToCompleteDeletes
+        || base._estimatedTimeToCompleteAddsInSeconds != compare._estimatedTimeToCompleteAddsInSeconds
+        || base._estimatedTimeToCompleteDeletesInSeconds != compare._estimatedTimeToCompleteDeletesInSeconds
         || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
         || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes;
   }
