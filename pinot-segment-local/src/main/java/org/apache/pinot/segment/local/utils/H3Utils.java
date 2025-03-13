@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.uber.h3core.H3Core;
 import com.uber.h3core.H3CoreV3;
 import com.uber.h3core.util.LatLng;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -42,12 +43,18 @@ public class H3Utils {
   }
 
   public static final H3CoreV3 H3_CORE;
+  public static final H3Core H3_CORE_INSTANCE;
 
   static {
     try {
       H3_CORE = H3CoreV3.newInstance();
     } catch (IOException e) {
       throw new RuntimeException("Failed to instantiate H3 V3 instance", e);
+    }
+    try {
+      H3_CORE_INSTANCE = H3Core.newInstance();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to instantiate H3 instance", e);
     }
   }
 
