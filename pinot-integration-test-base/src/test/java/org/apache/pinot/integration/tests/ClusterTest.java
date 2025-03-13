@@ -72,6 +72,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -513,7 +514,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  public JsonNode postQuery(String query)
+  public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
@@ -522,7 +523,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query, Map<String, String> headers)
+  protected JsonNode postQuery(@Language("sql") String query, Map<String, String> headers)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
         getExtraQueryProperties());
@@ -535,7 +536,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query or /query/sql)
    */
-  public static JsonNode postQuery(String query, String brokerQueryApiUrl, Map<String, String> headers,
+  public static JsonNode postQuery(@Language("sql") String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -551,7 +552,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryWithOptions(String query, String queryOptions)
+  protected JsonNode postQueryWithOptions(@Language("sql") String query, String queryOptions)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         Map.of("queryOptions", queryOptions));
@@ -560,7 +561,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public JsonNode postQueryToController(String query)
+  public JsonNode postQueryToController(@Language("sql") String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
   }
