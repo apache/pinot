@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -112,6 +113,10 @@ public interface BlockValSet {
    * @return Array of byte[] values
    */
   byte[][] getBytesValuesSV();
+
+  default HashValue128[] get128BitsMurmur3HashValuesSV() {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * MULTI-VALUED COLUMN APIs

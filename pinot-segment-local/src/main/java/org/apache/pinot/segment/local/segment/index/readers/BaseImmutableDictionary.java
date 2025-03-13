@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
@@ -276,6 +277,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected byte[] getBytes(int dictId) {
     return _valueReader.getBytes(dictId, _numBytesPerValue);
+  }
+
+  public HashValue128 get128BitsMurmur3HashValue(int dictId, byte[] buffer) {
+    return _valueReader.get128BitsMurmur3Hash(dictId, _numBytesPerValue, buffer);
   }
 
   protected byte[] getBuffer() {
