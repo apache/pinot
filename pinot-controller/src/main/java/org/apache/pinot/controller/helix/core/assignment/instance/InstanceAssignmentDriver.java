@@ -112,9 +112,9 @@ public class InstanceAssignmentDriver {
     boolean minimizeDataMovement =
         minimizeDataMovementOverride == null ? instanceAssignmentConfig.isMinimizeDataMovement()
             : minimizeDataMovementOverride;
-    LOGGER.info("Starting {} instance assignment for table {}, instanceAssignmentConfig.isMinimizeDataMovement()={}, "
-            + "minimizeDataMovementOverride={}, minimizeDataMovement={}", instancePartitionsName, tableNameWithType,
-        instanceAssignmentConfig.isMinimizeDataMovement(), minimizeDataMovementOverride, minimizeDataMovement);
+    LOGGER.info("Starting {} instance assignment for table {}, original minimizeDataMovement: {}, "
+            + "overriding with minimizeDataMovementOverride: {}", instancePartitionsName, tableNameWithType,
+        instanceAssignmentConfig.isMinimizeDataMovement(), minimizeDataMovementOverride);
     InstanceTagPoolSelector tagPoolSelector =
         new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType,
             minimizeDataMovement, existingInstancePartitions);
