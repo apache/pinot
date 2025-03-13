@@ -82,9 +82,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String PRIMARY_TABLE_SCHEMA_PATH = "baseballStats_schema.json";
   private static final String PRIMARY_TABLE_TABLE_CONFIG_PATH = "baseballStats_offline_table_config.json";
   private static final Integer PRIMARY_NUMBER_OF_RECORDS = 97889;
-  private static final String DIM_TABLE_DATA_PATH = "data/dimBaseballTeams.csv";
-  private static final String DIM_TABLE_SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
-  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
+  private static final String DIM_TABLE_DATA_PATH = "dimBaseballTeams.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "dimBaseballTeams_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimBaseballTeams_config.json";
   private static final Integer DIM_NUMBER_OF_RECORDS = 52;
 
   @Override
