@@ -29,9 +29,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -1627,6 +1629,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode jsonNode = postQuery(query);
     long result = jsonNode.get("resultTable").get("rows").size();
     assertEquals(result, 3);
+
+    // Verify that LOOKUP_JOIN stage is present and HASH_JOIN stage is not present in the query plan
+    Set<String> stages = new HashSet<>();
+    JsonNode currentNode = jsonNode.get("stageStats").get("children");
+    while (currentNode != null) {
+      currentNode = currentNode.get(0);
+      stages.add(currentNode.get("type").asText());
+      currentNode = currentNode.get("children");
+    }
+    assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
+    assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
 
     dropOfflineTable("baseballStats");
     dropOfflineTable("dimBaseballTeams");
