@@ -53,8 +53,8 @@ public class RebalancePreCheckerResult {
     return new RebalancePreCheckerResult(PreCheckStatus.PASS, message);
   }
 
-  public static RebalancePreCheckerResult warning(@Nullable String message) {
-    return new RebalancePreCheckerResult(PreCheckStatus.WARNING, message);
+  public static RebalancePreCheckerResult warn(@Nullable String message) {
+    return new RebalancePreCheckerResult(PreCheckStatus.WARN, message);
   }
 
   public static RebalancePreCheckerResult error(@Nullable String message) {
@@ -73,8 +73,8 @@ public class RebalancePreCheckerResult {
 
   public enum PreCheckStatus {
     // PASS if the pre-check status is considered safe for rebalance;
-    // WARNING if the pre-check status is a warning and should be double-checked for rebalance;
+    // WARN if the pre-check status is a warning and should be double-checked for rebalance;
     // ERROR if the pre-check status has failed and should be addressed prior to rebalance;
-    PASS, WARNING, ERROR
+    PASS, WARN, ERROR
   }
 }

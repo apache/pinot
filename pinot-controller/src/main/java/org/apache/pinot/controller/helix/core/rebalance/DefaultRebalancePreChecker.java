@@ -105,7 +105,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return needsReload == null
         ? RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually")
         : !needsReload ? RebalancePreCheckerResult.pass("No need to reload")
-            : RebalancePreCheckerResult.warning("Reload needed prior to running rebalance");
+            : RebalancePreCheckerResult.warn("Reload needed prior to running rebalance");
   }
 
   /**
@@ -119,67 +119,66 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
             InstancePartitionsType.OFFLINE);
-        InstanceAssignmentConfig instanceAssignmentConfig;
         RebalancePreCheckerResult rebalancePreCheckerResult;
         if (isInstanceAssignmentAllowed) {
-          instanceAssignmentConfig =
+          InstanceAssignmentConfig instanceAssignmentConfig =
               InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE);
           rebalancePreCheckerResult = instanceAssignmentConfig.isMinimizeDataMovement()
               ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-              : RebalancePreCheckerResult.warning("minimizeDataMovement is not enabled but instance assignment "
+              : RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment "
                   + "is allowed");
         } else {
           rebalancePreCheckerResult =
               RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
         }
         return rebalancePreCheckerResult;
-      } else {
-        boolean isInstanceAssignmentAllowedConsuming = InstanceAssignmentConfigUtils.allowInstanceAssignment(
-            tableConfig, InstancePartitionsType.CONSUMING);
-        InstanceAssignmentConfig instanceAssignmentConfigConsuming = null;
-        if (isInstanceAssignmentAllowedConsuming) {
-          instanceAssignmentConfigConsuming =
-              InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.CONSUMING);
-        }
-        // For REALTIME tables need to check for both CONSUMING and COMPLETED segments if relocation is enabled
-        if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
-          RebalancePreCheckerResult rebalancePreCheckerResult;
-          if (isInstanceAssignmentAllowedConsuming) {
-            rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-                ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-                : RebalancePreCheckerResult.warning("minimizeDataMovement is not enabled but instance assignment "
-                    + "is allowed");
-          } else {
-            rebalancePreCheckerResult =
-                RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
-          }
-          return rebalancePreCheckerResult;
-        }
+      }
 
-        boolean isInstanceAssignmentAllowedCompleted = InstanceAssignmentConfigUtils.allowInstanceAssignment(
-            tableConfig, InstancePartitionsType.COMPLETED);
-        InstanceAssignmentConfig instanceAssignmentConfigCompleted = null;
-        if (isInstanceAssignmentAllowedCompleted) {
-          instanceAssignmentConfigCompleted =
-              InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
-        }
-
+      boolean isInstanceAssignmentAllowedConsuming = InstanceAssignmentConfigUtils.allowInstanceAssignment(
+          tableConfig, InstancePartitionsType.CONSUMING);
+      InstanceAssignmentConfig instanceAssignmentConfigConsuming = null;
+      if (isInstanceAssignmentAllowedConsuming) {
+        instanceAssignmentConfigConsuming =
+            InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.CONSUMING);
+      }
+      // For REALTIME tables need to check for both CONSUMING and COMPLETED segments if relocation is enabled
+      if (!InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
         RebalancePreCheckerResult rebalancePreCheckerResult;
-        if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
+        if (isInstanceAssignmentAllowedConsuming) {
+          rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
+              : RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment "
+                  + "is allowed");
+        } else {
           rebalancePreCheckerResult =
               RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
-        } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
-          rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
-              && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
-              ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
-              : RebalancePreCheckerResult.warning("minimizeDataMovement may not enabled for consuming or completed "
-                  + "but instance assignment is allowed for both");
-        } else {
-          rebalancePreCheckerResult = RebalancePreCheckerResult.warning("minimizeDataMovement may not enabled for "
-              + "consuming or completed but instance assignment is allowed for at least one");
         }
         return rebalancePreCheckerResult;
       }
+
+      boolean isInstanceAssignmentAllowedCompleted = InstanceAssignmentConfigUtils.allowInstanceAssignment(
+          tableConfig, InstancePartitionsType.COMPLETED);
+      InstanceAssignmentConfig instanceAssignmentConfigCompleted = null;
+      if (isInstanceAssignmentAllowedCompleted) {
+        instanceAssignmentConfigCompleted =
+            InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED);
+      }
+
+      RebalancePreCheckerResult rebalancePreCheckerResult;
+      if (!isInstanceAssignmentAllowedConsuming && !isInstanceAssignmentAllowedCompleted) {
+        rebalancePreCheckerResult =
+            RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
+      } else if (instanceAssignmentConfigConsuming != null && instanceAssignmentConfigCompleted != null) {
+        rebalancePreCheckerResult = instanceAssignmentConfigConsuming.isMinimizeDataMovement()
+            && instanceAssignmentConfigCompleted.isMinimizeDataMovement()
+            ? RebalancePreCheckerResult.pass("minimizeDataMovement is enabled")
+            : RebalancePreCheckerResult.warn("minimizeDataMovement may not enabled for consuming or completed "
+                + "but instance assignment is allowed for both");
+      } else {
+        rebalancePreCheckerResult = RebalancePreCheckerResult.warn("minimizeDataMovement may not enabled for "
+            + "consuming or completed but instance assignment is allowed for at least one");
+      }
+      return rebalancePreCheckerResult;
     } catch (IllegalStateException e) {
       LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
       return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
