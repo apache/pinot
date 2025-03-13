@@ -327,15 +327,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  void testDual(boolean useMultiStageQueryEngine)
+  @Test
+  void testDual()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    setUseMultiStageQueryEngine(true);
     JsonNode queryResponse = postQuery("SELECT 1");
     Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
     Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
   }
 
+  /**
+   * This test is added because SSE engine supports it and is used in production.
+   * Make sure that the difference in support is well-documented.
+   */
   @Test
   void testDualWithNotExistsTableMSE()
       throws Exception {
