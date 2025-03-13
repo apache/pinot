@@ -95,11 +95,6 @@ public interface BrokerResponse {
   boolean isNumGroupsLimitReached();
 
   /**
-   * Returns the number of groups processed by the query.
-   */
-  int getNumGroups();
-
-  /**
    * Returns whether the limit for max rows in join has been reached.
    */
   boolean isMaxRowsInJoinReached();

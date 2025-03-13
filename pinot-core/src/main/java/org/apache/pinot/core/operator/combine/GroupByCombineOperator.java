@@ -67,7 +67,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   private volatile IndexedTable _indexedTable;
   private volatile boolean _numGroupsLimitReached;
-  private volatile int _numGroups;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -124,7 +123,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (resultsBlock.isNumGroupsLimitReached()) {
           _numGroupsLimitReached = true;
         }
-        _numGroups = resultsBlock.getNumGroups();
 
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
@@ -230,7 +228,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
-    mergedBlock.setNumGroups(_numGroups);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;

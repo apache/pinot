@@ -195,7 +195,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-        resultsBlock.setNumGroups(groupKeyGenerator.getNumKeys());
         return resultsBlock;
       }
     }
@@ -204,7 +203,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-    resultsBlock.setNumGroups(groupKeyGenerator.getNumKeys());
     return resultsBlock;
   }
 

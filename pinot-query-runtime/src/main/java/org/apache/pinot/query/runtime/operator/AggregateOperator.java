@@ -223,7 +223,7 @@ public class AggregateOperator extends MultiStageOperator {
         rows = _groupByExecutor.getResult(_groupTrimSize);
       }
 
-      _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
+      //_statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
@@ -448,8 +448,8 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
     },
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    NUM_GROUPS(StatMap.Type.INT);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    //NUM_GROUPS(StatMap.Type.INT);
     //@formatter:on
 
     private final StatMap.Type _type;

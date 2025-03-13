@@ -62,7 +62,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 
   private boolean _numGroupsLimitReached;
-  private int _numGroups;
   private int _numResizes;
   private long _resizeTimeMs;
 
@@ -125,11 +124,13 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   public int getNumGroups() {
-    return _numGroups;
-  }
-
-  public void setNumGroups(int numGroups) {
-    _numGroups = numGroups;
+    assert _aggregationGroupByResult != null || _intermediateRecords != null
+        : "Should not call getNumGroups() on instance level results";
+    if (_aggregationGroupByResult != null) {
+      return _aggregationGroupByResult.getNumGroups();
+    } else {
+      return _intermediateRecords.size();
+    }
   }
 
   public boolean isNumGroupsLimitReached() {
@@ -328,7 +329,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }
-    metadata.put(MetadataKey.NUM_GROUPS.getName(), Integer.toString(getNumGroups()));
     metadata.put(MetadataKey.NUM_RESIZES.getName(), Integer.toString(_numResizes));
     metadata.put(MetadataKey.RESIZE_TIME_MS.getName(), Long.toString(_resizeTimeMs));
     return metadata;

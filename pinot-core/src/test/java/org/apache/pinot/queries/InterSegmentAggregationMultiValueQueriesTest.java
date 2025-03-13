@@ -678,14 +678,12 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertFalse(brokerResponse.isNumGroupsLimitReached());
-    assertTrue(brokerResponse.getNumGroups() > 0);
 
     InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
     planMaker.setMaxInitialResultHolderCapacity(1000);
     planMaker.setNumGroupsLimit(1000);
     brokerResponse = getBrokerResponse(query, planMaker);
     assertTrue(brokerResponse.isNumGroupsLimitReached());
-    assertEquals(brokerResponse.getNumGroups(), 2000);
   }
 
   @Test

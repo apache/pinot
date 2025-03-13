@@ -281,10 +281,6 @@ public class MultistageGroupByExecutor {
     return _groupIdGenerator.getNumGroups() == _numGroupsLimit;
   }
 
-  public int getNumGroups() {
-    return _groupIdGenerator.getNumGroups();
-  }
-
   private void processAggregate(TransferableBlock block) {
     if (_maxFilterArgId < 0) {
       processAggregateWithoutFilter(block);

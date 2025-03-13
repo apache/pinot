@@ -142,14 +142,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-        resultsBlock.setNumGroups(groupByExecutor.getNumGroups());
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-    resultsBlock.setNumGroups(groupByExecutor.getNumGroups());
     return resultsBlock;
   }
 

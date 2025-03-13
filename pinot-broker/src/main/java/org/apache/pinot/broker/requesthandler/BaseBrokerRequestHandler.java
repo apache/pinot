@@ -192,7 +192,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerResponse brokerResponse =
         handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
-
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setRequestId(Long.toString(requestId));
     _brokerQueryEventListener.onQueryCompletion(requestContext);
@@ -224,7 +223,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setProcessingExceptions(processingExceptions);
     statistics.setNumExceptions(numExceptions);
     statistics.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
-    statistics.setNumGroups(response.getNumGroups());
     statistics.setProcessingTimeMillis(response.getTimeUsedMs());
     statistics.setNumDocsScanned(response.getNumDocsScanned());
     statistics.setTotalDocs(response.getTotalDocs());
