@@ -58,6 +58,13 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final MBeanServer MBEAN_SERVER = ManagementFactory.getPlatformMBeanServer();
   private static final String PINOT_JMX_METRICS_DOMAIN = "\"org.apache.pinot.common.metrics\"";
   private static final String BROKER_METRICS_TYPE = "\"BrokerMetrics\"";
+  private static final String SERVER_METRICS_TYPE = "\"ServerMetrics\"";
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    super.overrideServerConf(serverConf);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR, 0.001);
+  }
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -103,6 +110,11 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     ObjectName queriesGlobalMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
         new Hashtable<>(Map.of("type", BROKER_METRICS_TYPE,
             "name", "\"pinot.broker.queriesGlobal\"")));
+
+    // AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING
+    ObjectName aggregateTimesNumGroupsLimitWarningGlobalMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
+            "name", "\"pinot.server.aggregateTimesNumGroupsLimitWarningGlobal\"")));
 
     // Some queries are run during setup to ensure that all the docs are loaded
     long initialQueryCount = (Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count");
@@ -151,6 +163,9 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
         + 6L + "; actual value: " + multiStageMigrationMetricValue.get());
 
     assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
+
+    postQuery("SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
+    assertTrue(((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitWarningGlobalMetric, "Count")) > 1);
   }
 
   @Test
