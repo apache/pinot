@@ -146,13 +146,6 @@ public class Quickstart extends QuickStartBase {
     runVectorQueryExamples(runner);
   }
 
-  @Override
-  protected Map<String, Object> getConfigOverrides() {
-    Map<String, Object> cfg = new HashMap<>(super.getConfigOverrides());
-    cfg.put(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR, 0.001);
-    return cfg;
-  }
-
   public static void main(String[] args)
       throws Exception {
     List<String> arguments = new ArrayList<>();
