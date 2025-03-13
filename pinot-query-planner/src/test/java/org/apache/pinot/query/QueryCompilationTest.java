@@ -484,6 +484,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQueryWithNoArg));
     assertTrue(e.getMessage().contains("expecting 1 argument"));
+
+    String excludeCurrentRowQuery =
+        "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW EXCLUDE CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(excludeCurrentRowQuery));
+    assertTrue(e.getMessage().contains("EXCLUDE clauses are not supported"));
   }
 
   @Test

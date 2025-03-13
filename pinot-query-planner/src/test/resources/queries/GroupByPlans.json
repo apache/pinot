@@ -73,7 +73,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1], EXPR$2=[$2])",
-          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5))])",
+          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[$SUM0($2)], agg#2=[MAX($3)], agg#3=[MIN($4)], aggType=[FINAL])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($2)], agg#2=[MAX($2)], agg#3=[MIN($2)], aggType=[LEAF])",
@@ -88,7 +88,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(value1=[$0], count=[$1], SUM=[$2])",
-          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5))])",
+          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[$SUM0($2)], agg#2=[MAX($3)], agg#3=[MIN($4)], aggType=[FINAL])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($2)], agg#2=[MAX($2)], agg#3=[MIN($2)], aggType=[LEAF])",
@@ -195,7 +195,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1], EXPR$2=[$2])",
-          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5))])",
+          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
@@ -210,7 +210,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1])",
-          "\n  LogicalFilter(condition=[AND(>=($2, 0), <($3, 20), <=($1, 10), =(/(CAST($1):DOUBLE NOT NULL, $4), 5))])",
+          "\n  LogicalFilter(condition=[AND(>=($2, 0), <($3, 20), <=($1, 10), =(/(CAST($1):DOUBLE NOT NULL, $4), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[MAX($1)], agg#2=[MIN($1)], agg#3=[COUNT()], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
@@ -225,7 +225,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(value1=[$0], count=[$1], SUM=[$2])",
-          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5))])",
+          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($3, 0), <($4, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($1)], agg#2=[MAX($1)], agg#3=[MIN($1)], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",

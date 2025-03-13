@@ -63,13 +63,33 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   }
 
   @Override
+  public int getMaxScale(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getMaxScale(typeName);
+  }
+
+  @Override
   public int getMaxNumericScale() {
     return MAX_DECIMAL_SCALE;
   }
 
   @Override
+  public int getDefaultScale(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_SCALE : super.getDefaultScale(typeName);
+  }
+
+  @Override
+  public int getMaxPrecision(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getMaxPrecision(typeName);
+  }
+
+  @Override
   public int getMaxNumericPrecision() {
     return MAX_DECIMAL_PRECISION;
+  }
+
+  @Override
+  public int getDefaultPrecision(SqlTypeName typeName) {
+    return typeName == SqlTypeName.DECIMAL ? MAX_DECIMAL_PRECISION : super.getDefaultPrecision(typeName);
   }
 
   @Override
