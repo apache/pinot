@@ -78,6 +78,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -1690,8 +1691,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
-          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+      _allowConsumptionDuringCommit =
+          isConsumptionAllowedDuringCommit() ? true
+              : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1723,6 +1725,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }).start();
       throw t;
     }
+  }
+
+  // Consumption while downloading and replacing the slow replicas is not allowed for the following use cases:
+  // 1. Partial Upserts
+  // 2. Dedup Tables
+  // 3. Full Upserts with Drop Out of Order enabled.
+  // For all the above scenarios, we would be looking into the metadata information when inserting a new record,
+  // so it is not ideal to allow consumption when downloading and replacing the consuming segment as we might see
+  // unusual behaviour of duplicates in dedup tables and inconsistent entries compared to lead replicas for upsert
+  // tables. For full upserts, all the entries will be appended when drop out of order record is disabled which is
+  // the case by default.
+  private boolean isConsumptionAllowedDuringCommit() {
+    return !_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled() && !(
+        _realtimeTableDataManager.isUpsertEnabled() && _tableConfig.getUpsertMode() == UpsertConfig.Mode.FULL
+            && _tableConfig.isDropOutOfOrderRecord());
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
