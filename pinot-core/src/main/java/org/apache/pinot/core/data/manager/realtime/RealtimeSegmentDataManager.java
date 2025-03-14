@@ -1728,16 +1728,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Consumption while downloading and replacing the slow replicas is not allowed for the following use cases:
   // 1. Partial Upserts
   // 2. Dedup Tables
-  // 3. Full Upserts with Drop Out of Order enabled.
-  // For all the above scenarios, we would be looking into the metadata information when inserting a new record,
+  // For the above table types, we would be looking into the metadata information when inserting a new record,
   // so it is not ideal to allow consumption when downloading and replacing the consuming segment as we might see
-  // unusual behaviour of duplicates in dedup tables and inconsistent entries compared to lead replicas for upsert
-  // tables. For full upserts, all the entries will be appended when drop out of order record is disabled which is
-  // the case by default.
+  // unusual behaviour of duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
+  // upsert tables.
   private boolean isConsumptionAllowedDuringCommit() {
-    return !_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled() && !(
-        _realtimeTableDataManager.isUpsertEnabled() && _tableConfig.getUpsertMode() == UpsertConfig.Mode.FULL
-            && _tableConfig.isDropOutOfOrderRecord());
+    return !_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled();
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
