@@ -587,6 +587,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-confluent-json</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-orc</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -1705,6 +1710,11 @@
         <artifactId>kafka-protobuf-serializer</artifactId>
         <version>${confluent.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.confluent</groupId>
+        <artifactId>kafka-json-schema-serializer</artifactId>
+        <version>${confluent.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.apache.pulsar</groupId>
@@ -1927,6 +1937,11 @@
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-reflect</artifactId>
+        <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-scripting-compiler-embeddable</artifactId>
         <version>${kotlin.stdlib.version}</version>
       </dependency>
       <dependency>

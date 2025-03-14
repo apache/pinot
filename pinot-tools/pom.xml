@@ -67,6 +67,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-confluent-json</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-csv</artifactId>
     </dependency>
     <dependency>
