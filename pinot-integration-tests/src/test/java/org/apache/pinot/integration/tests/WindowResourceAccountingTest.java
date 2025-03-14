@@ -16,15 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests.custom;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import org.apache.pinot.core.accounting.AggregateByQueryIdAccountantFactoryForTest;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -32,8 +35,45 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
-public class WindowResourceAccountingTest extends WindowFunnelTestBase {
+public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
+
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
+    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+  }
+
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE,
+        InstanceType.BROKER);
+    brokerConf.setProperty(
+        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
+    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+  }
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    stopBroker();
+    stopServer();
+    Thread.sleep(100);
+    startBroker();
+    startServer();
+
+    super.setUp();
+  }
+
   @Test
   public void testFunnel()
       throws Exception {
