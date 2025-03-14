@@ -1689,8 +1689,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
       _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
           llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit() || (_tableConfig.getUpsertConfig() != null
-          && _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
+      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1732,7 +1731,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // unusual behaviour of duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
   // upsert tables.
   private boolean isConsumptionAllowedDuringCommit() {
-    return !_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled();
+    return (!_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled()) || (
+        _tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig()
+            .isAllowPartialUpsertConsumptionDuringCommit());
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
