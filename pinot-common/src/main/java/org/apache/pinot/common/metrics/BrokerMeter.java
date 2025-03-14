@@ -114,6 +114,10 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
 
+  // This metric track the number of broker responses with number of groups warning limit reached
+  // (potential bad responses).
+  BROKER_RESPONSES_WITH_NUM_GROUPS_WARNING_LIMIT_REACHED("badResponses", false),
+
   // These metrics track the cost of the query.
   DOCUMENTS_SCANNED("documents", false),
   ENTRIES_SCANNED_IN_FILTER("documents", false),

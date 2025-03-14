@@ -111,10 +111,9 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
         new Hashtable<>(Map.of("type", BROKER_METRICS_TYPE,
             "name", "\"pinot.broker.queriesGlobal\"")));
 
-    // AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING
-    ObjectName aggregateTimesNumGroupsLimitWarningGlobalMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+    ObjectName numGroupsWarningLimitMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
         new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
-            "name", "\"pinot.server.aggregateTimesNumGroupsLimitWarningGlobal\"")));
+            "name", "\"pinot.server.aggregateTimesNumGroupsWarningLimitReached\"")));
 
     // Some queries are run during setup to ensure that all the docs are loaded
     long initialQueryCount = (Long) MBEAN_SERVER.getAttribute(queriesGlobalMetric, "Count");
@@ -165,7 +164,7 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
 
     postQuery("SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
-    assertTrue(((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitWarningGlobalMetric, "Count")) > 1);
+    assertTrue(((Long) MBEAN_SERVER.getAttribute(numGroupsWarningLimitMetric, "Count")) > 1);
   }
 
   @Test

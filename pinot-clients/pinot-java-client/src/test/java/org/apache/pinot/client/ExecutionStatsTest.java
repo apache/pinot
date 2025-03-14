@@ -43,7 +43,7 @@ public class ExecutionStatsTest {
             + "\"numEntriesScannedInFilter\":10, \"numEntriesScannedPostFilter\":10, \"numSegmentsQueried\":10, "
             + "\"numSegmentsProcessed\":10, \"numSegmentsMatched\":10, \"numConsumingSegmentsQueried\":10, "
             + "\"minConsumingFreshnessTimeMs\":10, \"totalDocs\":10, \"numGroupsLimitReached\":true, "
-            + "\"timeUsedMs\":10}";
+            + "\"numGroupsWarningLimitReached\":true,\"timeUsedMs\":10}";
     _mockBrokerResponse = JsonUtils.stringToJsonNode(json);
     _executionStatsUnderTest = new ExecutionStats(_mockBrokerResponse);
   }
@@ -151,6 +151,15 @@ public class ExecutionStatsTest {
   public void testIsNumGroupsLimitReached() {
     // Run the test
     final boolean result = _executionStatsUnderTest.isNumGroupsLimitReached();
+
+    // Verify the results
+    assertTrue(result);
+  }
+
+  @Test
+  public void testIsNumGroupsWarningLimitReached() {
+    // Run the test
+    final boolean result = _executionStatsUnderTest.isNumGroupsWarningLimitReached();
 
     // Verify the results
     assertTrue(result);

@@ -44,7 +44,7 @@ public class TimeSeriesOperatorUtils {
     if (groupByResultsBlock.getNumRows() == 0) {
       return new TimeSeriesBlock(timeBuckets, new HashMap<>());
     }
-    // TODO: Check isNumGroupsLimitReached, and propagate it somehow to the caller.
+    // TODO: Check isNumGroupsLimitReached and isNumGroupsWarningLimitReached, and propagate it somehow to the caller.
     Map<Long, List<TimeSeries>> timeSeriesMap = new HashMap<>(groupByResultsBlock.getNumRows());
     List<String> tagNames = getTagNamesFromDataSchema(Objects.requireNonNull(groupByResultsBlock.getDataSchema(),
         "DataSchema is null in leaf stage of time-series query"));

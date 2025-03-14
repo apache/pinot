@@ -72,6 +72,7 @@ public class SqlResultComparator {
   private static final String FIELD_NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
   private static final String FIELD_NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
   private static final String FIELD_NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String FIELD_NUM_GROUPS_WARNING_LIMIT_REACHED = "numGroupsWarningLimitReached";
   private static final String FIELD_MULTI_STAGE_STATS = "stageStats";
   private static final String FIELD_MULTI_STAGE_STATS_TYPE = "type";
   private static final String FIELD_MULTI_STAGE_STATS_CHILDREN = "children";

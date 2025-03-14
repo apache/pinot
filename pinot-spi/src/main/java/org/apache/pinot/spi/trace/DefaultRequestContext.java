@@ -57,6 +57,7 @@ public class DefaultRequestContext implements RequestScope {
   private int _numServersQueried;
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
+  private boolean _isNumGroupsWarningLimitReached;
   private int _numExceptions;
   private String _brokerId;
   private String _offlineServerTenant;
@@ -340,6 +341,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public boolean isNumGroupsWarningLimitReached() {
+    return _isNumGroupsWarningLimitReached;
+  }
+
+  @Override
   public int getNumExceptions() {
     return _numExceptions;
   }
@@ -417,6 +423,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _isNumGroupsWarningLimitReached = numGroupsWarningLimitReached;
   }
 
   @Override

@@ -105,6 +105,7 @@ public class QueryLoggerTest {
         + "consumingFreshnessTimeMs=11,"
         + "servers=12/13,"
         + "groupLimitReached=false,"
+        + "groupWarningLimitReached=false,"
         + "brokerReduceTimeMs=20,"
         + "exceptions=0,"
         + "serverStats=serverStats,"

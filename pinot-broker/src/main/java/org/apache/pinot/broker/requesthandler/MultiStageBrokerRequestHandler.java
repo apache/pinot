@@ -385,6 +385,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         brokerResponse.setResultTable(null);
       }
 
+      // Set num groups metrics
+      if (brokerResponse.isNumGroupsLimitReached()) {
+        for (String tableName : tableNames) {
+          _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
+        }
+      }
+      if (brokerResponse.isNumGroupsWarningLimitReached()) {
+        for (String tableName : tableNames) {
+          _brokerMetrics.addMeteredTableValue(
+              tableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+        }
+      }
+
       // Log query and stats
       _queryLogger.log(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,

@@ -121,13 +121,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
 
-    if (groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit()) {
+    boolean numGroupsWarningLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
       LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
           _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
       ServerMetrics serverMetrics = ServerMetrics.get();
-      serverMetrics.addMeteredTableValue(
-          _queryContext.getTableName(), ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
-      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
     }
 
     // Trim the groups when iff:
@@ -144,12 +143,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

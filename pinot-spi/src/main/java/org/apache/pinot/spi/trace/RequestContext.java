@@ -128,6 +128,8 @@ public interface RequestContext {
 
   boolean isNumGroupsLimitReached();
 
+  boolean isNumGroupsWarningLimitReached();
+
   int getNumExceptions();
 
   boolean hasValidTableName();
@@ -159,6 +161,8 @@ public interface RequestContext {
   void setNumServersResponded(int numServersResponded);
 
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
+
+  void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached);
 
   void setNumExceptions(int numExceptions);
 

@@ -216,6 +216,8 @@ public abstract class MultiStageOperator
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
+        response.mergeNumGroupsWarningLimitReached(
+            stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
@@ -227,6 +229,10 @@ public abstract class MultiStageOperator
         boolean limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
         if (limitReached) {
           serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
+        }
+        limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
+        if (limitReached) {
+          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
         }
       }
     },

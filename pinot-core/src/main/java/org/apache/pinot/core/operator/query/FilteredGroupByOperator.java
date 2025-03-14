@@ -172,15 +172,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean numGroupsLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupKeyGenerator.getNumKeys());
 
-    if (groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningLimit()) {
+    boolean numGroupsWarningLimitReached = groupKeyGenerator.getNumKeys() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
       LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
           _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
       ServerMetrics serverMetrics = ServerMetrics.get();
-      serverMetrics.addMeteredTableValue(
-          _queryContext.getTableName(), ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
-      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
+      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
     }
-
 
     // Trim the groups when iff:
     // - Query has ORDER BY clause
@@ -197,6 +195,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
@@ -205,6 +204,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

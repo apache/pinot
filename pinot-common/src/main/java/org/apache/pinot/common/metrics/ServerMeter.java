@@ -155,8 +155,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
    * by 2.
    */
-  AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING("times", false),
-  AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL("times", true),
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
   /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.

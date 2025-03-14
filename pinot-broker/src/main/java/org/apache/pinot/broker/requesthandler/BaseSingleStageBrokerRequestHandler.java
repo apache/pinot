@@ -776,6 +776,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
           1);
     }
+    if (brokerResponse.isNumGroupsWarningLimitReached()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName,
+          BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+    }
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
     // this is an attempt to return more faithful information based on other sources
