@@ -19,6 +19,41 @@
 
 -->
 
+# Apache Pinot Helm Chart
+
+This Helm Chart helps you deploy Apache Pinot on Kubernetes.
+
+## Features
+
+- Deploy complete Pinot cluster (Controller, Broker, Server, Minion)
+- Support for auto-scaling Pinot Minions based on task queue size
+- Configurable resource limits and node affinity
+- ZooKeeper integration
+- Customizable configuration
+
+## Auto-scaling Pinot Minions
+
+Pinot now supports auto-scaling minions based on task queue size. For detailed documentation, see:
+- [Minion Auto-scaling Documentation](docs/minion-autoscaling.md)
+
+To enable auto-scaling, add the following to your values.yaml:
+
+```yaml
+minionStateless:
+  enabled: true
+  
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    # Task queue based autoscaling
+    taskQueueMetric:
+      enabled: true
+      # Target value is tasks per minion - e.g., 5 means scale to have ~5 tasks per minion
+      targetValue: 5
+```
+
 # Pinot Quickstart on Kubernetes with Helm
 
 ## Prerequisite
