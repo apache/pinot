@@ -41,7 +41,7 @@ public class RebalanceResult {
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private final Map<String, String> _preChecksResult;
+  private final Map<String, RebalancePreCheckerResult> _preChecksResult;
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final RebalanceSummaryResult _rebalanceSummaryResult;
 
@@ -52,7 +52,7 @@ public class RebalanceResult {
       @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
       @JsonProperty("tierInstanceAssignment") @Nullable Map<String, InstancePartitions> tierInstanceAssignment,
       @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment,
-      @JsonProperty("preChecksResult") @Nullable Map<String, String> preChecksResult,
+      @JsonProperty("preChecksResult") @Nullable Map<String, RebalancePreCheckerResult> preChecksResult,
       @JsonProperty("rebalanceSummaryResult") @Nullable RebalanceSummaryResult rebalanceSummaryResult) {
     _jobId = jobId;
     _status = status;
@@ -95,7 +95,7 @@ public class RebalanceResult {
   }
 
   @JsonProperty
-  public Map<String, String> getPreChecksResult() {
+  public Map<String, RebalancePreCheckerResult> getPreChecksResult() {
     return _preChecksResult;
   }
 

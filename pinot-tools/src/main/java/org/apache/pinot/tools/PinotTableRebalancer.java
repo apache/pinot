@@ -32,14 +32,13 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public class PinotTableRebalancer extends PinotZKChanger {
   private final RebalanceConfig _rebalanceConfig = new RebalanceConfig();
 
-  public PinotTableRebalancer(String zkAddress, String clusterName, boolean dryRun, boolean preChecks,
-      boolean reassignInstances, boolean includeConsuming,
-      RebalanceConfig.MinimizeDataMovementOptions minimizeDataMovement, boolean bootstrap, boolean downtime,
-      int minReplicasToKeepUpForNoDowntime, boolean lowDiskMode, boolean bestEffort, long externalViewCheckIntervalInMs,
+  public PinotTableRebalancer(String zkAddress, String clusterName, boolean dryRun, boolean reassignInstances,
+      boolean includeConsuming, RebalanceConfig.MinimizeDataMovementOptions minimizeDataMovement,
+      boolean bootstrap, boolean downtime, int minReplicasToKeepUpForNoDowntime, boolean lowDiskMode,
+      boolean bestEffort, long externalViewCheckIntervalInMs,
       long externalViewStabilizationTimeoutInMs) {
     super(zkAddress, clusterName);
     _rebalanceConfig.setDryRun(dryRun);
-    _rebalanceConfig.setPreChecks(preChecks);
     _rebalanceConfig.setReassignInstances(reassignInstances);
     _rebalanceConfig.setIncludeConsuming(includeConsuming);
     _rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);

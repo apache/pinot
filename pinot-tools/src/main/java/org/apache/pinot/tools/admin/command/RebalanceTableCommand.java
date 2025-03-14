@@ -51,11 +51,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
           + " changes to the cluster, false by default)")
   private boolean _dryRun = false;
 
-  @CommandLine.Option(names = {"-preChecks"},
-      description = "Whether to enable pre-checks for table, must be in dry-run mode to enable"
-          + " changes to the cluster, false by default)")
-  private boolean _preChecks = false;
-
   @CommandLine.Option(names = {"-reassignInstances"},
       description = "Whether to reassign instances before reassigning segments (true by default)")
   private boolean _reassignInstances = true;
@@ -113,8 +108,10 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Override
   public boolean execute()
       throws Exception {
+    // TODO: Add pre-checks option to this command. This needs the PinotHelixResourceManager to be wired in to use
+    //       the default pre-checker
     PinotTableRebalancer tableRebalancer =
-        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _preChecks, _reassignInstances, _includeConsuming,
+        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming,
             _minimizeDataMovement, _bootstrap, _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts,
             _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
@@ -141,12 +138,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
             + "myTable_OFFLINE -dryRun");
-    System.out.println();
-
-    System.out.println("Rebalance table in dry-run mode with pre-checks");
-    System.out.println(
-        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
-            + "myTable_OFFLINE -dryRun -preChecks");
     System.out.println();
 
     System.out.println("Rebalance table with instances reassigned");

@@ -219,7 +219,7 @@ public class TableRebalancer {
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement);
 
     // Perform pre-checks if enabled
-    Map<String, String> preChecksResult = null;
+    Map<String, RebalancePreCheckerResult> preChecksResult = null;
     if (preChecks) {
       if (!dryRun) {
         // Dry-run must be enabled to run pre-checks
