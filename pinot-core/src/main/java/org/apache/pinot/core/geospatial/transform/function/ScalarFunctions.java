@@ -253,4 +253,18 @@ public class ScalarFunctions {
     // TODO: to fully support Geography within operation.
     return firstGeometry.within(secondGeometry) ? 1 : 0;
   }
+
+  /**
+   * Gets the grid distance between two H3 indexes by finding the minimum number of grid cells that must be traversed
+   * @param firstH3Index first H3 index
+   * @param secondH3Index second H3 index
+   * @return the grid distance between the two H3 indexes
+   */
+  @ScalarFunction
+  public static long gridDistance(long firstH3Index, long secondH3Index) {
+    if (firstH3Index == secondH3Index) {
+      return 0;
+    }
+    return H3Utils.H3_CORE_INSTANCE.gridDistance(firstH3Index, secondH3Index);
+  }
 }
