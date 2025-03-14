@@ -255,7 +255,7 @@ public final class RelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound, windowGroup.exclude, constants);
   }
 
   private SortNode convertLogicalSort(LogicalSort node) {
@@ -446,9 +446,9 @@ public final class RelToPlanNodeConverter {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
     if (scale == 0) {
-      if (precision <= 10) {
+      if (precision < 10) {
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
-      } else if (precision <= 38) {
+      } else if (precision < 19) {
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
@@ -456,7 +456,7 @@ public final class RelToPlanNodeConverter {
     } else {
       // NOTE: Do not use FLOAT to represent DECIMAL to be consistent with single-stage engine behavior.
       //       See {@link RequestUtils#getLiteralExpression(SqlLiteral)}.
-      if (precision <= 30) {
+      if (precision < 15) {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;

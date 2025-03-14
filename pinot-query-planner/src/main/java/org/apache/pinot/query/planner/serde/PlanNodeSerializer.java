@@ -150,10 +150,9 @@ public class PlanNodeSerializer {
       }
       assert !receiverStageIds.isEmpty() : "Receiver stage IDs should not be empty";
 
-      Plan.MailboxSendNode mailboxSendNode =
-          Plan.MailboxSendNode.newBuilder()
-              .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
-              .addAllReceiverStageIds(receiverStageIds)
+      Plan.MailboxSendNode mailboxSendNode = Plan.MailboxSendNode.newBuilder()
+          .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
+          .addAllReceiverStageIds(receiverStageIds)
           .setExchangeType(convertExchangeType(node.getExchangeType()))
           .setDistributionType(convertDistributionType(node.getDistributionType()))
           .addAllKeys(node.getKeys())
@@ -217,6 +216,7 @@ public class PlanNodeSerializer {
           .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()))
           .setLowerBound(node.getLowerBound())
           .setUpperBound(node.getUpperBound())
+          .setExclude(convertWindowExclusion(node.getExclude()))
           .addAllConstants(convertLiterals(node.getConstants()))
           .build();
       builder.setWindowNode(windowNode);
@@ -413,6 +413,21 @@ public class PlanNodeSerializer {
           return Plan.WindowFrameType.RANGE;
         default:
           throw new IllegalStateException("Unsupported WindowFrameType: " + windowFrameType);
+      }
+    }
+
+    private static Plan.WindowExclusion convertWindowExclusion(RexWindowExclusion exclude) {
+      switch (exclude) {
+        case EXCLUDE_NO_OTHER:
+          return Plan.WindowExclusion.EXCLUDE_NO_OTHER;
+        case EXCLUDE_CURRENT_ROW:
+          return Plan.WindowExclusion.EXCLUDE_CURRENT_ROW;
+        case EXCLUDE_TIES:
+          return Plan.WindowExclusion.EXCLUDE_TIES;
+        case EXCLUDE_GROUP:
+          return Plan.WindowExclusion.EXCLUDE_GROUP;
+        default:
+          throw new IllegalStateException("Unsupported WindowExclusion: " + exclude);
       }
     }
   }
