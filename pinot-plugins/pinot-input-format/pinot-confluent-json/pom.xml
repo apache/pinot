@@ -22,41 +22,59 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.4.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>pinot-input-format</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Input Format</name>
+  <artifactId>pinot-confluent-json</artifactId>
+  <name>Pinot Confluent Json</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-input-format</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
-
-  <modules>
-    <module>pinot-avro</module>
-    <module>pinot-avro-base</module>
-    <module>pinot-clp-log</module>
-    <module>pinot-confluent-avro</module>
-    <module>pinot-confluent-json</module>
-    <module>pinot-confluent-protobuf</module>
-    <module>pinot-orc</module>
-    <module>pinot-json</module>
-    <module>pinot-parquet</module>
-    <module>pinot-csv</module>
-    <module>pinot-thrift</module>
-    <module>pinot-protobuf</module>
-  </modules>
-
+  <repositories>
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven/</url>
+    </repository>
+  </repositories>
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
+      <artifactId>pinot-json</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-schema-registry-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-json-schema-serializer</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.jetbrains.kotlin</groupId>
+          <artifactId>kotlin-scripting-compiler-embeddable</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>
