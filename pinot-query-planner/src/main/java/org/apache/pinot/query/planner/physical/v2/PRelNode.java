@@ -69,7 +69,7 @@ public class PRelNode {
 
   public PRelNode with(PinotDataDistribution newDistribution, TableScanMetadata tableScanMetadata) {
     Preconditions.checkNotNull(newDistribution, "Attempted to set null distribution in PRelNode");
-    return new PRelNode(_nodeId, _relNode, newDistribution, _inputs, _leafStage, _tableScanMetadata);
+    return new PRelNode(_nodeId, _relNode, newDistribution, _inputs, _leafStage, tableScanMetadata);
   }
 
   public PRelNode withNewInputs(int nodeId, List<PRelNode> newPRelInputs, PinotDataDistribution pinotDataDistribution) {

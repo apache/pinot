@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.physical.v2;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.rules.AggregatePushdownRule;
 import org.apache.pinot.query.planner.physical.v2.rules.LeafStageBoundaryRule;
@@ -34,10 +35,10 @@ public class PhysicalOptRuleSet {
   }
 
   public static List<Pair<PRelOptRule, RuleExecutor>> create(PhysicalPlannerContext context,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, TableCache tableCache) {
     return List.of(
         Pair.of(LeafStageBoundaryRule.INSTANCE, RuleExecutors.POST_ORDER),
-        Pair.of(new LeafStageWorkerAssignmentRule(context), RuleExecutors.POST_ORDER),
+        Pair.of(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.POST_ORDER),
         Pair.of(new WorkerExchangeAssignmentRule(context), RuleExecutors.IN_ORDER),
         Pair.of(AggregatePushdownRule.INSTANCE, RuleExecutors.POST_ORDER),
         Pair.of(SortPushdownRule.INSTANCE, RuleExecutors.POST_ORDER));

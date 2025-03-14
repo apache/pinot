@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.physical.v2;
 
 import java.util.Map;
 import org.apache.calcite.rel.RelNode;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,9 +33,10 @@ public class RelToPRelConverter {
   private RelToPRelConverter() {
   }
 
-  public PRelNode toPRelNode(RelNode relNode, PhysicalPlannerContext context, Map<String, String> queryOptions) {
+  public PRelNode toPRelNode(RelNode relNode, PhysicalPlannerContext context, Map<String, String> queryOptions,
+      TableCache tableCache) {
     PRelNode pRelNode = PRelNode.wrapRelTree(relNode, context.getNodeIdGenerator());
-    var rules = PhysicalOptRuleSet.create(context, queryOptions);
+    var rules = PhysicalOptRuleSet.create(context, queryOptions, tableCache);
     for (var ruleAndExecutor : rules) {
       PRelOptRule rule = ruleAndExecutor.getLeft();
       RuleExecutor executor = ruleAndExecutor.getRight();

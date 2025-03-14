@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
@@ -40,6 +41,8 @@ import org.apache.pinot.calcite.rel.HashDistributionDesc;
 import org.apache.pinot.calcite.rel.PinotDataDistribution;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
@@ -60,12 +63,14 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
 
 public class LeafStageWorkerAssignmentRule extends PRelOptRule {
+  private final TableCache _tableCache;
   private final RoutingManager _routingManager;
   private final PhysicalPlannerContext _physicalPlannerContext;
 
-  public LeafStageWorkerAssignmentRule(PhysicalPlannerContext physicalPlannerContext) {
+  public LeafStageWorkerAssignmentRule(PhysicalPlannerContext physicalPlannerContext, TableCache tableCache) {
     _routingManager = physicalPlannerContext.getRoutingManager();
     _physicalPlannerContext = physicalPlannerContext;
+    _tableCache = tableCache;
   }
 
   @Override
@@ -116,7 +121,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
 
   private PRelNode assignTableScan(PRelNode pRelNode) {
     TableScan tableScan = (TableScan) pRelNode.getRelNode();
-    String tableName = tableScan.getTable().getQualifiedName().get(1);
+    String tableName = getActualTableName(tableScan);
     // TODO: Support server pruning based on filter. Filter can be extracted from parent stack.
     String filter = "";
     Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, _physicalPlannerContext.getRequestId());
@@ -158,8 +163,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     Set<String> scannedTables = new HashSet<>();
     scannedTables.add(tableName);
     List<RelHint> hints = ((TableScan) pRelNode.getRelNode()).getHints();
-    Map<String, String> tableOptions =
-        new HashMap<>(PlanNode.NodeHint.fromRelHints(hints).getHintOptions().get(PinotHintOptions.TABLE_HINT_OPTIONS));
+    Map<String, String> tableOptions = getTableOptions(hints);
     for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
       String instanceId = entry.getKey().getInstanceId();
       _physicalPlannerContext.getInstanceIdToQueryServerInstance().putIfAbsent(
@@ -208,6 +212,20 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     }
     return pRelNode.with(pinotDataDistribution, new TableScanMetadata(scannedTables, workerIdToSegmentsMap,
         tableOptions, segmentUnavailableMap, timeBoundaryInfo));
+  }
+
+  private Map<String, String> getTableOptions(List<RelHint> hints) {
+    Map<String, String> tmp = PlanNode.NodeHint.fromRelHints(hints).getHintOptions().get(
+        PinotHintOptions.TABLE_HINT_OPTIONS);
+    return tmp == null ? Map.of() : tmp;
+  }
+
+  private String getActualTableName(TableScan tableScan) {
+    RelOptTable table = tableScan.getTable();
+    List<String> qualifiedName = table.getQualifiedName();
+    String tmp = qualifiedName.size() == 1 ? qualifiedName.get(0)
+        : DatabaseUtils.constructFullyQualifiedTableName(qualifiedName.get(0), qualifiedName.get(1));
+    return _tableCache.getActualTableName(tmp);
   }
 
   @Nullable

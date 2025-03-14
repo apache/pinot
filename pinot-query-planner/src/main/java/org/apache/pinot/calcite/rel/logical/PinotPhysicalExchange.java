@@ -35,7 +35,7 @@ import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 public class PinotPhysicalExchange extends Exchange {
-  private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(RelDistributions.ANY);
+  private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(RelDistributions.RANDOM_DISTRIBUTED);
   private final RelTraitSet _traitSet;
   /** The key indexes used for performing the exchange. */
   private final List<Integer> _keys;
@@ -51,7 +51,7 @@ public class PinotPhysicalExchange extends Exchange {
   // TODO: Trait set semantics are not clearly defined yet.
   public PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy desc,
       @Nullable RelCollation collation, RelTraitSet traitSet) {
-    super(input.getCluster(), traitSet, input, RelDistributions.ANY);
+    super(input.getCluster(), traitSet, input, RelDistributions.RANDOM_DISTRIBUTED);
     _keys = keys;
     _exchangeStrategy = desc;
     _collation = collation == null ? RelCollations.EMPTY : collation;
@@ -78,7 +78,7 @@ public class PinotPhysicalExchange extends Exchange {
 
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistributionIgnored) {
-    Preconditions.checkState(newDistributionIgnored.equals(RelDistributions.ANY),
+    Preconditions.checkState(newDistributionIgnored.equals(RelDistributions.RANDOM_DISTRIBUTED),
         "Exchange should always have ANY trait, because we use ExchangeStrategy instead.");
     return new PinotPhysicalExchange(newInput, _keys, _exchangeStrategy, _collation, traitSet);
   }

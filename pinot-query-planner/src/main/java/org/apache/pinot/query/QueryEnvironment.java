@@ -446,7 +446,7 @@ public class QueryEnvironment {
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     if (plannerContext.usePhysicalOptimizer()) {
-      return toDispatchableSubPlanV2(relRoot, plannerContext, requestId);
+      return toDispatchableSubPlanV2(relRoot, plannerContext, requestId, _envConfig.getTableCache());
     }
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
         _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
@@ -455,8 +455,9 @@ public class QueryEnvironment {
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
   }
 
-  private DispatchableSubPlan toDispatchableSubPlanV2(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    Pair<SubPlan, Blah.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot, plannerContext);
+  private DispatchableSubPlan toDispatchableSubPlanV2(RelRoot relRoot, PlannerContext plannerContext, long requestId,
+      TableCache tableCache) {
+    Pair<SubPlan, Blah.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot, plannerContext, tableCache);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());

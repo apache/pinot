@@ -70,10 +70,11 @@ public class PinotLogicalQueryPlanner {
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
   }
 
-  public static Pair<SubPlan, Blah.Result> makePlanV2(RelRoot relRoot, PlannerContext plannerContext) {
+  public static Pair<SubPlan, Blah.Result> makePlanV2(RelRoot relRoot, PlannerContext plannerContext,
+      TableCache tableCache) {
     PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
     PRelNode pRelNode = RelToPRelConverter.INSTANCE.toPRelNode(relRoot.rel, physicalPlannerContext,
-        plannerContext.getOptions());
+        plannerContext.getOptions(), tableCache);
     Blah blah = new Blah();
     Blah.Result blahResult = blah.compute(pRelNode, physicalPlannerContext);
     PlanFragment rootFragment = blahResult._planFragmentMap.get(0);
