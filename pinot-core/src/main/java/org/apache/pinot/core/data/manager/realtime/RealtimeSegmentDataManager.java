@@ -1688,12 +1688,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
-      _segmentLogger
-          .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
-              _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit =
-          isConsumptionAllowedDuringCommit() ? true
-              : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+      _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+          llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
+      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit() || (_tableConfig.getUpsertConfig() != null
+          && _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
