@@ -608,8 +608,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Map<String, String> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
-    // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
-    // manual check is needed
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION), "Within threshold");
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
@@ -628,8 +626,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
-    // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
-    // manual check is needed
     assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).toLowerCase().startsWith("unsafe"));
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);

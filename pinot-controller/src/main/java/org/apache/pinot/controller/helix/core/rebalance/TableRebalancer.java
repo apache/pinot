@@ -319,11 +319,16 @@ public class TableRebalancer {
     TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails = fetchTableSizeDetails(tableNameWithType);
 
     Map<String, RebalancePreCheckerResult> preChecksResult = null;
-    if (preChecks && _rebalancePreChecker != null) {
-      // TODO: consider making an error or warning log when pre-checks are enabled but the pre-checker is not set
-      RebalancePreChecker.TableFacts tableFacts = new RebalancePreChecker.TableFacts(rebalanceJobId, tableNameWithType,
-          tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails);
-      preChecksResult = _rebalancePreChecker.check(tableFacts);
+    if (preChecks) {
+      if (_rebalancePreChecker == null) {
+        LOGGER.warn("Pre-checks are enabled but the pre-checker is not set, skipping pre-checks for table: {}",
+            tableNameWithType);
+      } else {
+        RebalancePreChecker.TableFacts tableFacts =
+            new RebalancePreChecker.TableFacts(rebalanceJobId, tableNameWithType,
+                tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails);
+        preChecksResult = _rebalancePreChecker.check(tableFacts);
+      }
     }
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
     // is expected or not based on the summary results
@@ -598,10 +603,13 @@ public class TableRebalancer {
       LOGGER.warn("tableSizeReader is null, cannot calculate table size for table {}!", tableNameWithType);
       return null;
     }
-    LOGGER.info("Fetching the table size for rebalance summary for table: {}", tableNameWithType);
+    LOGGER.info("Fetching the table size for table: {}", tableNameWithType);
     try {
       // TODO: Consider making the timeoutMs for fetching table size via table rebalancer configurable
-      return _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
+      TableSizeReader.TableSubTypeSizeDetails sizeDetails =
+          _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
+      LOGGER.info("Fetched the table size details for table: {}", tableNameWithType);
+      return sizeDetails;
     } catch (InvalidConfigException e) {
       LOGGER.error("Caught exception while trying to fetch table size details for table: {}", tableNameWithType, e);
     }

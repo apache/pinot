@@ -76,10 +76,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
         tableNameWithType, tableConfig));
     // Check if all servers involved in the rebalance have enough disk space
-    String diskUtilizationMessage =
-        checkDiskUtilization(tableNameWithType, tableFacts._currentAssignment, tableFacts._targetAssignment,
-            tableFacts._tableSubTypeSizeDetails, _diskUtilizationThreshold);
-    preCheckResult.put(DISK_UTILIZATION, diskUtilizationMessage);
+    preCheckResult.put(DISK_UTILIZATION, checkDiskUtilization(tableNameWithType, tableFacts._currentAssignment, tableFacts._targetAssignment,
+        tableFacts._tableSubTypeSizeDetails, _diskUtilizationThreshold));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -212,14 +210,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
@@ -252,14 +250,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
       long diskUtilizationFootprint = diskUsage.getUsedSpaceBytes() + diskUtilizationGain;
-      double diskUtilizationFootprintRate =
+      double diskUtilizationFootprintRatio =
           (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
 
-      if (diskUtilizationFootprintRate >= threshold) {
+      if (diskUtilizationFootprintRatio >= threshold) {
         isDiskUtilSafe = false;
         message.append(sep)
             .append(server)
-            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRate * 100)));
+            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRatio * 100)));
         sep = ", ";
       }
     }

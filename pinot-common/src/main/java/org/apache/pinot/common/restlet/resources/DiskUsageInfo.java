@@ -34,7 +34,7 @@ public class DiskUsageInfo {
   private final long _usedSpaceBytes;
   private final long _lastUpdatedTimeInEpochMs;
 
-  public DiskUsageInfo(String instanceId) {
+  public DiskUsageInfo(@JsonProperty("instanceId") String instanceId) {
     _instanceId = instanceId;
     _path = null;
     _totalSpaceBytes = -1;
