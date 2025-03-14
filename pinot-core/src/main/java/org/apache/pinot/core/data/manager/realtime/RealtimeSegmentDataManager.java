@@ -1727,13 +1727,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // 1. Partial Upserts
   // 2. Dedup Tables
   // For the above table types, we would be looking into the metadata information when inserting a new record,
-  // so it is not ideal to allow consumption when downloading and replacing the consuming segment as we might see
-  // unusual behaviour of duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
+  // so it is not right to allow consumption when downloading and replacing the consuming segment as we might see
+  // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
   // upsert tables.
   private boolean isConsumptionAllowedDuringCommit() {
-    return (!_realtimeTableDataManager.isPartialUpsertEnabled() && !_realtimeTableDataManager.isDedupEnabled()) || (
-        _tableConfig.getUpsertConfig() != null && _tableConfig.getUpsertConfig()
-            .isAllowPartialUpsertConsumptionDuringCommit());
+    return !_realtimeTableDataManager.isDedupEnabled() && (!_realtimeTableDataManager.isPartialUpsertEnabled()
+        || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
