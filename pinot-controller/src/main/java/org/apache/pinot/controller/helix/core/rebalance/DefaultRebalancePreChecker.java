@@ -64,8 +64,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   @Override
   public Map<String, String> check(TableFacts tableFacts) {
-    LOGGER.info("Start pre-checks. Table fact: {}", tableFacts.toString());
-
+    LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableFacts._tableNameWithType,
+        tableFacts._rebalanceJobId);
     String rebalanceJobId = tableFacts._rebalanceJobId;
     String tableNameWithType = tableFacts._tableNameWithType;
     TableConfig tableConfig = tableFacts._tableConfig;
@@ -168,14 +168,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
       }
     }
 
@@ -208,14 +208,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
       long diskUtilizationFootprint = diskUsage.getUsedSpaceBytes() + diskUtilizationGain;
-      double diskUtilizationFootprintRate =
+      double diskUtilizationFootprintRatio =
           (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
 
-      if (diskUtilizationFootprintRate >= threshold) {
+      if (diskUtilizationFootprintRatio >= threshold) {
         isDiskUtilSafe = false;
         message.append(sep)
             .append(server)
-            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRate * 100)));
+            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRatio * 100)));
         sep = ", ";
       }
     }

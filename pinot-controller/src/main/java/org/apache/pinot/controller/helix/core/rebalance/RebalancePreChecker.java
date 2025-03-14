@@ -31,16 +31,16 @@ public interface RebalancePreChecker {
       double diskUtilizationThreshold);
 
   class TableFacts {
-    public String _rebalanceJobId;
-    public String _tableNameWithType;
-    public TableConfig _tableConfig;
-    public Map<String, Map<String, String>> _currentAssignment;
-    public Map<String, Map<String, String>> _targetAssignment;
-    public TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+    public final String _rebalanceJobId;
+    public final String _tableNameWithType;
+    public final TableConfig _tableConfig;
+    public final Map<String, Map<String, String>> _currentAssignment;
+    public final Map<String, Map<String, String>> _targetAssignment;
+    public final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
 
     public TableFacts(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-        TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
+        @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
       _rebalanceJobId = rebalanceJobId;
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
