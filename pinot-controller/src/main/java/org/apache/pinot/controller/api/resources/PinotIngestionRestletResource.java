@@ -151,7 +151,7 @@ public class PinotIngestionRestletResource {
       FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, DataPayload.newFilePayload(fileUpload)));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -203,7 +203,8 @@ public class PinotIngestionRestletResource {
       @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
+      DataPayload dataPayload = createDataPayload(sourceURIStr);
+      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, dataPayload));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -212,6 +213,17 @@ public class PinotIngestionRestletResource {
       asyncResponse.resume(new ControllerApplicationException(LOGGER,
           String.format("Caught exception when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e));
+    }
+  }
+
+  private DataPayload createDataPayload(String sourceURIStr) throws URISyntaxException {
+    URI uri = new URI(sourceURIStr);
+    String schema = uri.getScheme();
+    boolean httpSchema = CommonConstants.HTTP_PROTOCOL.equals(schema) || CommonConstants.HTTPS_PROTOCOL.equals(schema);
+    if (httpSchema) {
+      return DataPayload.newPublicUriPayload(uri);
+    } else {
+      return DataPayload.newBucketUriPayload(uri);
     }
   }
 
