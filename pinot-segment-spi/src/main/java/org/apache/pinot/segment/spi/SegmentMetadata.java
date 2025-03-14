@@ -107,6 +107,8 @@ public interface SegmentMetadata {
 
   TreeMap<String, ColumnMetadata> getColumnMetadataMap();
 
+  TreeMap<String, TreeMap<String, ColumnMetadata>> getChildColumnMetadataMap();
+
   default ColumnMetadata getColumnMetadataFor(String column) {
     return getColumnMetadataMap().get(column);
   }
