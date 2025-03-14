@@ -74,6 +74,19 @@ public class PinotDispatchPlanner {
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
+  public DispatchableSubPlan createDispatchableSubPlanV2(SubPlan subPlan, Blah.Result result) {
+    // perform physical plan conversion and assign workers to each stage.
+    DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
+        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+    PlanFragment rootFragment = subPlan.getSubPlanRoot();
+    context.getDispatchablePlanMetadataMap().putAll(result._fragmentMetadataMap);
+    for (var entry : result._planFragmentMap.entrySet()) {
+      context.getDispatchablePlanStageRootMap().put(entry.getKey(), entry.getValue().getFragmentRoot());
+    }
+    runValidations(rootFragment, context);
+    return finalizeDispatchableSubPlan(rootFragment, context);
+  }
+
   /**
    * Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
    */

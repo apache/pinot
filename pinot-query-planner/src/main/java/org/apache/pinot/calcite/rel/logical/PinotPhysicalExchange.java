@@ -21,6 +21,7 @@ package org.apache.pinot.calcite.rel.logical;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
@@ -29,10 +30,13 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.pinot.calcite.rel.ExchangeStrategy;
+import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
+import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 public class PinotPhysicalExchange extends Exchange {
   private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(RelDistributions.ANY);
+  private final RelTraitSet _traitSet;
   /** The key indexes used for performing the exchange. */
   private final List<Integer> _keys;
   /** Defines how records are distributed from streams in the sending operator to streams in the receiver. */
@@ -41,35 +45,42 @@ public class PinotPhysicalExchange extends Exchange {
   private final RelCollation _collation;
 
   public PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy exchangeStrategy) {
-    this(input, keys, exchangeStrategy, null);
+    this(input, keys, exchangeStrategy, null, FIXED_TRAIT_SET);
   }
 
+  // TODO: Trait set semantics are not clearly defined yet.
   public PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy desc,
-      RelCollation collation) {
-    super(input.getCluster(), FIXED_TRAIT_SET, input, RelDistributions.ANY);
+      @Nullable RelCollation collation, RelTraitSet traitSet) {
+    super(input.getCluster(), traitSet, input, RelDistributions.ANY);
     _keys = keys;
     _exchangeStrategy = desc;
     _collation = collation == null ? RelCollations.EMPTY : collation;
+    _traitSet = traitSet;
+  }
+
+  public PinotRelExchangeType getPinotRelExchangeType() {
+    PinotExecStrategyTrait trait = _traitSet.getTrait(PinotExecStrategyTraitDef.INSTANCE);
+    if (trait == null) {
+      trait = PinotExecStrategyTrait.getDefaultExecStrategy();
+    }
+    return trait.getType();
   }
 
   public static PinotPhysicalExchange broadcast(RelNode input) {
     return new PinotPhysicalExchange(input, Collections.emptyList(), ExchangeStrategy.BROADCAST_EXCHANGE,
-        null);
+        null, FIXED_TRAIT_SET);
   }
 
   public static PinotPhysicalExchange singleton(RelNode input) {
     return new PinotPhysicalExchange(input, Collections.emptyList(), ExchangeStrategy.SINGLETON_EXCHANGE,
-        null);
+        null, FIXED_TRAIT_SET);
   }
 
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistributionIgnored) {
     Preconditions.checkState(newDistributionIgnored.equals(RelDistributions.ANY),
         "Exchange should always have ANY trait, because we use ExchangeStrategy instead.");
-    Preconditions.checkState(traitSet.size() <= 1, "At most 1 trait allowed in PinotPhysicalExchange");
-    Preconditions.checkState(traitSet.isEmpty() || traitSet.getDistribution() != null,
-        "Only distribution trait allowed in PinotPhysicalExchange");
-    return new PinotPhysicalExchange(newInput, _keys, _exchangeStrategy, _collation);
+    return new PinotPhysicalExchange(newInput, _keys, _exchangeStrategy, _collation, traitSet);
   }
 
   public List<Integer> getKeys() {

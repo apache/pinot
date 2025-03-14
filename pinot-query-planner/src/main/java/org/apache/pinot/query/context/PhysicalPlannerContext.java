@@ -27,6 +27,7 @@ public class PhysicalPlannerContext {
   private final String _hostName;
   private final int _port;
   private final long _requestId;
+  private final String _instanceId;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -37,13 +38,16 @@ public class PhysicalPlannerContext {
     _hostName = "";
     _port = 0;
     _requestId = 0;
+    _instanceId = "";
   }
 
-  public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId) {
+  public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
+      String instanceId) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
     _requestId = requestId;
+    _instanceId = instanceId;
   }
 
   public Supplier<Integer> getNodeIdGenerator() {
@@ -69,5 +73,9 @@ public class PhysicalPlannerContext {
 
   public long getRequestId() {
     return _requestId;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 }

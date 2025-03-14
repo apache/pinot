@@ -33,11 +33,17 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
+import org.apache.pinot.query.planner.physical.Blah;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
+import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -62,31 +68,18 @@ public class PinotLogicalQueryPlanner {
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools);
     return new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
+  }
 
-    // TODO: Currently we don't support multiple sub-plans. Revisit the following logic when we add the support.
-    // Fragment the stage tree into multiple SubPlans.
-//    SubPlanFragmenter.Context subPlanContext = new SubPlanFragmenter.Context();
-//    subPlanContext._subPlanIdToRootNodeMap.put(0, rootNode);
-//    subPlanContext._subPlanIdToMetadataMap.put(0,
-//        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields));
-//    rootNode.visit(SubPlanFragmenter.INSTANCE, subPlanContext);
-//
-//    Map<Integer, SubPlan> subPlanMap = new HashMap<>();
-//    for (Map.Entry<Integer, PlanNode> subPlanEntry : subPlanContext._subPlanIdToRootNodeMap.entrySet()) {
-//      SubPlan subPlan =
-//          new SubPlan(planNodeToPlanFragment(subPlanEntry.getValue()), subPlanContext._subPlanIdToMetadataMap.get(0),
-//              new ArrayList<>());
-//      subPlanMap.put(subPlanEntry.getKey(), subPlan);
-//    }
-//    for (Map.Entry<Integer, List<Integer>> subPlanToChildrenEntry : subPlanContext._subPlanIdToChildrenMap.entrySet
-//    ()) {
-//      int subPlanId = subPlanToChildrenEntry.getKey();
-//      List<Integer> subPlanChildren = subPlanToChildrenEntry.getValue();
-//      for (int subPlanChild : subPlanChildren) {
-//        subPlanMap.get(subPlanId).getChildren().add(subPlanMap.get(subPlanChild));
-//      }
-//    }
-//    return subPlanMap.get(0);
+  public static Pair<SubPlan, Blah.Result> makePlanV2(RelRoot relRoot, PlannerContext plannerContext) {
+    PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+    PRelNode pRelNode = RelToPRelConverter.INSTANCE.toPRelNode(relRoot.rel, physicalPlannerContext,
+        plannerContext.getOptions());
+    Blah blah = new Blah();
+    Blah.Result blahResult = blah.compute(pRelNode, physicalPlannerContext);
+    PlanFragment rootFragment = blahResult._planFragmentMap.get(0);
+    SubPlan subPlan = new SubPlan(rootFragment,
+        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
+    return Pair.of(subPlan, blahResult);
   }
 
   private static PlanFragment planNodeToPlanFragment(

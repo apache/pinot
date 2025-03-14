@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.calcite.rel.ExchangeStrategy;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.PlanFragmenter;
@@ -45,11 +46,13 @@ public class ExchangeNode extends BasePlanNode {
   private final boolean _sortOnReceiver;
   // Table names should be set for SUB_PLAN exchange type.
   private final Set<String> _tableNames;
+  @Nullable
+  private final ExchangeStrategy _exchangeStrategy;
 
   public ExchangeNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sortOnSender, boolean sortOnReceiver,
-      @Nullable Set<String> tableNames) {
+      @Nullable Set<String> tableNames, @Nullable ExchangeStrategy exchangeStrategy) {
     super(stageId, dataSchema, null, inputs);
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -59,6 +62,7 @@ public class ExchangeNode extends BasePlanNode {
     _sortOnSender = sortOnSender;
     _sortOnReceiver = sortOnReceiver;
     _tableNames = tableNames;
+    _exchangeStrategy = exchangeStrategy;
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -96,6 +100,11 @@ public class ExchangeNode extends BasePlanNode {
     return _tableNames;
   }
 
+  @Nullable
+  public ExchangeStrategy getExchangeStrategy() {
+    return _exchangeStrategy;
+  }
+
   @Override
   public String explain() {
     return "EXCHANGE";
@@ -109,7 +118,7 @@ public class ExchangeNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new ExchangeNode(_stageId, _dataSchema, inputs, _exchangeType, _distributionType, _keys, _prePartitioned,
-        _collations, _sortOnSender, _sortOnReceiver, _tableNames);
+        _collations, _sortOnSender, _sortOnReceiver, _tableNames, null);
   }
 
   @Override

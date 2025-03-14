@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
@@ -114,7 +115,7 @@ public class WorkerExchangeAssignmentRule extends PRelOptRule {
       if (!derivedDistribution.satisfies(relCollation)) {
         // Add new identity exchange for sort.
         PinotPhysicalExchange newExchange = new PinotPhysicalExchange(currentNode.getInput(0).getRelNode(),
-            Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation);
+            Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation, RelTraitSet.createEmpty());
         PinotDataDistribution newDataDistribution = derivedDistribution.withCollation(relCollation);
         currentNodeExchange = new PRelNode(_physicalPlannerContext.getNodeIdGenerator().get(), newExchange,
             newDataDistribution);
@@ -124,7 +125,7 @@ public class WorkerExchangeAssignmentRule extends PRelOptRule {
         // Update existing exchange and add sort.
         PinotPhysicalExchange oldExchange = (PinotPhysicalExchange) currentNodeExchange.getRelNode();
         PinotPhysicalExchange newExchange = new PinotPhysicalExchange(oldExchange.getInput(), oldExchange.getKeys(),
-            oldExchange.getExchangeStrategy(), relCollation);
+            oldExchange.getExchangeStrategy(), relCollation, RelTraitSet.createEmpty());
         PinotDataDistribution newDataDistribution = currentNodeExchange.getPinotDataDistributionOrThrow();
         currentNodeExchange = new PRelNode(currentNodeExchange.getNodeId(), newExchange,
             newDataDistribution.withCollation(relCollation));
@@ -336,7 +337,7 @@ public class WorkerExchangeAssignmentRule extends PRelOptRule {
       numberOfPartitions = parentDistribution.getHashDistributionDesc().iterator().next().getNumPartitions();
     }
     PinotPhysicalExchange pinotPhysicalExchange = new PinotPhysicalExchange(currentNode.getRelNode(),
-        relDistribution.getKeys(), ExchangeStrategy.PARTITIONING_EXCHANGE, null);
+        relDistribution.getKeys(), ExchangeStrategy.PARTITIONING_EXCHANGE, null, RelTraitSet.createEmpty());
     HashDistributionDesc newDesc = new HashDistributionDesc(
         relDistribution.getKeys(), "murmur", numberOfPartitions);
     PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
