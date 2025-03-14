@@ -78,6 +78,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -103,6 +104,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -1656,12 +1658,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throw e;
     }
 
+    _allowConsumptionDuringCommit = allowConsumptionDuringCommit();
+
     // Acquire semaphore to create stream consumers
     try {
       long startTimeMs = System.currentTimeMillis();
       while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
         _segmentLogger.warn("Failed to acquire partitionGroupConsumerSemaphore in: {} ms. Retrying.",
             System.currentTimeMillis() - startTimeMs);
+
+        if (_allowConsumptionDuringCommit) {
+          if (!isSegmentInProgress()) {
+            // if segment is online, no need to wait.
+            throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
+          }
+        }
       }
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
@@ -1690,8 +1701,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
-          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1723,6 +1732,42 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }).start();
       throw t;
     }
+  }
+
+  private boolean allowConsumptionDuringCommit() {
+    if (_realtimeTableDataManager.isDedupEnabled()) {
+      return false;
+    }
+
+    if (!_realtimeTableDataManager.isPartialUpsertEnabled()) {
+      return true;
+    }
+
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    if (upsertConfig != null) {
+      return upsertConfig.isAllowPartialUpsertConsumptionDuringCommit();
+    }
+
+    return true;
+  }
+
+  private boolean isSegmentInProgress() {
+    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
+
+    if (segmentZKMetadata == null) {
+      _segmentLogger.error("segmentZKMetadata does not exists for segment: {}", _segmentNameStr);
+      throw new RuntimeException("segmentZKMetadata does not exists.");
+    }
+
+    if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      // it's certain at this point that there is a pending consuming -> online/offline transition message.
+      // hence return from here and handle pending message instead.
+      _segmentLogger.warn("segment: {} status must be {}. Skipping creation of RealtimeSegmentDataManager",
+          _segmentNameStr, CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+      return false;
+    }
+
+    return true;
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
