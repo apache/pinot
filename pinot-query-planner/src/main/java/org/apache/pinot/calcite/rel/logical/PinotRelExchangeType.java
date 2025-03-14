@@ -19,7 +19,7 @@
 package org.apache.pinot.calcite.rel.logical;
 
 /**
- * Type of exchange.
+ * Indicates the execution model of the exchange.
  */
 public enum PinotRelExchangeType {
 
