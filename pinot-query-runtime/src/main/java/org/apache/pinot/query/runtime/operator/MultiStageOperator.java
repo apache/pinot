@@ -230,6 +230,10 @@ public abstract class MultiStageOperator
         if (limitReached) {
           serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
         }
+        limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
+        if (limitReached) {
+          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
+        }
       }
     },
     FILTER(FilterOperator.StatKey.class) {

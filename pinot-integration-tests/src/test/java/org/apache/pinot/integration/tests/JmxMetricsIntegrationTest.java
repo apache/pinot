@@ -154,24 +154,20 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
   }
 
-  @Test
-  public void testNumGroupsLimitMultiStageMetrics() throws Exception {
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNumGroupsLimitMetrics(boolean useMultiStageEngine) throws Exception {
     ObjectName aggregateTimesNumGroupsLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
         new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
             "name", "\"pinot.server.aggregateTimesNumGroupsLimitReached\"")));
 
-    postQuery("SET useMultiStageEngine=true;SET numGroupsLimit=1; SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
-    assertEquals((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitReachedMetric, "Count"), 1L);
-  }
-
-  @Test
-  public void testNumGroupsLimitSingleStageMetrics() throws Exception {
-    ObjectName aggregateTimesNumGroupsLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+    ObjectName aggregateTimesNumGroupsWarningLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
         new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
-            "name", "\"pinot.server.aggregateTimesNumGroupsLimitReached\"")));
+            "name", "\"pinot.server.aggregateTimesNumGroupsWarningLimitReached\"")));
 
-    postQuery("SET useMultiStageEngine=false;SET numGroupsLimit=1; SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
+    postQuery("SET useMultiStageEngine=" + useMultiStageEngine + ";SET numGroupsLimit=100;"
+        + "SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
     assertTrue((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitReachedMetric, "Count") > 0L);
+    assertTrue((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsWarningLimitReachedMetric, "Count") > 0L);
   }
 
   @Test
@@ -209,5 +205,10 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC, "true");
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR, 0.0001);
   }
 }

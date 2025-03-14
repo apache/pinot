@@ -147,6 +147,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
   /**
+   * Number of times the warning threshold for number of groups has been reached.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
+  /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.
    */
