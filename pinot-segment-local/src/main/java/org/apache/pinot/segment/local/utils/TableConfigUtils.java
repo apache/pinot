@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
@@ -29,6 +30,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1004,6 +1006,7 @@ public final class TableConfigUtils {
     if (indexingConfig.getBloomFilterConfigs() != null) {
       bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
     }
+
     for (String bloomFilterColumn : bloomFilterColumns) {
       columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
     }
@@ -1079,6 +1082,20 @@ public final class TableConfigUtils {
                 rangeIndexCol), "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
       }
     }
+
+    // Bloom index semantic validation
+    // Bloom filter cannot be defined on boolean columns
+    if (indexingConfig.getBloomFilterColumns() != null) {
+      for (String bloomIndexCol : indexingConfig.getBloomFilterColumns()) {
+        Preconditions.checkState(schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN, "Cannot create a bloom filter on boolean column " + bloomIndexCol);
+      }
+    }
+    if (indexingConfig.getBloomFilterConfigs() != null) {
+      for (String bloomIndexCol: indexingConfig.getBloomFilterConfigs().keySet()) {
+        Preconditions.checkState(schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN, "Cannot create a bloom filter on boolean column " + bloomIndexCol);
+      }
+    }
+
 
     // Var length dictionary semantic validation
     if (indexingConfig.getVarLengthDictionaryColumns() != null) {
@@ -1199,6 +1216,8 @@ public final class TableConfigUtils {
     }
     assert indexingConfig != null;
 
+
+
     for (FieldConfig fieldConfig : fieldConfigList) {
       String columnName = fieldConfig.getName();
       EncodingType encodingType = fieldConfig.getEncodingType();
@@ -1242,6 +1261,12 @@ public final class TableConfigUtils {
 
       // Validate the forward index disabled compatibility with other indexes if enabled for this column
       validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
+
+      // Validate bloom filter is not added to boolean column
+      if (fieldConfig.getIndexes() != null && fieldConfig.getIndexes().has("bloom") ) {
+        Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
+          "Cannot create a bloom filter on boolean column " + columnName);
+      }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
