@@ -35,7 +35,8 @@ import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 public class PinotPhysicalExchange extends Exchange {
-  private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(RelDistributions.RANDOM_DISTRIBUTED);
+  private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(
+      RelDistributions.RANDOM_DISTRIBUTED);
   private final RelTraitSet _traitSet;
   /** The key indexes used for performing the exchange. */
   private final List<Integer> _keys;

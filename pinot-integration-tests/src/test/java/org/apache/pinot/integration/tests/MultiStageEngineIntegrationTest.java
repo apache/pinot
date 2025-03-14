@@ -202,17 +202,24 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<String> queries = new ArrayList<>();
     queries.add("SELECT ActualElapsedTime FROM mytable limit 10");
     queries.add("SET usePhysicalOptimizer=true; SELECT ActualElapsedTime FROM mytable limit 10");
-    queries.add("SET usePhysicalOptimizer=true; SELECT ActualElapsedTime FROM mytable order by OriginStateName limit 10");
-    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ COUNT(*) FROM mytable GROUP BY OriginStateName");
-    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ COUNT(*) FROM mytable GROUP BY OriginStateName");
+    queries.add("SET usePhysicalOptimizer=true; SELECT ActualElapsedTime FROM mytable order by OriginStateName "
+     + "limit 10");
+    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ "
+     + "COUNT(*) FROM mytable GROUP BY OriginStateName");
+    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ "
+     + "COUNT(*) FROM mytable GROUP BY OriginStateName");
     queries.add("SET usePhysicalOptimizer=true; SELECT COUNT(*) FROM mytable GROUP BY OriginStateName");
     queries.add("SET usePhysicalOptimizer=true; SELECT COUNT(*) FROM mytable GROUP BY OriginStateName limit 100");
-    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_enable_group_trim='true',num_groups_limit='50') */ COUNT(*) FROM mytable GROUP BY OriginStateName limit 100");
-    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_enable_group_trim='true',num_groups_limit='50') */ COUNT(*) FROM mytable GROUP BY OriginStateName order by OriginStateName limit 100");
-    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ tableOptions(partition_size='16', partition_key='OriginStateName') */ COUNT(*) FROM mytable GROUP BY OriginStateName limit 100");
+    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_enable_group_trim='true',"
+     + "num_groups_limit='50') */ COUNT(*) FROM mytable GROUP BY OriginStateName limit 100");
+    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ aggOptions(is_enable_group_trim='true',"
+     + "num_groups_limit='50') */ COUNT(*) FROM mytable GROUP BY OriginStateName order by OriginStateName limit 100");
+    queries.add("SET usePhysicalOptimizer=true; SELECT /*+ tableOptions(partition_size='16', "
+     + "partition_key='OriginStateName') */ COUNT(*) FROM mytable GROUP BY OriginStateName limit 100");
     queries.add("SET usePhysicalOptimizer=true; SELECT COUNT(*) FROM mytable GROUP BY OriginStateName");
     queries.add("SET usePhysicalOptimizer=true; SELECT COUNT(*) FROM mytable GROUP BY OriginStateName limit 10");
-    queries.add("SET usePhysicalOptimizer=true; SELECT OriginStateName, COUNT(*) FROM mytable GROUP BY OriginStateName ORDER BY 2 limit 10");
+    queries.add("SET usePhysicalOptimizer=true; SELECT OriginStateName, COUNT(*) FROM mytable GROUP BY OriginStateName"
+     + " ORDER BY 2 limit 10");
     for (String query : queries) {
       System.err.println(query);
       JsonNode jsonNode = postQuery(query);
