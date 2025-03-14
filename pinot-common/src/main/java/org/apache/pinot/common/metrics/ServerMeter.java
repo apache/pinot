@@ -142,10 +142,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
   /**
    * Number of times the max number of groups has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
-   * by 2.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
   /**

@@ -58,6 +58,7 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final MBeanServer MBEAN_SERVER = ManagementFactory.getPlatformMBeanServer();
   private static final String PINOT_JMX_METRICS_DOMAIN = "\"org.apache.pinot.common.metrics\"";
   private static final String BROKER_METRICS_TYPE = "\"BrokerMetrics\"";
+  private static final String SERVER_METRICS_TYPE = "\"ServerMetrics\"";
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -151,6 +152,16 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
         + 6L + "; actual value: " + multiStageMigrationMetricValue.get());
 
     assertEquals((Long) MBEAN_SERVER.getAttribute(multiStageMigrationMetric, "Count"), 6L);
+  }
+
+  @Test
+  public void testNumGroupsLimitMultiStageMetrics() throws Exception {
+    ObjectName aggregateTimesNumGroupsLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
+            "name", "\"pinot.server.aggregateTimesNumGroupsLimitReached\"")));
+
+    postQuery("SET useMultiStageEngine=true;SET numGroupsLimit=1; SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
+    assertEquals((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitReachedMetric, "Count"), 1L);
   }
 
   @Test
