@@ -165,6 +165,16 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
+  public void testNumGroupsLimitSingleStageMetrics() throws Exception {
+    ObjectName aggregateTimesNumGroupsLimitReachedMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
+        new Hashtable<>(Map.of("type", SERVER_METRICS_TYPE,
+            "name", "\"pinot.server.aggregateTimesNumGroupsLimitReached\"")));
+
+    postQuery("SET useMultiStageEngine=false;SET numGroupsLimit=1; SELECT DestState, Dest, count(*) FROM mytable GROUP BY DestState, Dest");
+    assertTrue((Long) MBEAN_SERVER.getAttribute(aggregateTimesNumGroupsLimitReachedMetric, "Count") > 0L);
+  }
+
+  @Test
   public void testEstimatedMseServerThreadsBrokerMetric() throws Exception {
     ObjectName estimatedMseServerThreadsMetric = new ObjectName(PINOT_JMX_METRICS_DOMAIN,
         new Hashtable<>(Map.of("type", BROKER_METRICS_TYPE,
