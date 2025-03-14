@@ -35,8 +35,7 @@ import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 public class PinotPhysicalExchange extends Exchange {
-  private static final RelTraitSet FIXED_TRAIT_SET = RelTraitSet.createEmpty().plus(
-      RelDistributions.RANDOM_DISTRIBUTED);
+  private static final RelTraitSet EMPTY_TRAIT_SET = RelTraitSet.createEmpty();
   private final RelTraitSet _traitSet;
   /** The key indexes used for performing the exchange. */
   private final List<Integer> _keys;
@@ -46,11 +45,15 @@ public class PinotPhysicalExchange extends Exchange {
   private final RelCollation _collation;
 
   public PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy exchangeStrategy) {
-    this(input, keys, exchangeStrategy, null, FIXED_TRAIT_SET);
+    this(input, keys, exchangeStrategy, null, EMPTY_TRAIT_SET);
   }
 
-  // TODO: Trait set semantics are not clearly defined yet.
   public PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy desc,
+      @Nullable RelCollation collation) {
+    this(input, keys, desc, collation, EMPTY_TRAIT_SET);
+  }
+
+  private PinotPhysicalExchange(RelNode input, List<Integer> keys, ExchangeStrategy desc,
       @Nullable RelCollation collation, RelTraitSet traitSet) {
     super(input.getCluster(), traitSet, input, RelDistributions.RANDOM_DISTRIBUTED);
     _keys = keys;
@@ -69,12 +72,12 @@ public class PinotPhysicalExchange extends Exchange {
 
   public static PinotPhysicalExchange broadcast(RelNode input) {
     return new PinotPhysicalExchange(input, Collections.emptyList(), ExchangeStrategy.BROADCAST_EXCHANGE,
-        null, FIXED_TRAIT_SET);
+        null, EMPTY_TRAIT_SET);
   }
 
   public static PinotPhysicalExchange singleton(RelNode input) {
     return new PinotPhysicalExchange(input, Collections.emptyList(), ExchangeStrategy.SINGLETON_EXCHANGE,
-        null, FIXED_TRAIT_SET);
+        null, EMPTY_TRAIT_SET);
   }
 
   @Override

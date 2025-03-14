@@ -127,7 +127,7 @@ public class AggregatePushdownRule extends PRelOptRule {
     PinotPhysicalExchange n1 = new PinotPhysicalExchange(n2,
         MappingGen.apply(newMapping, o1.getKeys(), () -> {
           throw new IllegalStateException("Multiple mappings found in Agg");
-        }), o1.getExchangeStrategy());
+        }), o1.getExchangeStrategy(), o1.getCollation());
     PinotLogicalAggregate n0 = convertAggFromIntermediateInput(o0, n1, AggType.FINAL, leafReturnFinalResult,
         o0.getCollations(), o0.getLimit());
     PRelNode n2PRelNode = new PRelNode(idGenerator.get(), n2,

@@ -74,7 +74,7 @@ import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
-import org.apache.pinot.query.planner.physical.Blah;
+import org.apache.pinot.query.planner.physical.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -457,7 +457,8 @@ public class QueryEnvironment {
 
   private DispatchableSubPlan toDispatchableSubPlanV2(RelRoot relRoot, PlannerContext plannerContext, long requestId,
       TableCache tableCache) {
-    Pair<SubPlan, Blah.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot, plannerContext, tableCache);
+    Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> plan = PinotLogicalQueryPlanner.makePlanV2(relRoot,
+        plannerContext, tableCache);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlanV2(plan.getLeft(), plan.getRight());

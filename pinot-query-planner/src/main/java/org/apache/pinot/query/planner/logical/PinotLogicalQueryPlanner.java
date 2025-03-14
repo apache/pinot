@@ -41,7 +41,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
-import org.apache.pinot.query.planner.physical.Blah;
+import org.apache.pinot.query.planner.physical.PlanFragmentAndMailboxAssignment;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.RelToPRelConverter;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
@@ -70,13 +70,14 @@ public class PinotLogicalQueryPlanner {
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
   }
 
-  public static Pair<SubPlan, Blah.Result> makePlanV2(RelRoot relRoot, PlannerContext plannerContext,
-      TableCache tableCache) {
+  public static Pair<SubPlan, PlanFragmentAndMailboxAssignment.Result> makePlanV2(RelRoot relRoot,
+      PlannerContext plannerContext, TableCache tableCache) {
     PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
     PRelNode pRelNode = RelToPRelConverter.INSTANCE.toPRelNode(relRoot.rel, physicalPlannerContext,
         plannerContext.getOptions(), tableCache);
-    Blah blah = new Blah();
-    Blah.Result blahResult = blah.compute(pRelNode, physicalPlannerContext);
+    PlanFragmentAndMailboxAssignment planFragmentAndMailboxAssignment = new PlanFragmentAndMailboxAssignment();
+    PlanFragmentAndMailboxAssignment.Result blahResult = planFragmentAndMailboxAssignment.compute(pRelNode,
+        physicalPlannerContext);
     PlanFragment rootFragment = blahResult._planFragmentMap.get(0);
     SubPlan subPlan = new SubPlan(rootFragment,
         new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());

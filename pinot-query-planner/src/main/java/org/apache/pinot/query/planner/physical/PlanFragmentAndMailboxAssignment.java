@@ -51,7 +51,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.SharedMailboxInfos;
 
 
-public class Blah {
+public class PlanFragmentAndMailboxAssignment {
   private static final int ROOT_FRAGMENT_ID = 0;
   private static final int FIRST_NON_ROOT_FRAGMENT_ID = 1;
 

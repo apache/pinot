@@ -74,7 +74,8 @@ public class PinotDispatchPlanner {
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
-  public DispatchableSubPlan createDispatchableSubPlanV2(SubPlan subPlan, Blah.Result result) {
+  public DispatchableSubPlan createDispatchableSubPlanV2(SubPlan subPlan,
+      PlanFragmentAndMailboxAssignment.Result result) {
     // perform physical plan conversion and assign workers to each stage.
     DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
         subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
