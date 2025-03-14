@@ -19,6 +19,7 @@
 package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +79,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -225,46 +227,8 @@ public class QueryEnvironment {
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
       @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
-      SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
-      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
-      SqlExplainFormat format = plannerContext.getSqlExplainFormat();
-      if (explain instanceof SqlPhysicalExplain) {
-        // get the physical plan for query.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-        return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
-            PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
-      } else {
-        // get the logical plan for query.
-        SqlExplainLevel level =
-            explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-        Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        if (!explain.withImplementation() || onServerExplainer == null) {
-          return getQueryPlannerResult(plannerContext, null, PlannerUtils.explainPlan(relRoot.rel, format, level),
-              tableNames);
-        } else {
-          Map<String, String> options = sqlNodeAndOptions.getOptions();
-          boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
-
-          // A map from the actual PlanNodes to the original RelNode in the logical rel tree
-          TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
-              new TransformationTracker.ByIdentity.Builder<>();
-          // Transform RelNodes into DispatchableSubPlan
-          DispatchableSubPlan dispatchableSubPlan =
-              toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
-
-          AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
-              onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
-
-          RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
-              dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
-
-          return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
-              PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
-        }
-      }
-    } catch (Exception e) {
-      throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
+    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
+      return compiledQuery.explain(requestId, onServerExplainer);
     }
   }
 
@@ -285,18 +249,32 @@ public class QueryEnvironment {
     return queryPlannerResult.getExplainPlan();
   }
 
-  public List<String> getTableNamesForQuery(String sqlQuery) {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+  public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
+    PlannerContext plannerContext = null;
+    try {
+      plannerContext = getPlannerContext(sqlNodeAndOptions);
+
       SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
+      SqlNode queryNode;
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
-        sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+        queryNode = ((SqlExplain) sqlNode).getExplicandum();
+      } else {
+        queryNode = sqlNode;
       }
-      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
-      Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-      return new ArrayList<>(tableNames);
+      RelRoot relRoot = compileQuery(queryNode, plannerContext);
+      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions,
+          queryNode);
     } catch (Throwable t) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+      if (plannerContext != null) {
+        plannerContext.close();
+      }
+      throw QueryErrorCode.SQL_PARSING.asException("Error composing query plan: " + t.getMessage(), t);
+    }
+  }
+
+  public List<String> getTableNamesForQuery(String sqlQuery) {
+    try (CompiledQuery compiledQuery = compile(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery))) {
+      return new ArrayList<>(compiledQuery.getTableNames());
     }
   }
 
@@ -557,5 +535,113 @@ public class QueryEnvironment {
      */
     @Nullable
     WorkerManager getWorkerManager();
+  }
+
+  public class CompiledQuery implements Closeable {
+    private final String _database;
+    private final String _textQuery;
+    private final RelRoot _relRoot;
+    private final PlannerContext _plannerContext;
+    private final SqlNodeAndOptions _sqlNodeAndOptions;
+    private final SqlNode _queryNode;
+
+    public CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
+        SqlNodeAndOptions sqlNodeAndOptions, SqlNode queryNode) {
+      _database = database;
+      _textQuery = textQuery;
+      _relRoot = relRoot;
+      _plannerContext = plannerContext;
+      _sqlNodeAndOptions = sqlNodeAndOptions;
+      _queryNode = queryNode;
+    }
+
+    public Set<String> getTableNames() {
+      return RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
+    }
+
+    public boolean isExplain() {
+      return _sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN);
+    }
+
+    public QueryEnvironment.QueryPlannerResult explain(long requestId,
+        @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
+      try {
+        SqlExplain explain = (SqlExplain) _sqlNodeAndOptions.getSqlNode();
+
+        SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
+        if (explain instanceof SqlPhysicalExplain) {
+          // get the physical plan for query.
+          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+          return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
+              PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
+        } else {
+          // get the logical plan for query.
+          SqlExplainLevel level =
+              explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
+          Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
+          if (!explain.withImplementation() || onServerExplainer == null) {
+            return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
+                tableNames);
+          } else {
+            Map<String, String> options = _sqlNodeAndOptions.getOptions();
+            boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
+
+            // A map from the actual PlanNodes to the original RelNode in the logical rel tree
+            TransformationTracker.ByIdentity.Builder<PlanNode, RelNode> nodeTracker =
+                new TransformationTracker.ByIdentity.Builder<>();
+            // Transform RelNodes into DispatchableSubPlan
+            DispatchableSubPlan dispatchableSubPlan =
+                toDispatchableSubPlan(_relRoot, _plannerContext, requestId, nodeTracker);
+
+            AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
+                onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
+
+            RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(_relRoot.rel,
+                dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
+
+            return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
+                PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Error explain query plan for: " + _textQuery, e);
+      }
+    }
+
+    public QueryPlannerResult planQuery(long requestId) {
+      try {
+        RelRoot relRoot = compileQuery(_sqlNodeAndOptions.getSqlNode(), _plannerContext);
+        // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
+        // Each SubPlan should be able to run independently from Broker then set the results into the dependent
+        // SubPlan for further processing.
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, _plannerContext, requestId);
+        return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
+      } catch (CalciteContextException e) {
+        throw new RuntimeException("Error composing query plan for '" + _textQuery + "': " + e.getMessage() + "'", e);
+      } catch (Throwable t) {
+        throw new RuntimeException("Error composing query plan for: " + _textQuery, t);
+      }
+    }
+
+    @Override
+    public void close() {
+      _plannerContext.close();
+    }
+
+    public String getTextQuery() {
+      return _textQuery;
+    }
+
+    public SqlNodeAndOptions getSqlNodeAndOptions() {
+      return _sqlNodeAndOptions;
+    }
+
+    public String getDatabase() {
+      return _database;
+    }
+
+    public Map<String, String> getOptions() {
+      return _sqlNodeAndOptions.getOptions();
+    }
   }
 }
