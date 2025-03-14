@@ -119,7 +119,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
 
-    if (groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit()) {
+    boolean numGroupsWarningLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
       LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
           _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
     }
@@ -138,12 +139,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 
