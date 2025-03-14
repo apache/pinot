@@ -32,6 +32,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
+@Test(suiteName = "CustomClusterIntegrationTest")
 public class WindowResourceAccountingTest extends WindowFunnelTestBase {
   @Test
   public void testFunnel()
