@@ -111,5 +111,4 @@ public class DedupConfig extends BaseJsonConfig {
   public void setAllowDedupConsumptionDuringCommit(boolean allowDedupConsumptionDuringCommit) {
     _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
   }
-
 }
