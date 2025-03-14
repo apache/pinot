@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -30,6 +33,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -1305,6 +1309,40 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(),
           "Cannot disable forward index for column intCol, as the table type is REALTIME.");
     }
+  }
+
+  @Test
+  public void testValidateBFOnBoolean() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN).addSingleValueDimension("mycol2", FieldSpec.DataType.STRING).build();
+    TableConfig tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setBloomFilterColumns(Arrays.asList("mycol")).build();
+    try {
+      TableConfigUtils.validate(tableconfig, schema);
+      Assert.fail("Should fail for invalid Bloom filter column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    tableconfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("myCol", new BloomFilterConfig(0.01, 1000, true)));
+    try {
+      TableConfigUtils.validate(tableconfig, schema);
+      Assert.fail("Should fail for invalid Bloom filter column name");
+    } catch (Exception e) {
+      // expected
+    }
+
+    tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
+    indexesNode.putObject("bloom");
+    FieldConfig fieldConfig = new FieldConfig("MyCol", FieldConfig.EncodingType.DICTIONARY,null, null, null, null, indexesNode,null,null);
+    tableconfig.setFieldConfigList(Arrays.asList(fieldConfig));
+    try {
+      TableConfigUtils.validate(tableconfig, schema);
+      Assert.fail("Should fail for invalid Bloom filter column name");
+    } catch (Exception e) {
+      // expected
+    }
+
   }
 
   @Test
