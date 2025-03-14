@@ -22,16 +22,13 @@ import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -52,9 +49,7 @@ public abstract class SetOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
-  protected TransferableBlock _upstreamErrorBlock;
-  @Nullable
-  private MultiStageQueryStats _rightQueryStats = null;
+  protected MseBlock.Eos _eos;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
@@ -100,65 +95,62 @@ public abstract class SetOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     if (!_isRightSetBuilt) {
       // construct a SET with all the right side rows.
       constructRightBlockSet();
     }
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
+    if (_eos != null) {
+      return _eos;
     }
     return constructResultBlockSet();
   }
 
   protected void constructRightBlockSet() {
-    TransferableBlock block = _rightChildOperator.nextBlock();
-    while (!block.isEndOfStreamBlock()) {
-      if (block.getType() != DataBlock.Type.METADATA) {
-        for (Object[] row : block.getContainer()) {
-          _rightRowSet.add(new Record(row));
-        }
+    MseBlock block = _rightChildOperator.nextBlock();
+    while (block.isData()) {
+      MseBlock.Data dataBlock = (MseBlock.Data) block;
+      for (Object[] row : dataBlock.asRowHeap().getRows()) {
+        _rightRowSet.add(new Record(row));
       }
       sampleAndCheckInterruption();
       block = _rightChildOperator.nextBlock();
     }
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
+    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
     } else {
       _isRightSetBuilt = true;
-      _rightQueryStats = block.getQueryStats();
-      assert _rightQueryStats != null;
     }
   }
 
-  protected TransferableBlock constructResultBlockSet() {
+  protected MseBlock constructResultBlockSet() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
-      TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-      if (leftBlock.isErrorBlock()) {
-        return leftBlock;
+      MseBlock leftBlock = _leftChildOperator.nextBlock();
+      if (leftBlock.isEos()) {
+        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
+        _eos = eosBlock;
+        return eosBlock;
       }
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        assert _rightQueryStats != null;
-        MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
-        assert leftQueryStats != null;
-        _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
-        _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
-      }
-      assert leftBlock.isDataBlock();
+      MseBlock.Data dataBlock = (MseBlock.Data) leftBlock;
       List<Object[]> rows = new ArrayList<>();
-      for (Object[] row : leftBlock.getContainer()) {
+      for (Object[] row : dataBlock.asRowHeap().getRows()) {
         if (handleRowMatched(row)) {
           rows.add(row);
         }
       }
       sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(rows, _dataSchema);
       }
     }
+  }
+
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   /**

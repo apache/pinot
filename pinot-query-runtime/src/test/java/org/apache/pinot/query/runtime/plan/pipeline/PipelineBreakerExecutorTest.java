@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -42,9 +43,8 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
@@ -107,7 +107,8 @@ public class PipelineBreakerExecutorTest {
   }
 
   @Test
-  public void shouldReturnBlocksUponNormalOperation() {
+  public void shouldReturnBlocksUponNormalOperation()
+      throws IOException {
     MailboxReceiveNode mailboxReceiveNode = getPBReceiveNode(1);
     StagePlan stagePlan = new StagePlan(mailboxReceiveNode, _stageMetadata);
 
@@ -115,9 +116,10 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(1)));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(1).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -137,7 +139,8 @@ public class PipelineBreakerExecutorTest {
   }
 
   @Test
-  public void shouldWorkWithMultiplePBNodeUponNormalOperation() {
+  public void shouldWorkWithMultiplePBNodeUponNormalOperation()
+      throws IOException {
     MailboxReceiveNode mailboxReceiveNode1 = getPBReceiveNode(1);
     MailboxReceiveNode mailboxReceiveNode2 = getPBReceiveNode(2);
     JoinNode joinNode =
@@ -150,10 +153,12 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(1)));
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(2)));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(1).serialize()));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.eosWithStats(OperatorTestUtil.getDummyStats(2).serialize()));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -164,7 +169,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
-    Iterator<List<TransferableBlock>> it = pipelineBreakerResult.getResultMap().values().iterator();
+    Iterator<List<MseBlock>> it = pipelineBreakerResult.getResultMap().values().iterator();
     Assert.assertEquals(it.next().size(), 1);
     Assert.assertEquals(it.next().size(), 1);
     Assert.assertFalse(it.hasNext());
@@ -192,7 +197,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
-    List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
+    List<MseBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
     Assert.assertEquals(resultBlocks.size(), 0);
 
     Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats());
@@ -208,7 +213,7 @@ public class PipelineBreakerExecutorTest {
     CountDownLatch latch = new CountDownLatch(1);
     when(_mailbox1.poll()).thenAnswer(invocation -> {
       latch.await();
-      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1);
+      return SuccessMseBlock.INSTANCE;
     });
 
     PipelineBreakerResult pipelineBreakerResult =
@@ -218,9 +223,9 @@ public class PipelineBreakerExecutorTest {
     // then
     // should contain only failure error blocks
     Assert.assertNotNull(pipelineBreakerResult);
-    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    MseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
     Assert.assertNotNull(errorBlock);
-    Assert.assertTrue(errorBlock.isErrorBlock());
+    Assert.assertTrue(errorBlock.isError());
 
     latch.countDown();
   }
@@ -239,10 +244,12 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1));
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.eosWithStats(List.of()));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -272,10 +279,12 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_2)).thenReturn(_mailbox2);
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("ERROR ON 1")));
-    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_mailbox1.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row1),
+        OperatorTestUtil.errorWithStats(new RuntimeException("ERROR ON 1"), List.of()));
+    when(_mailbox2.poll()).thenReturn(
+        OperatorTestUtil.blockWithStats(DATA_SCHEMA, row2),
+        OperatorTestUtil.eosWithStats(List.of()));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -284,9 +293,9 @@ public class PipelineBreakerExecutorTest {
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
     Assert.assertNotNull(pipelineBreakerResult);
-    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    MseBlock errorBlock = pipelineBreakerResult.getErrorBlock();
     Assert.assertNotNull(errorBlock);
-    Assert.assertTrue(errorBlock.isErrorBlock());
+    Assert.assertTrue(errorBlock.isEos() && ((MseBlock.Eos) errorBlock).isError());
   }
 
   private static MailboxReceiveNode getPBReceiveNode(int senderStageId) {

@@ -33,9 +33,9 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.Assert;
@@ -79,7 +79,7 @@ public class WindowAggregateOperatorTest {
   public void testShouldHandleUpstreamErrorBlocks() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
+    when(_input.nextBlock()).thenReturn(ErrorMseBlock.fromException(new Exception("foo!")));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -90,18 +90,18 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
     verify(_input, times(1)).nextBlock();
-    assertTrue(block.isErrorBlock(), "Input errors should propagate immediately");
+    assertTrue(block.isError(), "Input errors should propagate immediately");
   }
 
   @Test
   public void testShouldHandleEndOfStreamBlockWithNoOtherInputs() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -112,11 +112,11 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
     verify(_input, times(1)).nextBlock();
-    assertTrue(block.isSuccessfulEndOfStreamBlock(), "EOS blocks should propagate");
+    assertTrue(block.isSuccess(), "EOS blocks should propagate");
   }
 
   @Test
@@ -124,7 +124,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -135,12 +135,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -148,7 +148,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -161,12 +161,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -174,7 +174,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -184,12 +184,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -197,7 +197,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -208,12 +208,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 3, 42.0});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -230,12 +230,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("Aa", List.<Object[]>of(new Object[]{1, "Aa", 1.0}), "BB",
         List.of(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0})));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
@@ -279,7 +279,7 @@ public class WindowAggregateOperatorTest {
                 new Object[]{1, "foo"})).thenReturn(
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
                 new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "rank", "dense_rank"},
         new ColumnDataType[]{INT, STRING, LONG, LONG});
     List<Integer> keys = List.of(0);
@@ -293,7 +293,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, keys,
@@ -303,7 +303,7 @@ public class WindowAggregateOperatorTest {
                 2, "foo", 2L, 2L
             }, new Object[]{2, "the", 4L, 3L}), 3,
             List.of(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L})));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -315,7 +315,7 @@ public class WindowAggregateOperatorTest {
             OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
         .thenReturn(
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{2, "the"},
-                new Object[]{3, "true"})).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+                new Object[]{3, "true"})).thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "row_number"}, new ColumnDataType[]{INT, STRING, LONG});
     List<Integer> keys = List.of(0);
@@ -328,13 +328,13 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1L}), 2,
         List.of(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
             new Object[]{2, "the", 4L}), 3, List.of(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L})));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -345,7 +345,7 @@ public class WindowAggregateOperatorTest {
     when(_input.nextBlock()).thenReturn(
             OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
-            new Object[]{3, "true"})).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+            new Object[]{3, "true"})).thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -358,13 +358,13 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of(1, List.<Object[]>of(new Object[]{1, "foo", 1.0}), 2,
         List.of(new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}), 3,
         List.of(new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0})));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -372,7 +372,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(1);
@@ -384,12 +384,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, "foo", 2.0});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -402,7 +402,7 @@ public class WindowAggregateOperatorTest {
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "bar"}))
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{3, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(1);
@@ -414,12 +414,12 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, keys, Map.of("bar", List.<Object[]>of(new Object[]{2, "bar", 2.0}), "foo",
         List.of(new Object[]{2, "foo", 5.0}, new Object[]{3, "foo", 5.0})));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -430,7 +430,7 @@ public class WindowAggregateOperatorTest {
     // (see the comment in WindowAggregate operator)
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "metallica"}))
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "pink floyd"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
@@ -440,11 +440,11 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
-    assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    assertTrue(block.getExceptions().get(1000).contains("String cannot be cast to class"),
+    assertTrue(block.isError(), "expected ERROR block from invalid computation");
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(1000).contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
   }
 
@@ -453,7 +453,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}, new Object[]{3, 4}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -466,11 +466,11 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
-    assertTrue(block.isErrorBlock(), "expected ERROR block from window overflow");
-    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
+    assertTrue(block.isError(), "expected ERROR block from window overflow");
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED)
         .contains("reach number of rows limit"));
   }
 
@@ -479,7 +479,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}, new Object[]{3, 4}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -492,16 +492,16 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verify(_input).earlyTerminate();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
-    TransferableBlock block2 = operator.nextBlock();
-    assertTrue(block2.isSuccessfulEndOfStreamBlock());
+    MseBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccess());
     StatMap<WindowAggregateOperator.StatKey> windowStats =
-        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, block2);
+        OperatorTestUtil.getStatMap(WindowAggregateOperator.StatKey.class, operator.calculateStats());
     assertTrue(windowStats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED),
         "Max rows in window should be reached");
   }
@@ -515,7 +515,7 @@ public class WindowAggregateOperatorTest {
                 new Object[]{1, "foo"})).thenReturn(
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
                 new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
@@ -531,7 +531,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     // Then:
     verifyResultRows(resultRows, keys, Map.of(
         1, List.of(
@@ -547,7 +547,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{3, "and", 3, null},
             new Object[]{3, "true", null, 3})
     ));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -559,7 +559,7 @@ public class WindowAggregateOperatorTest {
                 new Object[]{1, "foo"})).thenReturn(
             OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
                 new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
@@ -577,7 +577,7 @@ public class WindowAggregateOperatorTest {
             Integer.MIN_VALUE, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     // Then:
     verifyResultRows(resultRows, keys, Map.of(
         1, List.of(
@@ -593,7 +593,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{3, "and", 100, 200},
             new Object[]{3, "true", 100, 3})
     ));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -612,7 +612,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then (result should be the same for both window frame types):
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -626,7 +626,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -645,7 +645,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -659,7 +659,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -678,7 +678,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -692,7 +692,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -711,7 +711,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -725,7 +725,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -744,7 +744,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -758,7 +758,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 20.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -777,7 +777,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -791,7 +791,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10.0},
             new Object[]{"B", 20, 2005, 20.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -810,7 +810,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -824,7 +824,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 20.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -843,7 +843,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -857,7 +857,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -876,7 +876,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -890,7 +890,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20.0},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -909,7 +909,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -923,7 +923,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -942,7 +942,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -956,7 +956,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -976,7 +976,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -990,7 +990,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1010,7 +1010,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1024,7 +1024,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1043,7 +1043,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1057,7 +1057,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1076,7 +1076,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1090,7 +1090,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20.0},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1109,7 +1109,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1123,7 +1123,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 30.0},
             new Object[]{"B", 20, 2005, 30.0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1142,7 +1142,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1156,7 +1156,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1176,7 +1176,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1191,7 +1191,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1210,7 +1210,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1224,7 +1224,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1244,7 +1244,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1259,7 +1259,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 20, 2000, 20},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1279,7 +1279,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1294,7 +1294,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 1, 2000, null},
             new Object[]{"B", 0, 2005, 1}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1314,7 +1314,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1329,7 +1329,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 1, 2000, 1},
             new Object[]{"B", 0, 2005, 0}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1349,7 +1349,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1364,7 +1364,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 1, 2000, 0},
             new Object[]{"B", 0, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1384,7 +1384,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1399,7 +1399,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 1, 2000, 1},
             new Object[]{"B", 0, 2005, 1}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1418,7 +1418,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1432,7 +1432,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1452,7 +1452,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1466,7 +1466,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1485,7 +1485,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1499,7 +1499,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1518,7 +1518,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1532,7 +1532,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1551,7 +1551,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1565,7 +1565,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1584,7 +1584,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1598,7 +1598,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1617,7 +1617,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1631,7 +1631,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1650,7 +1650,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1664,7 +1664,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1683,7 +1683,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1697,7 +1697,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1716,7 +1716,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1730,7 +1730,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1749,7 +1749,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1763,7 +1763,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1783,7 +1783,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1797,7 +1797,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1816,7 +1816,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1830,7 +1830,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1849,7 +1849,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1863,7 +1863,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1882,7 +1882,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1896,7 +1896,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -1915,7 +1915,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1929,7 +1929,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1948,7 +1948,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1962,7 +1962,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -1981,7 +1981,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -1995,7 +1995,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, 20}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2014,7 +2014,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2028,7 +2028,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2047,7 +2047,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2061,7 +2061,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 20},
             new Object[]{"B", 20, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2082,7 +2082,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2097,7 +2097,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2118,7 +2118,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2133,7 +2133,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", 20, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2153,7 +2153,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2168,7 +2168,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2188,7 +2188,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2203,7 +2203,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2224,7 +2224,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2239,7 +2239,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2260,7 +2260,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2275,7 +2275,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2295,7 +2295,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2310,7 +2310,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2330,7 +2330,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2345,7 +2345,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2365,7 +2365,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2380,7 +2380,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2400,7 +2400,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2415,7 +2415,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2005, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2435,7 +2435,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2449,7 +2449,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2469,7 +2469,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2483,7 +2483,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2502,7 +2502,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2516,7 +2516,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2535,7 +2535,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2549,7 +2549,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2570,7 +2570,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2585,7 +2585,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", null, 2000, 10},
             new Object[]{"B", 10, 2005, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test(dataProvider = "windowFrameTypes")
@@ -2606,7 +2606,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2621,7 +2621,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", null, 2000, frameType == ROWS ? null : 10},
             new Object[]{"B", null, 2008, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2640,7 +2640,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2654,7 +2654,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2008, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2673,7 +2673,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2687,7 +2687,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, 10},
             new Object[]{"B", null, 2008, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2706,7 +2706,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2720,7 +2720,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2008, 10}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2739,7 +2739,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2753,7 +2753,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", null, 2008, null}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   @Test
@@ -2786,7 +2786,7 @@ public class WindowAggregateOperatorTest {
         });
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     verifyResultRows(resultRows, List.of(0), Map.of(
@@ -2815,7 +2815,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"C", 1, 1},
             new Object[]{"C", 2, 2}
         )));
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+    assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
   }
 
   private WindowAggregateOperator prepareDataForWindowFunction(String[] inputSchemaCols,
@@ -2824,7 +2824,7 @@ public class WindowAggregateOperatorTest {
       int windowFrameUpperBound, RexExpression.FunctionCall functionCall, Object[][] rows) {
     DataSchema inputSchema = new DataSchema(inputSchemaCols, inputSchemaColTypes);
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, rows))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     String[] outputSchemaCols = new String[inputSchemaCols.length + 1];
     System.arraycopy(inputSchemaCols, 0, outputSchemaCols, 0, inputSchemaCols.length);
@@ -2846,7 +2846,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -2868,7 +2868,7 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);

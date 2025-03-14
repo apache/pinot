@@ -25,6 +25,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -66,13 +67,13 @@ public class LiteralValueOperatorTest {
     LiteralValueOperator operator = getOperator(schema, literalRows);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{"foo", 1});
     assertEquals(resultRows.get(1), new Object[]{"", 2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Expected EOS after reading two rows");
+    assertTrue(operator.nextBlock().isSuccess(), "Expected EOS after reading two rows");
   }
 
   @Test
@@ -82,12 +83,12 @@ public class LiteralValueOperatorTest {
         getOperator(new DataSchema(new String[0], new ColumnDataType[0]), List.of(List.of()));
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   private static LiteralValueOperator getOperator(DataSchema schema, List<List<RexExpression.Literal>> literalRows) {
