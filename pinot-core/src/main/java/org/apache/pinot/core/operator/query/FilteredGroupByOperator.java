@@ -176,7 +176,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
           _queryContext.getNumGroupsWarningLimit(), groupKeyGenerator.getNumKeys());
       ServerMetrics serverMetrics = ServerMetrics.get();
-      serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
+      serverMetrics.addMeteredTableValue(
+          _queryContext.getTableName(), ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
       serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
     }
 

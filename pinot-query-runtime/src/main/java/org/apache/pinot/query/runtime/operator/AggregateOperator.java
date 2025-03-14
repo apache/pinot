@@ -233,7 +233,8 @@ public class AggregateOperator extends MultiStageOperator {
           LOGGER.warn("Query number of groups above warning limit: {} (actual: {}).",
               _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
           ServerMetrics serverMetrics = ServerMetrics.get();
-          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
+          //TODO: determine the set of tables the non-global metric relates to
+          //serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING, 1);
           serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_WARNING_GLOBAL, 1);
         }
         if (_groupByExecutor.isNumGroupsLimitReached()) {
