@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.logical;
+package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -27,13 +27,11 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
@@ -46,25 +44,21 @@ import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
-import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.calcite.rel.logical.PinotPhysicalExchange;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
+import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -81,11 +75,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The {@link RelToPlanNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
- */
-public final class RelToPlanNodeConverter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RelToPlanNodeConverter.class);
+
+public class PRelToPlanNodeConverter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PRelToPlanNodeConverter.class);
   private static final int DEFAULT_STAGE_ID = -1;
 
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
@@ -93,107 +85,71 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
-  private final TableCache _tableCache;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
-      TableCache tableCache) {
+  public PRelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     _tracker = tracker;
-    _tableCache = tableCache;
   }
 
   /**
    * Converts a {@link RelNode} into its serializable counterpart.
    * NOTE: Stage ID is not determined yet.
    */
-  public PlanNode toPlanNode(RelNode node) {
+  public static PlanNode toPlanNode(PRelNode pRelNode, int stageId) {
+    RelNode node = pRelNode.getRelNode();
     PlanNode result;
     if (node instanceof PinotLogicalTableScan) {
-      result = convertPinotLogicalTableScan((PinotLogicalTableScan) node);
+      result = convertLogicalTableScan((PinotLogicalTableScan) node, pRelNode);
     } else if (node instanceof LogicalProject) {
-      result = convertLogicalProject((LogicalProject) node);
+      result = convertLogicalProject((LogicalProject) node, pRelNode);
     } else if (node instanceof LogicalFilter) {
-      result = convertLogicalFilter((LogicalFilter) node);
+      result = convertLogicalFilter((LogicalFilter) node, pRelNode);
     } else if (node instanceof PinotLogicalAggregate) {
-      result = convertLogicalAggregate((PinotLogicalAggregate) node);
+      result = convertLogicalAggregate((PinotLogicalAggregate) node, pRelNode);
     } else if (node instanceof LogicalSort) {
-      result = convertLogicalSort((LogicalSort) node);
+      result = convertLogicalSort((LogicalSort) node, pRelNode);
     } else if (node instanceof Exchange) {
-      result = convertLogicalExchange((Exchange) node);
+      result = convertPhysicalExchange((PinotPhysicalExchange) node, pRelNode);
     } else if (node instanceof LogicalJoin) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
+      /* _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
       if (!_joinFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
         _joinFound = true;
-      }
-      result = convertLogicalJoin((LogicalJoin) node);
+      } */
+      result = convertLogicalJoin((LogicalJoin) node, pRelNode);
     } else if (node instanceof LogicalWindow) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
+      /* _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
         _windowFunctionFound = true;
-      }
-      result = convertLogicalWindow((LogicalWindow) node);
+      } */
+      result = convertLogicalWindow((LogicalWindow) node, pRelNode);
     } else if (node instanceof LogicalValues) {
-      result = convertLogicalValues((LogicalValues) node);
+      result = convertLogicalValues((LogicalValues) node, pRelNode);
     } else if (node instanceof SetOp) {
-      result = convertLogicalSetOp((SetOp) node);
+      result = convertLogicalSetOp((SetOp) node, pRelNode);
     } else {
       throw new IllegalStateException("Unsupported RelNode: " + node);
     }
-    if (_tracker != null) {
+    result.setStageId(stageId);
+    /* if (_tracker != null) {
       _tracker.trackCreation(node, result);
-    }
+    } */
     return result;
   }
 
-  private ExchangeNode convertLogicalExchange(Exchange node) {
-    RelDistribution distribution = node.getDistribution();
-    RelDistribution.Type distributionType = distribution.getType();
-    PinotRelExchangeType exchangeType;
-    List<Integer> keys;
-    Boolean prePartitioned;
-    List<RelFieldCollation> collations;
-    boolean sortOnSender;
-    boolean sortOnReceiver;
-    if (node instanceof PinotLogicalSortExchange) {
-      PinotLogicalSortExchange sortExchange = (PinotLogicalSortExchange) node;
-      exchangeType = sortExchange.getExchangeType();
-      keys = distribution.getKeys();
-      prePartitioned = null;
-      collations = sortExchange.getCollation().getFieldCollations();
-      sortOnSender = sortExchange.isSortOnSender();
-      sortOnReceiver = sortExchange.isSortOnReceiver();
-    } else {
-      assert node instanceof PinotLogicalExchange;
-      PinotLogicalExchange exchange = (PinotLogicalExchange) node;
-      exchangeType = exchange.getExchangeType();
-      keys = exchange.getKeys();
-      prePartitioned = exchange.getPrePartitioned();
-      collations = null;
-      sortOnSender = false;
-      sortOnReceiver = false;
-    }
-    if (keys.isEmpty()) {
-      keys = null;
-    }
-    if (prePartitioned == null) {
-      if (distributionType == RelDistribution.Type.HASH_DISTRIBUTED) {
-        RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-        prePartitioned = distribution.equals(inputDistributionTrait);
-      } else {
-        prePartitioned = false;
-      }
-    }
-    return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null);
+  public static ExchangeNode convertPhysicalExchange(PinotPhysicalExchange node, PRelNode pRelNode) {
+    return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
+        convertInputs(pRelNode.getInputs()), node.getPinotRelExchangeType(), RelDistribution.Type.ANY,
+        node.getKeys(), false, node.getCollation().getFieldCollations(), false,
+        !node.getCollation().getKeys().isEmpty(), null /* table names? */, node.getExchangeStrategy());
   }
 
-  private SetOpNode convertLogicalSetOp(SetOp node) {
+  public static SetOpNode convertLogicalSetOp(SetOp node, PRelNode pRelNode) {
     return new SetOpNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), SetOpNode.SetOpType.fromObject(node), node.all);
+        convertInputs(pRelNode.getInputs()), SetOpNode.SetOpType.fromObject(node), node.all);
   }
 
-  private ValueNode convertLogicalValues(LogicalValues node) {
+  public static ValueNode convertLogicalValues(LogicalValues node, PRelNode pRelNode) {
     List<List<RexExpression.Literal>> literalRows = new ArrayList<>(node.tuples.size());
     for (List<RexLiteral> tuple : node.tuples) {
       List<RexExpression.Literal> literalRow = new ArrayList<>(tuple.size());
@@ -203,10 +159,10 @@ public final class RelToPlanNodeConverter {
       literalRows.add(literalRow);
     }
     return new ValueNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), literalRows);
+        convertInputs(pRelNode.getInputs()), literalRows);
   }
 
-  private WindowNode convertLogicalWindow(LogicalWindow node) {
+  public static WindowNode convertLogicalWindow(LogicalWindow node, PRelNode pRelNode) {
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(node.groups.size() == 1, "Only a single window group is allowed, got: %s",
         node.groups.size());
@@ -254,18 +210,18 @@ public final class RelToPlanNodeConverter {
       constants.add(RexExpressionUtils.fromRexLiteral(constant));
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
+        convertInputs(pRelNode.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
         aggCalls, windowFrameType, lowerBound, upperBound, constants);
   }
 
-  private SortNode convertLogicalSort(LogicalSort node) {
+  public static SortNode convertLogicalSort(LogicalSort node, PRelNode pRelNode) {
     int fetch = RexExpressionUtils.getValueAsInt(node.fetch);
     int offset = RexExpressionUtils.getValueAsInt(node.offset);
     return new SortNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), node.getCollation().getFieldCollations(), fetch, offset);
+        convertInputs(pRelNode.getInputs()), node.getCollation().getFieldCollations(), fetch, offset);
   }
 
-  private AggregateNode convertLogicalAggregate(PinotLogicalAggregate node) {
+  public static AggregateNode convertLogicalAggregate(PinotLogicalAggregate node, PRelNode pRelNode) {
     List<AggregateCall> aggregateCalls = node.getAggCallList();
     int numAggregates = aggregateCalls.size();
     List<RexExpression.FunctionCall> functionCalls = new ArrayList<>(numAggregates);
@@ -275,39 +231,40 @@ public final class RelToPlanNodeConverter {
       filterArgs.add(aggregateCall.filterArg);
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
+        convertInputs(pRelNode.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
         node.isLeafReturnFinalResult(), node.getCollations(), node.getLimit());
   }
 
-  private ProjectNode convertLogicalProject(LogicalProject node) {
+  public static ProjectNode convertLogicalProject(LogicalProject node, PRelNode pRelNode) {
     return new ProjectNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), RexExpressionUtils.fromRexNodes(node.getProjects()));
+        convertInputs(pRelNode.getInputs()), RexExpressionUtils.fromRexNodes(node.getProjects()));
   }
 
-  private FilterNode convertLogicalFilter(LogicalFilter node) {
+  public static FilterNode convertLogicalFilter(LogicalFilter node, PRelNode pRelNode) {
     return new FilterNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), RexExpressionUtils.fromRexNode(node.getCondition()));
+        convertInputs(pRelNode.getInputs()), RexExpressionUtils.fromRexNode(node.getCondition()));
   }
 
-  private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
-    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+  public static TableScanNode convertLogicalTableScan(PinotLogicalTableScan node, PRelNode pRelNode) {
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
       columns.add(field.getName());
     }
     return new TableScanNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), tableName, columns);
+        convertInputs(pRelNode.getInputs()), tableName, columns);
   }
 
-  private JoinNode convertLogicalJoin(LogicalJoin join) {
+  public static JoinNode convertLogicalJoin(LogicalJoin join, PRelNode pRelNode) {
+    // TODO: This is wrong. Right now we compute PlanNode top-down. This assumes bottom-up.
     JoinInfo joinInfo = join.analyzeCondition();
     DataSchema dataSchema = toDataSchema(join.getRowType());
-    List<PlanNode> inputs = convertInputs(join.getInputs());
+    List<PlanNode> inputs = convertInputs(pRelNode.getInputs());
     JoinRelType joinType = join.getJoinType();
 
     // Run some validations for join
-    Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
+    /* Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
     PlanNode left = inputs.get(0);
     PlanNode right = inputs.get(1);
     int numLeftColumns = left.getDataSchema().size();
@@ -321,14 +278,13 @@ public final class RelToPlanNodeConverter {
       Preconditions.checkState(numLeftColumns == numResultColumns,
           "Invalid number of columns for join type: %s, left: %s, result: %s", joinType, numLeftColumns,
           numResultColumns);
-    }
+    } */
 
     // Check if the join hint specifies the join strategy
     JoinNode.JoinStrategy joinStrategy;
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       joinStrategy = JoinNode.JoinStrategy.LOOKUP;
-
-      // Run some validations for lookup join
+      /* // Run some validations for lookup join
       Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(), "Lookup join requires join keys");
       // Right table should be a dimension table, and the right input should be an identifier only ProjectNode over
       // TableScanNode.
@@ -344,9 +300,8 @@ public final class RelToPlanNodeConverter {
       RelNode projectInput = PinotRuleUtils.unboxRel(project.getInput());
       Preconditions.checkState(projectInput instanceof TableScan,
           "Right input for lookup join must be a Project over TableScan, got Project over: %s",
-          projectInput.getClass().getSimpleName());
+          projectInput.getClass().getSimpleName()); */
     } else {
-      // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
       joinStrategy = JoinNode.JoinStrategy.HASH;
     }
 
@@ -355,17 +310,12 @@ public final class RelToPlanNodeConverter {
         joinStrategy);
   }
 
-  private List<PlanNode> convertInputs(List<RelNode> inputs) {
+  public static List<PlanNode> convertInputs(List<PRelNode> inputs) {
     // NOTE: Inputs can be modified in place. Do not create immutable List here.
-    int numInputs = inputs.size();
-    List<PlanNode> planNodes = new ArrayList<>(numInputs);
-    for (RelNode input : inputs) {
-      planNodes.add(toPlanNode(input));
-    }
-    return planNodes;
+    return new ArrayList<>();
   }
 
-  private static DataSchema toDataSchema(RelDataType rowType) {
+  public static DataSchema toDataSchema(RelDataType rowType) {
     if (rowType instanceof RelRecordType) {
       RelRecordType recordType = (RelRecordType) rowType;
       String[] columnNames = recordType.getFieldNames().toArray(new String[]{});
