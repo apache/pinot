@@ -47,6 +47,9 @@ public class DedupConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery")
   private boolean _enablePreload;
 
+  @JsonPropertyDescription("Whether to pause dedup table's partition consumption during commit")
+  private boolean _allowDedupConsumptionDuringCommit;
+
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
     this(dedupEnabled, hashFunction, null, null, 0, null, false);
@@ -100,4 +103,13 @@ public class DedupConfig extends BaseJsonConfig {
   public void setEnablePreload(boolean enablePreload) {
     _enablePreload = enablePreload;
   }
+
+  public boolean isAllowDedupConsumptionDuringCommit() {
+    return _allowDedupConsumptionDuringCommit;
+  }
+
+  public void setAllowDedupConsumptionDuringCommit(boolean allowDedupConsumptionDuringCommit) {
+    _allowDedupConsumptionDuringCommit = allowDedupConsumptionDuringCommit;
+  }
+
 }
