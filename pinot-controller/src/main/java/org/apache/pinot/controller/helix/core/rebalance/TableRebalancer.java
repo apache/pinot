@@ -544,6 +544,15 @@ public class TableRebalancer {
         }
       }
 
+      // Record change of current ideal state and the new target
+      // Do this prior to checking current and target assignment equality to ensure that we update the progress
+      // stats for any pending deletions that the EV-IS convergence couldn't catch (since deletions are only checked
+      // for during convergence when lowDiskMode=true)
+      rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
+          allOriginalSegmentsIdealState);
+      _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
+          targetAssignment, rebalanceContext);
+
       if (currentAssignment.equals(targetAssignment)) {
         String msg = String.format("For rebalanceId: %s, finished rebalancing table: %s with minAvailableReplicas: %d, "
                 + "enableStrictReplicaGroup: %b, bestEfforts: %b in %d ms.", rebalanceJobId, tableNameWithType,
@@ -557,11 +566,6 @@ public class TableRebalancer {
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
 
-      // Record change of current ideal state and the new target
-      rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
-          allOriginalSegmentsIdealState);
-      _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
-          targetAssignment, rebalanceContext);
       // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
       allOriginalSegmentsIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
