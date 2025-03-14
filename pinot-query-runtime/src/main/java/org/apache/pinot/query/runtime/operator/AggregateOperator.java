@@ -236,6 +236,10 @@ public class AggregateOperator extends MultiStageOperator {
             _input.earlyTerminate();
           }
         }
+        if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
+          LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+              _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
+        }
         return dataBlock;
       }
     }
