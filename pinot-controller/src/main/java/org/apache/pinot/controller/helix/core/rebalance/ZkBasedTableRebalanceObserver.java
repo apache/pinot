@@ -122,10 +122,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
                 latestProgress._totalSegmentsToBeAdded - currentStepStats._totalSegmentsToBeAdded;
             int numTotalDeletedInLastStep =
                 latestProgress._totalSegmentsToBeDeleted - currentStepStats._totalSegmentsToBeDeleted;
-            int numAddedInLastStep =
-                currentStepStats._totalRemainingSegmentsToBeAdded - latestProgress._totalRemainingSegmentsToBeAdded;
-            int numDeletedInLastStep =
-                currentStepStats._totalRemainingSegmentsToBeDeleted - latestProgress._totalRemainingSegmentsToBeDeleted;
+            int numAddedInLastStep = Math.abs(currentStepStats._totalRemainingSegmentsToBeAdded
+                - latestProgress._totalRemainingSegmentsToBeAdded);
+            int numDeletedInLastStep = Math.abs(currentStepStats._totalRemainingSegmentsToBeDeleted
+                - latestProgress._totalRemainingSegmentsToBeDeleted);
             _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(
                 updateOverallProgressStatsFromStep(_tableRebalanceProgressStats, numTotalAddedInLastStep,
@@ -342,13 +342,16 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * Updates the overall progress stats based on the current step's progress stats. This should be called
    * during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
    * @param rebalanceProgressStats the rebalance stats
-   * @param numAddedInLastStep number of segments added since the last check
-   * @param numDeletedInLastStep number of segments deleted since the last check
+   * @param numAdditionalSegmentsAdded number of new segments added to total segments to add in last step
+   * @param numAdditionalSegmentsDeleted number of new segments added to total segments to delete in last step
+   * @param numSegmentAddsProcessedInLastStep number of segment adds processed since the last check
+   * @param numSegmentDeletesProcessedInLastStep number of segment deletes processed since the last check
    * @return the newly calculated overall progress stats
    */
   public static TableRebalanceProgressStats.RebalanceProgressStats updateOverallProgressStatsFromStep(
-      TableRebalanceProgressStats rebalanceProgressStats, int numTotalSegsAddedOverall, int numTotalSegsDeletedOverall,
-      int numAddedInLastStep, int numDeletedInLastStep) {
+      TableRebalanceProgressStats rebalanceProgressStats, int numAdditionalSegmentsAdded,
+      int numAdditionalSegmentsDeleted, int numSegmentAddsProcessedInLastStep,
+      int numSegmentDeletesProcessedInLastStep) {
     TableRebalanceProgressStats.RebalanceProgressStats overallProgressStats =
         rebalanceProgressStats.getRebalanceProgressStatsOverall();
 
@@ -356,37 +359,33 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
     newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded
-        + numTotalSegsAddedOverall;
+        + numAdditionalSegmentsAdded;
     newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted
-        + numTotalSegsDeletedOverall;
-    newOverallProgressStats._totalRemainingSegmentsToBeAdded = numTotalSegsAddedOverall == 0
-        ? overallProgressStats._totalRemainingSegmentsToBeAdded - numAddedInLastStep
-        : overallProgressStats._totalRemainingSegmentsToBeAdded + numTotalSegsAddedOverall;
-    newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numTotalSegsDeletedOverall == 0
-        ? overallProgressStats._totalRemainingSegmentsToBeDeleted - numDeletedInLastStep
-        : overallProgressStats._totalRemainingSegmentsToBeAdded + numTotalSegsDeletedOverall;
-    newOverallProgressStats._percentageTotalSegmentsAddsRemaining = newOverallProgressStats._totalSegmentsToBeAdded == 0
-        ? 0.0 : (double) newOverallProgressStats._totalRemainingSegmentsToBeAdded
-        / newOverallProgressStats._totalSegmentsToBeAdded * 100.0;
+        + numAdditionalSegmentsDeleted;
+    newOverallProgressStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
+        ? overallProgressStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+    newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
+        ? overallProgressStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numSegmentDeletesProcessedInLastStep;
+    newOverallProgressStats._percentageTotalSegmentsAddsRemaining =
+        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeAdded,
+            newOverallProgressStats._totalRemainingSegmentsToBeAdded);
     newOverallProgressStats._percentageTotalSegmentDeletesRemaining =
-        newOverallProgressStats._totalSegmentsToBeDeleted == 0
-            ? 0.0 : (double) newOverallProgressStats._totalRemainingSegmentsToBeDeleted
-            / newOverallProgressStats._totalSegmentsToBeDeleted * 100.0;
+        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeDeleted,
+            newOverallProgressStats._totalRemainingSegmentsToBeDeleted);
     // Calculate elapsed time based on start of rebalance (global)
-    long elapsedTimeInSeconds = (System.currentTimeMillis() - rebalanceProgressStats.getStartTimeMs()) / 1000;
-    int segmentsAlreadyAdded =
-        newOverallProgressStats._totalSegmentsToBeAdded - newOverallProgressStats._totalRemainingSegmentsToBeAdded;
-    int segmentsAlreadyDeleted =
-        newOverallProgressStats._totalSegmentsToBeDeleted - newOverallProgressStats._totalRemainingSegmentsToBeDeleted;
-    newOverallProgressStats._estimatedTimeToCompleteAddsInSeconds = segmentsAlreadyAdded == 0
-        ? -1 : newOverallProgressStats._totalRemainingSegmentsToBeAdded / segmentsAlreadyAdded * elapsedTimeInSeconds;
-    newOverallProgressStats._estimatedTimeToCompleteDeletesInSeconds = segmentsAlreadyDeleted == 0
-        ? -1 : newOverallProgressStats._totalRemainingSegmentsToBeDeleted / segmentsAlreadyDeleted
-        * elapsedTimeInSeconds;
+    newOverallProgressStats._estimatedTimeToCompleteAddsInSeconds =
+        calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
+            newOverallProgressStats._totalSegmentsToBeAdded, newOverallProgressStats._totalRemainingSegmentsToBeAdded);
+    newOverallProgressStats._estimatedTimeToCompleteDeletesInSeconds =
+        calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
+            newOverallProgressStats._totalSegmentsToBeDeleted,
+            newOverallProgressStats._totalRemainingSegmentsToBeDeleted);
     newOverallProgressStats._averageSegmentSizeInBytes = overallProgressStats._averageSegmentSizeInBytes;
     newOverallProgressStats._totalEstimatedDataToBeMovedInBytes =
         overallProgressStats._totalEstimatedDataToBeMovedInBytes
-            + (numTotalSegsAddedOverall * overallProgressStats._averageSegmentSizeInBytes);
+            + (numAdditionalSegmentsAdded * overallProgressStats._averageSegmentSizeInBytes);
     newOverallProgressStats._startTimeMs = rebalanceProgressStats.getStartTimeMs();
 
     return newOverallProgressStats;
@@ -399,9 +398,6 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   public static TableRebalanceProgressStats.RebalanceProgressStats calculateOverallProgressStats(
       Map<String, Map<String, String>> targetAssignment, Map<String, Map<String, String>> currentAssignment,
       RebalanceContext rebalanceContext, Trigger trigger, TableRebalanceProgressStats rebalanceProgressStats) {
-    TableRebalanceProgressStats.RebalanceProgressStats progressStats =
-        new TableRebalanceProgressStats.RebalanceProgressStats();
-
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
     Set<String> newSegmentsNotExistingBefore = new HashSet<>();
@@ -469,9 +465,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
     int newNumberSegmentsTotal = totalSegmentsTarget;
     int totalSegmentsToBeAdded = newNumberSegmentsTotal - segmentsNotMoved;
-    long totalEstimatedDataToBeMovedInBytes = rebalanceContext.getEstimatedAverageSegmentSizeInBytes() < 0
-        ? -1 : ((long) totalSegmentsToBeAdded) * rebalanceContext.getEstimatedAverageSegmentSizeInBytes();
 
+    TableRebalanceProgressStats.RebalanceProgressStats progressStats =
+        new TableRebalanceProgressStats.RebalanceProgressStats();
     switch (trigger) {
       case START_TRIGGER:
       case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
@@ -484,7 +480,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._estimatedTimeToCompleteAddsInSeconds = -1;
         progressStats._estimatedTimeToCompleteDeletesInSeconds = -1;
         progressStats._averageSegmentSizeInBytes = rebalanceContext.getEstimatedAverageSegmentSizeInBytes();
-        progressStats._totalEstimatedDataToBeMovedInBytes = totalEstimatedDataToBeMovedInBytes;
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(0,
+            rebalanceContext.getEstimatedAverageSegmentSizeInBytes(), totalSegmentsToBeAdded);
         progressStats._startTimeMs = trigger == Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER
             ? System.currentTimeMillis() : rebalanceProgressStats.getStartTimeMs();
         break;
@@ -497,27 +494,21 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             existingOverallProgressStats._totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
         progressStats._totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
         progressStats._totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats._percentageTotalSegmentsAddsRemaining = existingOverallProgressStats._totalSegmentsToBeAdded == 0
-            ? 0.0 : (double) totalSegmentsToBeAdded / (double) existingOverallProgressStats._totalSegmentsToBeAdded
-            * 100.0;
+        progressStats._percentageTotalSegmentsAddsRemaining =
+            calculatePercentageChange(existingOverallProgressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
         progressStats._percentageTotalSegmentDeletesRemaining =
-            existingOverallProgressStats._totalSegmentsToBeDeleted == 0
-                ? 0.0 : (double) totalSegmentsToBeDeleted
-                / (double) existingOverallProgressStats._totalSegmentsToBeDeleted * 100.0;
+            calculatePercentageChange(existingOverallProgressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         // Calculate elapsed time based on start of rebalance (global)
-        long elapsedTimeInSeconds = (System.currentTimeMillis() - rebalanceProgressStats.getStartTimeMs()) / 1000;
-        int segmentsAlreadyAdded =
-            progressStats._totalSegmentsToBeAdded - progressStats._totalRemainingSegmentsToBeAdded;
-        int segmentsAlreadyDeleted =
-            progressStats._totalSegmentsToBeDeleted - progressStats._totalRemainingSegmentsToBeDeleted;
-        progressStats._estimatedTimeToCompleteAddsInSeconds = segmentsAlreadyAdded == 0
-            ? -1 : progressStats._totalRemainingSegmentsToBeAdded / segmentsAlreadyAdded * elapsedTimeInSeconds;
-        progressStats._estimatedTimeToCompleteDeletesInSeconds = segmentsAlreadyDeleted == 0
-            ? -1 : progressStats._totalRemainingSegmentsToBeDeleted / segmentsAlreadyDeleted * elapsedTimeInSeconds;
+        progressStats._estimatedTimeToCompleteAddsInSeconds =
+            calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
+                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+        progressStats._estimatedTimeToCompleteDeletesInSeconds =
+            calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
+                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
         progressStats._averageSegmentSizeInBytes = existingOverallProgressStats._averageSegmentSizeInBytes;
-        progressStats._totalEstimatedDataToBeMovedInBytes =
-            existingOverallProgressStats._totalEstimatedDataToBeMovedInBytes
-                + (newSegsAddedInThisAssignment * existingOverallProgressStats._averageSegmentSizeInBytes);
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
+            existingOverallProgressStats._totalEstimatedDataToBeMovedInBytes, progressStats._averageSegmentSizeInBytes,
+            newSegsAddedInThisAssignment);
         progressStats._startTimeMs = rebalanceProgressStats.getStartTimeMs();
         break;
       case EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER:
@@ -529,24 +520,21 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             existingProgressStats._totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
         progressStats._totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
         progressStats._totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats._percentageTotalSegmentsAddsRemaining = progressStats._totalSegmentsToBeAdded == 0
-            ? 0.0 : (double) totalSegmentsToBeAdded / (double) progressStats._totalSegmentsToBeAdded * 100.0;
-        progressStats._percentageTotalSegmentDeletesRemaining = progressStats._totalSegmentsToBeDeleted == 0
-            ? 0.0 : (double) totalSegmentsToBeDeleted / (double) progressStats._totalSegmentsToBeDeleted
-            * 100.0;
+        progressStats._percentageTotalSegmentsAddsRemaining =
+            calculatePercentageChange(progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
+        progressStats._percentageTotalSegmentDeletesRemaining =
+            calculatePercentageChange(progressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         // Calculate elapsed time based on start time in existing progress stats
-        elapsedTimeInSeconds = (System.currentTimeMillis() - existingProgressStats._startTimeMs) / 1000;
-        segmentsAlreadyAdded =
-            progressStats._totalSegmentsToBeAdded - progressStats._totalRemainingSegmentsToBeAdded;
-        segmentsAlreadyDeleted =
-            progressStats._totalSegmentsToBeDeleted - progressStats._totalRemainingSegmentsToBeDeleted;
-        progressStats._estimatedTimeToCompleteAddsInSeconds = segmentsAlreadyAdded == 0
-            ? -1 : progressStats._totalRemainingSegmentsToBeAdded / segmentsAlreadyAdded * elapsedTimeInSeconds;
-        progressStats._estimatedTimeToCompleteDeletesInSeconds = segmentsAlreadyDeleted == 0
-            ? -1 : progressStats._totalRemainingSegmentsToBeDeleted / segmentsAlreadyDeleted * elapsedTimeInSeconds;
+        progressStats._estimatedTimeToCompleteAddsInSeconds =
+            calculateEstimatedTimeToCompleteChange(existingProgressStats._startTimeMs,
+                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+        progressStats._estimatedTimeToCompleteDeletesInSeconds =
+            calculateEstimatedTimeToCompleteChange(existingProgressStats._startTimeMs,
+                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
         progressStats._averageSegmentSizeInBytes = existingProgressStats._averageSegmentSizeInBytes;
-        progressStats._totalEstimatedDataToBeMovedInBytes = existingProgressStats._totalEstimatedDataToBeMovedInBytes
-            + (newSegsAddedInThisAssignment * existingProgressStats._averageSegmentSizeInBytes);
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
+            existingProgressStats._totalEstimatedDataToBeMovedInBytes, progressStats._averageSegmentSizeInBytes,
+            newSegsAddedInThisAssignment);
         progressStats._startTimeMs = existingProgressStats._startTimeMs;
         break;
       default:
@@ -554,5 +542,23 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     }
 
     return progressStats;
+  }
+
+  private static double calculatePercentageChange(int totalSegmentsToChange, int remainingSegmentsToChange) {
+    return totalSegmentsToChange == 0
+        ? 0.0 : (double) remainingSegmentsToChange / (double) totalSegmentsToChange * 100.0;
+  }
+
+  private static long calculateEstimatedTimeToCompleteChange(long startTime, int totalSegmentsToChange,
+      int remainingSegmentsToChange) {
+    long elapsedTimeInSeconds = (System.currentTimeMillis() - startTime) / 1000;
+    int segmentsAlreadyChanged = totalSegmentsToChange - remainingSegmentsToChange;
+    return segmentsAlreadyChanged == 0 ? -1 : remainingSegmentsToChange / segmentsAlreadyChanged * elapsedTimeInSeconds;
+  }
+
+  private static long calculateNewEstimatedDataToBeMovedInBytes(long existingDataToBeMovedInBytes,
+      long averageSegmentSizeInBytes, int newSegmentsAdded) {
+    return averageSegmentSizeInBytes < 0
+        ? -1 : existingDataToBeMovedInBytes + ((long) newSegmentsAdded * averageSegmentSizeInBytes);
   }
 }
