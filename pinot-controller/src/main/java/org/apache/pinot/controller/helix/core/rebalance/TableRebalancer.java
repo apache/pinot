@@ -56,6 +56,7 @@ import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -70,7 +71,6 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -663,17 +663,17 @@ public class TableRebalancer {
     Set<String> serversRemoved = new HashSet<>();
     Set<String> serversUnchanged = new HashSet<>();
     Set<String> serversGettingNewSegments = new HashSet<>();
-    TableNameBuilder tenantNameBuilder = TableNameBuilder.forType(tableConfig.getTableType());
     Map<String, RebalanceSummaryResult.TenantInfo> tenantInfoMap = new HashMap<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantNameWithType = tenantNameBuilder.tableNameWithType(serverTenantName);
+      String serverTenantNameWithType =
+          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       tenantInfoMap.put(serverTenantNameWithType,
           new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType, null));
     }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {
-        String tierTenantNameWithType = tenantNameBuilder.tableNameWithType(tierConfig.getServerTag());
+        String tierTenantNameWithType = tierConfig.getServerTag();
         tenantInfoMap.put(tierTenantNameWithType, new RebalanceSummaryResult.TenantInfo(tierTenantNameWithType, null));
       });
     }
@@ -722,7 +722,7 @@ public class TableRebalancer {
       for (Map.Entry<String, RebalanceSummaryResult.TenantInfo> tenantInfoEntry : tenantInfoMap.entrySet()) {
         String tenantNameWithType = tenantInfoEntry.getKey();
         RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoEntry.getValue();
-        if (serverTags.contains(tenantNameBuilder.tableNameWithType(tenantNameWithType))) {
+        if (serverTags.contains(tenantNameWithType)) {
           tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
           tenantInfo.increaseNumSegmentsReceived(segmentsAdded);
           tenantInfo.increaseNumServersParticipants(1);
