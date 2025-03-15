@@ -122,10 +122,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
                 latestProgress._totalSegmentsToBeAdded - currentStepStats._totalSegmentsToBeAdded;
             int numTotalDeletedInLastStep =
                 latestProgress._totalSegmentsToBeDeleted - currentStepStats._totalSegmentsToBeDeleted;
-            int numAddedInLastStep =
-                currentStepStats._totalRemainingSegmentsToBeAdded - latestProgress._totalRemainingSegmentsToBeAdded;
-            int numDeletedInLastStep =
-                currentStepStats._totalRemainingSegmentsToBeDeleted - latestProgress._totalRemainingSegmentsToBeDeleted;
+            int numAddedInLastStep = Math.abs(currentStepStats._totalRemainingSegmentsToBeAdded
+                - latestProgress._totalRemainingSegmentsToBeAdded);
+            int numDeletedInLastStep = Math.abs(currentStepStats._totalRemainingSegmentsToBeDeleted
+                - latestProgress._totalRemainingSegmentsToBeDeleted);
             _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(
                 updateOverallProgressStatsFromStep(_tableRebalanceProgressStats, numTotalAddedInLastStep,
@@ -361,10 +361,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         + numTotalSegsDeletedOverall;
     newOverallProgressStats._totalRemainingSegmentsToBeAdded = numTotalSegsAddedOverall == 0
         ? overallProgressStats._totalRemainingSegmentsToBeAdded - numAddedInLastStep
-        : overallProgressStats._totalRemainingSegmentsToBeAdded + numTotalSegsAddedOverall;
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numAddedInLastStep;
     newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numTotalSegsDeletedOverall == 0
         ? overallProgressStats._totalRemainingSegmentsToBeDeleted - numDeletedInLastStep
-        : overallProgressStats._totalRemainingSegmentsToBeAdded + numTotalSegsDeletedOverall;
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numDeletedInLastStep;
     newOverallProgressStats._percentageTotalSegmentsAddsRemaining = newOverallProgressStats._totalSegmentsToBeAdded == 0
         ? 0.0 : (double) newOverallProgressStats._totalRemainingSegmentsToBeAdded
         / newOverallProgressStats._totalSegmentsToBeAdded * 100.0;
