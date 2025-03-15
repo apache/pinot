@@ -438,4 +438,11 @@ public class QueryOptionsUtils {
     return new IllegalArgumentException(
         String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
   }
+
+  public static String getConfigKey(Object property) {
+    if (property instanceof String) {
+      return QueryOptionsUtils.CONFIG_RESOLVER.get(((String) property).toLowerCase());
+    }
+    return null;
+  }
 }
