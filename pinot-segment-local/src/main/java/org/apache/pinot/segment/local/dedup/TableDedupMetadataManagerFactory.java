@@ -62,6 +62,11 @@ public class TableDedupMetadataManagerFactory {
         dedupConfig.setEnablePreload(
             Boolean.parseBoolean(instanceDedupConfig.getProperty(DEDUP_DEFAULT_ENABLE_PRELOAD, "false")));
       }
+      // server level config honoured only when table level config is not set to true
+      if (!dedupConfig.isAllowDedupConsumptionDuringCommit()) {
+        dedupConfig.setAllowDedupConsumptionDuringCommit(Boolean.parseBoolean(
+            instanceDedupConfig.getProperty(DEDUP_DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT, "false")));
+      }
     }
     if (StringUtils.isNotEmpty(metadataManagerClass)) {
       LOGGER.info("Creating TableDedupMetadataManager with class: {} for table: {}", metadataManagerClass,
@@ -77,12 +82,6 @@ public class TableDedupMetadataManagerFactory {
     } else {
       LOGGER.info("Creating ConcurrentMapTableDedupMetadataManager for table: {}", tableNameWithType);
       metadataManager = new ConcurrentMapTableDedupMetadataManager();
-    }
-
-    // server level config honoured only when table level config is not set to true
-    if (!dedupConfig.isAllowDedupConsumptionDuringCommit()) {
-      dedupConfig.setAllowDedupConsumptionDuringCommit(Boolean.parseBoolean(
-          instanceDedupConfig.getProperty(DEDUP_DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT, "false")));
     }
 
     metadataManager.init(tableConfig, schema, tableDataManager, serverMetrics);
