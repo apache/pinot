@@ -355,10 +355,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     TableRebalanceProgressStats.RebalanceProgressStats newOverallProgressStats =
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
-    newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded +
-        numTotalSegsAddedOverall;
-    newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted +
-        numTotalSegsDeletedOverall;
+    newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded
+        + numTotalSegsAddedOverall;
+    newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted
+        + numTotalSegsDeletedOverall;
     newOverallProgressStats._totalRemainingSegmentsToBeAdded = numTotalSegsAddedOverall == 0
         ? overallProgressStats._totalRemainingSegmentsToBeAdded - numAddedInLastStep
         : overallProgressStats._totalRemainingSegmentsToBeAdded + numTotalSegsAddedOverall;
