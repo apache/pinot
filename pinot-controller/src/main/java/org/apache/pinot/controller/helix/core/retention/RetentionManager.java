@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -39,6 +45,9 @@ import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionSt
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -118,9 +127,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     // Scan all segment ZK metadata and purge segments if necessary
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
       manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
+    } else if (isHybridTable(tableConfig)) {
+      manageRetentionForHybridTable(tableConfig);
     } else {
       manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
     }
+  }
+
+  private boolean isHybridTable(TableConfig tableConfig) {
+    String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+    TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+    return offlineTableConfig != null && realtimeTableConfig != null;
   }
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
@@ -162,6 +180,95 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
+    }
+  }
+
+  @VisibleForTesting
+  void manageRetentionForHybridTable(TableConfig realtimeTableConfig) {
+    LOGGER.info("Managing retention for hybrid table: {}", realtimeTableConfig.getTableName());
+    List<String> segmentsToDelete = new ArrayList<>();
+    String realtimeTableName = realtimeTableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    try {
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(offlineTableName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+      Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, offlineTableName);
+      if (schema == null) {
+        throw new RuntimeException("Failed to get schema for table: " + offlineTableName);
+      }
+      String timeColumn = null;
+      SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
+      if (validationConfig != null) {
+        timeColumn = validationConfig.getTimeColumnName();
+      }
+      if (StringUtils.isEmpty(timeColumn)) {
+        throw new RuntimeException("TimeColumn is null or empty for table: " + offlineTableName);
+      }
+      DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+      if (dateTimeSpec == null) {
+        throw new RuntimeException(String.format("Failed to get DateTimeFieldSpec for time column: %s of table: %s",
+            timeColumn, offlineTableName));
+      }
+      DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
+      if (timeFormatSpec.getColumnUnit() == null) {
+        throw new RuntimeException(String.format("Time unit must be configured in the field spec for time column: %s of"
+            + " table: %s", timeColumn, offlineTableName));
+      }
+      List<SegmentZKMetadata> offlineSegmentsZKMetadata =
+          _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName);
+      // When the OFFLINE table is initially created, there wouldn't be any segments available for the OFFLINE table,
+      // and the segment metadata would be null. In this case, skip the retention management for the REALTIME table.
+      if (CollectionUtils.isEmpty(offlineSegmentsZKMetadata)) {
+        LOGGER.info("Failed to find segments metadata for offline table: {}. "
+                + "Skipping retention management on the REALTIME table", offlineTableName);
+        return;
+      }
+      // For HOURLY table with time unit other than DAYS, use (maxEndTime - 1 HOUR) as the time boundary; otherwise, use
+      // (maxEndTime - 1 DAY)
+      boolean isHourlyTable = CommonConstants.Table.PUSH_FREQUENCY_HOURLY.equalsIgnoreCase(
+          IngestionConfigUtils.getBatchSegmentIngestionFrequency(offlineTableConfig))
+          && timeFormatSpec.getColumnUnit() != TimeUnit.DAYS;
+      long timeOffsetMs = isHourlyTable ? TimeUnit.HOURS.toMillis(1) : TimeUnit.DAYS.toMillis(1);
+      long offlineSegmentsMaxEndTimeMs = -1;
+      // Determine the max end time of all offline segments
+      for (SegmentZKMetadata segmentZKMetadata : offlineSegmentsZKMetadata) {
+        // skip empty segments
+        if (segmentZKMetadata.getTotalDocs() == 0) {
+          LOGGER.warn("Skipping empty segment: {} from table: {}", segmentZKMetadata.getSegmentName(),
+              offlineTableName);
+          continue;
+        }
+        offlineSegmentsMaxEndTimeMs = Math.max(offlineSegmentsMaxEndTimeMs, segmentZKMetadata.getEndTimeMs());
+      }
+
+      if (offlineSegmentsMaxEndTimeMs == -1) {
+        throw new RuntimeException("Failed to determine max end time of segments for table: " + offlineTableName);
+      }
+
+      // realtime table segments older than the time boundary will be deleted
+      long timeBoundaryMs = offlineSegmentsMaxEndTimeMs - timeOffsetMs;
+
+      // Iterate over all COMPLETED segments of the REALTIME table and check if they are eligible for deletion.
+      for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
+        // The segment should be in COMPLETED state
+        if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS
+            || segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING) {
+          continue;
+        }
+        // The segment should be older than the calculated time boundary
+        if (segmentZKMetadata.getEndTimeMs() < timeBoundaryMs) {
+          segmentsToDelete.add(segmentZKMetadata.getSegmentName());
+        }
+      }
+      LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
+      if (!segmentsToDelete.isEmpty()) {
+        _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
+      }
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 0);
+    } catch (Exception e) {
+      LOGGER.error("Exception while managing retention for hybrid table: {}", realtimeTableConfig.getTableName(), e);
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.RETENTION_MANAGER_ERROR, 1);
     }
   }
 

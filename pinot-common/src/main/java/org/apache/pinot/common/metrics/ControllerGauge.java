@@ -190,7 +190,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
 
   // Resource utilization is within limits or not for a table
-  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false);
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  RETENTION_MANAGER_ERROR("retentionManagerError", false);
 
   private final String _gaugeName;
   private final String _unit;

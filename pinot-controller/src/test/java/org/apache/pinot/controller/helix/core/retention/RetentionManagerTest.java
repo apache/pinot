@@ -19,9 +19,11 @@
 package org.apache.pinot.controller.helix.core.retention;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -35,8 +37,14 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -137,6 +145,80 @@ public class RetentionManagerTest {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long pastDaysSinceEpoch = 15544L;
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
+  }
+
+  @Test
+  public void testManageRetentionForHybridTable() {
+    // setup
+    String tableName = "myTable";
+    String realtimeTableName = "myTable_REALTIME";
+    String offlineTableName = "myTable_OFFLINE";
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY", false));
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(realtimeTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("").setRetentionTimeUnit("DAYS")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(offlineTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("90").setRetentionTimeUnit("DAYS")
+        .build();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setTimeColumnName("ms");
+    offlineTableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    when(mockPinotHelixResourceManager.getOfflineTableConfig(offlineTableName)).thenReturn(offlineTableConfig);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+
+    // create realtime table schema
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
+    String realtimeTableSchemaJson = schema.toSingleLineJsonString();
+    ZNRecord tableZNRecord = new ZNRecord(tableName);
+    tableZNRecord.setSimpleField("schemaJSON", realtimeTableSchemaJson);
+    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+
+    // create segment ZK metadata for offline table
+    SegmentZKMetadata offlineSeg1 = new SegmentZKMetadata("offline_seg1");
+    offlineSeg1.setTimeUnit(TimeUnit.MILLISECONDS);
+    offlineSeg1.setTotalDocs(100);
+    offlineSeg1.setStartTime(86_400_000 * 9);
+    offlineSeg1.setEndTime(86_400_000 * 10);
+
+    SegmentZKMetadata offlineSeg2 = new SegmentZKMetadata("offline_seg2");
+    offlineSeg2.setTimeUnit(TimeUnit.MILLISECONDS);
+    offlineSeg2.setTotalDocs(100);
+    offlineSeg2.setStartTime(86_400_000 * 10);
+    offlineSeg2.setEndTime(86_400_000 * 11);
+
+    List<SegmentZKMetadata> offlineSegments = Arrays.asList(offlineSeg1, offlineSeg2);
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)).thenReturn(offlineSegments);
+
+    // create segment ZK metadata for realtime table
+    SegmentZKMetadata realtimeSeg1 = new SegmentZKMetadata("realtime_seg1");
+    realtimeSeg1.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    SegmentZKMetadata realtimeSeg2 = new SegmentZKMetadata("realtime_seg2");
+    realtimeSeg2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    realtimeSeg2.setTimeUnit(TimeUnit.MILLISECONDS);
+    realtimeSeg2.setEndTime(86_400_000 * 8);
+
+    List<SegmentZKMetadata> realtimeSegments = Arrays.asList(realtimeSeg1, realtimeSeg2);
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)).thenReturn(realtimeSegments);
+
+    // test
+    ControllerConf controllerConf = new ControllerConf();
+    RetentionManager retentionManager =
+        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class));
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig);
+
+    // verify
+    verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
   }
 
   private TableConfig createOfflineTableConfig() {
