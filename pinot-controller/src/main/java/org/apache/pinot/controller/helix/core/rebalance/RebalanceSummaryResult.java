@@ -174,19 +174,19 @@ public class RebalanceSummaryResult {
     private final String _tenantName;
     private int _numSegmentsUnchanged;
     private int _numSegmentsReceived;
-    private int _numServersParticipants;
+    private int _numServerParticipants;
 
     @JsonCreator
     public TenantInfo(
         @JsonProperty("tenantName") String tenantName,
         @JsonProperty("numSegmentsReceived") int numSegmentsReceived,
         @JsonProperty("numSegmentsUnchanged") int numSegmentsUnchanged,
-        @JsonProperty("numServerParticipants") int numServersParticipants
+        @JsonProperty("numServerParticipants") int numServerParticipants
     ) {
       _tenantName = tenantName;
       _numSegmentsUnchanged = numSegmentsUnchanged;
       _numSegmentsReceived = numSegmentsReceived;
-      _numServersParticipants = numServersParticipants;
+      _numServerParticipants = numServerParticipants;
     }
 
     public TenantInfo(String tenantName, List<String> usedAsTier) {
@@ -209,8 +209,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public int getNumServersParticipants() {
-      return _numServersParticipants;
+    public int getNumServerParticipants() {
+      return _numServerParticipants;
     }
 
     public void increaseNumSegmentsUnchanged(int numSegments) {
@@ -221,8 +221,8 @@ public class RebalanceSummaryResult {
       _numSegmentsReceived += numSegments;
     }
 
-    public void increaseNumServersParticipants(int numServers) {
-      _numServersParticipants += numServers;
+    public void increaseNumServerParticipants(int numServers) {
+      _numServerParticipants += numServers;
     }
   }
 
