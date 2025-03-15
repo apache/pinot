@@ -84,6 +84,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -131,8 +132,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
-    _queryCompileExecutor = Executors.newFixedThreadPool(Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
-        new NamedThreadFactory("multi-stage-query-compile-executor"));
+    _queryCompileExecutor = QueryThreadContext.contextAwareExecutorService(
+            Executors.newFixedThreadPool(
+                Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
+                new NamedThreadFactory("multi-stage-query-compile-executor")));
   }
 
   @Override
@@ -144,6 +147,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryCompileExecutor.shutdown();
     _queryDispatcher.shutdown();
+  }
+
+  @Override
+  protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
+    super.onQueryStart(requestId, clientRequestId, query, extras);
+    QueryThreadContext.setQueryEngine("mse");
   }
 
   @Override
