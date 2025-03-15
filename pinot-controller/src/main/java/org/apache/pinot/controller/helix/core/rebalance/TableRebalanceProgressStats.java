@@ -43,9 +43,10 @@ public class TableRebalanceProgressStats {
 
   // These rebalance stats specifically track the total segments added / deleted across all replicas
   public static class RebalanceProgressStats {
+    // Total segments
     public int _totalSegmentsToBeAdded; // across all replicas
     public int _totalSegmentsToBeDeleted; // across all replica
-    // Total - # processed so far
+    // Total segments processed so far
     public int _totalRemainingSegmentsToBeAdded; // across all replicas
     public int _totalRemainingSegmentsToBeDeleted; // across all replicas
     // Derived
@@ -55,6 +56,8 @@ public class TableRebalanceProgressStats {
     public long _estimatedTimeToCompleteDeletesInSeconds;
     public long _averageSegmentSizeInBytes;
     public long _totalEstimatedDataToBeMovedInBytes;
+    // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
+    public long _startTimeMs;
 
     RebalanceProgressStats() {
       _totalSegmentsToBeAdded = 0;
@@ -67,6 +70,7 @@ public class TableRebalanceProgressStats {
       _estimatedTimeToCompleteDeletesInSeconds = 0;
       _averageSegmentSizeInBytes = 0;
       _totalEstimatedDataToBeMovedInBytes = 0;
+      _startTimeMs = 0;
     }
   }
 
@@ -183,7 +187,8 @@ public class TableRebalanceProgressStats {
         || base._estimatedTimeToCompleteAddsInSeconds != compare._estimatedTimeToCompleteAddsInSeconds
         || base._estimatedTimeToCompleteDeletesInSeconds != compare._estimatedTimeToCompleteDeletesInSeconds
         || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
-        || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes;
+        || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes
+        || base._startTimeMs != compare._startTimeMs;
   }
 
   public static boolean statsDiffer(RebalanceStateStats base, RebalanceStateStats compare) {

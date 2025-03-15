@@ -465,7 +465,8 @@ public class TableRebalancer {
       IdealState idealState;
       try {
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
-            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes);
+            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
+            allOriginalSegmentsIdealState);
       } catch (Exception e) {
         String errorMsg = String.format(
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
@@ -1015,7 +1016,7 @@ public class TableRebalancer {
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
       Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
-      long estimateAverageSegmentSizeInBytes)
+      long estimateAverageSegmentSizeInBytes, Set<String> allOriginalSegmentsIdealState)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1031,12 +1032,13 @@ public class TableRebalancer {
       // ExternalView might be null when table is just created, skipping check for this iteration
       if (externalView != null) {
         // Record external view and ideal state convergence status
-        Set<String> allOriginalSegmentsIdealState = idealState.getRecord().getMapFields().keySet();
         TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
             estimateAverageSegmentSizeInBytes, allOriginalSegmentsIdealState);
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
+        // Update unique segment list as IS-EV trigger must have processed these
+        allOriginalSegmentsIdealState = idealState.getRecord().getMapFields().keySet();
         if (_tableRebalanceObserver.isStopped()) {
           throw new RuntimeException(
               String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
