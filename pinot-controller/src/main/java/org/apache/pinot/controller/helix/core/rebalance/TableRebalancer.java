@@ -697,7 +697,7 @@ public class TableRebalancer {
         if (serverTags.contains(tenantNameWithType)) {
           tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
           tenantInfo.increaseNumSegmentsReceived(segmentsAdded);
-          tenantInfo.increaseNumServersParticipants(1);
+          tenantInfo.increaseNumServerParticipants(1);
         }
       }
     }
