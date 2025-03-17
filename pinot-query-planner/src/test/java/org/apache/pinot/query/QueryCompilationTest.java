@@ -489,7 +489,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         "SELECT col1, col2, SUM(col3) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
             + "CURRENT ROW EXCLUDE CURRENT ROW) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(excludeCurrentRowQuery));
-    assertTrue(e.getMessage().contains("EXCLUDE clauses are not supported"));
+    assertTrue(e.getMessage().contains("EXCLUDE clauses for window functions are not currently supported"));
   }
 
   @Test
