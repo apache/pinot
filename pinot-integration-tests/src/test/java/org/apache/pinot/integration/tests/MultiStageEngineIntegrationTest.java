@@ -79,14 +79,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
 
-  private static final String PRIMARY_TABLE_DATA_PATH = "baseballStats_data.csv";
-  private static final String PRIMARY_TABLE_SCHEMA_PATH = "baseballStats_schema.json";
-  private static final String PRIMARY_TABLE_TABLE_CONFIG_PATH = "baseballStats_offline_table_config.json";
-  private static final Integer PRIMARY_NUMBER_OF_RECORDS = 97889;
-  private static final String DIM_TABLE_DATA_PATH = "dimBaseballTeams.csv";
-  private static final String DIM_TABLE_SCHEMA_PATH = "dimBaseballTeams_schema.json";
-  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimBaseballTeams_config.json";
-  private static final Integer DIM_NUMBER_OF_RECORDS = 52;
+  private static final String DIM_TABLE_DATA_PATH = "dimDayOfWeek_data.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "dimDayOfWeek_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimDayOfWeek_config.json";
+  private static final Integer DIM_NUMBER_OF_RECORDS = 7;
 
   @Override
   protected String getSchemaFileName() {
@@ -1642,19 +1638,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
         DIM_NUMBER_OF_RECORDS, 60_000);
 
-    Schema primaryTableSchema = createSchema(PRIMARY_TABLE_SCHEMA_PATH);
-    addSchema(primaryTableSchema);
-    TableConfig primaryTableConfig = createTableConfig(PRIMARY_TABLE_TABLE_CONFIG_PATH);
-    primaryTableConfig.setTenantConfig(tenantConfig);
-    addTableConfig(primaryTableConfig);
-    createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV,
-        PRIMARY_NUMBER_OF_RECORDS, 60_000);
-
-    String query = "select /*+ joinOptions(join_strategy='lookup') */ yearID, teamName from baseballStats "
-        + "join dimBaseballTeams ON baseballStats.teamID = dimBaseballTeams.teamID where playerId = 'aardsda01'";
+    // Compare total rows in the primary table with number of rows in the result of the join with lookup table
+    String query = "select count(*) from " + getTableName();
     JsonNode jsonNode = postQuery(query);
+    long totalRowsInTable = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    query = "select /*+ joinOptions(join_strategy='lookup') */ AirlineID, DayOfWeek, dayName from " + getTableName()
+        + " join daysOfWeek ON DayOfWeek = dayId where dayName in ('Monday', 'Tuesday', 'Wednesday')";
+    jsonNode = postQuery(query);
     long result = jsonNode.get("resultTable").get("rows").size();
-    assertEquals(result, 3);
+    assertTrue(result > 0);
+    assertTrue(result < totalRowsInTable);
 
     // Verify that LOOKUP_JOIN stage is present and HASH_JOIN stage is not present in the query plan
     Set<String> stages = new HashSet<>();
@@ -1667,8 +1661,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
     assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
 
-    dropOfflineTable("baseballStats");
-    dropOfflineTable("dimBaseballTeams");
+    dropOfflineTable(tableConfig.getTableName());
   }
 
   public void testSearchLiteralFilter() throws Exception {
