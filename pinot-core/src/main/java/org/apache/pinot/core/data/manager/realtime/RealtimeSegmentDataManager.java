@@ -757,7 +757,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
-        if ( _partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
