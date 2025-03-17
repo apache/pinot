@@ -47,8 +47,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
-  public static final String DISK_UTILIZATION_FOOTPRINT = "diskUtilizationFootprint";
-  public static final String DISK_UTILIZATION_AFTERWARD = "diskUtilizationAfterward";
+  public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
+  public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
 
   private static double _diskUtilizationThreshold;
 
@@ -78,16 +78,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         tableNameWithType, tableConfig));
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
-    preCheckResult.put(DISK_UTILIZATION_FOOTPRINT,
+    preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
         checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
             preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, true));
     // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
     // TODO: give this check a separate threshold other than the disk utilization threshold
-    preCheckResult.put(DISK_UTILIZATION_AFTERWARD,
+    preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
         checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
             preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, false));
-
-
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -239,7 +237,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
       if (diskUsage.getTotalSpaceBytes() < 0) {
         return RebalancePreCheckerResult.warn(
-            "Disk usage info not enabled. Try later or set controller.resource.utilization.checker.initial.delay to a"
+            "Disk usage info has not been updated. Try later or set controller.resource.utilization.checker.initial"
+                + ".delay to a"
                 + " shorter period");
       }
 
