@@ -907,10 +907,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 3);
+    assertEquals(preChecksResult.size(), 4);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
-    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_FOOTPRINT));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTERWARD));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         expectedMinimizeDataMovementStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
@@ -923,7 +924,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
     // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
     // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_FOOTPRINT).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTERWARD).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.WARN);
   }
 

@@ -47,7 +47,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
-  public static final String DISK_UTILIZATION = "diskUtilization";
+  public static final String DISK_UTILIZATION_FOOTPRINT = "diskUtilizationFootprint";
+  public static final String DISK_UTILIZATION_AFTERWARD = "diskUtilizationAfterward";
 
   private static double _diskUtilizationThreshold;
 
@@ -75,10 +76,18 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check whether minimizeDataMovement is set in TableConfig
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
         tableNameWithType, tableConfig));
-    // Check if all servers involved in the rebalance have enough disk space
-    preCheckResult.put(DISK_UTILIZATION,
+    // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
+    // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
+    preCheckResult.put(DISK_UTILIZATION_FOOTPRINT,
         checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
-            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold));
+            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, true));
+    // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
+    // TODO: give this check a separate threshold other than the disk utilization threshold
+    preCheckResult.put(DISK_UTILIZATION_AFTERWARD,
+        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
+            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, false));
+
+
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -203,7 +212,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment,
-      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold) {
+      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold, boolean worstCase) {
     boolean isDiskUtilSafe = true;
     StringBuilder message = new StringBuilder("UNSAFE. Servers with unsafe disk util footprint: ");
     String sep = "";
@@ -252,7 +261,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       long diskUtilizationGain = newSegmentSet.size() * avgSegmentSize;
       long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
 
-      long diskUtilizationFootprint = diskUsage.getUsedSpaceBytes() + diskUtilizationGain;
+      long diskUtilizationFootprint =
+          diskUsage.getUsedSpaceBytes() + diskUtilizationGain - (worstCase ? 0 : diskUtilizationLoss);
       double diskUtilizationFootprintRatio =
           (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
 
