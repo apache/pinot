@@ -8,6 +8,7 @@ export type RebalanceServerOption = {
     isStatsGatheringConfig: boolean;
     hasBreakingChange: boolean;
     allowedValues?: string[];
+    toolTip?: string;
 }
 
 export const rebalanceServerOptions: RebalanceServerOption[] = [
@@ -60,7 +61,8 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "Minimize data movement if set to ENABLE, disable if set to DISABLE, and use minimizeDataMovement value in TableConfig if DEFAULT. Minimize data movement only applies for explicit assignment and is a no-op otherwise",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true
+        "hasBreakingChange": true,
+        "toolTip": "Disabling minimizeDataMovement can cause a large amount of data movement"
     },
     {
         "name": "bootstrap",
@@ -70,17 +72,19 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "Regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true
-},
+        "hasBreakingChange": true,
+        "toolTip": "Enabling bootstrap can cause a large amount of data movement"
+    },
     {
         "name": "downtime",
         "defaultValue": false,
         "type": "BOOL",
         "label": "Downtime",
-        "description": "Whether to allow downtime for rebalance or not, must be enabled if table replication = 1",
+        "description": "Whether to allow downtime for rebalance or not, must be set to true if replication = 1",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true
+        "hasBreakingChange": true,
+        "toolTip": "Enabling can cause downtime even if replication > 1"
     },
     {
         "name": "minAvailableReplicas",
@@ -110,8 +114,9 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved). This can cause downtime if IS-EV convergence fails or segments get into ERROR state",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true
-},
+        "hasBreakingChange": true,
+        "toolTip": "Enabling can cause downtime even if downtime = true"
+    },
     {
         "name": "externalViewStabilizationTimeoutInMs",
         "defaultValue": 3600000,

@@ -1,4 +1,4 @@
-import {Box, FormControl, FormControlLabel, Input, InputLabel, Switch, Typography} from "@material-ui/core";
+import {Box, FormControl, TextField, Typography} from "@material-ui/core";
 import React, {useState} from "react";
 import {RebalanceServerOption} from "../RebalanceServerOptions";
 import {
@@ -15,19 +15,25 @@ export const RebalanceServerConfigurationOptionInteger = (
     const [value, setValue] = useState<number>(option.defaultValue as number);
     return (
         <Box display='flex' flexDirection='column'>
-            <FormControl fullWidth={true}>
+            <FormControl fullWidth>
                 <RebalanceServerConfigurationOptionLabel option={option} />
-                <Input
+                <TextField
+                    variant='outlined'
+                    fullWidth
+                    style={{ width: '100%' }}
+                    size='small'
                     id={`rebalance-server-number-input-${option.name}`}
-                    type="number" value={value}
+                    type='number'
+                    value={value}
                     onChange={(e) => {
-                        handleConfigChange({
-                            [option.name]: parseInt(e.target.value)
-                        });
+                        handleConfigChange(
+                            {
+                                [option.name]: parseInt(e.target.value)
+                            });
                         setValue(parseInt(e.target.value));
                     }}/>
+                <Typography variant='caption'>{option.description}</Typography>
             </FormControl>
-            <Typography variant='caption'>{option.description}</Typography>
         </Box>
     );
 }

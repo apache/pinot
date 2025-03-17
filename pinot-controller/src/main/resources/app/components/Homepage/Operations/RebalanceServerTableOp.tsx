@@ -31,7 +31,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon
+  ListItemIcon, Divider
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
@@ -82,6 +82,8 @@ export default function RebalanceServerTableOp({
 
   return (
     <Dialog
+      showTitleDivider
+      showFooterDivider
       open={true}
       handleClose={hideModal}
       title={<RebalanceServerDialogHeader />}
@@ -96,34 +98,30 @@ export default function RebalanceServerTableOp({
                   It is strongly recommended to run rebalance with these options enabled prior to running the actual rebalance.
                   This is needed to verify that rebalance will do what's expected.
                 </Typography>
-                <List>
-                  {rebalanceServerOptions
-                      .filter(option => option.isStatsGatheringConfig)
-                      .map(option => (
-                          <ListItem key={option.name} style={{ padding: 0 }}>
-                            <ListItemIcon style={{ minWidth: 30 }}>
-                              <FiberManualRecordIcon color='primary' fontSize='small'/>
-                            </ListItemIcon>
-                            <ListItemText primaryTypographyProps={{ variant: 'body2' }} primary={option.label} />
-                          </ListItem>
-                      ))
-                  }
-                </List>
               </Alert>
-            </RebalanceServerConfigurationSection>
-            <RebalanceServerConfigurationSection sectionTitle='Basic Options'>
               <Grid container spacing={2}>
-                {rebalanceServerOptions.filter(option => !option.isAdvancedConfig).map((option) => (
-                    <Grid item>
+                {rebalanceServerOptions.filter(option => option.isStatsGatheringConfig).map((option) => (
+                    <Grid item xs={12} key={`stats-gathering-${option.name}`}>
                       <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}
               </Grid>
             </RebalanceServerConfigurationSection>
+            <Divider style={{ marginBottom: 20 }} />
+            <RebalanceServerConfigurationSection sectionTitle='Basic Options'>
+              <Grid container spacing={2}>
+                {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
+                    <Grid item xs={12} key={`basic-options-${option.name}`}>
+                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
+                    </Grid>
+                ))}
+              </Grid>
+            </RebalanceServerConfigurationSection>
+            <Divider style={{ marginBottom: 20 }}/>
             <RebalanceServerConfigurationSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
-                    <Grid item>
+                    <Grid item xs={12} key={`advanced-options-${option.name}`}>
                       <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
                     </Grid>
                 ))}

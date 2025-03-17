@@ -1,11 +1,8 @@
 import {
     Box,
     FormControl,
-    FormControlLabel,
-    Input,
-    InputLabel, MenuItem,
+    MenuItem,
     Select,
-    Switch,
     Typography
 } from "@material-ui/core";
 import React, {useState} from "react";
@@ -27,6 +24,7 @@ export const RebalanceServerConfigurationOptionSelect = (
             <FormControl fullWidth={true}>
                 <RebalanceServerConfigurationOptionLabel option={option} />
                 <Select
+                    variant='outlined'
                     id={`rebalance-server-number-select-${option.name}`}
                     value={value}
                     onChange={(e) => {
