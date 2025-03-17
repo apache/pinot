@@ -28,10 +28,8 @@ import static org.apache.pinot.controller.helix.core.realtime.SegmentCompletionC
 
 public class SegmentCompletionConfigTest {
 
-  private static final String DEFAULT_FSM_CLASS =
-      "org.apache.pinot.controller.helix.core.realtime.BlockingSegmentCompletionFSM";
-  private static final String PAUSELESS_FSM_CLASS =
-      "org.apache.pinot.controller.helix.core.realtime.PauselessSegmentCompletionFSM";
+  private static final String DEFAULT_FSM_CLASS = BlockingSegmentCompletionFSM.class.getName();
+  private static final String PAUSELESS_FSM_CLASS = PauselessSegmentCompletionFSM.class.getName();
   private static final String CUSTOM_FSM_CLASS =
       "org.apache.pinot.controller.helix.core.realtime.CustomSegmentCompletionFSM";
 

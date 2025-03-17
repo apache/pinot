@@ -38,9 +38,7 @@ import static org.mockito.Mockito.when;
 
 
 public class SegmentCompletionFSMFactoryTest {
-  private static final String DEFAULT_FSM_CLASS =
-      "org.apache.pinot.controller.helix.core.realtime.BlockingSegmentCompletionFSM";
-
+  private static final String DEFAULT_FSM_CLASS = BlockingSegmentCompletionFSM.class.getName();
   private static final String LLC_SEGMENT_NAME = "tableName__0__0__20250228T1903Z";
 
   @AfterMethod
