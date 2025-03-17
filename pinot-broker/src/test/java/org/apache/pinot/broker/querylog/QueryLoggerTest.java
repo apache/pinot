@@ -111,8 +111,7 @@ public class QueryLoggerTest {
         + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):45/14/15/16,"
         + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):54/17/18/19,"
         + "clientIp=ip,"
-        + "queryEngine=singleStage,"
-        + "query=SELECT * FROM foo");
+        + "queryEngine=singleStage");
     //@formatter:on
   }
 

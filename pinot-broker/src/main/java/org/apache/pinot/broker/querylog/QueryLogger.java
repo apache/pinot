@@ -91,9 +91,9 @@ public class QueryLogger {
     /*
     queryLogBuilder.append("query=")
         .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
-    _logger.info(queryLogBuilder.toString());
     */
     queryLogBuilder.setLength(queryLogBuilder.length() - 1);
+    _logger.info(queryLogBuilder.toString());
 
     if (_droppedLogRateLimiter.tryAcquire()) {
       // use getAndSet to 0 so that there will be no race condition between
