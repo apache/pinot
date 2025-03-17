@@ -150,7 +150,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       HttpHeaders httpHeaders, AccessControl accessControl) {
-    LOGGER.debug("SQL query for request {}: {}", requestId, query);
+    LOGGER.info("SQL query for request {}: {}", requestId, query);
 
     // Compile the request
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
