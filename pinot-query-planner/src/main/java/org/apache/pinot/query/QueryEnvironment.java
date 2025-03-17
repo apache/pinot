@@ -610,11 +610,10 @@ public class QueryEnvironment {
 
     public QueryPlannerResult planQuery(long requestId) {
       try {
-        RelRoot relRoot = compileQuery(_sqlNodeAndOptions.getSqlNode(), _plannerContext);
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, _plannerContext, requestId);
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
         return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
       } catch (CalciteContextException e) {
         throw new RuntimeException("Error composing query plan for '" + _textQuery + "': " + e.getMessage() + "'", e);
