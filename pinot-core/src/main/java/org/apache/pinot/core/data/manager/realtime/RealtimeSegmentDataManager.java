@@ -757,7 +757,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
-        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+        if ( _partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
@@ -1063,7 +1063,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    closeStreamConsumers();
+    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
+    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
+    // complete.
+    if (_allowConsumptionDuringCommit) {
+      closeStreamConsumers();
+    }
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
       _segmentLogger.warn("Table data manager is already shut down");
