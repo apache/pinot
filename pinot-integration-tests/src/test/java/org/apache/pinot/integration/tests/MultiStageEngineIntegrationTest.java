@@ -46,6 +46,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -1613,6 +1614,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
     addSchema(lookupTableSchema);
     TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
+    tableConfig.setTenantConfig(tenantConfig);
     addTableConfig(tableConfig);
     createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
         DIM_NUMBER_OF_RECORDS, 60_000);
@@ -1620,6 +1623,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Schema primaryTableSchema = createSchema(PRIMARY_TABLE_SCHEMA_PATH);
     addSchema(primaryTableSchema);
     TableConfig primaryTableConfig = createTableConfig(PRIMARY_TABLE_TABLE_CONFIG_PATH);
+    primaryTableConfig.setTenantConfig(tenantConfig);
     addTableConfig(primaryTableConfig);
     createAndUploadSegmentFromFile(primaryTableConfig, primaryTableSchema, PRIMARY_TABLE_DATA_PATH, FileFormat.CSV,
         PRIMARY_NUMBER_OF_RECORDS, 60_000);
