@@ -76,8 +76,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
         tableNameWithType, tableConfig));
     // Check if all servers involved in the rebalance have enough disk space
-    preCheckResult.put(DISK_UTILIZATION, checkDiskUtilization(tableNameWithType, preCheckContext._currentAssignment, preCheckContext._targetAssignment,
-        preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold));
+    preCheckResult.put(DISK_UTILIZATION,
+        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
+            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -200,7 +201,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
   }
 
-  private RebalancePreCheckerResult checkDiskUtilization(String tableNameWithType, Map<String, Map<String, String>> currentAssignment,
+  private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment,
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold) {
     boolean isDiskUtilSafe = true;
@@ -228,7 +229,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       DiskUsageInfo diskUsage = getDiskUsageInfoOfInstance(server);
 
       if (diskUsage.getTotalSpaceBytes() < 0) {
-        return RebalancePreCheckerResult.warn("Disk usage info not enabled. Try to set controller.enable.resource.utilization.check=true");
+        return RebalancePreCheckerResult.warn(
+            "Disk usage info not enabled. Try later or set controller.resource.utilization.checker.initial.delay to a"
+                + " shorter period");
       }
 
       Set<String> segmentSet = entry.getValue();
@@ -261,7 +264,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         sep = ", ";
       }
     }
-    return isDiskUtilSafe ? RebalancePreCheckerResult.pass("Within threshold") : RebalancePreCheckerResult.error(message.toString());
+    return isDiskUtilSafe ? RebalancePreCheckerResult.pass(
+        String.format("Within threshold (<%d%%)", (short) (threshold * 100)))
+        : RebalancePreCheckerResult.error(message.toString());
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {

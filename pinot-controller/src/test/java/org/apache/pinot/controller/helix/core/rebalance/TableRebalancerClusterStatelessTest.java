@@ -250,8 +250,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         "Instance assignment not allowed, no need for minimizeDataMovement");
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getMessage(),
-        "Within threshold");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getMessage().startsWith("Within threshold"));
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -609,7 +611,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getMessage(), "Within threshold");
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getMessage().startsWith("Within threshold"));
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;

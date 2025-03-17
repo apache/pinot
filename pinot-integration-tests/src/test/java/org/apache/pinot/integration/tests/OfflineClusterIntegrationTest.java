@@ -919,6 +919,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         expectedNeedsReloadStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
         expectedNeedsReloadMessage);
+    // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
+    // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
+    // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
+    // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
   }
 
   private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap(boolean minimizeDataMovement) {
@@ -4200,7 +4206,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(rebalanceResult.getPreChecksResult().get(
-        DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
+            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         "Instance assignment not allowed, no need for minimizeDataMovement");
     assertEquals(rebalanceResult.getPreChecksResult().get(
             DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
