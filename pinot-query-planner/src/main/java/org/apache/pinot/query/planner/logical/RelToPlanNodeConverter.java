@@ -217,7 +217,7 @@ public final class RelToPlanNodeConverter {
     Window.Group windowGroup = node.groups.get(0);
 
     Preconditions.checkState(windowGroup.exclude == RexWindowExclusion.EXCLUDE_NO_OTHER,
-        "EXCLUDE clauses are not supported");
+        "EXCLUDE clauses for window functions are not currently supported");
 
     int numAggregates = windowGroup.aggCalls.size();
     List<RexExpression.FunctionCall> aggCalls = new ArrayList<>(numAggregates);
