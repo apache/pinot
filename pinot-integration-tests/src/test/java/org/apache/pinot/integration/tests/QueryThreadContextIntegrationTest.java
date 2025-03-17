@@ -84,7 +84,7 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testReqIdOnSimplification(boolean useMse)
+  public void testReqIdOnBroker(boolean useMse)
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
     JsonNode jsonNode = postQuery("SELECT reqId('cte'), count(*) "
@@ -93,6 +93,9 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
     DocumentContext parsed = JsonPath.parse(jsonNode.toString());
     Assert.assertEquals(parsed.read("$.numRowsResultSet", Integer.class), 1, "Unexpected number of rows");
     Assert.assertEquals(parsed.read("$.resultTable.rows[0][1]", Integer.class), 115545, "Unexpected count");
+    String requestId = parsed.read("$.resultTable.rows[0][0]", String.class);
+    Assert.assertNotNull(requestId, "Request id should not be null");
+    Assert.assertTrue(Long.parseLong(requestId) > 0, "Request id should be positive");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -126,7 +129,7 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testCidOnSimplification(boolean useMse)
+  public void testCidOnBroker(boolean useMse)
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
     String clientRequestId = "testCid";
@@ -172,7 +175,7 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testStageIdOnSimplification(boolean useMse)
+  public void testStageIdOnBroker(boolean useMse)
       throws Exception {
     setUseMultiStageQueryEngine(useMse);
     JsonNode jsonNode = postQuery("SELECT stageId('cte'), count(*) "
