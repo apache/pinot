@@ -212,7 +212,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       Map<String, Map<String, String>> targetAssignment,
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold, boolean worstCase) {
     boolean isDiskUtilSafe = true;
-    StringBuilder message = new StringBuilder("UNSAFE. Servers with unsafe disk util footprint: ");
+    StringBuilder message = new StringBuilder("UNSAFE. Servers with unsafe disk utilization (>" + (short) (threshold * 100) +  "%): ");
     String sep = "";
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
