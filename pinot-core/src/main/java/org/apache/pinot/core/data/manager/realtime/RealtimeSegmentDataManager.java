@@ -869,7 +869,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   // We could not build the segment. Go into error state.
                   _state = State.ERROR;
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-                  if (_segmentCannotBuild) {
+                  if (_segmentCannotBuild && _tableConfig.getIngestionConfig().isRetryOnSegmentBuildPrecheckFailure()) {
                     _segmentLogger.error(
                         "Found non-recoverable segment build error for {}, from offset {} to {},"
                             + "sending notifyCannotBuild event.",

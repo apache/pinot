@@ -1033,7 +1033,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
 
-      // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
+    // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
     // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
     // Invoking now() in any part of RealtimeSegmentDataManager code will break the following tests:
     // 1. RealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
