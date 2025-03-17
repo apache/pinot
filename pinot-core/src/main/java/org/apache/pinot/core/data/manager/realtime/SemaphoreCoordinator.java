@@ -22,43 +22,40 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 
 
 public class SemaphoreCoordinator {
 
   private final Semaphore _semaphore;
   private final boolean _enforceConsumptionInOrder;
-  private volatile int _nextSequenceNumber;
+  private final RealtimeTableDataManager _realtimeTableDataManager;
   private final Condition _condition;
   private final Lock _lock;
 
-  public SemaphoreCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder) {
+  public SemaphoreCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
+      RealtimeTableDataManager realtimeTableDataManager) {
     _semaphore = semaphore;
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
+    _realtimeTableDataManager = realtimeTableDataManager;
   }
 
-  public void acquire(LLCSegmentName llcSegmentName)
+  public void acquire(SegmentZKMetadata segmentZKMetadata)
       throws InterruptedException {
-    while (_enforceConsumptionInOrder && (llcSegmentName.getSequenceNumber() != _nextSequenceNumber)) {
-      try {
-        _lock.lock();
-        _condition.await();
-      } finally {
-        _lock.unlock();
-      }
+    String prevSegmentName = segmentZKMetadata.getPreviousSegment();
+
+    if (_enforceConsumptionInOrder) {
+      waitForPrevSegment(prevSegmentName);
     }
+
     _semaphore.acquire();
   }
 
   public void release() {
     _semaphore.release();
-  }
-
-  public void setNextSequenceNumber(int nextSequenceNumber) {
-    _nextSequenceNumber = nextSequenceNumber;
     try {
       _lock.lock();
       _condition.signalAll();
@@ -69,5 +66,22 @@ public class SemaphoreCoordinator {
 
   public Semaphore getSemaphore() {
     return _semaphore;
+  }
+
+  private void waitForPrevSegment(String prevSegmentName)
+      throws InterruptedException {
+    SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(prevSegmentName);
+    _lock.lock();
+    try {
+      while (segmentDataManager == null) {
+        _condition.await();
+        segmentDataManager = _realtimeTableDataManager.acquireSegment(prevSegmentName);
+      }
+    } finally {
+      _lock.unlock();
+      if (segmentDataManager != null) {
+        _realtimeTableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
   }
 }

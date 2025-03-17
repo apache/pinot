@@ -1315,6 +1315,7 @@ public class CommonConstants {
     public static final String PARTITION_METADATA = "segment.partition.metadata";
     public static final String CUSTOM_MAP = "custom.map";
     public static final String SIZE_IN_BYTES = "segment.size.in.bytes";
+    public static final String PREV_SEGMENT = "prev.segment";
 
     /**
      * This field is used for parallel push protection to lock the segment globally.

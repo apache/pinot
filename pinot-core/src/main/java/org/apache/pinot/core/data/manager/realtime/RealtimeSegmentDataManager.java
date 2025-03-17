@@ -1253,8 +1253,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
-      _partitionGroupSemaphoreCoordinator.setNextSequenceNumber(
-          LLCSegmentName.of(_segmentNameStr).getSequenceNumber() + 1);
       _partitionGroupSemaphoreCoordinator.release();
     }
   }
@@ -1660,7 +1658,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupSemaphoreCoordinator.acquire(llcSegmentName);
+      _partitionGroupSemaphoreCoordinator.acquire(_segmentZKMetadata);
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";

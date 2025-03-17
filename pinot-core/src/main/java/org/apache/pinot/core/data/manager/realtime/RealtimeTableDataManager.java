@@ -138,6 +138,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
+  private boolean _enforceConsumptionInOrder = false;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -218,6 +219,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
       _tableUpsertMetadataManager.init(_tableConfig, schema, this);
     }
+
+    _enforceConsumptionInOrder = enforceConsumptionInOrder();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
@@ -507,7 +510,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void doAddConsumingSegment(String segmentName)
       throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-    if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
+    if ((zkMetadata.getStatus() != Status.IN_PROGRESS) && (!_enforceConsumptionInOrder)) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
       //       Helix, then we can rely on the following CONSUMING -> ONLINE state transition to add it.
@@ -540,7 +543,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
     SemaphoreCoordinator semaphoreCoordinator = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId,
-        k -> new SemaphoreCoordinator(new Semaphore(1), isDedupEnabled()));
+        k -> new SemaphoreCoordinator(new Semaphore(1), _enforceConsumptionInOrder, this));
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
@@ -550,8 +553,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
-        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator,
-            partitionUpsertMetadataManager, partitionDedupMetadataManager, _isTableReadyToConsumeData);
+        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
+            semaphoreCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
+            _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
@@ -560,6 +564,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
 
     _logger.info("Added new CONSUMING segment: {}", segmentName);
+  }
+
+  private boolean enforceConsumptionInOrder() {
+    if (_tableConfig.getIngestionConfig() == null
+        || _tableConfig.getIngestionConfig().getStreamIngestionConfig() == null) {
+      return (isDedupEnabled() || isPartialUpsertEnabled());
+    }
+    return _tableConfig.getIngestionConfig().getStreamIngestionConfig().isEnforceConsumptionInOrder() && (
+        isDedupEnabled() || isPartialUpsertEnabled());
   }
 
   @Override
@@ -645,8 +658,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator, _serverMetrics, partitionUpsertMetadataManager,
-        partitionDedupMetadataManager, isTableReadyToConsumeData);
+        indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator, _serverMetrics,
+        partitionUpsertMetadataManager, partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
   /**

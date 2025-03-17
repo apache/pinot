@@ -43,6 +43,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
   private boolean _pauselessConsumptionEnabled = false;
 
+  @JsonPropertyDescription("Enforce consumption of segments in order of segment creation by the controller")
+  private boolean _enforceConsumptionInOrder = false;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -74,5 +77,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
     _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
+  public boolean isEnforceConsumptionInOrder() {
+    return _enforceConsumptionInOrder;
+  }
+
+  public void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
+    _enforceConsumptionInOrder = enforceConsumptionInOrder;
   }
 }
