@@ -189,7 +189,14 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   /**
    * The number of bytes stored in the response store. Only the size of the result table is tracked.
    */
-  CURSOR_RESPONSE_STORE_SIZE("bytes", true);
+  CURSOR_RESPONSE_STORE_SIZE("bytes", true),
+  
+  /**
+   * Number of query routing failures due to strict zone matching requirements not being met.
+   * This occurs when a query is configured to only use servers in the same availability zone
+   * as the broker, but not enough same-zone servers are available.
+   */
+  ZONE_AWARE_ROUTING_FAILURES("badResponses", false);
 
   private final String _brokerMeterName;
   private final String _unit;
