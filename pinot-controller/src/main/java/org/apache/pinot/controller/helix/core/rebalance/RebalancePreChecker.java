@@ -30,7 +30,7 @@ public interface RebalancePreChecker {
   void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService,
       double diskUtilizationThreshold);
 
-  class TableFacts {
+  class PreCheckContext {
     public final String _rebalanceJobId;
     public final String _tableNameWithType;
     public final TableConfig _tableConfig;
@@ -38,7 +38,7 @@ public interface RebalancePreChecker {
     public final Map<String, Map<String, String>> _targetAssignment;
     public final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
 
-    public TableFacts(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
+    public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
         @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
       _rebalanceJobId = rebalanceJobId;
@@ -50,5 +50,5 @@ public interface RebalancePreChecker {
     }
   }
 
-  Map<String, RebalancePreCheckerResult> check(TableFacts tableFacts);
+  Map<String, RebalancePreCheckerResult> check(PreCheckContext preCheckContext);
 }

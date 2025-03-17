@@ -336,7 +336,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
-
     // Try dry-run summary mode
     // No need to reassign instances because instances should be automatically assigned when updating the table config
     rebalanceConfig = new RebalanceConfig();
@@ -605,10 +604,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-    Map<String, String> preCheckResult = rebalanceResult.getPreChecksResult();
+    Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION), "Within threshold");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getMessage(), "Within threshold");
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
@@ -626,7 +627,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION));
-    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).toLowerCase().startsWith("unsafe"));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.ERROR);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
 

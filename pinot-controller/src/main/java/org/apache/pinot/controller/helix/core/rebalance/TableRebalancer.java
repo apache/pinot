@@ -324,10 +324,10 @@ public class TableRebalancer {
         LOGGER.warn("Pre-checks are enabled but the pre-checker is not set, skipping pre-checks for table: {}",
             tableNameWithType);
       } else {
-        RebalancePreChecker.TableFacts tableFacts =
-            new RebalancePreChecker.TableFacts(rebalanceJobId, tableNameWithType,
+        RebalancePreChecker.PreCheckContext preCheckContext =
+            new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType,
                 tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails);
-        preChecksResult = _rebalancePreChecker.check(tableFacts);
+        preChecksResult = _rebalancePreChecker.check(preCheckContext);
       }
     }
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that

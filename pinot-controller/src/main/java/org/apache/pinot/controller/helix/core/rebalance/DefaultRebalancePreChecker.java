@@ -63,10 +63,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
   }
 
   @Override
-  public Map<String, RebalancePreCheckerResult> check(TableFacts tableFacts) {
-    String rebalanceJobId = tableFacts._rebalanceJobId;
-    String tableNameWithType = tableFacts._tableNameWithType;
-    TableConfig tableConfig = tableFacts._tableConfig;
+  public Map<String, RebalancePreCheckerResult> check(PreCheckContext preCheckContext) {
+    String rebalanceJobId = preCheckContext._rebalanceJobId;
+    String tableNameWithType = preCheckContext._tableNameWithType;
+    TableConfig tableConfig = preCheckContext._tableConfig;
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
@@ -76,8 +76,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
         tableNameWithType, tableConfig));
     // Check if all servers involved in the rebalance have enough disk space
-    preCheckResult.put(DISK_UTILIZATION, checkDiskUtilization(tableNameWithType, tableFacts._currentAssignment, tableFacts._targetAssignment,
-        tableFacts._tableSubTypeSizeDetails, _diskUtilizationThreshold));
+    preCheckResult.put(DISK_UTILIZATION, checkDiskUtilization(tableNameWithType, preCheckContext._currentAssignment, preCheckContext._targetAssignment,
+        preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
