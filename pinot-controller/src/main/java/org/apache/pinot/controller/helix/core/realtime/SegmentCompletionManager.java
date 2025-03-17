@@ -28,6 +28,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -138,7 +139,8 @@ public class SegmentCompletionManager {
     }
 
     if (factoryName == null) {
-      factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+      factoryName = PauselessConsumptionUtils.isPauselessEnabled(tableConfig)
+          ? _segmentCompletionConfig.getDefaultPauselessFsmScheme() : _segmentCompletionConfig.getDefaultFsmScheme();
     }
 
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
