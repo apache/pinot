@@ -90,6 +90,7 @@ import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.query.table.HybridTable;
 import org.apache.pinot.query.table.ImplicitHybridTable;
+import org.apache.pinot.query.table.PhysicalTable;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -476,7 +477,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         offlineTableName = null;
       }
     }
-    if (offlineTableName != null && realtimeTableName != null) {
+    if (hybridTable.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
@@ -497,7 +498,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (offlineTableName != null) {
+    } else if (hybridTable.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
@@ -596,19 +597,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
-    if (offlineTableDisabled || realtimeTableDisabled) {
-      String errorMessage = null;
-      if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
-          && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
-          realtimeTableConfig == null && offlineTableDisabled)) {
-        requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
-        return BrokerResponseNative.TABLE_IS_DISABLED;
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
-        errorMessage = "Realtime table is disabled in hybrid table";
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
-        errorMessage = "Offline table is disabled in hybrid table";
+    // If all tables are disabled then return an error.
+    if (hybridTable.isDisabled()) {
+      requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
+      return BrokerResponseNative.TABLE_IS_DISABLED;
+    }
+
+    List<PhysicalTable> disabledTables = hybridTable.getDisabledTables();
+    if (disabledTables != null) {
+      for (PhysicalTable disabled : disabledTables) {
+        String errorMessage = String.format("%s Table %s is disabled", disabled.getTableType().name(),
+            disabled.getTableNameWithType());
+        LOGGER.info("{}: {}", errorMessage, query);
+        errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
       }
-      errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
     }
 
     int numUnavailableSegments = unavailableSegments.size();

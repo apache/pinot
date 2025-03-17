@@ -143,7 +143,7 @@ public class ImplicitHybridTable implements HybridTable {
     } else if (isRealtime()) {
       return _realtimeTable.isDisabled();
     } else {
-      return _offlineTable.isDisabled() || _realtimeTable.isDisabled();
+      return _offlineTable.isDisabled() && _realtimeTable.isDisabled();
     }
   }
 
