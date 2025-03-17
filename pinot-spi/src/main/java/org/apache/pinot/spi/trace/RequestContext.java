@@ -20,6 +20,7 @@ package org.apache.pinot.spi.trace;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 public interface RequestContext {
@@ -63,7 +64,7 @@ public interface RequestContext {
 
   long getReduceTimeMillis();
 
-  void setErrorCode(int errorCode);
+  void setErrorCode(QueryErrorCode errorCode);
 
   void setQuery(String pql);
 

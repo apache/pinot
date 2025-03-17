@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -44,21 +45,26 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,7 +149,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);
     if (!authorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       String failureMessage = authorizationResult.getFailureMessage();
       if (StringUtils.isNotBlank(failureMessage)) {
@@ -154,7 +160,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null || !sql.isTextual()) {
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
       _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
@@ -168,8 +174,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
       } catch (Exception e) {
         // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
       }
     }
 
@@ -179,8 +185,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage =
           "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
       LOGGER.info(errorMessage);
-      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
     // Add null handling option from broker config only if there is no override in the query
@@ -316,5 +322,67 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _queriesById != null;
+  }
+
+  protected void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
+    for (String tableName : tableNames) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
+    }
+  }
+
+  /**
+   * Validates whether the requester has access to all the tables.
+   */
+  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+      RequestContext requestContext, HttpHeaders httpHeaders) {
+    final long startTimeNs = System.nanoTime();
+    AccessControl accessControl = _accessControlFactory.create();
+
+    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+
+    Set<String> failedTables = tableNames.stream()
+        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
+        .collect(Collectors.toSet());
+
+    failedTables.addAll(tableAuthorizationResult.getFailedTables());
+
+    if (!failedTables.isEmpty()) {
+      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
+    } else {
+      tableAuthorizationResult = TableAuthorizationResult.success();
+    }
+
+    if (!tableAuthorizationResult.hasAccess()) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
+      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+    }
+
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return tableAuthorizationResult;
+  }
+
+  /**
+   * Returns true if the QPS quota of query tables, database or application has been exceeded.
+   */
+  protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
+      RequestContext requestContext) {
+    if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
+      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
+      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+      return true;
+    }
+    for (String tableName : tableNames) {
+      if (!_queryQuotaManager.acquire(tableName)) {
+        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
+        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+        return true;
+      }
+    }
+    return false;
   }
 }

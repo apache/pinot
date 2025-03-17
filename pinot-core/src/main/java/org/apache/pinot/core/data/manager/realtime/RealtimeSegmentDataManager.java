@@ -1683,11 +1683,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
-      _segmentLogger
-          .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
-              _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
-          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+      _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+          llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
+      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1719,6 +1717,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }).start();
       throw t;
     }
+  }
+
+  // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
+  // 1. Partial Upserts
+  // 2. Dedup Tables
+  // For the above table types, we would be looking into the metadata information when inserting a new record,
+  // so it is not right to allow consumption while downloading and replacing the consuming segment as we might see
+  // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
+  // upsert tables. If tables are dedup/partial upsert enabled check for table and server config properties to see if
+  // consumption is allowed
+  private boolean isConsumptionAllowedDuringCommit() {
+    return (!_realtimeTableDataManager.isDedupEnabled() || _tableConfig.getDedupConfig()
+        .isAllowDedupConsumptionDuringCommit()) && (!_realtimeTableDataManager.isPartialUpsertEnabled()
+        || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {

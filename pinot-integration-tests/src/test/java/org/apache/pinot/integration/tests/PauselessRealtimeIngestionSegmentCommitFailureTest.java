@@ -35,7 +35,6 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -54,7 +53,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.realtime.utils.FailureInjectingRealtimeTableDataManager.MAX_NUMBER_OF_FAILURES;
-import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -72,8 +70,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
-    properties.put(SegmentCompletionConfig.FSM_SCHEME + "pauseless",
-        "org.apache.pinot.controller.helix.core.realtime.PauselessSegmentCompletionFSM");
     // Set the delay more than the time we sleep before triggering RealtimeSegmentValidationManager manually, i.e.
     // MAX_SEGMENT_COMPLETION_TIME_MILLIS, to ensure that the segment level validations are performed.
     properties.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
@@ -155,7 +151,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     Map<String, String> streamConfigMap = ingestionConfig.getStreamIngestionConfig()
         .getStreamConfigMaps()
         .get(0);
-    streamConfigMap.put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
     streamConfigMap.put("segmentDownloadTimeoutMinutes", "1");
     tableConfig.getIndexingConfig().setStreamConfigs(null);
     tableConfig.setIngestionConfig(ingestionConfig);

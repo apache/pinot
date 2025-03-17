@@ -241,8 +241,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
       URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
-          outputSegmentDirURI)) {
-        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentDirURI));
+          outputSegmentTarURI)) {
+        LOGGER.warn("Not overwrite existing output segment tar file: {}", outputFileFS.exists(outputSegmentTarURI));
       } else {
         outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       }

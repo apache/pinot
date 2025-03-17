@@ -42,6 +42,7 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -161,21 +162,22 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
-      // Filter segments based on status
-      List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
-          = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);
+      List<SegmentZKMetadata> allSegments =
+              tableConfig.getTableType() == TableType.OFFLINE
+                      ? getSegmentsZKMetadataForTable(tableNameWithType)
+                      : filterSegmentsforRealtimeTable(
+                              getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType));
 
       // Select current segment snapshot based on lineage, filter out empty segments
       SegmentLineage segmentLineage = _clusterInfoAccessor.getSegmentLineage(tableNameWithType);
       Set<String> preSelectedSegmentsBasedOnLineage = new HashSet<>();
-      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
+      for (SegmentZKMetadata segment : allSegments) {
         preSelectedSegmentsBasedOnLineage.add(segment.getSegmentName());
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
-      for (SegmentZKMetadata segment : preSelectedSegmentsBasedOnStatus) {
+      for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
             && MergeTaskUtils.allowMerge(segment)) {
           preSelectedSegments.add(segment);
@@ -543,44 +545,49 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  static List<SegmentZKMetadata> filterSegmentsBasedOnStatus(TableType tableType, List<SegmentZKMetadata> allSegments) {
-    if (tableType == TableType.REALTIME) {
-      // For realtime table, don't process
-      // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS)
-      // 2. sealed segments with start time later than the earliest start time of all in progress segments
-      // This prevents those in-progress segments from not being merged.
-      //
-      // Note that we make the following two assumptions here:
-      // 1. streaming data consumer lags are negligible
-      // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
-      //    than bufferTimeMS)
-      //
-      // We don't handle the following cases intentionally because it will be either overkill or too complex
-      // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
-      //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
-      //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
-      //    for new partitions to be picked up
-      // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
-      //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
-      //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
-      //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
-      //    records correctly.
-      long earliestStartTimeMsOfInProgressSegments = Long.MAX_VALUE;
-      for (SegmentZKMetadata segmentZKMetadata : allSegments) {
-        if (!segmentZKMetadata.getStatus().isCompleted()
-            && segmentZKMetadata.getTotalDocs() > 0
-            && segmentZKMetadata.getStartTimeMs() < earliestStartTimeMsOfInProgressSegments) {
-          earliestStartTimeMsOfInProgressSegments = segmentZKMetadata.getStartTimeMs();
-        }
+  static List<SegmentZKMetadata> filterSegmentsforRealtimeTable(List<SegmentZKMetadata> allSegments) {
+    // For realtime table, don't process
+    // 1. in-progress segments (Segment.Realtime.Status.IN_PROGRESS), this has been taken care of in
+    //    getNonConsumingSegmentsZKMetadataForRealtimeTable()
+    // 2. most recent sealed segments in each partition, this prevents those paused segments from being merged.
+    //
+    // Note that we make the following two assumptions here:
+    // 1. streaming data consumer lags are negligible
+    // 2. streaming data records are ingested mostly in chronological order (no records are ingested with delay larger
+    //    than bufferTimeMS)
+    //
+    // We don't handle the following cases intentionally because it will be either overkill or too complex
+    // 1. New partition added. If new partitions are not picked up timely, the MergeRollupTask will move watermarks
+    //    forward, and may not be able to merge some lately-created segments for those new partitions -- users should
+    //    configure pinot properly to discover new partitions timely, or they should restart pinot servers manually
+    //    for new partitions to be picked up
+    // 2. (1) no new in-progress segments are created for some partitions (2) new in-progress segments are created for
+    //    partitions, but there is no record consumed (i.e, empty in-progress segments). In those two cases,
+    //    if new records are consumed later, the MergeRollupTask may have already moved watermarks forward, and may
+    //    not be able to merge those lately-created segments -- we assume that users will have a way to backfill those
+    //    records correctly.
+    Map<Integer, LLCSegmentName> partitionIdToLatestCompletedSegment = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : allSegments) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      if (LLCSegmentName.isLLCSegment(segmentName)) {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        partitionIdToLatestCompletedSegment.compute(llcSegmentName.getPartitionGroupId(), (partId, latestSegment) -> {
+          if (latestSegment == null) {
+            return llcSegmentName;
+          } else {
+            return latestSegment.getSequenceNumber() > llcSegmentName.getSequenceNumber()
+                    ? latestSegment : llcSegmentName;
+          }
+        });
       }
-      final long finalEarliestStartTimeMsOfInProgressSegments = earliestStartTimeMsOfInProgressSegments;
-      return allSegments.stream()
-          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus().isCompleted()
-              && segmentZKMetadata.getStartTimeMs() < finalEarliestStartTimeMsOfInProgressSegments)
-          .collect(Collectors.toList());
-    } else {
-      return allSegments;
     }
+    Set<String> filteredSegmentNames = new HashSet<>();
+    for (LLCSegmentName llcSegmentName : partitionIdToLatestCompletedSegment.values()) {
+      filteredSegmentNames.add(llcSegmentName.getSegmentName());
+    }
+    return allSegments.stream()
+            .filter(a -> !filteredSegmentNames.contains(a.getSegmentName()))
+            .collect(Collectors.toList());
   }
 
   /**

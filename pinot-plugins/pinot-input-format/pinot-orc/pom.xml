@@ -66,7 +66,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>

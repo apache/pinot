@@ -29,10 +29,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -74,18 +73,15 @@ public class DataTableSerDeTest {
   public void testException(int dataTableVersion)
       throws IOException {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-    Exception exception = new UnsupportedOperationException("Caught exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
-    String expected = processingException.getMessage();
+    String expected = "Caught exception.";
 
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
-    dataTable.addException(processingException);
+    dataTable.addException(QueryErrorCode.QUERY_EXECUTION, expected);
     DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
     Assert.assertNull(newDataTable.getDataSchema());
     Assert.assertEquals(newDataTable.getNumberOfRows(), 0);
 
-    String actual = newDataTable.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
+    String actual = newDataTable.getExceptions().get(QueryErrorCode.QUERY_EXECUTION.getId());
     Assert.assertEquals(actual, expected);
   }
 

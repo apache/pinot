@@ -16,7 +16,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[30], EXPR$1=[11])",
-          "\n  LogicalTableScan(table=[[default, d]])",
+          "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -26,7 +26,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00])",
-          "\n  LogicalTableScan(table=[[default, d]])",
+          "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -36,7 +36,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[854755200000:BIGINT])",
-          "\n  LogicalTableScan(table=[[default, d]])",
+          "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -46,7 +46,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0) NOT NULL)])",
-          "\n  LogicalTableScan(table=[[default, d]])",
+          "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -56,7 +56,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalFilter(condition=[=(CAST($6):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
-          "\n  LogicalTableScan(table=[[default, d]])",
+          "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -66,7 +66,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(day=[854755200000:BIGINT])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -76,7 +76,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalFilter(condition=[=(DATETRUNC(_UTF-8'MONTH', $6), 1546300800000)])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -86,7 +86,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[_UTF-8'MONTH'])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -96,7 +96,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[_UTF-8'month 1':VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -106,7 +106,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[_UTF-8'nth':VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -116,7 +116,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[_UTF-8'NTH':VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -126,7 +126,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[599041711439609855:BIGINT])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -136,7 +136,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[X'8040340000000000004024000000000000':VARBINARY])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -146,7 +146,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[1.3416951966757335E7:DOUBLE])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -156,7 +156,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[12345678901234567890123456789.1234567890123456789:DECIMAL(1000, 0)])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -166,7 +166,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[14:BIGINT])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -176,7 +176,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[15:BIGINT])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -186,7 +186,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(1, 2, 3)])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -206,7 +206,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(0.1:DECIMAL(2, 1), 0.2:DECIMAL(2, 1), 0.3:DECIMAL(2, 1))])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -226,7 +226,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(_UTF-8'a', _UTF-8'b', _UTF-8'c')])",
-          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -249,7 +249,7 @@
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n      LogicalFilter(condition=[>(CAST($0):BIGINT NOT NULL, 14)])",
-          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -257,16 +257,6 @@
         "description": "select non-exist literal function",
         "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
         "expectedException": ".*No match found for function signature nonExistFun.*"
-      },
-      {
-        "description": "Literal only filter on subquery is simplified",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM (SELECT CASE WHEN col1 = 'abc123' THEN 'val1' ELSE 'val2' END as val FROM a) WHERE val in ('val1', 'val2')",
-        "output": [
-          "Execution Plan",
-          "\nLogicalProject(val=[CASE(=($0, _UTF-8'abc123'), _UTF-8'val1', _UTF-8'val2')])",
-          "\n  LogicalTableScan(table=[[default, a]])",
-          "\n"
-        ]
       }
     ]
   },
@@ -279,31 +269,6 @@
         "output": [
           "Execution Plan",
           "\nLogicalValues(tuples=[[]])",
-          "\n"
-        ]
-      },
-      {
-        "description": "AND filter on constants is simplified",
-        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM a GROUP BY __ts) SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts",
-        "output": [
-          "Execution Plan",
-          "\nLogicalProject(__ts=[1692057600000:BIGINT])",
-          "\n  PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
-          "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
-          "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
-          "\n          LogicalTableScan(table=[[default, a]])",
-          "\n"
-        ]
-      },
-      {
-        "description": "Search + OR filter on constants is simplified",
-        "sql": "EXPLAIN PLAN FOR WITH tmp2 AS (SELECT CASE WHEN col2 = 'VAL1' THEN 'A' ELSE col2 END AS cased FROM a) SELECT 1 FROM tmp2 WHERE ((cased = 'B') OR (cased = 'A'))",
-        "output": [
-          "Execution Plan",
-          "\nLogicalProject(EXPR$0=[1])",
-          "\n  LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'A':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'B':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'VAL1':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
-          "\n    LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       }

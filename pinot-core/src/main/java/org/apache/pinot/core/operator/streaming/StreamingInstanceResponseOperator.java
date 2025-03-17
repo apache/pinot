@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.streaming;
 
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -32,8 +31,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 public class StreamingInstanceResponseOperator extends InstanceResponseOperator {
   private static final String EXPLAIN_NAME = "STREAMING_INSTANCE_RESPONSE";
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamingInstanceResponseOperator.class);
 
   private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
   private final ResultsBlockStreamer _streamer;
@@ -89,11 +92,13 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
       }
     } catch (EarlyTerminationException e) {
       Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
-      return new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(
-          "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
-          e)));
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION,
+          "Cancelled while streaming results" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg));
+      return new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
     } catch (Exception e) {
-      return new InstanceResponseBlock(new ExceptionResultsBlock(QueryException.INTERNAL_ERROR, e));
+      QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL, e.getMessage());
+      LOGGER.warn("Caught exception while streaming results", e);
+      return new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
     } finally {
       if (_streamingCombineOperator != null) {
         _streamingCombineOperator.stop();

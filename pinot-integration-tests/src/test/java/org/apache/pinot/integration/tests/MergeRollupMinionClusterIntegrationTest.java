@@ -1031,8 +1031,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
     String sqlQuery = "SELECT count(*) FROM " + tableName;
     JsonNode expectedJson = postQuery(sqlQuery);
-    long[] expectedNumBucketsToProcess100Days = {3, 2, 1, 0, 3, 2, 1, 0};
-    long[] expectedNumBucketsToProcess200Days = {0, 0, 1, 1, 0, 0, 1, 1};
+    long[] expectedNumBucketsToProcess100Days = {2, 1, 0, 0, 3, 2, 1, 0};
+    long[] expectedNumBucketsToProcess200Days = {0, 0, 2, 1, 0, 0, 1, 1};
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     int numTasks = 0;
     TaskSchedulingContext context = new TaskSchedulingContext()

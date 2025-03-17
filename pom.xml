@@ -175,8 +175,8 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.30.33</aws.sdk.version>
-    <azure.sdk.version>1.2.31</azure.sdk.version>
+    <aws.sdk.version>2.30.38</aws.sdk.version>
+    <azure.sdk.version>1.2.32</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
     <janino.version>3.1.12</janino.version>
@@ -253,7 +253,7 @@
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
-    <curator.version>5.7.1</curator.version>
+    <curator.version>5.8.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
@@ -261,7 +261,7 @@
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
-    <paranamer.version>2.8</paranamer.version>
+    <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
     <okio.version>3.10.2</okio.version>
@@ -1375,8 +1375,8 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
-        <version>1.2.0</version>
+        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+        <version>1.3.0</version>
       </dependency>
 
       <!-- Metrics -->

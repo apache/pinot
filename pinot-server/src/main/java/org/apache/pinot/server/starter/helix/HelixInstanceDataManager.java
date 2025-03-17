@@ -199,6 +199,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public String getInstanceDataDir() {
+    return _instanceDataManagerConfig.getInstanceDataDir();
+  }
+
+  @Override
   public String getInstanceId() {
     return _instanceId;
   }

@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class QueryCancelledException extends RuntimeException {
+public class QueryCancelledException extends QueryException {
   public QueryCancelledException(String message) {
-    super(message);
+    super(QueryErrorCode.QUERY_CANCELLATION, message);
   }
 
   public QueryCancelledException(String message, Throwable cause) {
-    super(message, cause);
+    super(QueryErrorCode.QUERY_CANCELLATION, message, cause);
   }
 
   public QueryCancelledException(Throwable cause) {
-    super(cause);
+    super(QueryErrorCode.QUERY_CANCELLATION, cause);
   }
 }

@@ -27,5 +27,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 public interface RebalancePreChecker {
   void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService);
-  Map<String, String> check(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig);
+  Map<String, RebalancePreCheckerResult> check(String rebalanceJobId, String tableNameWithType,
+      TableConfig tableConfig);
 }
