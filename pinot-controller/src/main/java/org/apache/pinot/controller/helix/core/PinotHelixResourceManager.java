@@ -1881,6 +1881,11 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Validates if a minion instance is configured for each task type in the table config.
+   * This is useful to verify as a config validation to not miss out on the task execution.
+   * The validation will run only when the task is set to be scheduled (has the schedule config param set).
+   */
   @VisibleForTesting
   void validateTableTaskMinionInstanceTagConfig(TableConfig tableConfig) {
 
@@ -1892,12 +1897,18 @@ public class PinotHelixResourceManager {
 
     if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().getTaskTypeConfigsMap() != null) {
       tableConfig.getTaskConfig().getTaskTypeConfigsMap().forEach((taskType, taskTypeConfig) -> {
-        String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
-            CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
-        if (!minionInstanceTagSet.contains(taskInstanceTag)) {
-          throw new InvalidTableConfigException("Failed to find minion instances with tag: " + taskInstanceTag
-              + " for table: " + tableConfig.getTableName());
+
+        if (taskTypeConfig.containsKey(PinotTaskManager.SCHEDULE_KEY)) {
+          String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
+              CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+          if (!minionInstanceTagSet.contains(taskInstanceTag)) {
+            throw new InvalidTableConfigException("Failed to find minion instances with tag: " + taskInstanceTag
+                + " for table: " + tableConfig.getTableName()
+                + ". If the task is not required to run, remove the schedule parameter from the task config");
+          }
         }
+        // Skip the validation if the task is not scheduled to run, because it's possible that the task is not required
+        // but configs are still present if required in future.
       });
     }
   }
