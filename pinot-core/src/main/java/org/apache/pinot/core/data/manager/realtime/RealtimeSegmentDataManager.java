@@ -1459,9 +1459,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    // for partial upsert and dedup tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
+    // for partial upsert and dedup tables, do not release _partitionGroupConsumerSemaphore proactively and rely on
+    // offload() to release the semaphore. This ensures new consuming segment is not consuming until the segment
+    // replacement is complete.
     if (_allowConsumptionDuringDownload) {
       closeStreamConsumers();
     }
