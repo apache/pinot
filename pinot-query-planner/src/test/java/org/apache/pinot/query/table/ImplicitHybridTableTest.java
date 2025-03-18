@@ -195,7 +195,6 @@ public class ImplicitHybridTableTest {
   public static Object[][] hybridTableProvider() {
     //@formatter:off
     return new Object[][] {
-        {"b"},
         {"d"},
         {"e"},
         {"no_route_table"},
@@ -226,6 +225,21 @@ public class ImplicitHybridTableTest {
 
     assertNotNull(table.getAllPhysicalTables());
     assertEquals(table.getAllPhysicalTables().size(), 2);
+  }
+
+  /**
+   * Table 'b' has not time boundary. So it is considered a realtime table.
+   */
+  @Test
+  public void testWithNoTimeBoundary() {
+    ImplicitHybridTable table = ImplicitHybridTable.from("b", _routingManager, _tableCache);
+    assertTrue(table.isExists(), "The table should exist");
+    assertTrue(table.isRealtime(), "The table should be realtime");
+    assertNotNull(table.getRealtimeTables());
+    assertEquals(table.getRealtimeTables().size(), 1);
+    assertNotNull(table.getRealtimeTable());
+    assertEquals(table.getRealtimeTable().getTableNameWithType(),
+        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType("b"));
   }
 
   @DataProvider(name = "nonExistentTableProvider")
@@ -486,7 +500,7 @@ public class ImplicitHybridTableTest {
     return new Object[][] {
         {"a"},
         {"a_REALTIME"},
-        {"b"},
+        // {"b"}, This table is not a hybrid table because of no time boundary. Do not test it here.
         {"b_OFFLINE"},
         {"b_REALTIME"},
         {"c"},

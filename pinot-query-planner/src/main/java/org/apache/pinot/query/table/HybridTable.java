@@ -20,6 +20,7 @@ package org.apache.pinot.query.table;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 
 
 /**
@@ -100,6 +101,8 @@ public interface HybridTable {
    */
   boolean hasRealtime();
 
+  boolean hasTimeBoundaryInfo();
+
   /**
    * Retrieves the list of disabled physical tables.
    *
@@ -127,6 +130,8 @@ public interface HybridTable {
    * @return a list of realtime physical tables
    */
   List<PhysicalTable> getRealtimeTables();
+
+  TimeBoundaryInfo getTimeBoundaryInfo();
 
   /**
    * Retrieves the primary offline physical table.
