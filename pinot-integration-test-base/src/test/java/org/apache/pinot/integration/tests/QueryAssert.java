@@ -19,10 +19,15 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Locale;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.assertj.core.api.AbstractAssert;
 import org.assertj.core.api.AbstractSoftAssertions;
 
+/// A custom AssertJ assertion class for query responses that provides a fluent API for asserting on query responses.
+///
+/// The current implementation is partial and we should be adding more methods to support more use cases as more tests
+/// are migrated to this class instead of TestNG's Assert class.
 public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
   public QueryAssert(JsonNode jsonNode) {
     super(jsonNode, QueryAssert.class);
@@ -32,6 +37,9 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
     return new QueryAssert(actual);
   }
 
+  /// Obtains the first exception in the query response, returning it as a [QueryErrorAssert] object.
+  ///
+  /// It fails if there are no exceptions in the query response.
   public QueryErrorAssert firstException() {
     isNotNull();
     if (!actual.has("exceptions")) {
@@ -44,6 +52,15 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
     return new QueryErrorAssert(actual.get("exceptions").get(0));
   }
 
+
+  /// Obtains the first exception in the query response, returning it as a [QueryErrorAssert.Soft] object.
+  ///
+  /// It fails if there are no exceptions in the query response.
+  ///
+  /// Unlike [#firstException], this method returns a [QueryErrorAssert.Soft] object, which allows for multiple
+  /// assertions to be made before failing.
+  ///
+  /// See [Soft Assertions in AssertJ docs](https://assertj.github.io/doc/#assertj-core-soft-assertions)
   public QueryErrorAssert.Soft softFirstException() {
     isNotNull();
     if (!actual.has("exceptions")) {
@@ -63,6 +80,7 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
       return proxy(QueryAssert.class, JsonNode.class, actual);
     }
 
+    /// Closes this object, asserting that all soft assertions have passed.
     @Override
     public void close()
         throws Exception {
@@ -76,6 +94,10 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
       super(jsonNode, QueryErrorAssert.class);
     }
 
+    /// Asserts that the error code in the exception matches the given error code.
+    ///
+    /// In case of a mismatch, it fails with a message indicating the expected and actual error codes in both numeric
+    /// and enum form.
     public QueryErrorAssert hasErrorCode(QueryErrorCode errorCode) {
       isNotNull();
       int actualId = actual.get("errorCode").intValue();
@@ -92,14 +114,16 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
       return this;
     }
 
+    /// Asserts that the message in the exception contains the given message (ignoring case).
     public QueryErrorAssert containsMessage(String message) {
       isNotNull();
       if (actual == null || !actual.has("message")) {
         failWithMessage("Expected message %s but no message found in exception", message);
-      }
-      String actualMessage = actual.get("message").asText();
-      if (!actualMessage.contains(message)) {
-        failWithMessage("Expected message to contain <%s> but was <%s>", message, actualMessage);
+      } else {
+        String actualMessage = actual.get("message").asText();
+        if (!actualMessage.toLowerCase(Locale.US).contains(message.toLowerCase(Locale.US))) {
+          failWithMessage("Expected message to contain <%s> but was <%s>", message, actualMessage);
+        }
       }
       return this;
     }

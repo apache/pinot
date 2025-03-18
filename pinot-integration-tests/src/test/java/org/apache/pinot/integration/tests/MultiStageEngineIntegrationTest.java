@@ -1609,6 +1609,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     ObjectNode exception = (ObjectNode) exIterator.next();
 
     try (QueryAssert.QueryErrorAssert.Soft assertions = QueryAssert.assertThat(result).softFirstException()) {
+      // In case both error code and message are incorrect, instead of failing early, this fails with the following
+      // message:
+      // org.assertj.core.api.SoftAssertionError:
+      // The following 2 assertions failed:
+      // 1) Expected error code <BROKER_TIMEOUT (400)> but was <ACTUAL ERROR CODE>
+      // at QueryAssert$QueryErrorAssert$Soft.hasErrorCode(QueryAssert$QueryErrorAssert$Soft.java:119)
+      // 2) Expected message to contain <BrokerTimeoutError> but was <ACTUAL ERROR MESSAGE>
       assertions
           .hasErrorCode(QueryErrorCode.BROKER_TIMEOUT)
           .containsMessage(QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
