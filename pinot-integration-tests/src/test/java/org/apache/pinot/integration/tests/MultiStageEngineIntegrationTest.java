@@ -1399,7 +1399,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed only as table prefix. Will
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
   @Test
@@ -1441,7 +1441,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
         null);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
   @Test
@@ -1449,7 +1449,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
   @Test
@@ -1468,7 +1468,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
