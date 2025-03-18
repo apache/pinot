@@ -400,10 +400,13 @@ public class TableRebalancer {
       }
     }
 
+    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
+
     long estimatedAverageSegmentSizeInBytes = summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes();
     Set<String> allOriginalSegmentsIdealState = currentAssignment.keySet();
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
-        estimatedAverageSegmentSizeInBytes, allOriginalSegmentsIdealState);
+        estimatedAverageSegmentSizeInBytes, allOriginalSegmentsIdealState, segmentsToMonitor);
 
     // Record the beginning of rebalance
     _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
@@ -417,8 +420,6 @@ public class TableRebalancer {
     //    current instances as this is the best we can do, and can help the table get out of this state.
     // 2. Only check the segments to be moved because we don't need to maintain available replicas for segments not
     //    being moved, including segments with all replicas OFFLINE (error segments during consumption).
-    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
-
     int numReplicas = Integer.MAX_VALUE;
     for (String segment : segmentsToMove) {
       numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
@@ -459,7 +460,6 @@ public class TableRebalancer {
     //
     // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
     //       in the previous round are also converged.
-    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
@@ -550,7 +550,7 @@ public class TableRebalancer {
       // stats for any pending deletions that the EV-IS convergence couldn't catch (since deletions are only checked
       // for during convergence when lowDiskMode=true)
       rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
-          allOriginalSegmentsIdealState);
+          allOriginalSegmentsIdealState, null);
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
           targetAssignment, rebalanceContext);
 
@@ -1033,7 +1033,7 @@ public class TableRebalancer {
       if (externalView != null) {
         // Record external view and ideal state convergence status
         TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
-            estimateAverageSegmentSizeInBytes, allOriginalSegmentsIdealState);
+            estimateAverageSegmentSizeInBytes, allOriginalSegmentsIdealState, segmentsToMonitor);
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
