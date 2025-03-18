@@ -35,7 +35,6 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.Assert;
@@ -47,7 +46,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.RANGE;
 import static org.apache.pinot.query.planner.plannode.WindowNode.WindowFrameType.ROWS;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
@@ -58,8 +56,6 @@ import static org.testng.Assert.assertTrue;
 
 public class WindowAggregateOperatorTest {
   private AutoCloseable _mocks;
-  @Mock
-  private MultiStageOperator _input;
   @Mock
   private VirtualServerAddress _serverAddress;
 
@@ -79,7 +75,8 @@ public class WindowAggregateOperatorTest {
   public void testShouldHandleUpstreamErrorBlocks() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(ErrorMseBlock.fromException(new Exception("foo!")));
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .buildWithError(ErrorMseBlock.fromException(new Exception("foo!")));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -87,13 +84,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     MseBlock block = operator.nextBlock();
 
     // Then:
-    verify(_input, times(1)).nextBlock();
     assertTrue(block.isError(), "Input errors should propagate immediately");
   }
 
@@ -101,7 +97,7 @@ public class WindowAggregateOperatorTest {
   public void testShouldHandleEndOfStreamBlockWithNoOtherInputs() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -109,13 +105,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     MseBlock block = operator.nextBlock();
 
     // Then:
-    verify(_input, times(1)).nextBlock();
     assertTrue(block.isSuccess(), "EOS blocks should propagate");
   }
 
@@ -123,8 +118,9 @@ public class WindowAggregateOperatorTest {
   public void testShouldWindowAggregateOverSingleInputBlock() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+        .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -132,7 +128,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -147,8 +143,9 @@ public class WindowAggregateOperatorTest {
   public void testShouldWindowAggregateOverSingleInputBlockWithSameOrderByKeys() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+         .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -158,7 +155,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -173,15 +170,16 @@ public class WindowAggregateOperatorTest {
   public void testShouldWindowAggregateOverSingleInputBlockWithoutPartitionByKeys() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+        .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, List.of(), List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -196,8 +194,9 @@ public class WindowAggregateOperatorTest {
   public void testShouldWindowAggregateOverSingleInputBlockWithLiteralInput() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 3}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 3})
+        .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{
         INT, INT, DOUBLE
     });
@@ -205,7 +204,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.Literal(ColumnDataType.INT, 42)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -219,7 +218,7 @@ public class WindowAggregateOperatorTest {
   @Test
   public void testPartitionByWindowAggregateWithHashCollision() {
     // Given:
-    _input = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
+    MultiStageOperator input = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     DataSchema inputSchema = new DataSchema(new String[]{"arg", "group"}, new ColumnDataType[]{INT, STRING});
     DataSchema resultSchema =
         new DataSchema(new String[]{"arg", "group", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
@@ -227,7 +226,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(0)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -243,6 +242,7 @@ public class WindowAggregateOperatorTest {
   public void testShouldThrowOnUnknownAggFunction() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     List<Integer> keys = List.of(0);
     List<RexExpression.FunctionCall> aggCalls =
@@ -250,7 +250,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-        Integer.MIN_VALUE, Integer.MAX_VALUE);
+        Integer.MIN_VALUE, Integer.MAX_VALUE, input);
   }
 
   @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*Failed to instantiate "
@@ -259,6 +259,7 @@ public class WindowAggregateOperatorTest {
     // TODO: Remove this test when support is added for NTILE function
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema).buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     List<Integer> keys = List.of(0);
     List<RexExpression.FunctionCall> aggCalls =
@@ -266,7 +267,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-        Integer.MIN_VALUE, Integer.MAX_VALUE);
+        Integer.MIN_VALUE, Integer.MAX_VALUE, input);
   }
 
   @Test
@@ -274,12 +275,18 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    when(_input.nextBlock()).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
-                new Object[]{1, "foo"})).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
-                new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(3, "and")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .addRow(1, "foo")
+        .finishBlock()
+        .addRow(1, "foo")
+        .addRow(2, "foo")
+        .addRow(1, "numb")
+        .addRow(2, "the")
+        .addRow(3, "true")
+        .buildWithEos();
     DataSchema resultSchema = new DataSchema(new String[]{"group", "arg", "rank", "dense_rank"},
         new ColumnDataType[]{INT, STRING, LONG, LONG});
     List<Integer> keys = List.of(0);
@@ -290,7 +297,7 @@ public class WindowAggregateOperatorTest {
             new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.DENSE_RANK.name(), List.of()));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -311,11 +318,16 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    when(_input.nextBlock()).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
-        .thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{2, "the"},
-                new Object[]{3, "true"})).thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(3, "and")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .finishBlock()
+        .addRow(1, "foo")
+        .addRow(2, "foo")
+        .addRow(2, "the")
+        .addRow(3, "true")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "row_number"}, new ColumnDataType[]{INT, STRING, LONG});
     List<Integer> keys = List.of(0);
@@ -325,7 +337,7 @@ public class WindowAggregateOperatorTest {
         List.of(new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.ROW_NUMBER.name(), List.of()));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, ROWS,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -342,10 +354,15 @@ public class WindowAggregateOperatorTest {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    when(_input.nextBlock()).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
-            new Object[]{3, "true"})).thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(3, "and")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .finishBlock()
+        .addRow(1, "foo")
+        .addRow(2, "foo")
+        .addRow(3, "true")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -355,7 +372,7 @@ public class WindowAggregateOperatorTest {
     // RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (default window frame for ORDER BY)
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -371,8 +388,9 @@ public class WindowAggregateOperatorTest {
   public void testNonEmptyOrderByKeysMatchingPartitionByKeys() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(2, "foo")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(1);
@@ -381,7 +399,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(0)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -399,10 +417,13 @@ public class WindowAggregateOperatorTest {
     // like a PARTITION BY only query (since the final aggregation value won't change).
     // TODO: Test null direction handling once support for it is available
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "bar"}))
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{3, "foo"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(2, "foo")
+        .finishBlock()
+        .addRow(2, "bar")
+        .finishBlock()
+        .addRow(3, "foo")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(1);
@@ -411,7 +432,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(0)));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -428,23 +449,26 @@ public class WindowAggregateOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // TODO: it is necessary to produce two values here, the operator only throws on second
     // (see the comment in WindowAggregate operator)
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "metallica"}))
-        .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "pink floyd"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(2, "metallica")
+        .addRow(2, "pink floyd")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
     List<Integer> keys = List.of(0);
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, input);
 
     // When:
     MseBlock block = operator.nextBlock();
 
     // Then:
     assertTrue(block.isError(), "expected ERROR block from invalid computation");
-    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(1000).contains("String cannot be cast to class"),
+    assertTrue(((ErrorMseBlock) block).getErrorMessages()
+            .get(QueryErrorCode.UNKNOWN)
+            .contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
   }
 
@@ -452,8 +476,10 @@ public class WindowAggregateOperatorTest {
   public void testShouldPropagateWindowLimitError() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}, new Object[]{3, 4}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(new Object[]{2, 1})
+        .addBlock(new Object[]{3, 4})
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -463,7 +489,7 @@ public class WindowAggregateOperatorTest {
             PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1")));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint, input);
 
     // When:
     MseBlock block = operator.nextBlock();
@@ -478,8 +504,11 @@ public class WindowAggregateOperatorTest {
   public void testShouldHandleWindowWithPartialResultsWhenHitDataRowsLimit() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, 1}, new Object[]{3, 4}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .spied()
+        .addBlock(new Object[]{2, 1})
+        .addBlock(new Object[]{3, 4})
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -489,13 +518,13 @@ public class WindowAggregateOperatorTest {
             PinotHintOptions.WindowHintOptions.MAX_ROWS_IN_WINDOW, "1")));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint);
+            Integer.MIN_VALUE, Integer.MAX_VALUE, nodeHint, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
-    verify(_input).earlyTerminate();
+    verify(input).earlyTerminate();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2, 1, 1.0});
     MseBlock block2 = operator.nextBlock();
@@ -510,12 +539,18 @@ public class WindowAggregateOperatorTest {
   public void testLeadLagWindowFunction() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
-                new Object[]{1, "foo"})).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
-                new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(3, "and")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .addRow(1, "foo")
+        .finishBlock()
+        .addRow(1, "foo")
+        .addRow(2, "foo")
+        .addRow(1, "numb")
+        .addRow(2, "the")
+        .addRow(3, "true")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
@@ -528,7 +563,7 @@ public class WindowAggregateOperatorTest {
             List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.INT, 1))));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -554,12 +589,18 @@ public class WindowAggregateOperatorTest {
   public void testLeadLagWindowFunction2() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
-                new Object[]{1, "foo"})).thenReturn(
-            OperatorTestUtil.block(inputSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
-                new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addRow(3, "and")
+        .addRow(2, "bar")
+        .addRow(2, "foo")
+        .addRow(1, "foo")
+        .finishBlock()
+        .addRow(1, "foo")
+        .addRow(2, "foo")
+        .addRow(1, "numb")
+        .addRow(2, "the")
+        .addRow(3, "true")
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "lead", "lag"}, new ColumnDataType[]{INT, STRING, INT, INT});
     List<Integer> keys = List.of(0);
@@ -574,7 +615,7 @@ public class WindowAggregateOperatorTest {
                 new RexExpression.Literal(ColumnDataType.INT, 200))));
     WindowAggregateOperator operator =
         getOperator(inputSchema, resultSchema, keys, collations, aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MIN_VALUE, 0);
+            Integer.MIN_VALUE, 0, input);
 
     // When:
     List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
@@ -2823,8 +2864,9 @@ public class WindowAggregateOperatorTest {
       int collationFieldIndex, WindowNode.WindowFrameType frameType, int windowFrameLowerBound,
       int windowFrameUpperBound, RexExpression.FunctionCall functionCall, Object[][] rows) {
     DataSchema inputSchema = new DataSchema(inputSchemaCols, inputSchemaColTypes);
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, rows))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(OperatorTestUtil.block(inputSchema, rows))
+        .buildWithEos();
 
     String[] outputSchemaCols = new String[inputSchemaCols.length + 1];
     System.arraycopy(inputSchemaCols, 0, outputSchemaCols, 0, inputSchemaCols.length);
@@ -2838,15 +2880,16 @@ public class WindowAggregateOperatorTest {
     List<RexExpression.FunctionCall> aggCalls = List.of(functionCall);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(collationFieldIndex));
     return getOperator(inputSchema, resultSchema, partitionKeys, collations, aggCalls, frameType, windowFrameLowerBound,
-        windowFrameUpperBound);
+        windowFrameUpperBound, input);
   }
 
   @Test
   public void testShouldThrowOnWindowFrameWithInvalidOffsetBounds() {
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -2854,11 +2897,11 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
-        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, 5, 2));
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, 5, 2, input));
     assertEquals(e.getMessage(), "Window frame lower bound can't be greater than upper bound");
 
     e = Assert.expectThrows(IllegalStateException.class,
-        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, -2, -3));
+        () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, ROWS, -2, -3, input));
     assertEquals(e.getMessage(), "Window frame lower bound can't be greater than upper bound");
   }
 
@@ -2867,8 +2910,9 @@ public class WindowAggregateOperatorTest {
     // TODO: Remove this test when support for RANGE window frames with offset PRECEDING / FOLLOWING is added
     // Given:
     DataSchema inputSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator input = new BlockListMultiStageOperator.Builder(inputSchema)
+        .addBlock(OperatorTestUtil.block(inputSchema, new Object[]{2, "foo"}))
+        .buildWithEos();
     DataSchema resultSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     List<Integer> keys = List.of(0);
@@ -2877,28 +2921,29 @@ public class WindowAggregateOperatorTest {
     // Then:
     IllegalStateException e = Assert.expectThrows(IllegalStateException.class,
         () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE, 5,
-            Integer.MAX_VALUE));
+            Integer.MAX_VALUE, input));
     assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
 
     e = Assert.expectThrows(IllegalStateException.class,
         () -> getOperator(inputSchema, resultSchema, keys, List.of(), aggCalls, WindowNode.WindowFrameType.RANGE,
-            Integer.MAX_VALUE, 5));
+            Integer.MAX_VALUE, 5, input));
     assertEquals(e.getMessage(), "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls,
-      WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint) {
-    return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), _input, inputSchema,
+      WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, PlanNode.NodeHint nodeHint,
+      MultiStageOperator input) {
+    return new WindowAggregateOperator(OperatorTestUtil.getTracingContext(), input, inputSchema,
         new WindowNode(-1, resultSchema, nodeHint, List.of(), keys, collations, aggCalls, windowFrameType, lowerBound,
             upperBound, List.of()));
   }
 
   private WindowAggregateOperator getOperator(DataSchema inputSchema, DataSchema resultSchema, List<Integer> keys,
       List<RelFieldCollation> collations, List<RexExpression.FunctionCall> aggCalls,
-      WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound) {
+      WindowNode.WindowFrameType windowFrameType, int lowerBound, int upperBound, MultiStageOperator input) {
     return getOperator(inputSchema, resultSchema, keys, collations, aggCalls, windowFrameType, lowerBound, upperBound,
-        PlanNode.NodeHint.EMPTY);
+        PlanNode.NodeHint.EMPTY, input);
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
