@@ -30,6 +30,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -61,6 +62,8 @@ public class MailboxSendOperatorTest {
     _mocks = openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(1234);
+
+    when(_input.calculateStats()).thenReturn(MultiStageQueryStats.emptyStats(1));
   }
 
   @AfterMethod
@@ -105,7 +108,7 @@ public class MailboxSendOperatorTest {
   public void shouldNotSendErrorBlockWhenTimedOut()
       throws Exception {
     // Given:
-    MseBlock dataBlock = getDummyDataBlock();
+    MseBlock.Data dataBlock = getDummyDataBlock();
     when(_input.nextBlock()).thenReturn(dataBlock);
     doThrow(new TimeoutException()).when(_exchange).send(any());
 
@@ -114,9 +117,11 @@ public class MailboxSendOperatorTest {
 
     // Then:
     assertTrue(block.isError(), "expected error block to propagate");
-    ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
-    verify(_exchange).send(captor.capture(), anyList());
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
+    verify(_exchange).send(captor.capture());
     assertSame(captor.getValue(), dataBlock, "expected to send data block to exchange");
+
+    verify(_exchange, never()).send(any(), anyList());
   }
 
   @Test
@@ -196,7 +201,7 @@ public class MailboxSendOperatorTest {
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
   }
 
-  private static MseBlock getDummyDataBlock() {
+  private static MseBlock.Data getDummyDataBlock() {
     return OperatorTestUtil.block(new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT}),
         new Object[]{1});
   }
