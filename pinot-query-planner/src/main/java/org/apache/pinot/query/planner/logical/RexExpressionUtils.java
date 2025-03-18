@@ -249,7 +249,7 @@ public class RexExpressionUtils {
         value = ((Double) value).floatValue();
         break;
       case DOUBLE:
-        value = value instanceof BigDecimal ? ((BigDecimal) value).doubleValue() : value;
+        value = ((Number) value).doubleValue();
         break;
       case BIG_DECIMAL:
         break;
