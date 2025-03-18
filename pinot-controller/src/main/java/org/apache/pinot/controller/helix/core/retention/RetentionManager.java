@@ -66,7 +66,9 @@ import org.slf4j.LoggerFactory;
  */
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
+  public static final int DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE = 100;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
+  private final boolean _untrackedSegmentDeletionEnabled;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
@@ -75,7 +77,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
-
+    _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
 
@@ -116,7 +118,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
     String retentionTimeValue = validationConfig.getRetentionTimeValue();
-    int untrackedSegmentsDeletionBatchSize = validationConfig.getUntrackedSegmentsDeletionBatchSize();
+    int untrackedSegmentsDeletionBatchSize =
+        validationConfig.getUntrackedSegmentsDeletionBatchSize() != null ? Integer.parseInt(
+            validationConfig.getUntrackedSegmentsDeletionBatchSize()) : DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
 
     RetentionStrategy retentionStrategy;
     try {
@@ -223,8 +227,14 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize) {
     List<String> segmentsToDelete = new ArrayList<>();
 
+    if (!_untrackedSegmentDeletionEnabled) {
+      LOGGER.info(
+          "Not scanning deep store for untracked segments for table: {}", tableNameWithType);
+      return segmentsToDelete;
+    }
+
     if (untrackedSegmentsDeletionBatchSize <= 0) {
-      // return an empty list in case untracked segment deletion is not configured
+      // return an empty list in case untracked segment deletion batch size is configured < 0 in table config
       LOGGER.info(
           "Not scanning deep store for untracked segments for table: {} as untrackedSegmentsDeletionBatchSize is set "
               + "to: {}",

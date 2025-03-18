@@ -55,7 +55,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
-  private int _untrackedSegmentsDeletionBatchSize;
+  private String _untrackedSegmentsDeletionBatchSize;
 
   /**
    * @deprecated Use {@link InstanceAssignmentConfig} instead
@@ -253,11 +253,11 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _minimizeDataMovement = minimizeDataMovement;
   }
 
-  public int getUntrackedSegmentsDeletionBatchSize() {
+  public String getUntrackedSegmentsDeletionBatchSize() {
     return _untrackedSegmentsDeletionBatchSize;
   }
 
-  public void setUntrackedSegmentsDeletionBatchSize(int untrackedSegmentsDeletionBatchSize) {
+  public void setUntrackedSegmentsDeletionBatchSize(String untrackedSegmentsDeletionBatchSize) {
     _untrackedSegmentsDeletionBatchSize = untrackedSegmentsDeletionBatchSize;
   }
 }
