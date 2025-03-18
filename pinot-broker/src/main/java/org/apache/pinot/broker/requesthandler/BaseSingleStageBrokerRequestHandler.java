@@ -458,7 +458,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         offlineTableName = null;
       }
     }
-    if (hybridTable.isHybrid()) {
+    if (offlineTableName != null && realtimeTableName != null) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
@@ -479,7 +479,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (hybridTable.isOffline()) {
+    } else if (offlineTableName != null) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
