@@ -19,12 +19,11 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -48,7 +47,7 @@ public class BroadcastExchangeTest {
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    _block = new RowHeapDataBlock(Collections.emptyList(), DataSchema.EXPLAIN_RESULT_SCHEMA);
+    _block = OperatorTestUtil.block(DataSchema.EXPLAIN_RESULT_SCHEMA, new Object[] {"something", 1, 2});
   }
 
   @AfterMethod
