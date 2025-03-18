@@ -425,6 +425,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         hybridTable.getOfflineTable() != null ? hybridTable.getOfflineTable().getTableConfig() : null;
     TableConfig realtimeTableConfig =
         hybridTable.getRealtimeTable() != null ? hybridTable.getRealtimeTable().getTableConfig() : null;
+    TimeBoundaryInfo timeBoundaryInfo = hybridTable.getTimeBoundaryInfo();
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
@@ -449,19 +450,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    TimeBoundaryInfo timeBoundaryInfo = null;
-    if (offlineTableName != null && realtimeTableName != null) {
-      // Time boundary info might be null when there is no segment in the offline table, query real-time side only
-      timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
-      if (timeBoundaryInfo == null) {
-        LOGGER.debug("No time boundary info found for hybrid table: {}", rawTableName);
-        offlineTableName = null;
-      }
-    }
-    if (offlineTableName != null && realtimeTableName != null) {
+
+    if (hybridTable.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
+      assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
@@ -479,7 +473,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (offlineTableName != null) {
+    } else if (hybridTable.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
