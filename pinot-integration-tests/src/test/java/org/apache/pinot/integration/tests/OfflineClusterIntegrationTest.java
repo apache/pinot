@@ -826,16 +826,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Enable minimizeDataMovement
     tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS);
+        "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS, "",
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+
+    // Override minimizeDataMovement
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DISABLE);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "minimizeDataMovement is enabled in table config but it's overridden with disabled",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
+
+    // Use default minimizeDataMovement and disable it in table config
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(false));
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.DEFAULT);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "minimizeDataMovement is not enabled but instance assignment is allowed",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
+    rebalanceConfig.setMinimizeDataMovement(RebalanceConfig.MinimizeDataMovementOptions.ENABLE);
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
@@ -843,7 +862,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
@@ -852,7 +871,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS);
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a schema change
     Schema schema = createSchema();
@@ -862,31 +881,44 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add minimizeDataMovement
     tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN, "",
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
     tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(false));
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
-        "minimizeDataMovement is not enabled but instance assignment is allowed",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN);
+        "minimizeDataMovement is enabled",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setMinAvailableReplicas(-1);
     tableConfig.setInstanceAssignmentConfigMap(null);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN,
+        "", RebalancePreCheckerResult.PreCheckStatus.PASS);
+
+    // Rebalance is expected to fail because there's one available replica. Rebalance config check should warn
+    rebalanceConfig.setMinAvailableReplicas(1);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN,
+        "The number of replicas (1) is less than minAvailableReplicas. The rebalance would fail.\n",
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Disable dry-run
@@ -903,15 +935,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
       String expectedMinimizeDataMovement, RebalancePreCheckerResult.PreCheckStatus expectedMinimizeDataMovementStatus,
-      String expectedNeedsReloadMessage, RebalancePreCheckerResult.PreCheckStatus expectedNeedsReloadStatus) {
+      String expectedNeedsReloadMessage, RebalancePreCheckerResult.PreCheckStatus expectedNeedsReloadStatus,
+      String expectedRebalanceConfig, RebalancePreCheckerResult.PreCheckStatus expectedRebalanceConfigStatus) {
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 4);
+    assertEquals(preChecksResult.size(), 5);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         expectedMinimizeDataMovementStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
@@ -920,6 +954,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         expectedNeedsReloadStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
         expectedNeedsReloadMessage);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
+        expectedRebalanceConfigStatus);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
+        expectedRebalanceConfig);
     // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
     // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
     // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if

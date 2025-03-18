@@ -314,7 +314,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
     }
 
-    if (rebalanceConfig.isDowntime() && numReplicas > 1) {
+    if (rebalanceConfig.isDowntime() && !segmentsToMove.isEmpty() && numReplicas > 1) {
       pass = false;
       message.append("Number of replicas (")
           .append(numReplicas)
