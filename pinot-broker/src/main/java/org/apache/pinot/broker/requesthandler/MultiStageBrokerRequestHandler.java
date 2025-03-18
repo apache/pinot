@@ -351,7 +351,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
       } finally {
-        Tracing.getThreadAccountant().clear();
+        Tracing.ThreadAccountantOps.clear();
         onQueryFinish(requestId);
       }
       long executionEndTimeNs = System.nanoTime();
