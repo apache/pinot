@@ -24,7 +24,6 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -174,11 +173,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     // Terminate when receiving exception block
     Map<Integer, String> exceptions = _exceptions;
     if (exceptions != null) {
-      EnumMap<QueryErrorCode, String> errorMap = new EnumMap<>(QueryErrorCode.class);
-      for (Map.Entry<Integer, String> entry : exceptions.entrySet()) {
-        errorMap.put(QueryErrorCode.fromErrorCode(entry.getKey()), entry.getValue());
-      }
-      return new ErrorMseBlock(errorMap);
+      return new ErrorMseBlock(QueryErrorCode.fromKeyMap(exceptions));
     }
     if (resultsBlock == LAST_RESULTS_BLOCK) {
       return SuccessMseBlock.INSTANCE;

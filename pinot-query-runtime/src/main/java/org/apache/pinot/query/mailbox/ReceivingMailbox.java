@@ -23,7 +23,6 @@ import com.google.errorprone.annotations.ThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -118,11 +117,8 @@ public class ReceivingMailbox {
       if (exceptions.isEmpty()) {
         block = SuccessMseBlock.INSTANCE;
       } else {
-        EnumMap<QueryErrorCode, String> errorMap = new EnumMap<>(QueryErrorCode.class);
-        for (Map.Entry<Integer, String> entry : exceptions.entrySet()) {
-          errorMap.put(QueryErrorCode.fromErrorCode(entry.getKey()), entry.getValue());
-        }
-        setErrorBlock(new ErrorMseBlock(errorMap), dataBlock.getStatsByStage());
+        Map<QueryErrorCode, String> exceptionsByQueryError = QueryErrorCode.fromKeyMap(exceptions);
+        setErrorBlock(new ErrorMseBlock(exceptionsByQueryError), dataBlock.getStatsByStage());
         return ReceivingMailboxStatus.FIRST_ERROR;
       }
     } else {
