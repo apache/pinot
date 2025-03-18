@@ -29,7 +29,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
-import org.apache.pinot.spi.trace.LoggerConstants;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -38,13 +38,17 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 
 /**
- * The <code>ServerQueryRequest</code> class encapsulates the query related information as well as the query processing
- * context.
+ * The <code>ServerQueryRequest</code> class encapsulates the <b>SSE</b> query related information as well as the query
+ * processing context.
  * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
  * per segment basis.
+ *
+ * Please notice that although given the name of this class seems to indicate that it applies to all request, in fact it
+ * is only used for SSE queries or the leaf stages in MSE.
  */
 public class ServerQueryRequest {
   private final long _requestId;
+  private final String _cid;
   private final String _brokerId;
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
@@ -59,13 +63,20 @@ public class ServerQueryRequest {
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
+  /**
+   * This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
+   */
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
     this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
   }
 
+  /**
+   * This is called from by MSE to create a ServerQueryRequest to be used in the leaf stages.
+   */
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
       boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
+    _cid = instanceRequest.getCid() != null ? instanceRequest.getCid() : Long.toString(_requestId);
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = enableStreaming;
@@ -77,12 +88,19 @@ public class ServerQueryRequest {
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
   }
 
+  /**
+   * This is called from the grpc SSE server to create a ServerQueryRequest from the grpc request.
+   *
+   * Notice that this is not used for MSE, which only build ServerQueryRequest using
+   * {@link #ServerQueryRequest(InstanceRequest, ServerMetrics, long, boolean)}.
+   */
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
       throws Exception {
     long queryArrivalTimeMs = System.currentTimeMillis();
 
     Map<String, String> metadata = serverRequest.getMetadataMap();
     _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
+    _cid = metadata.getOrDefault(Request.MetadataKeys.CORRELATION_ID, Long.toString(_requestId));
     _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
     _enableTrace = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_TRACE));
     _enableStreaming = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_STREAMING));
@@ -94,6 +112,7 @@ public class ServerQueryRequest {
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
     if (payloadType.equalsIgnoreCase(Request.PayloadType.SQL)) {
+      QueryThreadContext.setSql(serverRequest.getSql());
       brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(serverRequest.getSql());
     } else if (payloadType.equalsIgnoreCase(Request.PayloadType.BROKER_REQUEST)) {
       brokerRequest = new BrokerRequest();
@@ -118,6 +137,7 @@ public class ServerQueryRequest {
 
     // Initialize metadata
     _requestId = Long.parseLong(metadata.getOrDefault(Request.MetadataKeys.REQUEST_ID, "0"));
+    _cid = metadata.getOrDefault(Request.MetadataKeys.CORRELATION_ID, Long.toString(_requestId));
     _brokerId = metadata.getOrDefault(Request.MetadataKeys.BROKER_ID, "unknown");
     _enableTrace = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_TRACE, "false"));
     _enableStreaming = Boolean.parseBoolean(metadata.getOrDefault(Request.MetadataKeys.ENABLE_STREAMING, "false"));
@@ -174,11 +194,9 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
-  public void registerInMdc() {
-    LoggerConstants.QUERY_ID_KEY.registerInMdcIfNotSet(String.valueOf(_requestId));
-  }
-
-  public void unregisterFromMdc() {
-    LoggerConstants.QUERY_ID_KEY.unregisterFromMdc();
+  public void registerOnQueryThreadLocal() {
+    // Notice that we register the request id and not the query id.
+    QueryThreadContext.setIds(_requestId, _cid);
+    QueryThreadContext.setBrokerId(_brokerId);
   }
 }
