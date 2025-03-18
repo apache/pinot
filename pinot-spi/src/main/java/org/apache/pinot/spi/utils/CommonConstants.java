@@ -71,6 +71,7 @@ public class CommonConstants {
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
+  public static final String QUERY_WORKLOAD = "queryWorkload";
 
   /**
    * The state of the consumer for a given segment
@@ -610,6 +611,9 @@ public class CommonConstants {
       public static class QueryOptionValue {
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
+      // QueryWorkload can be applied to a collection of queries and it is unique across helix cluster.
+      // When specified in the query, based on node characteristics, the query will be routed to the appropriate node.
+      public static final String QUERY_WORKLOAD_NAME = "queryWorkloadName";
     }
 
     public static class FailureDetector {

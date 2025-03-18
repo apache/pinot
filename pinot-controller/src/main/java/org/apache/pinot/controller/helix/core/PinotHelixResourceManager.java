@@ -105,6 +105,7 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -160,6 +161,10 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
+import org.apache.pinot.controller.workload.splitter.InstancesInfo;
+import org.apache.pinot.controller.workload.selector.QueryWorkloadInstanceSelectorHandler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -175,6 +180,9 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
+import org.apache.pinot.spi.config.workload.InstanceCost;
+import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -243,6 +251,8 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private final QueryWorkloadInstanceSelectorHandler _queryWorkloadInstanceSelectorHandler;
+  private final CostSplitter _costSplitter;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -272,6 +282,9 @@ public class PinotHelixResourceManager {
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService);
+    // TODO: Make the cost splitter configurable
+    _costSplitter = new DefaultCostSplitter();
+    _queryWorkloadInstanceSelectorHandler = new QueryWorkloadInstanceSelectorHandler(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -563,6 +576,11 @@ public class PinotHelixResourceManager {
   public List<InstanceConfig> getAllMinionInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isMinion(instance.getId())).collect(Collectors.toList());
+  }
+
+  public List<String> getAllServerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isServer)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -3425,6 +3443,28 @@ public class PinotHelixResourceManager {
     return tableConfigs;
   }
 
+
+  public List<String> getServerInstancesFor(String tableName) {
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    TableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    Set<String> serverInstances = new HashSet<>();
+    List<InstanceConfig> instanceConfigs = HelixHelper.getInstanceConfigs(_helixZkManager);
+    TenantConfig tenantConfig = null;
+    if (offlineTableConfig != null) {
+       tenantConfig = offlineTableConfig.getTenantConfig();
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractOfflineServerTag(tenantConfig)));
+    }
+    if (realtimeTableConfig != null) {
+      tenantConfig = realtimeTableConfig.getTenantConfig();
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractConsumingServerTag(tenantConfig)));
+      serverInstances.addAll(
+          HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.extractCompletedServerTag(tenantConfig)));
+    }
+    return new ArrayList<>(serverInstances);
+  }
+
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     Preconditions.checkNotNull(tableConfig);
@@ -4604,6 +4644,72 @@ public class PinotHelixResourceManager {
       tagMinInstanceMap.put(brokerTag, 1);
     }
     return tagMinInstanceMap;
+  }
+
+  @Nullable
+  public List<QueryWorkloadConfig> getQueryWorkloadConfigs() throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfigs(_propertyStore);
+  }
+
+  @Nullable
+  public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) throws Exception {
+    return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, queryWorkloadName);
+  }
+
+  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
+    if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
+      throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
+          + queryWorkloadConfig.getQueryWorkloadName());
+    }
+    // Propagate the query workload config to all nodes in the query workload config
+    // TODO: Add support for propagating for specific instances where they has been a change in the NodeConfig
+    propagate(queryWorkloadConfig);
+  }
+
+  private void propagate(QueryWorkloadConfig queryWorkloadConfig) {
+    Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
+    String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
+
+    nodeConfigs.forEach((nodeType, nodeConfig) -> {
+      // Resolve the instances based on the node type and node config
+      Set<String> instances = _queryWorkloadInstanceSelectorHandler.resolveInstances(nodeType, nodeConfig);
+      // Map of instance to instance cost
+      Map<String, InstanceCost> instanceCostMap = _costSplitter.getInstanceCostMap(nodeConfig,
+          new InstancesInfo(instances));
+      // Map of instance to query workload refresh message
+      Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey,
+              entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
+     sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+    });
+  }
+
+  public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
+    instanceToRefreshMessageMap.forEach((instance, message) -> {
+      Criteria criteria = new Criteria();
+      criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      criteria.setInstanceName(instance);
+      criteria.setSessionSpecific(true);
+
+      int numMessagesSent = _helixZkManager.getMessagingService().send(criteria, message, null, -1);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
+      } else {
+        LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+      }
+    });
+  }
+
+  public void deleteQueryWorkloadConfig(String workload) {
+    ZKMetadataProvider.deleteQueryWorkloadConfig(_propertyStore, workload);
+  }
+
+  public QueryWorkloadInstanceSelectorHandler getQueryWorkloadInstanceSelectorHandler() {
+    return _queryWorkloadInstanceSelectorHandler;
+  }
+
+  public CostSplitter getCostSplitter() {
+    return _costSplitter;
   }
 
   /*
