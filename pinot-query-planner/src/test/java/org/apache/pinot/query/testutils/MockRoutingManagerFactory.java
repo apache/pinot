@@ -178,11 +178,22 @@ public class MockRoutingManagerFactory {
       return _serverInstances;
     }
 
+    @Override
+    public boolean isTableDisabled(String tableNameWithType) {
+      return false;
+    }
+
     @Nullable
     @Override
     public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
       String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
       return _routingTableMap.get(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+      return null;
     }
 
     @Nullable

@@ -49,4 +49,6 @@ public interface SegmentSelector {
    * (table) without overlap.
    */
   Set<String> select(BrokerRequest brokerRequest);
+
+  Set<String> select(BrokerRequest brokerRequest, String tableNameWithType);
 }
