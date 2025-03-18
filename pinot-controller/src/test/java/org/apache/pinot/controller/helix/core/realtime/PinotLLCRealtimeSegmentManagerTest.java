@@ -1395,7 +1395,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testReduceSegmentSizeAndReset() {
-    // Set up a new table with 2 replicas, 5 instances, 4 partition
+    // Set up a new table with 2 replicas, 5 instances, 4 partitions
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);

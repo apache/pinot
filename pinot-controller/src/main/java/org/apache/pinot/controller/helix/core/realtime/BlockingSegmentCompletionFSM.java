@@ -186,8 +186,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * cannot build segment due to non-recoverable error.
    * In most of cases, when such request is sent, the error should be deterministic. However, due to possible data lost,
    * replicas may not hold exact same data and some of them might be able to build the segment.
-   * If the FSM _state indicates that one replica starts to commit.
-   * It means immutable segment can be created successfully, returns true.
+   * If the FSM _state indicates that one replica starts to commit, it means immutable segment can be
+   * created successfully, returns true.
    *
    * @return boolean
    */
