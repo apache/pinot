@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
+import React, {ReactNode} from 'react';
 import {
   Button,
   Dialog,
@@ -68,7 +68,8 @@ type Props = {
   disableBackdropClick?: boolean,
   disableEscapeKeyDown?: boolean,
   showTitleDivider?: boolean,
-  showFooterDivider?: boolean
+  showFooterDivider?: boolean,
+  moreActions?: ReactNode
 };
 
 export default function CustomDialog({
@@ -85,7 +86,8 @@ export default function CustomDialog({
   disableBackdropClick = false,
   disableEscapeKeyDown = false,
   showTitleDivider = false,
-  showFooterDivider = false
+  showFooterDivider = false,
+  moreActions
 }: Props) {
 
   const classes = useStyles();
@@ -109,11 +111,12 @@ export default function CustomDialog({
       {showFooterDivider && <Divider style={{ marginBottom: 10 }} />}
       <DialogActions>
         {showCancelBtn &&
-        <CancelButton onClick={handleClose} variant="outlined">
+        <CancelButton onClick={handleClose}  style={{ textTransform: 'none' }} variant="outlined">
           {btnCancelText || 'Cancel'}
         </CancelButton>}
+        {moreActions}
         {showOkBtn &&
-        <Button onClick={handleSave} variant="outlined" color="primary">
+        <Button onClick={handleSave} variant="contained" style={{ textTransform: 'none' }} color="primary">
           {btnOkText || 'Save'}
         </Button>}
       </DialogActions>

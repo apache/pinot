@@ -31,7 +31,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemIcon, Divider
+  ListItemIcon,
+  Divider, Button
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
@@ -50,6 +51,14 @@ type Props = {
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
 };
 
+const DryRunAction = ({ handleOnRun }: { handleOnRun: () => void }) => {
+  return (
+      <Button onClick={handleOnRun} variant="outlined" style={{ textTransform: 'none' }} color="primary">
+        Dry Run
+      </Button>
+  );
+}
+
 export default function RebalanceServerTableOp({
   hideModal,
   tableName,
@@ -67,9 +76,19 @@ export default function RebalanceServerTableOp({
     }
   };
 
-  const handleSave = async (event) => {
+  const handleSave = async () => {
     const data = getData();
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, data);
+    setRebalanceResponse(response);
+  };
+
+  const handleDryRun = async () => {
+    const data = getData();
+    const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, {
+      ...data,
+      dryRun: true,
+      preChecks: true
+    });
     setRebalanceResponse(response);
   };
 
@@ -80,32 +99,29 @@ export default function RebalanceServerTableOp({
     });
   }
 
+
   return (
     <Dialog
       showTitleDivider
       showFooterDivider
+      size='md'
       open={true}
       handleClose={hideModal}
       title={<RebalanceServerDialogHeader />}
       handleSave={handleSave}
+      btnOkText='Rebalance'
       showOkBtn={!rebalanceResponse}
+      moreActions={!rebalanceResponse ? <DryRunAction handleOnRun={handleDryRun} /> : null}
     >
         {!rebalanceResponse ?
           <Box flexDirection="column">
-            <RebalanceServerConfigurationSection sectionTitle='Preparation'>
+            <RebalanceServerConfigurationSection sectionTitle='Before you begin'>
               <Alert color='info' icon={<InfoOutlinedIcon fontSize='small' />}>
                 <Typography variant='body2'>
-                  It is strongly recommended to run rebalance with these options enabled prior to running the actual rebalance.
+                  It is strongly recommended to run once via "Dry Run" with the options enabled prior to running the actual "Rebalance" operation.
                   This is needed to verify that rebalance will do what's expected.
                 </Typography>
               </Alert>
-              <Grid container spacing={2}>
-                {rebalanceServerOptions.filter(option => option.isStatsGatheringConfig).map((option) => (
-                    <Grid item xs={12} key={`stats-gathering-${option.name}`}>
-                      <RebalanceServerConfigurationOption option={option} handleConfigChange={handleConfigChange} />
-                    </Grid>
-                ))}
-              </Grid>
             </RebalanceServerConfigurationSection>
             <Divider style={{ marginBottom: 20 }} />
             <RebalanceServerConfigurationSection sectionTitle='Basic Options'>

@@ -1,9 +1,5 @@
 import {
-    Box,
-    FormControl,
-    MenuItem,
-    Select,
-    Typography
+    Box, FormControl, MenuItem, Select, TextField, Typography
 } from "@material-ui/core";
 import React, {useState} from "react";
 import {RebalanceServerOption} from "../RebalanceServerOptions";
@@ -23,19 +19,25 @@ export const RebalanceServerConfigurationOptionSelect = (
         <Box display='flex' flexDirection='column'>
             <FormControl fullWidth={true}>
                 <RebalanceServerConfigurationOptionLabel option={option} />
-                <Select
+                <TextField
                     variant='outlined'
-                    id={`rebalance-server-number-select-${option.name}`}
+                    fullWidth
+                    style={{ width: '100%' }}
+                    size='small'
+                    select
+                    id={`rebalance-server-select-input-${option.name}`}
                     value={value}
                     onChange={(e) => {
-                        handleConfigChange({
-                            [option.name]: e.target.value as string
-                        })
-                        setValue(e.target.value as string);
-                    }}
-                >
-                    {option.allowedValues.map((allowedValue) => (<MenuItem key={allowedValue} value={allowedValue}>{allowedValue}</MenuItem>))}
-                </Select>
+                        handleConfigChange(
+                            {
+                                [option.name]: e.target.value
+                            });
+                        setValue(e.target.value);
+                    }}>
+                    {option.allowedValues.map((allowedValue) => (
+                        <MenuItem key={allowedValue} value={allowedValue}>{allowedValue}</MenuItem>
+                    ))}
+                </TextField>
             </FormControl>
             <Typography variant='caption'>{option.description}</Typography>
         </Box>
