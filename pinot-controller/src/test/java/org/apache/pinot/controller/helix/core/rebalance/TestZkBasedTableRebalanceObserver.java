@@ -56,7 +56,7 @@ public class TestZkBasedTableRebalanceObserver {
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(-1,
-        source.keySet());
+        source.keySet(), source.keySet());
     observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
     assertEquals(observer.getNumUpdatesToZk(), 1);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source, rebalanceContext);

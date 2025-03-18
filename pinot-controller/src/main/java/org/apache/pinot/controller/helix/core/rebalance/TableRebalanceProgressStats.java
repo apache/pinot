@@ -49,11 +49,13 @@ public class TableRebalanceProgressStats {
     // Total segments processed so far
     public int _totalRemainingSegmentsToBeAdded; // across all replicas
     public int _totalRemainingSegmentsToBeDeleted; // across all replicas
+    // Total new segments stats (not tracked by rebalance)
+    public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
     // Derived
     public double _percentageTotalSegmentsAddsRemaining;
     public double _percentageTotalSegmentDeletesRemaining;
-    public long _estimatedTimeToCompleteAddsInSeconds;
-    public long _estimatedTimeToCompleteDeletesInSeconds;
+    public double _estimatedTimeToCompleteAddsInSeconds;
+    public double _estimatedTimeToCompleteDeletesInSeconds;
     public long _averageSegmentSizeInBytes;
     public long _totalEstimatedDataToBeMovedInBytes;
     // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
@@ -64,6 +66,7 @@ public class TableRebalanceProgressStats {
       _totalSegmentsToBeDeleted = 0;
       _totalRemainingSegmentsToBeAdded = 0;
       _totalRemainingSegmentsToBeDeleted = 0;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
       _percentageTotalSegmentsAddsRemaining = 0.0;
       _percentageTotalSegmentDeletesRemaining = 0.0;
       _estimatedTimeToCompleteAddsInSeconds = 0;
@@ -182,6 +185,8 @@ public class TableRebalanceProgressStats {
         || base._totalSegmentsToBeDeleted != compare._totalSegmentsToBeDeleted
         || base._totalRemainingSegmentsToBeAdded != compare._totalRemainingSegmentsToBeAdded
         || base._totalRemainingSegmentsToBeDeleted != compare._totalRemainingSegmentsToBeDeleted
+        || base._totalUniqueNewUntrackedSegmentsDuringRebalance
+        != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
         || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
         || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
         || base._estimatedTimeToCompleteAddsInSeconds != compare._estimatedTimeToCompleteAddsInSeconds

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /**
@@ -55,10 +56,13 @@ public interface TableRebalanceObserver {
   class RebalanceContext {
     private final long _estimatedAverageSegmentSizeInBytes;
     private final Set<String> _uniqueSegmentList;
+    private final Set<String> _segmentsToMonitor;
 
-    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegmentList) {
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegmentList,
+        @Nullable Set<String> segmentsToMonitor) {
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
       _uniqueSegmentList = uniqueSegmentList;
+      _segmentsToMonitor = segmentsToMonitor;
     }
 
     public long getEstimatedAverageSegmentSizeInBytes() {
@@ -67,6 +71,10 @@ public interface TableRebalanceObserver {
 
     public Set<String> getUniqueSegmentList() {
       return _uniqueSegmentList;
+    }
+
+    public Set<String> getSegmentsToMonitor() {
+      return _segmentsToMonitor;
     }
   }
 }
