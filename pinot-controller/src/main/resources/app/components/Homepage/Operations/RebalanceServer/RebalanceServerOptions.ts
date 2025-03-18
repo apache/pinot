@@ -6,7 +6,7 @@ export type RebalanceServerOption = {
     defaultValue: string | boolean | number;
     isAdvancedConfig: boolean;
     isStatsGatheringConfig: boolean;
-    hasBreakingChange: boolean;
+    markWithWarningIcon: boolean;
     allowedValues?: string[];
     toolTip?: string;
 }
@@ -20,7 +20,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, rebalance will not run but expected changes that will occur will be returned",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": true,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "preChecks",
@@ -30,7 +30,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, will perform some pre-checks to ensure rebalance is safe, must enable dryRun to enable this",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": true,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "reassignInstances",
@@ -40,7 +40,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, reassign the instances of the table before making updates to the segment assignment",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "includeConsuming",
@@ -50,7 +50,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, CONSUMING segments will be included in the rebalance of realtime tables. This is mandatory for for upsert/dedup tables",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "minimizeDataMovement",
@@ -61,7 +61,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, it reduces the segments that will be moved by trying to minimize the changes to the instance assignment. Setting this to default will fallback to the value of this flag in the TableConfig",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true,
+        "markWithWarningIcon": true,
         "toolTip": "Disabling minimizeDataMovement can cause a large amount of data movement"
     },
     {
@@ -72,7 +72,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, regardless of minimum segment movement, reassign all segments in a round-robin fashion as if adding new segments to an empty table",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true,
+        "markWithWarningIcon": true,
         "toolTip": "Enabling bootstrap can cause a large amount of data movement"
     },
     {
@@ -83,8 +83,8 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, rebalance will be performed with downtime. This must be set to true if replication = 1",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true,
-        "toolTip": "Enabling can cause downtime even if replication > 1"
+        "markWithWarningIcon": true,
+        "toolTip": "Enabling can cause downtime if replication > 1"
     },
     {
         "name": "minAvailableReplicas",
@@ -94,7 +94,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative. Should not be 0 unless for downtime=true",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "lowDiskMode",
@@ -104,7 +104,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, perform rebalance by offloading segments off servers prior to adding them. Can slow down rebalance and is recommended to enable for scenarios which are low on disk capacity",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "bestEfforts",
@@ -114,7 +114,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, even if downtime=false do not fail rebalance if IS-EV convergence fails within timeout or segments are in ERROR state and continue rebalancing. This can cause downtime",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": true,
+        "markWithWarningIcon": true,
         "toolTip": "Enabling can cause downtime even if downtime = true"
     },
     {
@@ -125,7 +125,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "How long to wait for EV-IS convergence, increase this timeout for large tables (TBs in size)",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "maxAttempts",
@@ -135,7 +135,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "Max number of attempts to rebalance",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     },
     {
         "name": "updateTargetTier",
@@ -145,6 +145,6 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "description": "If enabled, update segment target tier as part of the rebalance",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
-        "hasBreakingChange": false
+        "markWithWarningIcon": false
     }
 ]

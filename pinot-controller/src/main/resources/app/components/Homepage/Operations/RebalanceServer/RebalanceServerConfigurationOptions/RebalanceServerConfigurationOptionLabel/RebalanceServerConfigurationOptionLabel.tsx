@@ -12,7 +12,7 @@ export const RebalanceServerConfigurationOptionLabel = ({option}: RebalanceServe
         <Typography variant='body2' style={{marginRight: 10, fontWeight: "600"}}>
             {option.label}
         </Typography>
-        {option.hasBreakingChange && (
+        {option.markWithWarningIcon && (
             <Tooltip title={option.toolTip} arrow placement="right">
                 <ReportProblemOutlined color='error' fontSize='small' />
             </Tooltip>
