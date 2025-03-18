@@ -81,6 +81,7 @@ import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClie
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -265,7 +266,8 @@ public class QueryDispatcher {
       throw new RuntimeException("No server instances to dispatch query to");
     }
 
-    Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(requestId, QueryThreadContext.getCid(), queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
@@ -373,10 +375,11 @@ public class QueryDispatcher {
     return requestBuilder.build();
   }
 
-  private static Map<String, String> prepareRequestMetadata(long requestId, Map<String, String> queryOptions,
-      Deadline deadline) {
+  private static Map<String, String> prepareRequestMetadata(long requestId, String cid,
+      Map<String, String> queryOptions, Deadline deadline) {
     Map<String, String> requestMetadata = new HashMap<>();
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID, cid);
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.putAll(queryOptions);

@@ -35,6 +35,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -118,8 +119,11 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap, ThreadExecutionContext parentContext) {
-    return CompletableFuture.runAsync(
-        () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext),
-        _queryRunner.getExecutorService());
+    try (QueryThreadContext.CloseableContext closeMe1 = QueryThreadContext.openFromRequestMetadata(requestMetadataMap);
+        QueryThreadContext.CloseableContext closeMe2 = MseWorkerThreadContext.open()) {
+      return CompletableFuture.runAsync(
+          () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext),
+          _queryRunner.getExecutorService());
+    }
   }
 }
