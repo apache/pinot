@@ -128,7 +128,8 @@ public class MockRoutingManagerFactory {
       routingTableMap.put(tableNameWithType, new RoutingTable(serverRouteInfoMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
     }
-    return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, _disabledTables, partitionInfoMap, _serverInstances);
+    return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, _disabledTables, partitionInfoMap,
+        _serverInstances);
   }
 
   public TableCache buildTableCache() {
@@ -179,8 +180,8 @@ public class MockRoutingManagerFactory {
     private final Map<String, ServerInstance> _serverInstances;
 
     public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
-        Set<String> hybridTables, Set<String> disabledTables, @Nullable Map<String, TablePartitionInfo> partitionInfoMap,
-        Map<String, ServerInstance> serverInstances) {
+        Set<String> hybridTables, Set<String> disabledTables,
+        @Nullable Map<String, TablePartitionInfo> partitionInfoMap, Map<String, ServerInstance> serverInstances) {
       _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
