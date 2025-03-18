@@ -45,6 +45,7 @@ import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
 import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
@@ -141,7 +142,7 @@ public final class ListenerConfigUtil {
     String adminApiPortString = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT);
     if (adminApiPortString != null) {
       listeners.add(
-          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(adminApiPortString),
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, NetUtils.findOpenPort(Integer.parseInt(adminApiPortString)),
               CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
     }
 
@@ -152,7 +153,7 @@ public final class ListenerConfigUtil {
     // support legacy behavior < 0.7.0
     if (listeners.isEmpty()) {
       listeners.add(
-          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, NetUtils.findOpenPort(CommonConstants.Server.DEFAULT_ADMIN_API_PORT),
               CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(serverConf, "pinot.server")));
     }
 
@@ -164,7 +165,7 @@ public final class ListenerConfigUtil {
 
     String portString = minionConf.getProperty(CommonConstants.Helix.KEY_OF_MINION_PORT);
     if (portString != null) {
-      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, Integer.parseInt(portString),
+      listeners.add(new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, NetUtils.findOpenPort(Integer.parseInt(portString)),
           CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
     }
 
@@ -174,7 +175,7 @@ public final class ListenerConfigUtil {
     // support legacy behavior < 0.7.0
     if (listeners.isEmpty()) {
       listeners.add(
-          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, CommonConstants.Minion.DEFAULT_HELIX_PORT,
+          new ListenerConfig(CommonConstants.HTTP_PROTOCOL, DEFAULT_HOST, NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT),
               CommonConstants.HTTP_PROTOCOL, new TlsConfig(), buildServerThreadPoolConfig(minionConf, "pinot.minion")));
     }
 
