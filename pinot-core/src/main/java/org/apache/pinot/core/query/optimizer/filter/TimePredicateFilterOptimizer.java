@@ -44,6 +44,7 @@ import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * The {@code TimePredicateFilterOptimizer} optimizes the time related predicates:
  * <ul>
@@ -80,7 +81,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   }
 
   @VisibleForTesting
-  Expression optimize(Expression filterExpression) {
+  static Expression optimize(Expression filterExpression) {
     Function filterFunction = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(filterFunction.getOperator());
     List<Expression> operands = filterFunction.getOperands();
@@ -110,7 +111,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper method to optimize TIME_CONVERT function with range/equality predicate to directly apply the predicate to
    * the inner expression. Changes are applied in-place of the filter function.
    */
-  private void optimizeTimeConvert(Function filterFunction, FilterKind filterKind) {
+  private static void optimizeTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> timeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
     Preconditions.checkArgument(timeConvertOperands.size() == 3,
@@ -262,7 +263,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper method to optimize DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
    * to the inner expression. Changes are applied in-place of the filter function.
    */
-  private void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
+  private static void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTimeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
@@ -427,7 +428,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  private void optimizeDateTrunc(Function filterFunction, FilterKind filterKind) {
+  private static void optimizeDateTrunc(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
@@ -531,12 +532,12 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
   }
 
-  private boolean isStringLiteral(Expression expression) {
+  private static boolean isStringLiteral(Expression expression) {
     Literal literal = expression.getLiteral();
     return literal != null && literal.isSetStringValue();
   }
 
-  private long getLongValue(Expression expression) {
+  private static long getLongValue(Expression expression) {
     Literal literal = expression.getLiteral();
     Preconditions.checkArgument(literal != null, "Got non-literal expression: %s", expression);
     switch (literal.getSetField()) {
@@ -554,11 +555,11 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   /**
    * Helper method to round up the given value based on the granularity.
    */
-  private long ceil(long millisValue, long granularityMillis) {
+  private static long ceil(long millisValue, long granularityMillis) {
     return (millisValue + granularityMillis - 1) / granularityMillis * granularityMillis;
   }
 
-  private void rewriteToRange(Function filterFunction, Expression expression, String rangeString) {
+  private static void rewriteToRange(Function filterFunction, Expression expression, String rangeString) {
     filterFunction.setOperator(FilterKind.RANGE.name());
     // NOTE: Create an ArrayList because we might need to modify the list later
     List<Expression> newOperands = new ArrayList<>(2);
@@ -567,20 +568,11 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     filterFunction.setOperands(newOperands);
   }
 
-
-  private Expression getExpression(long value, DateTimeFormatSpec inputFormat) {
-    Literal literal = new Literal();
-    literal.setLongValue(value);
-    Expression expression = new Expression(ExpressionType.LITERAL);
-    expression.setLiteral(literal);
-    return expression;
-  }
-
   /**
    * Helper function to find the floor of acceptable values truncating to a specified value
    * Computes floor inverse of date trunc function
    */
-  private long dateTruncFloor(long timeValue, String outputTimeUnit) {
+  private static long dateTruncFloor(long timeValue, String outputTimeUnit) {
     return TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
   }
 
@@ -588,7 +580,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper function that finds the maximum value (ceiling) that truncates to specified value
    * Computes ceiling inverse of date trunc function
    */
-  private long dateTruncCeil(String unit, long timeValue, String outputTimeUnit) {
+  private static long dateTruncCeil(String unit, long timeValue, String outputTimeUnit) {
     long floorMillis = dateTruncFloor(timeValue, outputTimeUnit);
     return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(floorMillis)
         + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;

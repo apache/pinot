@@ -29,7 +29,6 @@ import static org.testng.Assert.assertEquals;
 
 
 public class TimePredicateFilterOptimizerTest {
-  private static final TimePredicateFilterOptimizer OPTIMIZER = new TimePredicateFilterOptimizer();
 
   @Test
   public void testTimeConvert() {
@@ -50,14 +49,11 @@ public class TimePredicateFilterOptimizerTest {
         new Range(1620777600000L, true, 1620864000000L, false));
 
     // Other input format
-    testTimeConvert("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760",
-        new Range(27013846L, false, null, false));
-    testTimeConvert("timeConvert(col, 'HOURS', 'MINUTES') < 27015286",
-        new Range(null, false, 450254L, true));
+    testTimeConvert("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760", new Range(27013846L, false, null, false));
+    testTimeConvert("timeConvert(col, 'HOURS', 'MINUTES') < 27015286", new Range(null, false, 450254L, true));
     testTimeConvert("timeConvert(col, 'DAYS', 'HOURS') BETWEEN 450230 AND 450254",
         new Range(18759L, false, 18760L, true));
-    testTimeConvert("timeConvert(col, 'SECONDS', 'DAYS') = 18759",
-        new Range(1620777600L, true, 1620864000L, false));
+    testTimeConvert("timeConvert(col, 'SECONDS', 'DAYS') = 18759", new Range(1620777600L, true, 1620864000L, false));
 
     // Invalid time
     testInvalidFilterOptimizer("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760.5");
@@ -67,24 +63,30 @@ public class TimePredicateFilterOptimizerTest {
   @Test
   public void testEpochToEpochDateTimeConvert() {
     // Value not on granularity boundary
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > "
-        + "1620830760000", new Range(1620831600000L, true, null, false));
-    testTimeConvert("DATE_TIME_CONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < "
-        + "1620917160000", new Range(null, false, 1620918000000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > " + "1620830760000",
+        new Range(1620831600000L, true, null, false));
+    testTimeConvert(
+        "DATE_TIME_CONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < " + "1620917160000",
+        new Range(null, false, 1620918000000L, false));
     testTimeConvert("datetimeconvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') BETWEEN "
         + "1620830760000 AND 1620917160000", new Range(1620831600000L, true, 1620918000000L, false));
-    testTimeConvert("DATETIMECONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = "
-        + "1620830760000", new Range(1620831600000L, true, 1620831600000L, false));
+    testTimeConvert(
+        "DATETIMECONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = " + "1620830760000",
+        new Range(1620831600000L, true, 1620831600000L, false));
 
     // Value on granularity boundary
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > "
-        + "1620831600000", new Range(1620833400000L, true, null, false));
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < "
-        + "1620918000000", new Range(null, false, 1620918000000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > " + "1620831600000",
+        new Range(1620833400000L, true, null, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < " + "1620918000000",
+        new Range(null, false, 1620918000000L, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') "
         + "BETWEEN 1620831600000 AND 1620918000000", new Range(1620831600000L, true, 1620919800000L, false));
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = "
-        + "1620831600000", new Range(1620831600000L, true, 1620833400000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = " + "1620831600000",
+        new Range(1620831600000L, true, 1620833400000L, false));
 
     // Other output format
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') > 27013846",
@@ -97,8 +99,9 @@ public class TimePredicateFilterOptimizerTest {
         new Range(1620833400000L, true, null, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:HOURS:EPOCH', '30:MINUTES') < 450255",
         new Range(null, false, 1620918000000L, false));
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') BETWEEN 18759 AND "
-            + "18760", new Range(1620777600000L, true, 1620950400000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') BETWEEN 18759 AND " + "18760",
+        new Range(1620777600000L, true, 1620950400000L, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') = 18759",
         new Range(1620777600000L, true, 1620864000000L, false));
 
@@ -114,8 +117,7 @@ public class TimePredicateFilterOptimizerTest {
         new Range(1620833400L, true, null, false));
     testTimeConvert("dateTimeConvert(col, '1:MINUTES:EPOCH', '1:HOURS:EPOCH', '30:MINUTES') < 450255",
         new Range(null, false, 27015300L, false));
-    testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') "
-            + "BETWEEN 18759 AND 18760",
+    testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') " + "BETWEEN 18759 AND 18760",
         new Range(18759L, true, 18761L, false));
     testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') = 18759",
         new Range(18759L, true, 18760L, false));
@@ -132,8 +134,8 @@ public class TimePredicateFilterOptimizerTest {
     testTimeConvert("dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', '1:MILLISECONDS:EPOCH',"
         + " '30:MINUTES') < 1620917160000", new Range(null, false, "2021-05-13 15:00:00", false));
     testTimeConvert("dateTimeConvert(col, '1:MINUTES:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm', '1:MILLISECONDS:EPOCH', "
-        + "'30:MINUTES') BETWEEN 1620830760000 AND 1620917160000", new Range("2021-05-12 15:00", true, "2021-05-13 "
-        + "15:00", false));
+            + "'30:MINUTES') BETWEEN 1620830760000 AND 1620917160000",
+        new Range("2021-05-12 15:00", true, "2021-05-13 " + "15:00", false));
     testTimeConvert("dateTimeConvert(col, '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd', '1:MILLISECONDS:EPOCH', '30:MINUTES')"
         + " = 1620830760000", new Range("2021-05-12", false, "2021-05-12", true));
 
@@ -143,7 +145,6 @@ public class TimePredicateFilterOptimizerTest {
     testInvalidFilterOptimizer("dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', "
         + "'1:MILLISECONDS:EPOCH', '30:MINUTES') < 1620917160");
   }
-
 
   @Test
   public void testDateTruncOptimizer() {
@@ -182,8 +183,8 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("DATETRUNC('DAY', col) between 1620777600000 and 1620863999999",
         new Range("1620777600000", true, "1620863999999", true));
     testInvalidFilterOptimizer("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') BETWEEN 453630 AND 453631");
-    testInvalidFilterOptimizer("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND "
-        + "39193718399999");
+    testInvalidFilterOptimizer(
+        "datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND " + "39193718399999");
     testDateTrunc("dateTrunc('DAY', col) BETWEEN 1620777600000 AND 1621036799999",
         new Range("1620777600000", true, "1621036799999", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
@@ -198,7 +199,8 @@ public class TimePredicateFilterOptimizerTest {
    */
   private void testDateTrunc(String filterString, Range expectedRange) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
-    Expression optimizedFilterExpression = OPTIMIZER.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
     Function function = optimizedFilterExpression.getFunctionCall();
     assertEquals(function.getOperator(), FilterKind.RANGE.name());
     List<Expression> operands = function.getOperands();
@@ -216,7 +218,8 @@ public class TimePredicateFilterOptimizerTest {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
     Function originalFunction = originalExpression.getFunctionCall();
     List<Expression> originalOperands = originalFunction.getOperands();
-    Expression optimizedFilterExpression = OPTIMIZER.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
     Function optimizedFunction = optimizedFilterExpression.getFunctionCall();
     List<Expression> optimizedOperands = optimizedFunction.getOperands();
     assertEquals(optimizedFunction.getOperator(), originalFunction.getOperator());
@@ -234,7 +237,8 @@ public class TimePredicateFilterOptimizerTest {
    */
   private void testTimeConvert(String filterString, Range expectedRange) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
-    Expression optimizedFilterExpression = OPTIMIZER.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
     Function function = optimizedFilterExpression.getFunctionCall();
     assertEquals(function.getOperator(), FilterKind.RANGE.name());
     List<Expression> operands = function.getOperands();
@@ -250,7 +254,8 @@ public class TimePredicateFilterOptimizerTest {
    */
   private void testInvalidFilterOptimizer(String filterString) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
-    Expression optimizedFilterExpression = OPTIMIZER.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
     assertEquals(optimizedFilterExpression, originalExpression);
   }
 }
