@@ -379,10 +379,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
 
       // Track number of queries with number of groups limit reached
-      for (String table : tableNames) {
-        if (brokerResponse.isNumGroupsLimitReached()) {
-          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
-              1);
+      if (brokerResponse.isNumGroupsLimitReached()) {
+        for (String table : tableNames) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
         }
       }
 
