@@ -160,7 +160,8 @@ public class ImplicitHybridTableTest {
     assertNotNull(table.getOfflineTables());
     assertEquals(table.getOfflineTables().size(), 1);
     assertNotNull(table.getOfflineTable());
-    assertEquals(table.getOfflineTable().getTableNameWithType(), TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
+    assertEquals(table.getOfflineTable().getTableNameWithType(),
+        TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "realtimeTableProvider")
@@ -186,7 +187,8 @@ public class ImplicitHybridTableTest {
     assertNotNull(table.getRealtimeTables());
     assertEquals(table.getRealtimeTables().size(), 1);
     assertNotNull(table.getRealtimeTable());
-    assertEquals(table.getRealtimeTable().getTableNameWithType(), TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
+    assertEquals(table.getRealtimeTable().getTableNameWithType(),
+        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "hybridTableProvider")
@@ -213,12 +215,14 @@ public class ImplicitHybridTableTest {
     assertNotNull(table.getOfflineTables());
     assertEquals(table.getOfflineTables().size(), 1);
     assertNotNull(table.getOfflineTable());
-    assertEquals(table.getOfflineTable().getTableNameWithType(), TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
+    assertEquals(table.getOfflineTable().getTableNameWithType(),
+        TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
 
     assertNotNull(table.getRealtimeTables());
     assertEquals(table.getRealtimeTables().size(), 1);
     assertNotNull(table.getRealtimeTable());
-    assertEquals(table.getRealtimeTable().getTableNameWithType(), TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
+    assertEquals(table.getRealtimeTable().getTableNameWithType(),
+        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
 
     assertNotNull(table.getAllPhysicalTables());
     assertEquals(table.getAllPhysicalTables().size(), 2);
