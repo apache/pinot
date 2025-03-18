@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadata;
@@ -245,15 +244,6 @@ public class SegmentZKMetadata implements ZKMetadata {
 
   public void setDownloadUrl(String downloadUrl) {
     setValue(Segment.DOWNLOAD_URL, downloadUrl);
-  }
-
-  @Nullable
-  public String getPreviousSegment() {
-    return _simpleFields.get(Segment.PREV_SEGMENT);
-  }
-
-  public void setPreviousSegment(String segmentName) {
-    setValue(Segment.PREV_SEGMENT, segmentName);
   }
 
   public String getCrypterName() {

@@ -18,37 +18,46 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.base.Preconditions;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.common.utils.LLCSegmentName;
 
 
-public class SemaphoreCoordinator {
+public class SemaphoreAccessCoordinator {
 
   private final Semaphore _semaphore;
   private final boolean _enforceConsumptionInOrder;
-  private final RealtimeTableDataManager _realtimeTableDataManager;
   private final Condition _condition;
   private final Lock _lock;
+  private final ConcurrentHashMap.KeySetView<Integer, Boolean> _segmentSequenceNumSet;
+  private final int _partitionGroupId;
+  private final RealtimeTableDataManager _realtimeTableDataManager;
+  private volatile boolean _preloaded;
 
-  public SemaphoreCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
+  public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder, int partitionGroupId,
       RealtimeTableDataManager realtimeTableDataManager) {
     _semaphore = semaphore;
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
+    _segmentSequenceNumSet = ConcurrentHashMap.newKeySet();
+    _partitionGroupId = partitionGroupId;
     _realtimeTableDataManager = realtimeTableDataManager;
+    _preloaded = false;
   }
 
-  public void acquire(SegmentZKMetadata segmentZKMetadata)
+  public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException {
-    String prevSegmentName = segmentZKMetadata.getPreviousSegment();
 
     if (_enforceConsumptionInOrder) {
-      waitForPrevSegment(prevSegmentName);
+      int prevSequenceNum = llcSegmentName.getSequenceNumber() - 1;
+      if (prevSequenceNum >= 0) {
+        waitForPrevSegment(prevSequenceNum);
+      }
     }
 
     _semaphore.acquire();
@@ -68,20 +77,50 @@ public class SemaphoreCoordinator {
     return _semaphore;
   }
 
-  private void waitForPrevSegment(String prevSegmentName)
-      throws InterruptedException {
-    SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(prevSegmentName);
+  public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      while (segmentDataManager == null) {
+      _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
+      _condition.signalAll();
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  private void waitForPrevSegment(int prevSeqNum)
+      throws InterruptedException {
+    if (!_preloaded) {
+      preload();
+    }
+    _lock.lock();
+    try {
+      while (!_segmentSequenceNumSet.contains(prevSeqNum)) {
         _condition.await();
-        segmentDataManager = _realtimeTableDataManager.acquireSegment(prevSegmentName);
       }
     } finally {
       _lock.unlock();
-      if (segmentDataManager != null) {
-        _realtimeTableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  private synchronized void preload()
+      throws InterruptedException {
+
+    if (_preloaded) {
+      return;
+    }
+
+    while (!_realtimeTableDataManager.getIsTableReadyToConsumeData().getAsBoolean()) {
+      Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+    }
+
+    for (String segment : _realtimeTableDataManager.getSegments()) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      Preconditions.checkNotNull(llcSegmentName);
+      if (llcSegmentName.getPartitionGroupId() == _partitionGroupId) {
+        _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
       }
     }
+
+    _preloaded = true;
   }
 }
