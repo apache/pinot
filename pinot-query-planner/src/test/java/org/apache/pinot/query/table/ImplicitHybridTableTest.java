@@ -21,25 +21,27 @@ package org.apache.pinot.query.table;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class ImplicitHybridTableTest {
@@ -62,7 +64,7 @@ public class ImplicitHybridTableTest {
   //@formatter:on
 
   public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
-
+  private static final Set<String> DISABLED_TABLES = new HashSet<>();
   static {
     TABLE_SCHEMAS.put("a_REALTIME", getSchemaBuilder("a").build());
     TABLE_SCHEMAS.put("b_OFFLINE", getSchemaBuilder("b").build());
@@ -70,6 +72,18 @@ public class ImplicitHybridTableTest {
     TABLE_SCHEMAS.put("c_OFFLINE", getSchemaBuilder("c").build());
     TABLE_SCHEMAS.put("d", getSchemaBuilder("d").build());
     TABLE_SCHEMAS.put("e", getSchemaBuilder("e").build());
+    // The following tables are disabled.
+    TABLE_SCHEMAS.put("hybrid_disabled", getSchemaBuilder("hybrid_disabled").build());
+    DISABLED_TABLES.add("hybrid_disabled_OFFLINE");
+    DISABLED_TABLES.add("hybrid_disabled_REALTIME");
+    TABLE_SCHEMAS.put("hybrid_o_disabled", getSchemaBuilder("hybrid_o_disabled").build());
+    DISABLED_TABLES.add("hybrid_o_disabled_OFFLINE");
+    TABLE_SCHEMAS.put("hybrid_r_disabled", getSchemaBuilder("hybrid_r_disabled").build());
+    DISABLED_TABLES.add("hybrid_r_disabled_REALTIME");
+    TABLE_SCHEMAS.put("o_disabled_OFFLINE", getSchemaBuilder("o_disabled").build());
+    DISABLED_TABLES.add("o_disabled_OFFLINE");
+    TABLE_SCHEMAS.put("r_disabled_REALTIME", getSchemaBuilder("r_disabled").build());
+    DISABLED_TABLES.add("r_disabled_REALTIME");
     // The following three tables are registered but there are no routes for these tables.
     TABLE_SCHEMAS.put("no_route_table", getSchemaBuilder("no_route_table").build());
     TABLE_SCHEMAS.put("no_route_table_O_OFFLINE", getSchemaBuilder("no_route_table").build());
@@ -113,8 +127,14 @@ public class ImplicitHybridTableTest {
         factory.registerSegment(port2, entry.getKey(), segment);
       }
     }
+
+    for (String disabledTable : DISABLED_TABLES) {
+      factory.disableTable(disabledTable);
+    }
+
     _routingManager = factory.buildRoutingManager(null);
     _tableCache = factory.buildTableCache();
+
   }
 
   @DataProvider(name = "offlineTableProvider")
@@ -127,7 +147,8 @@ public class ImplicitHybridTableTest {
         {"d_OFFLINE"},
         {"e_OFFLINE"},
         {"no_route_table_O"},
-        {"no_route_table_O_OFFLINE"}
+        {"no_route_table_O_OFFLINE"},
+        {"o_disabled_OFFLINE"}
     };
     //@formatter:on
   }
@@ -148,7 +169,8 @@ public class ImplicitHybridTableTest {
         {"b_REALTIME"},
         {"e_REALTIME"},
         {"no_route_table_R"},
-        {"no_route_table_R_REALTIME"}
+        {"no_route_table_R_REALTIME"},
+        {"r_disabled_REALTIME"}
     };
     //@formatter:on
   }
@@ -168,6 +190,9 @@ public class ImplicitHybridTableTest {
         {"d"},
         {"e"},
         {"no_route_table"},
+        {"hybrid_disabled"},
+        {"hybrid_o_disabled"},
+        {"hybrid_r_disabled"}
     };
     //@formatter:on
   }
@@ -189,7 +214,9 @@ public class ImplicitHybridTableTest {
         {"a_OFFLINE"},
         {"c_REALTIME"},
         {"no_route_table_O_REALTIME"},
-        {"no_route_table_R_OFFLINE"}
+        {"no_route_table_R_OFFLINE"},
+        {"o_disabled_REALTIME"},
+        {"r_disabled_OFFLINE"}
     };
     //@formatter:on
   }
@@ -246,6 +273,80 @@ public class ImplicitHybridTableTest {
     ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
     assertTrue(table.isExists(), "The table should exist");
     assertFalse(table.isRouteExists(), "The table should not have route");
+  }
+
+  @DataProvider(name = "notDisabledTableProvider")
+  public static Object[][] notDisabledTableProvider() {
+    //@formatter:off
+    return new Object[][] {
+        {"a"},
+        {"a_REALTIME"},
+        {"b"},
+        {"b_OFFLINE"},
+        {"b_REALTIME"},
+        {"c"},
+        {"c_OFFLINE"},
+        {"d"},
+        {"d_OFFLINE"},
+        {"e"},
+        {"e_OFFLINE"},
+        {"e_REALTIME"},
+        {"no_route_table"},
+        {"no_route_table_O"},
+        {"no_route_table_R"},
+        {"no_route_table_O_OFFLINE"},
+        {"no_route_table_R_REALTIME"},
+    };
+    //@formatter:on
+  }
+
+  @Test(dataProvider = "notDisabledTableProvider")
+  public void testNotDisabledTable(String parameter) {
+    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    assertTrue(table.isExists(), "The table should exist");
+    assertFalse(table.isDisabled(), "The table should not be disabled");
+    assertNull(table.getDisabledTables());
+  }
+
+  @DataProvider(name = "partiallyDisabledTableProvider")
+  public static Object[][] partiallyDisabledTableProvider() {
+    //@formatter:off
+    return new Object[][] {
+        {"hybrid_o_disabled"},
+        {"hybrid_r_disabled"}
+    };
+    //@formatter:on
+  }
+
+  @Test(dataProvider = "partiallyDisabledTableProvider")
+  public void testPartiallyDisabledTable(String parameter) {
+    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    assertTrue(table.isExists(), "The table should exist");
+    assertFalse(table.isDisabled(), "The table should be disabled");
+    assertNotNull(table.getDisabledTables());
+    assertEquals(table.getDisabledTables().size(), 1);
+  }
+
+  @DataProvider(name = "disabledTableProvider")
+  public static Object[][] disabledTableProvider() {
+    //@formatter:off
+    return new Object[][] {
+        {"hybrid_disabled"},
+        {"hybrid_o_disabled_OFFLINE"},
+        {"hybrid_r_disabled_REALTIME"},
+        {"o_disabled_OFFLINE"},
+        {"r_disabled_REALTIME"}
+    };
+    //@formatter:on
+  }
+
+  @Test(dataProvider = "disabledTableProvider")
+  public void testDisabledTable(String parameter) {
+    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    assertTrue(table.isExists(), "The table should exist");
+    assertTrue(table.isDisabled(), "The table should not have route");
+    assertNotNull(table.getDisabledTables(), "The table should have disabled tables");
+    assertFalse(table.getDisabledTables().isEmpty(), "The table should have disabled tables");
   }
 
   static class TableNameAndConfig {
@@ -414,5 +515,89 @@ public class ImplicitHybridTableTest {
     } else {
       assertFalse(hybridTable.isRouteExists(), "The table should not have route");
     }
+  }
+
+  static class ExceptionOrResponse {
+    public final QueryProcessingException _exception;
+    public final BrokerResponse _brokerResponse;
+
+    public ExceptionOrResponse(QueryProcessingException exception) {
+      _exception = exception;
+      _brokerResponse = null;
+    }
+
+    public ExceptionOrResponse(BrokerResponse brokerResponse) {
+      _exception = null;
+      _brokerResponse = brokerResponse;
+    }
+  }
+
+  ExceptionOrResponse checkTableDisabled(boolean offlineTableDisabled, boolean realtimeTableDisabled, TableConfig offlineTableConfig, TableConfig realtimeTableConfig) {
+    if (offlineTableDisabled || realtimeTableDisabled) {
+      String errorMessage = null;
+      if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
+          && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
+          realtimeTableConfig == null && offlineTableDisabled)) {
+        return new ExceptionOrResponse(BrokerResponseNative.TABLE_IS_DISABLED);
+      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
+        errorMessage = "Realtime table is disabled in hybrid table";
+      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
+        errorMessage = "Offline table is disabled in hybrid table";
+      }
+      return new ExceptionOrResponse(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
+    }
+
+    return null;
+  }
+
+  @Test(dataProvider = "notDisabledTableProvider")
+  public void testNotDisabledWithCheckDisabled(String tableName) {
+    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+
+    ExceptionOrResponse exceptionOrResponse =
+        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
+            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
+            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
+            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+
+    assertNull(exceptionOrResponse);
+    assertFalse(hybridTable.isDisabled());
+    assertNull(hybridTable.getDisabledTables());
+  }
+
+  @Test(dataProvider = "partiallyDisabledTableProvider")
+  public void testPartiallyDisabledWithCheckDisabled(String tableName) {
+    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+
+    ExceptionOrResponse exceptionOrResponse =
+        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
+            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
+            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
+            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+
+    assertNotNull(exceptionOrResponse);
+    assertNull(exceptionOrResponse._brokerResponse);
+    assertNotNull(exceptionOrResponse._exception);
+    assertFalse(hybridTable.isDisabled());
+    assertNotNull(hybridTable.getDisabledTables());
+    assertFalse(hybridTable.getDisabledTables().isEmpty());
+  }
+
+  @Test(dataProvider = "disabledTableProvider")
+  public void testDisabledWithCheckDisabled(String tableName) {
+    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+
+    ExceptionOrResponse exceptionOrResponse =
+        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
+            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
+            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
+            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+
+    assertNotNull(exceptionOrResponse);
+    assertNull(exceptionOrResponse._exception);
+    assertNotNull(exceptionOrResponse._brokerResponse);
+    assertTrue(hybridTable.isDisabled());
+    assertNotNull(hybridTable.getDisabledTables());
+    assertFalse(hybridTable.getDisabledTables().isEmpty());
   }
 }
