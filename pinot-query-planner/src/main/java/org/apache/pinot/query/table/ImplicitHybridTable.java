@@ -22,9 +22,12 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -33,9 +36,12 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * If the table name has a type, then it represents the table with the given type.
  */
 public class ImplicitHybridTable implements HybridTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitHybridTable.class);
+
   private final String _rawTableName;
   private final PhysicalTable _offlineTable;
   private final PhysicalTable _realtimeTable;
+  private final TimeBoundaryInfo _timeBoundaryInfo;
 
   /**
    * A factory method to create an ImplicitHybridTable from the given table name. Precedence is given to the existence
@@ -49,6 +55,7 @@ public class ImplicitHybridTable implements HybridTable {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     PhysicalTable offlineTable = PhysicalTable.EMPTY;
     PhysicalTable realtimeTable = PhysicalTable.EMPTY;
+    TimeBoundaryInfo timeBoundaryInfo = null;
 
     if (tableType != null) {
       TableConfig tableConfig = tableCache.getTableConfig(tableName);
@@ -84,14 +91,27 @@ public class ImplicitHybridTable implements HybridTable {
                 TableType.REALTIME, routingManager.routingExists(realtimeTableNameToCheck),
                 realtimeTableConfig, routingManager.isTableDisabled(realtimeTableNameToCheck));
       }
+
+      // Get TimeBoundaryInfo. If there is no
+      if (!offlineTable.equals(PhysicalTable.EMPTY) && !realtimeTable.equals(PhysicalTable.EMPTY)) {
+        // Time boundary info might be null when there is no segment in the offline table, query real-time side only
+        timeBoundaryInfo = routingManager.getTimeBoundaryInfo(offlineTable.getTableNameWithType());
+        if (timeBoundaryInfo == null) {
+          LOGGER.debug("No time boundary info found for hybrid table: {}", tableName);
+          offlineTable = PhysicalTable.EMPTY;
+        }
+      }
     }
-    return new ImplicitHybridTable(TableNameBuilder.extractRawTableName(tableName), offlineTable, realtimeTable);
+    return new ImplicitHybridTable(TableNameBuilder.extractRawTableName(tableName), offlineTable, realtimeTable,
+        timeBoundaryInfo);
   }
 
-  private ImplicitHybridTable(String rawTableName, PhysicalTable offlineTable, PhysicalTable realtimeTable) {
+  private ImplicitHybridTable(String rawTableName, PhysicalTable offlineTable, PhysicalTable realtimeTable,
+      TimeBoundaryInfo timeBoundaryInfo) {
     _rawTableName = rawTableName;
     _offlineTable = offlineTable;
     _realtimeTable = realtimeTable;
+    _timeBoundaryInfo = timeBoundaryInfo;
   }
 
   public String getRawTableName() {
@@ -241,12 +261,25 @@ public class ImplicitHybridTable implements HybridTable {
     return null;
   }
 
+  @Override
+  public boolean hasTimeBoundaryInfo() {
+    return _timeBoundaryInfo != null;
+  }
+
   @Nullable
+  @Override
+  public TimeBoundaryInfo getTimeBoundaryInfo() {
+    return _timeBoundaryInfo;
+  }
+
+  @Nullable
+  @Override
   public PhysicalTable getOfflineTable() {
     return _offlineTable.getTableConfig() != null ? _offlineTable : null;
   }
 
   @Nullable
+  @Override
   public PhysicalTable getRealtimeTable() {
     return _realtimeTable.getTableConfig() != null ? _realtimeTable : null;
   }
