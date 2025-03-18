@@ -844,6 +844,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()),
           ControllerGauge.TASK_STATUS, taskStateEntry.getValue());
     }
+    
+    // Also update task count metrics for autoscaling
+    getPendingTaskCount(taskType);
+    
+    // We update the total pending task count when reporting metrics for any task type
+    // This ensures the metric is updated frequently
+    getTotalPendingTaskCount();
   }
 
   protected synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
@@ -853,6 +860,53 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           .subscribeDataChanges(getPropertyStorePathForTaskQueue(taskType), taskTypeMetricsUpdater);
       _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
     }
+  }
+  
+  /**
+   * Gets the total number of pending tasks for all task types
+   * This can be used for autoscaling minions based on queue size
+   * @return total number of pending tasks across all task types
+   */
+  public int getTotalPendingTaskCount() {
+    int pendingTaskCount = 0;
+    
+    for (String taskType : _helixTaskResourceManager.getTaskTypes()) {
+      Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
+      
+      for (TaskState taskState : taskStates.values()) {
+        if (TaskState.IN_PROGRESS.equals(taskState) || TaskState.NOT_STARTED.equals(taskState)) {
+          pendingTaskCount++;
+        }
+      }
+      
+      // Set a gauge metric for pending tasks that can be scraped by Prometheus
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TOTAL_PENDING_MINION_TASKS, pendingTaskCount);
+    }
+    
+    return pendingTaskCount;
+  }
+  
+  /**
+   * Gets the number of pending tasks for a specific task type
+   * This can be used for autoscaling minions based on queue size for specific task types
+   * @param taskType the task type to check
+   * @return number of pending tasks for the specified task type
+   */
+  public int getPendingTaskCount(String taskType) {
+    int pendingTaskCount = 0;
+    
+    Map<String, TaskState> taskStates = _helixTaskResourceManager.getTaskStates(taskType);
+    
+    for (TaskState taskState : taskStates.values()) {
+      if (TaskState.IN_PROGRESS.equals(taskState) || TaskState.NOT_STARTED.equals(taskState)) {
+        pendingTaskCount++;
+      }
+    }
+    
+    // Set a gauge metric for pending tasks that can be scraped by Prometheus
+    _controllerMetrics.setValueOfTableGauge(taskType, ControllerGauge.PENDING_MINION_TASKS_PER_TYPE, pendingTaskCount);
+    
+    return pendingTaskCount;
   }
 
   protected boolean isTaskSchedulable(String taskType, List<String> tables) {
