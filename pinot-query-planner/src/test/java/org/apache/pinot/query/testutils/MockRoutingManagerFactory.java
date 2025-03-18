@@ -59,6 +59,7 @@ public class MockRoutingManagerFactory {
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
   private final Map<String, Map<String, List<ServerInstance>>> _tableSegmentServersMap;
+  private final Set<String> _disabledTables;
 
   public MockRoutingManagerFactory(int... ports) {
     _tableNameMap = new HashMap<>();
@@ -66,6 +67,7 @@ public class MockRoutingManagerFactory {
     _hybridTables = new HashSet<>();
     _serverInstances = new HashMap<>();
     _tableSegmentServersMap = new HashMap<>();
+    _disabledTables = new HashSet<>();
     for (int port : ports) {
       _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
     }
@@ -95,6 +97,10 @@ public class MockRoutingManagerFactory {
         .add(serverInstance);
   }
 
+  public void disableTable(String tableNameWithType) {
+    _disabledTables.add(tableNameWithType);
+  }
+
   public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
     int numTables = _tableSegmentServersMap.size();
     Map<String, RoutingTable> routingTableMap = Maps.newHashMapWithExpectedSize(numTables);
@@ -122,7 +128,7 @@ public class MockRoutingManagerFactory {
       routingTableMap.put(tableNameWithType, new RoutingTable(serverRouteInfoMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
     }
-    return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, partitionInfoMap, _serverInstances);
+    return new FakeRoutingManager(routingTableMap, tableSegmentsMap, _hybridTables, _disabledTables, partitionInfoMap, _serverInstances);
   }
 
   public TableCache buildTableCache() {
@@ -168,17 +174,19 @@ public class MockRoutingManagerFactory {
     private final Map<String, RoutingTable> _routingTableMap;
     private final Map<String, List<String>> _segmentsMap;
     private final Set<String> _hybridTables;
+    private final Set<String> _disabledTables;
     private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
 
     public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, List<String>> segmentsMap,
-        Set<String> hybridTables, @Nullable Map<String, TablePartitionInfo> partitionInfoMap,
+        Set<String> hybridTables, Set<String> disabledTables, @Nullable Map<String, TablePartitionInfo> partitionInfoMap,
         Map<String, ServerInstance> serverInstances) {
       _segmentsMap = segmentsMap;
       _routingTableMap = routingTableMap;
       _hybridTables = hybridTables;
       _partitionInfoMap = partitionInfoMap;
       _serverInstances = serverInstances;
+      _disabledTables = disabledTables;
     }
 
     @Override
@@ -222,6 +230,11 @@ public class MockRoutingManagerFactory {
     @Override
     public Set<String> getServingInstances(String tableNameWithType) {
       return _serverInstances.keySet();
+    }
+
+    @Override
+    public boolean isTableDisabled(String tableNameWithType) {
+      return _disabledTables.contains(tableNameWithType);
     }
   }
 }
