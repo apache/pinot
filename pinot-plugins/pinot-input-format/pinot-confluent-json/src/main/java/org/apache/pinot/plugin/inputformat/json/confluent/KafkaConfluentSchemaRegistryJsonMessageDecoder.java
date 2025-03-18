@@ -19,17 +19,21 @@
 package org.apache.pinot.plugin.inputformat.json.confluent;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
 import io.confluent.kafka.schemaregistry.client.rest.RestService;
 import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
 import io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
@@ -47,11 +51,6 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkState;
 
 
-/**
- * Decodes avro messages with confluent schema registry.
- * First byte is MAGIC = 0, second 4 bytes are the schema id, the remainder is the value.
- * NOTE: Do not use schema in the implementation, as schema will be removed from the params
- */
 public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfluentSchemaRegistryJsonMessageDecoder.class);
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
@@ -61,8 +60,26 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
   private KafkaJsonSchemaDeserializer _deserializer;
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
   private String _topicName;
+  @Nullable
+  private final Consumer<Map<String, Object>> _onMessage;
 
-  public RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
+  /**
+   * Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
+   */
+  public KafkaConfluentSchemaRegistryJsonMessageDecoder() {
+    _onMessage = null;
+  }
+
+  /**
+   * Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
+   * analyze the received message.
+   */
+  @VisibleForTesting
+  KafkaConfluentSchemaRegistryJsonMessageDecoder(@Nullable Consumer<Map<String, Object>> onMessage) {
+    _onMessage = onMessage;
+  }
+
+  private RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
 
     ConfigDef configDef = new ConfigDef();
@@ -117,11 +134,8 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
       JsonNode jsonRecord = (JsonNode) _deserializer.deserialize(_topicName, payload);
       Map<String, Object> from = JsonUtils.jsonNodeToMap(jsonRecord);
       return _jsonRecordExtractor.extract(from, destination);
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | IOException e) {
       ignoreOrRethrowException(e);
-      return null;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while decoding row, discarding row. Payload is {}", new String(payload), e);
       return null;
     }
   }
@@ -144,6 +158,14 @@ public class KafkaConfluentSchemaRegistryJsonMessageDecoder implements StreamMes
       return;
     }
     throw e;
+  }
+
+  private void ignoreOrRethrowException(Exception e) {
+    if (isUnknownMagicByte(e) || (e.getCause() != null && isUnknownMagicByte(e.getCause()))) {
+      LOGGER.error("Caught IOexception while mapping jsonNode in topic {}, discarding row", _topicName, e);
+      return;
+    }
+    throw new RuntimeException(e);
   }
 
   private boolean isUnknownMagicByte(Throwable e) {

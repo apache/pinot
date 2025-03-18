@@ -1940,11 +1940,6 @@
         <version>${kotlin.stdlib.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-scripting-compiler-embeddable</artifactId>
-        <version>${kotlin.stdlib.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.squareup.okio</groupId>
         <artifactId>okio</artifactId>
         <version>${okio.version}</version>
