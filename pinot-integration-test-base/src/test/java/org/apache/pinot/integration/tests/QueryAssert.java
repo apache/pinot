@@ -37,6 +37,14 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
     return new QueryAssert(actual);
   }
 
+  public QueryAssert hasNoExceptions() {
+    isNotNull();
+    if (actual.has("exceptions") && !actual.get("exceptions").isEmpty()) {
+      failWithMessage("Expected no exceptions but found <%s>", actual.get("exceptions"));
+    }
+    return this;
+  }
+
   /// Obtains the first exception in the query response, returning it as a [QueryErrorAssert] object.
   ///
   /// It fails if there are no exceptions in the query response.
@@ -82,8 +90,7 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
 
     /// Closes this object, asserting that all soft assertions have passed.
     @Override
-    public void close()
-        throws Exception {
+    public void close() {
       super.assertAll();
     }
   }
@@ -108,8 +115,8 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
         } catch (IllegalArgumentException e) {
           actualValueDescription = "*INVALID ERROR CODE*" + " (" + actualId + ")";
         }
-        failWithMessage("Expected error code <%s (%s)> but was <%s>",
-            errorCode, errorCode.getId(), actualValueDescription);
+        failWithMessage("Expected error code <%s (%s)> but was <%s>. Error message is %s",
+            errorCode, errorCode.getId(), actualValueDescription, actual.get("message").asText());
       }
       return this;
     }
@@ -144,8 +151,7 @@ public class QueryAssert extends AbstractAssert<QueryAssert, JsonNode> {
       }
 
       @Override
-      public void close()
-          throws Exception {
+      public void close() {
         super.assertAll();
       }
     }

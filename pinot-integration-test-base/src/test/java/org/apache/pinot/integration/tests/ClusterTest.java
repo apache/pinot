@@ -622,11 +622,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public void assertNoError(JsonNode response) {
-    JsonNode exceptionsJson = response.get("exceptions");
-    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
-    if (exIterator.hasNext()) {
-      Assert.fail("There is at least one exception: " + exIterator.next());
-    }
+    QueryAssert.assertThat(response)
+        .hasNoExceptions();
   }
 
   @DataProvider(name = "systemColumns")
