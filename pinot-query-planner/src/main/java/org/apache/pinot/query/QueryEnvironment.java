@@ -43,7 +43,6 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
@@ -80,6 +79,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -194,17 +194,8 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
-      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
-      // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
-      // Each SubPlan should be able to run independently from Broker then set the results into the dependent
-      // SubPlan for further processing.
-      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-      return getQueryPlannerResult(plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
-    } catch (CalciteContextException e) {
-      throw new RuntimeException("Error composing query plan for '" + sqlQuery + "': " + e.getMessage() + "'", e);
-    } catch (Throwable t) {
-      throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
+    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
+      return compiledQuery.planQuery(requestId);
     }
   }
 
@@ -262,8 +253,9 @@ public class QueryEnvironment {
         queryNode = sqlNode;
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
-      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions,
-          queryNode);
+      return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
+    } catch (QueryException e) {
+      throw e;
     } catch (Throwable t) {
       if (plannerContext != null) {
         plannerContext.close();
@@ -352,41 +344,54 @@ public class QueryEnvironment {
   }
 
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
-    SqlNode validated = plannerContext.getValidator().validate(sqlNode);
-    if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
-      throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
+    try {
+      SqlNode validated = plannerContext.getValidator().validate(sqlNode);
+      if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
+        throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
+      }
+      validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+      return validated;
+    } catch (QueryException e) {
+      throw e;
+    } catch (Throwable e) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
     }
-    validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
-    return validated;
   }
 
   private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
-    RexBuilder rexBuilder = new RexBuilder(_typeFactory);
-    RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
-    SqlToRelConverter converter =
-        new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
-            PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
-    RelRoot relRoot;
     try {
-      relRoot = converter.convertQuery(sqlNode, false, true);
+      RexBuilder rexBuilder = new RexBuilder(_typeFactory);
+      RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      SqlToRelConverter converter =
+          new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
+              PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
+      RelRoot relRoot;
+      try {
+        relRoot = converter.convertQuery(sqlNode, false, true);
+      } catch (Throwable e) {
+        throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
+      }
+      RelNode rootNode = relRoot.rel;
+      try {
+        // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
+        //       probably a bug in Calcite.
+        RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
+        rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+      } catch (Throwable e) {
+        throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
+      }
+      try {
+        rootNode = converter.trimUnusedFields(false, rootNode);
+      } catch (Throwable e) {
+        throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
+      }
+      return relRoot.withRel(rootNode);
+    } catch (QueryException e) {
+      throw e;
     } catch (Throwable e) {
-      throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
+      throw QueryErrorCode.QUERY_PLANNING.asException(
+          "Error converting query to relational expression: " + e.getMessage(), e);
     }
-    RelNode rootNode = relRoot.rel;
-    try {
-      // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
-      //       probably a bug in Calcite.
-      RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
-      rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
-    } catch (Throwable e) {
-      throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
-    }
-    try {
-      rootNode = converter.trimUnusedFields(false, rootNode);
-    } catch (Throwable e) {
-      throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
-    }
-    return relRoot.withRel(rootNode);
   }
 
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
@@ -403,8 +408,7 @@ public class QueryEnvironment {
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
     } catch (Throwable e) {
-      throw new RuntimeException(
-          "Failed to generate a valid execution plan for query:\n" + RelOptUtil.toString(relRoot.rel), e);
+      throw QueryErrorCode.QUERY_PLANNING.asException("Error optimizing query: " + e.getMessage(), e);
     }
   }
 
@@ -543,20 +547,22 @@ public class QueryEnvironment {
     private final RelRoot _relRoot;
     private final PlannerContext _plannerContext;
     private final SqlNodeAndOptions _sqlNodeAndOptions;
-    private final SqlNode _queryNode;
+    private final Set<String> _tableNames;
 
     public CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
-        SqlNodeAndOptions sqlNodeAndOptions, SqlNode queryNode) {
+        SqlNodeAndOptions sqlNodeAndOptions) {
       _database = database;
       _textQuery = textQuery;
       _relRoot = relRoot;
       _plannerContext = plannerContext;
       _sqlNodeAndOptions = sqlNodeAndOptions;
-      _queryNode = queryNode;
+      // Important & tricky: RelToPlanNodeConverter uses thread local. Therefore we need to get the table names here
+      // instead of lazily in getTableNames() method.
+      _tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
     }
 
     public Set<String> getTableNames() {
-      return RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
+      return _tableNames;
     }
 
     public boolean isExplain() {
@@ -615,10 +621,10 @@ public class QueryEnvironment {
         // SubPlan for further processing.
         DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
         return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
-      } catch (CalciteContextException e) {
-        throw new RuntimeException("Error composing query plan for '" + _textQuery + "': " + e.getMessage() + "'", e);
+      } catch (QueryException e) {
+        throw e;
       } catch (Throwable t) {
-        throw new RuntimeException("Error composing query plan for: " + _textQuery, t);
+        throw new RuntimeException("Error composing query plan for '" + _textQuery + "': " + t.getMessage() + "'", t);
       }
     }
 

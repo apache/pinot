@@ -62,6 +62,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
+import static org.assertj.core.api.Assertions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
@@ -344,9 +345,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   void testDualWithNotExistsTableMSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
-    Assert.assertEquals(queryResponse.get("exceptions").get(0).get("errorCode").asInt(),
-        QueryErrorCode.QUERY_PLANNING.getId()); // TODO: The right error is TABLE_DOES_NOT_EXIST
+
+    assertQuery("SELECT 1 from notExistsTable")
+        .firstException()
+        .hasErrorCode(QueryErrorCode.QUERY_VALIDATION);  // TODO: The right error is TABLE_DOES_NOT_EXIST
   }
 
   @Test
@@ -694,7 +696,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
+    assertThat(response.get("exceptions").get(0).get("message").asText())
+        .as("First exception message")
+        .contains("Illegal base64 character");
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
@@ -1395,7 +1399,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed only as table prefix. Will
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1437,7 +1441,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
         null);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1445,7 +1449,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1464,7 +1468,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1603,8 +1607,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Iterator<JsonNode> exIterator = exceptionsJson.iterator();
     assertTrue(exIterator.hasNext(), "Expected a timeout exception but did not find one");
     ObjectNode exception = (ObjectNode) exIterator.next();
-    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.BROKER_TIMEOUT.getId());
-    assertEquals(exception.get("message").asText(), QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
+
+    try (QueryAssert.QueryErrorAssert.Soft assertions = QueryAssert.assertThat(result).softFirstException()) {
+      assertions
+          .hasErrorCode(QueryErrorCode.BROKER_TIMEOUT)
+          .containsMessage(QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
+    }
   }
 
   @Test
@@ -1681,8 +1689,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, QueryErrorCode errorCode) {
-    long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(result, errorCode.getId());
+    QueryAssert.assertThat(queryResult)
+        .firstException()
+        .hasErrorCode(errorCode);
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
