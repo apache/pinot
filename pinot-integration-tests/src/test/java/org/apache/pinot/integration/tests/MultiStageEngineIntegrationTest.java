@@ -348,7 +348,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     assertQuery("SELECT 1 from notExistsTable")
         .firstException()
-        .hasErrorCode(QueryErrorCode.QUERY_VALIDATION);  // TODO: The right error is TABLE_DOES_NOT_EXIST
+        .hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
   @Test

@@ -43,6 +43,7 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
@@ -353,6 +354,8 @@ public class QueryEnvironment {
       return validated;
     } catch (QueryException e) {
       throw e;
+    } catch (CalciteContextException e) {
+      throw CalciteContextExceptionClassifier.classifyValidationException(e);
     } catch (Throwable e) {
       throw QueryErrorCode.QUERY_VALIDATION.asException(e.getMessage(), e);
     }
