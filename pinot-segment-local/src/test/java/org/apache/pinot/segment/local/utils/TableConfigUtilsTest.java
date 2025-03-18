@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
@@ -76,6 +75,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import static org.testng.Assert.assertThrows;
+
 
 
 /**
@@ -1313,36 +1314,27 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testValidateBFOnBoolean() {
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN).addSingleValueDimension("mycol2", FieldSpec.DataType.STRING).build();
-    TableConfig tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setBloomFilterColumns(Arrays.asList("mycol")).build();
-    try {
-      TableConfigUtils.validate(tableconfig, schema);
-      Assert.fail("Should fail for invalid Bloom filter column name");
-    } catch (Exception e) {
-      // expected
-    }
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("mycol2", FieldSpec.DataType.STRING).build();
 
-    tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
-    tableconfig.getIndexingConfig().setBloomFilterConfigs(Collections.singletonMap("myCol", new BloomFilterConfig(0.01, 1000, true)));
-    try {
-      TableConfigUtils.validate(tableconfig, schema);
-      Assert.fail("Should fail for invalid Bloom filter column name");
-    } catch (Exception e) {
-      // expected
-    }
+    TableConfig tableconfig1 = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setBloomFilterColumns(Arrays.asList("mycol")).build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig1, schema));
 
-    tableconfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    TableConfig tableconfig2 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    tableconfig2.getIndexingConfig().setBloomFilterConfigs(
+        Collections.singletonMap("myCol", new BloomFilterConfig(0.01, 1000, true)));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig2, schema));
+
+    TableConfig tableconfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
     indexesNode.putObject("bloom");
-    FieldConfig fieldConfig = new FieldConfig("MyCol", FieldConfig.EncodingType.DICTIONARY,null, null, null, null, indexesNode,null,null);
-    tableconfig.setFieldConfigList(Arrays.asList(fieldConfig));
-    try {
-      TableConfigUtils.validate(tableconfig, schema);
-      Assert.fail("Should fail for invalid Bloom filter column name");
-    } catch (Exception e) {
-      // expected
-    }
-
+    FieldConfig fieldConfig = new FieldConfig(
+        "MyCol", FieldConfig.EncodingType.DICTIONARY, null, null, null,
+        null, indexesNode, null, null);
+    tableconfig3.setFieldConfigList(Arrays.asList(fieldConfig));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig3, schema));
   }
 
   @Test
