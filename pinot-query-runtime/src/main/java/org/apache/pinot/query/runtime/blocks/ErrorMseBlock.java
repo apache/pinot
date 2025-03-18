@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -26,6 +28,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /// A block that represents a failed execution.
@@ -66,5 +69,17 @@ public class ErrorMseBlock implements MseBlock.Eos {
   @Override
   public <R, A> R accept(Visitor<R, A> visitor, A arg) {
     return visitor.visit(this, arg);
+  }
+
+  @Override
+  public String toString() {
+    try {
+      ObjectNode root = JsonUtils.newObjectNode();
+      root.put("type", "error");
+      root.put("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
+      return JsonUtils.objectToString(root);
+    } catch (JsonProcessingException e) {
+      return "{\"type\": \"error\", \"errorMessages\": \"not serializable\"}";
+    }
   }
 }

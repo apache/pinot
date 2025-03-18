@@ -104,4 +104,9 @@ public class RowHeapDataBlock implements MseBlock, MseBlock.Data {
   public <R, A> R accept(Data.Visitor<R, A> visitor, A arg) {
     return visitor.visit(this, arg);
   }
+
+  @Override
+  public String toString() {
+    return "{\"type\": \"rowHeap\", \"numRows\": " + getNumRows() + "}";
+  }
 }

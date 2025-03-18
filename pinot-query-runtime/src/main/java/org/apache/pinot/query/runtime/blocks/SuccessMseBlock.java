@@ -37,4 +37,9 @@ public class SuccessMseBlock implements MseBlock.Eos {
   public <R, A> R accept(Visitor<R, A> visitor, A arg) {
     return visitor.visit(this, arg);
   }
+
+  @Override
+  public String toString() {
+    return "{\"type\": \"success\"}";
+  }
 }
