@@ -134,7 +134,6 @@ public class ImplicitHybridTableTest {
 
     _routingManager = factory.buildRoutingManager(null);
     _tableCache = factory.buildTableCache();
-
   }
 
   @DataProvider(name = "offlineTableProvider")
@@ -158,6 +157,10 @@ public class ImplicitHybridTableTest {
     ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isOffline(), "The table should be offline");
+    assertNotNull(table.getOfflineTables());
+    assertEquals(table.getOfflineTables().size(), 1);
+    assertNotNull(table.getOfflineTable());
+    assertEquals(table.getOfflineTable().getTableNameWithType(), TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "realtimeTableProvider")
@@ -180,6 +183,10 @@ public class ImplicitHybridTableTest {
     ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isRealtime(), "The table should be realtime");
+    assertNotNull(table.getRealtimeTables());
+    assertEquals(table.getRealtimeTables().size(), 1);
+    assertNotNull(table.getRealtimeTable());
+    assertEquals(table.getRealtimeTable().getTableNameWithType(), TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "hybridTableProvider")
@@ -202,6 +209,19 @@ public class ImplicitHybridTableTest {
     ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isHybrid(), "The table should be hybrid");
+
+    assertNotNull(table.getOfflineTables());
+    assertEquals(table.getOfflineTables().size(), 1);
+    assertNotNull(table.getOfflineTable());
+    assertEquals(table.getOfflineTable().getTableNameWithType(), TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
+
+    assertNotNull(table.getRealtimeTables());
+    assertEquals(table.getRealtimeTables().size(), 1);
+    assertNotNull(table.getRealtimeTable());
+    assertEquals(table.getRealtimeTable().getTableNameWithType(), TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
+
+    assertNotNull(table.getAllPhysicalTables());
+    assertEquals(table.getAllPhysicalTables().size(), 2);
   }
 
   @DataProvider(name = "nonExistentTableProvider")
@@ -532,7 +552,8 @@ public class ImplicitHybridTableTest {
     }
   }
 
-  ExceptionOrResponse checkTableDisabled(boolean offlineTableDisabled, boolean realtimeTableDisabled, TableConfig offlineTableConfig, TableConfig realtimeTableConfig) {
+  ExceptionOrResponse checkTableDisabled(boolean offlineTableDisabled, boolean realtimeTableDisabled,
+      TableConfig offlineTableConfig, TableConfig realtimeTableConfig) {
     if (offlineTableDisabled || realtimeTableDisabled) {
       String errorMessage = null;
       if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled

@@ -27,6 +27,10 @@ import org.apache.pinot.spi.config.table.TableType;
  * It contains metadata about the table, such as its name, type, configuration, and status.
  */
 public class PhysicalTable {
+  /**
+   * A PhysicalTable is marked as empty for two reasons: TableConfig is not available or a route does not exist in the
+   * broker. The error message depends on the reason. Therefore, Java null cannot be used to represent an empty table.
+   */
   public static final PhysicalTable EMPTY = new PhysicalTable(null, null, null, false, null, false);
 
   private final String _rawTableName;
