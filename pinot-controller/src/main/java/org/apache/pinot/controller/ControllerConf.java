@@ -241,6 +241,10 @@ public class ControllerConf extends PinotConfiguration {
     public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
         "controller.realtime.segment.tmpFileRetentionInSeconds";
 
+    // Enables the deletion of untracked segments during the retention manager run.
+    // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
+    public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
+        "controller.retentionManager.untrackedSegmentDeletionEnabled";
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -1080,6 +1084,15 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
+
+  public boolean getUntrackedSegmentDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+  }
+
+  public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
+    setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
+  }
+
 
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();
