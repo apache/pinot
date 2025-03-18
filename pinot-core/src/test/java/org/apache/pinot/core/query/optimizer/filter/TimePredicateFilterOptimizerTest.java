@@ -64,28 +64,30 @@ public class TimePredicateFilterOptimizerTest {
   public void testEpochToEpochDateTimeConvert() {
     // Value not on granularity boundary
     testTimeConvert(
-        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > " + "1620830760000",
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > 1620830760000",
         new Range(1620831600000L, true, null, false));
     testTimeConvert(
-        "DATE_TIME_CONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < " + "1620917160000",
+        "DATE_TIME_CONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < 1620917160000",
         new Range(null, false, 1620918000000L, false));
-    testTimeConvert("datetimeconvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') BETWEEN "
-        + "1620830760000 AND 1620917160000", new Range(1620831600000L, true, 1620918000000L, false));
     testTimeConvert(
-        "DATETIMECONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = " + "1620830760000",
+        "datetimeconvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') BETWEEN 1620830760000 AND"
+            + " 1620917160000", new Range(1620831600000L, true, 1620918000000L, false));
+    testTimeConvert(
+        "DATETIMECONVERT(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = 1620830760000",
         new Range(1620831600000L, true, 1620831600000L, false));
 
     // Value on granularity boundary
     testTimeConvert(
-        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > " + "1620831600000",
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') > 1620831600000",
         new Range(1620833400000L, true, null, false));
     testTimeConvert(
-        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < " + "1620918000000",
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') < 1620918000000",
         new Range(null, false, 1620918000000L, false));
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') "
-        + "BETWEEN 1620831600000 AND 1620918000000", new Range(1620831600000L, true, 1620919800000L, false));
     testTimeConvert(
-        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = " + "1620831600000",
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') BETWEEN 1620831600000 AND"
+            + " 1620918000000", new Range(1620831600000L, true, 1620919800000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES') = 1620831600000",
         new Range(1620831600000L, true, 1620833400000L, false));
 
     // Other output format
@@ -93,14 +95,15 @@ public class TimePredicateFilterOptimizerTest {
         new Range(1620831600000L, true, null, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '10:MINUTES:EPOCH', '30:MINUTES') < 2701528",
         new Range(null, false, 1620918000000L, false));
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '30:MINUTES') BETWEEN 1620830760 "
-        + "AND 1620917160", new Range(1620831600000L, true, 1620918000000L, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '30:MINUTES') BETWEEN 1620830760 AND "
+            + "1620917160", new Range(1620831600000L, true, 1620918000000L, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '30:MINUTES:EPOCH', '30:MINUTES') > 900462",
         new Range(1620833400000L, true, null, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:HOURS:EPOCH', '30:MINUTES') < 450255",
         new Range(null, false, 1620918000000L, false));
     testTimeConvert(
-        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') BETWEEN 18759 AND " + "18760",
+        "dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') BETWEEN 18759 AND 18760",
         new Range(1620777600000L, true, 1620950400000L, false));
     testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') = 18759",
         new Range(1620777600000L, true, 1620864000000L, false));
@@ -117,7 +120,7 @@ public class TimePredicateFilterOptimizerTest {
         new Range(1620833400L, true, null, false));
     testTimeConvert("dateTimeConvert(col, '1:MINUTES:EPOCH', '1:HOURS:EPOCH', '30:MINUTES') < 450255",
         new Range(null, false, 27015300L, false));
-    testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') " + "BETWEEN 18759 AND 18760",
+    testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') BETWEEN 18759 AND 18760",
         new Range(18759L, true, 18761L, false));
     testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') = 18759",
         new Range(18759L, true, 18760L, false));
@@ -129,21 +132,30 @@ public class TimePredicateFilterOptimizerTest {
 
   @Test
   public void testSDFToEpochDateTimeConvert() {
-    testTimeConvert("dateTimeConvert(col, '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:MILLISECONDS:"
-        + "EPOCH', '30:MINUTES') > 1620830760000", new Range("2021-05-12 15:00:00.000", true, null, false));
-    testTimeConvert("dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', '1:MILLISECONDS:EPOCH',"
-        + " '30:MINUTES') < 1620917160000", new Range(null, false, "2021-05-13 15:00:00", false));
-    testTimeConvert("dateTimeConvert(col, '1:MINUTES:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm', '1:MILLISECONDS:EPOCH', "
-            + "'30:MINUTES') BETWEEN 1620830760000 AND 1620917160000",
-        new Range("2021-05-12 15:00", true, "2021-05-13 " + "15:00", false));
-    testTimeConvert("dateTimeConvert(col, '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd', '1:MILLISECONDS:EPOCH', '30:MINUTES')"
-        + " = 1620830760000", new Range("2021-05-12", false, "2021-05-12", true));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:MILLISECONDS:EPOCH', "
+            + "'30:MINUTES') > 1620830760000",
+        new Range("2021-05-12 15:00:00.000", true, null, false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', '1:MILLISECONDS:EPOCH', "
+            + "'30:MINUTES') < 1620917160000",
+        new Range(null, false, "2021-05-13 15:00:00", false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:MINUTES:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm', '1:MILLISECONDS:EPOCH', '30:MINUTES') "
+            + "BETWEEN 1620830760000 AND 1620917160000",
+        new Range("2021-05-12 15:00", true, "2021-05-13 15:00", false));
+    testTimeConvert(
+        "dateTimeConvert(col, '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd', '1:MILLISECONDS:EPOCH', '30:MINUTES') = "
+            + "1620830760000",
+        new Range("2021-05-12", false, "2021-05-12", true));
 
     // Invalid time
-    testInvalidFilterOptimizer("dateTimeConvert(col, '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
-        + "'1:MILLISECONDS:EPOCH', '30:MINUTES') > 1620830760000.5");
-    testInvalidFilterOptimizer("dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', "
-        + "'1:MILLISECONDS:EPOCH', '30:MINUTES') < 1620917160");
+    testInvalidFilterOptimizer(
+        "dateTimeConvert(col, '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:MILLISECONDS:EPOCH', "
+            + "'30:MINUTES') > 1620830760000.5");
+    testInvalidFilterOptimizer(
+        "dateTimeConvert(col, '1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss', '1:MILLISECONDS:EPOCH', "
+            + "'30:MINUTES') < 1620917160");
   }
 
   @Test
@@ -184,7 +196,7 @@ public class TimePredicateFilterOptimizerTest {
         new Range("1620777600000", true, "1620863999999", true));
     testInvalidFilterOptimizer("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') BETWEEN 453630 AND 453631");
     testInvalidFilterOptimizer(
-        "datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND " + "39193718399999");
+        "datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') BETWEEN 39193632000000 AND 39193718399999");
     testDateTrunc("dateTrunc('DAY', col) BETWEEN 1620777600000 AND 1621036799999",
         new Range("1620777600000", true, "1621036799999", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
