@@ -90,17 +90,22 @@ public class PartitionFunctionTest {
    */
   @Test
   public void testMurmurPartitioner() {
+    // Both Murmur and Murmur2 are aliases for MurmurPartitionFunction
+    testMurmurPartitioner("mUrmur");
+    testMurmurPartitioner("mUrMuR2");
+  }
+
+  private void testMurmurPartitioner(String functionName) {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
-      String functionName = "mUrmur";
       PartitionFunction partitionFunction =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, numPartitions);
+      testBasicProperties(partitionFunction, "murmur", numPartitions);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
