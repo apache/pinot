@@ -30,7 +30,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 ///
 /// This class is a subclass of [MseBlock.Data] and is used to store data in row heap format.
 /// This is probably the less efficient way to store data, but it is also the easiest to work with.
-/// As the day this comment was written, this class is used almost everytime we need to read or create data blocks.
+/// At the time of writing, this class is used almost every time we need to read or create data blocks.
 /// The only place where this class is not used is when we need to shuffle data through the network, in which case
 /// we use [SerializedDataBlock].
 public class RowHeapDataBlock implements MseBlock, MseBlock.Data {

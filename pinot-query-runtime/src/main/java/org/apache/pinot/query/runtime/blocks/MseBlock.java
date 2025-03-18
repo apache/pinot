@@ -40,10 +40,10 @@ import org.apache.pinot.core.common.Block;
 /// removing the need for the [Visitor] pattern.
 ///
 /// Meanwhile, the API force callers to do some castings, but it is a trade-off to have a more robust and maintainable
-/// codebase given that we can relay on Java typesystem to verify some important properties at compile time instead of
+/// codebase given that we can rely on Java typesystem to verify some important properties at compile time instead of
 /// adding runtime checks.
 ///
-/// The alternative of this pattern would be to have a single class with all methods, adding runtime checks to verify
+/// The alternative to this pattern would be to have a single class with all methods, adding runtime checks to verify
 /// whether it is acceptable to call a method or not. This is the approach that was used in the removed
 /// TransferableBlock class, which was used for all possible block type combinations. As a result each method
 /// had to include a runtime check to verify if it was legal to call it given some conditions imposed by its attributes.
