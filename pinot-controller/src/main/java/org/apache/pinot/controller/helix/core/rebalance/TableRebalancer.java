@@ -718,7 +718,13 @@ public class TableRebalancer {
       // Since this is a server in the target assignment, it should contain at least one tag of the tenant or tier
       // server tag. Note that if the server is tagged with multiple tenant or tier tags that are used in the table
       // config, we will count it multiple times, i.e. the total segment count would not add up to the actual total.
-      assert serverTags != null;
+      if (serverTags.isEmpty()) {
+        LOGGER.warn(
+            "Server: {} was assigned to table: {} but does not have any tags. Race condition might happen during the "
+                + "instance assignment.",
+            server, tableNameWithType);
+        continue;
+      }
       for (Map.Entry<String, RebalanceSummaryResult.TenantInfo> tenantInfoEntry : tenantInfoMap.entrySet()) {
         String tenantNameWithType = tenantInfoEntry.getKey();
         RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoEntry.getValue();
