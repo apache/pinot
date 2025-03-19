@@ -83,9 +83,9 @@ public class TestZkBasedTableRebalanceObserver {
     // Stats when there's nothing to rebalance
     TableRebalanceProgressStats.RebalanceStateStats stats =
         ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, target);
-    assertEquals(stats.uniqueSegmentsToRebalance, 0);
-    assertEquals(stats.segmentsMissingFromSource, 0);
-    assertEquals(stats.percentRemainingSegmentsToRebalance, 0.0);
+    assertEquals(stats._uniqueSegmentsToRebalance, 0);
+    assertEquals(stats._segmentsMissingFromSource, 0);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 0.0);
 
     // Stats when there's something to converge
     Map<String, Map<String, String>> current = new TreeMap<>();
@@ -93,18 +93,18 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats.uniqueSegmentsToRebalance, 2);
-    assertEquals(stats.percentRemainingSegmentsToRebalance, 100.0);
-    assertEquals(stats.totalSegmentsToRebalance, 4);
+    assertEquals(stats._uniqueSegmentsToRebalance, 2);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 100.0);
+    assertEquals(stats._totalSegmentsToRebalance, 4);
 
     // Stats when there are errors
     current = new TreeMap<>();
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ERROR));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats.uniqueSegmentsToRebalance, 2);
-    assertEquals(stats.segmentsMissingFromSource, 1);
-    assertEquals(stats.totalSegmentsToRebalance, 3);
+    assertEquals(stats._uniqueSegmentsToRebalance, 2);
+    assertEquals(stats._segmentsMissingFromSource, 1);
+    assertEquals(stats._totalSegmentsToRebalance, 3);
 
     // Stats when partially converged
     current = new TreeMap<>();
@@ -113,6 +113,6 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.getDifferenceBetweenTableRebalanceStates(target, current);
-    assertEquals(stats.percentRemainingSegmentsToRebalance, 50.0);
+    assertEquals(stats._percentRemainingSegmentsToRebalance, 50.0);
   }
 }
