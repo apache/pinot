@@ -120,7 +120,7 @@ public class SortedMailboxReceiveOperatorTest {
         DATA_SCHEMA, FIELD_COLLATIONS, System.currentTimeMillis() + 100L)) {
       MseBlock block = operator.nextBlock();
       assertTrue(block.isError());
-      assertTrue(((ErrorMseBlock) block).getErrorMessages().containsKey(QueryErrorCode.EXECUTION_TIMEOUT.getId()));
+      assertTrue(((ErrorMseBlock) block).getErrorMessages().containsKey(QueryErrorCode.EXECUTION_TIMEOUT));
     }
   }
 
