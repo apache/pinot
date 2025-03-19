@@ -650,11 +650,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      SemaphoreAccessCoordinator semaphoreCoordinator, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphoreCoordinator, _serverMetrics,
+        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, _serverMetrics,
         partitionUpsertMetadataManager, partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 

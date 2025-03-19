@@ -46,11 +46,11 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
   public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata,
       TableConfig tableConfig, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
       IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      SemaphoreAccessCoordinator partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator, ServerMetrics serverMetrics,
       boolean failCommit) throws AttemptsExceededException, RetriableOperationException {
     // Pass through to the real parent constructor
     super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
-        indexLoadingConfig, schema, llcSegmentName, partitionGroupConsumerSemaphore, serverMetrics,
+        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, serverMetrics,
         null /* no PartitionUpsertMetadataManager */, null /* no PartitionDedupMetadataManager */,
         () -> true /* isReadyToConsumeData always true for tests */);
 

@@ -53,7 +53,7 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
   @Override
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      SemaphoreAccessCoordinator semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
 
