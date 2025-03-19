@@ -142,6 +142,7 @@ public class TableRebalanceProgressStats {
         || base._totalSegmentsToBeDeleted != compare._totalSegmentsToBeDeleted
         || base._totalRemainingSegmentsToBeAdded != compare._totalRemainingSegmentsToBeAdded
         || base._totalRemainingSegmentsToBeDeleted != compare._totalRemainingSegmentsToBeDeleted
+        || base._totalRemainingSegmentsToConverge != compare._totalRemainingSegmentsToConverge
         || base._totalUniqueNewUntrackedSegmentsDuringRebalance
         != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
         || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
@@ -193,6 +194,8 @@ public class TableRebalanceProgressStats {
     public int _totalRemainingSegmentsToBeAdded;
     @JsonProperty("totalRemainingSegmentsToBeDeleted")
     public int _totalRemainingSegmentsToBeDeleted;
+    @JsonProperty("totalRemainingSegmentsToConverge")
+    public int _totalRemainingSegmentsToConverge;
     // Total new segments stats (not tracked by rebalance)
     @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
     public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
@@ -218,6 +221,7 @@ public class TableRebalanceProgressStats {
       _totalSegmentsToBeDeleted = 0;
       _totalRemainingSegmentsToBeAdded = 0;
       _totalRemainingSegmentsToBeDeleted = 0;
+      _totalRemainingSegmentsToConverge = 0;
       _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
       _percentageTotalSegmentsAddsRemaining = 0.0;
       _percentageTotalSegmentDeletesRemaining = 0.0;

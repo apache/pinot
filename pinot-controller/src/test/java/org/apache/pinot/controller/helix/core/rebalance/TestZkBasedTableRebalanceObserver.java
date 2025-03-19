@@ -19,7 +19,9 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -55,8 +57,10 @@ public class TestZkBasedTableRebalanceObserver {
     source.put("segment2",
         SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3", "host4"), ONLINE));
 
+    Set<String> segmentSet = new HashSet<>(source.keySet());
+    segmentSet.addAll(target.keySet());
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(-1,
-        source.keySet(), source.keySet());
+        segmentSet, segmentSet);
     observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
     assertEquals(observer.getNumUpdatesToZk(), 1);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source, rebalanceContext);
@@ -64,6 +68,8 @@ public class TestZkBasedTableRebalanceObserver {
         rebalanceContext);
     // START_TRIGGER will set up the ZK progress stats to have the diff between source and target. When calling the
     // triggers for IS and EV-IS, since source and source are compared, the diff will change, so ZK must be updated
+    // The diff will always change because we always calculate the estimated time for completion for progress stats,
+    // even if the other stats aren't changing.
     assertEquals(observer.getNumUpdatesToZk(), 3);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target,
