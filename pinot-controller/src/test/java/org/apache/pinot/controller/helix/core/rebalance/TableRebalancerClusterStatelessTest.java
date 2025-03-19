@@ -38,6 +38,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -152,6 +153,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
+    assertNull(rebalanceSummaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertNotNull(rebalanceSummaryResult.getTagsInfo());
@@ -1568,6 +1570,78 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers; i++) {
       stopAndDropFakeInstance("minimizeDataMovement_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
+  }
+
+  @Test
+  public void testRebalanceConsumingSegmentSummary()
+      throws Exception {
+    int numServers = 3;
+    int numReplica = 2;
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+    }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null,
+        _helixResourceManager.getTableSizeReader());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setNumReplicas(numReplica)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+
+    // dry-run with default rebalance config
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(summaryResult.getSegmentInfo());
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(), 0);
+
+    rebalanceConfig.setIncludeConsuming(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    summaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(summaryResult.getSegmentInfo());
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(), 0);
+
+    for (int i = numServers; i < numServers * 2; i++) {
+      String instanceId = "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+    }
+    for (int i = 0; i < numServers; i++) {
+      _helixAdmin.removeInstanceTag(getHelixClusterName(), "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i,
+          TagNameUtils.getRealtimeTagForTenant(null));
+    }
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    summaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(summaryResult.getSegmentInfo());
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(),
+        FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
+
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers * 2; i++) {
+      stopAndDropFakeInstance("consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    executorService.shutdown();
   }
 
   @AfterClass
