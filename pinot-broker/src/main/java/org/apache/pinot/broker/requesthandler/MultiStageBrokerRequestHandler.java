@@ -306,12 +306,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
     boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
         CommonConstants.Broker.DEFAULT_OF_SPOOLS);
+    boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
+        CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
     return QueryEnvironment.configBuilder()
         .database(database)
         .tableCache(_tableCache)
         .workerManager(_workerManager)
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
+        .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .build();
   }
 
