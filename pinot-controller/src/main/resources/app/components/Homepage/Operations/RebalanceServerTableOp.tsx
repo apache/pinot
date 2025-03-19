@@ -20,30 +20,23 @@
 import React from 'react';
 import {
   DialogContentText,
-  FormControl,
-  FormControlLabel,
   Grid,
-  Input,
-  InputLabel,
-  Switch,
   Box,
   Typography,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Divider, Button
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
 import {RebalanceServerDialogHeader} from "./RebalanceServer/RebalanceServerDialogHeader";
-import {RebalanceServerConfigurationSection} from "./RebalanceServer/RebalanceServerConfigurationSection";
+import {
+  RebalanceServerSection
+} from "./RebalanceServer/RebalanceServerSection";
 import Alert from "@material-ui/lab/Alert";
 import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import {rebalanceServerOptions} from "./RebalanceServer/RebalanceServerOptions";
-import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import {RebalanceServerConfigurationOption} from "./RebalanceServer/RebalanceServerConfigurationOption";
+import {RebalanceResponse} from "./RebalanceServer/RebalanceResponse";
 
 type Props = {
   tableType: string,
@@ -115,16 +108,16 @@ export default function RebalanceServerTableOp({
     >
         {!rebalanceResponse ?
           <Box flexDirection="column">
-            <RebalanceServerConfigurationSection sectionTitle='Before you begin'>
+            <RebalanceServerSection sectionTitle='Before you begin'>
               <Alert color='info' icon={<InfoOutlinedIcon fontSize='small' />}>
                 <Typography variant='body2'>
                   It is strongly recommended to run once via "Dry Run" with the options enabled prior to running the actual "Rebalance" operation.
                   This is needed to verify that rebalance will do what's expected.
                 </Typography>
               </Alert>
-            </RebalanceServerConfigurationSection>
+            </RebalanceServerSection>
             <Divider style={{ marginBottom: 20 }} />
-            <RebalanceServerConfigurationSection sectionTitle='Basic Options'>
+            <RebalanceServerSection sectionTitle='Basic Options'>
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
                     <Grid item xs={12} key={`basic-options-${option.name}`}>
@@ -132,9 +125,9 @@ export default function RebalanceServerTableOp({
                     </Grid>
                 ))}
               </Grid>
-            </RebalanceServerConfigurationSection>
+            </RebalanceServerSection>
             <Divider style={{ marginBottom: 20 }}/>
-            <RebalanceServerConfigurationSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
+            <RebalanceServerSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
               <Grid container spacing={2}>
                 {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
                     <Grid item xs={12} key={`advanced-options-${option.name}`}>
@@ -142,10 +135,11 @@ export default function RebalanceServerTableOp({
                     </Grid>
                 ))}
               </Grid>
-            </RebalanceServerConfigurationSection>
+            </RebalanceServerSection>
           </Box>
         : 
           <React.Fragment>
+            <RebalanceResponse response={rebalanceResponse} />
             <DialogContentText>
               Operation Status:
             </DialogContentText>
