@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Condition;
@@ -33,7 +35,7 @@ public class SemaphoreAccessCoordinator {
   private final boolean _enforceConsumptionInOrder;
   private final Condition _condition;
   private final Lock _lock;
-  private final ConcurrentHashMap.KeySetView<Integer, Boolean> _segmentSequenceNumSet;
+  private final Set<Integer> _segmentSequenceNumSet;
   private final BooleanSupplier _isTableReady;
 
   public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
@@ -42,7 +44,7 @@ public class SemaphoreAccessCoordinator {
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
-    _segmentSequenceNumSet = ConcurrentHashMap.newKeySet();
+    _segmentSequenceNumSet = new HashSet<>();
     _isTableReady = isTableReady;
   }
 
