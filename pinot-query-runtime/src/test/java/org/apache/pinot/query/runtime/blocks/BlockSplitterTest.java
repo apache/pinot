@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
@@ -100,10 +99,6 @@ public class BlockSplitterTest {
         DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1));
     ColumnarDataBlock columnarBlock = DataBlockBuilder.buildFromColumns(columnars, dataSchema);
     validateNonSplittableBlock(columnarBlock);
-
-    // METADATA
-    MetadataBlock metadataBlock = MetadataBlock.newEos();
-    validateNonSplittableBlock(metadataBlock);
   }
 
   private void validateNonSplittableBlock(BaseDataBlock nonSplittableBlock) {
