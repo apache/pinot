@@ -317,12 +317,8 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   @Override
   public void close() {
-    try {
-      if (_readerContext != null) {
-        _readerContext.close();
-      }
-    } catch (Exception e) {
-      // Ignore
+    if (_readerContext != null) {
+      _readerContext.close();
     }
   }
 }

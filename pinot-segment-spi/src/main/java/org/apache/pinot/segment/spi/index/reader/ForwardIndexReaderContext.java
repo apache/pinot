@@ -28,4 +28,7 @@ import java.io.Closeable;
  * inside the context in order to accelerate the following reads.
  */
 public interface ForwardIndexReaderContext extends Closeable {
+
+  @Override
+  void close();
 }

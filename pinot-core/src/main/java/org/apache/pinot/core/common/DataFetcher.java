@@ -19,7 +19,6 @@
 package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -586,8 +585,7 @@ public class DataFetcher implements AutoCloseable {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
       if (_readerContext != null) {
         _readerContext.close();
       }
@@ -599,17 +597,8 @@ public class DataFetcher implements AutoCloseable {
    */
   @Override
   public void close() {
-    boolean failedToCloseAll = false;
     for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
-      try {
         columnValueReader.close();
-      } catch (IOException e) {
-        failedToCloseAll = true;
-      }
-    }
-
-    if (failedToCloseAll) {
-      throw new RuntimeException("Failed to close the DataFetcher and release all query resources");
     }
   }
 }
