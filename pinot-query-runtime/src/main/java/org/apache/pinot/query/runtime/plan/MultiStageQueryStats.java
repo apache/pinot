@@ -520,17 +520,19 @@ public class MultiStageQueryStats {
           throws IOException {
         int numOperators = input.readInt();
         if (numOperators != _operatorTypes.size()) {
+          Closed deserialized;
           try {
-            Closed deserialized = deserialize(input, numOperators);
-            throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
-                + _operatorTypes + " operators, got " + numOperators + ". Deserialized stats: " + deserialized);
+            deserialized = deserialize(input, numOperators);
           } catch (IOException e) {
             throw new IOException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
-          } catch (RuntimeException e) {
+          } catch (Exception e) {
             throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
           }
+          throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
+              + _operatorTypes + " operators, got " + deserialized._operatorTypes
+              + ". Deserialized stats: " + deserialized);
         }
         for (int i = 0; i < numOperators; i++) {
           byte ordinal = input.readByte();
