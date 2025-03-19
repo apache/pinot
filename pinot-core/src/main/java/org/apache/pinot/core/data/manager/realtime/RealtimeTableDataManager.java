@@ -804,6 +804,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // metadata manger can update the upsert view before the segment becomes visible to queries.
       partitionUpsertMetadataManager.trackSegmentForUpsertView(segmentDataManager.getSegment());
     }
+    registerSegment(segmentName, segmentDataManager);
+  }
+
+  @Override
+  protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     if (_enforceConsumptionInOrder) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       Preconditions.checkNotNull(llcSegmentName);
@@ -811,7 +816,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
       semaphoreAccessCoordinator.trackSegment(llcSegmentName);
     }
-    registerSegment(segmentName, segmentDataManager);
+    return super.registerSegment(segmentName, segmentDataManager);
   }
 
   /**
@@ -904,11 +909,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private SemaphoreAccessCoordinator getSemaphoreAccessCoordinator(int partitionGroupId) {
     return _partitionGroupIdToSemaphoreCoordinatorMap.computeIfAbsent(partitionGroupId,
-        k -> new SemaphoreAccessCoordinator(new Semaphore(1), _enforceConsumptionInOrder, partitionGroupId, this));
-  }
-
-  public BooleanSupplier getIsTableReadyToConsumeData() {
-    return _isTableReadyToConsumeData;
+        k -> new SemaphoreAccessCoordinator(new Semaphore(1), _enforceConsumptionInOrder, _isTableReadyToConsumeData));
   }
 
   private boolean enforceConsumptionInOrder() {
@@ -919,5 +920,4 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _tableConfig.getIngestionConfig().getStreamIngestionConfig().isEnforceConsumptionInOrder() && (
         isDedupEnabled() || isPartialUpsertEnabled());
   }
-
 }

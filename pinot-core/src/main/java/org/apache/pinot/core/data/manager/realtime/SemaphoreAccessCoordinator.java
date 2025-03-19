@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import com.google.common.base.Preconditions;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import org.apache.pinot.common.utils.LLCSegmentName;
 
 
@@ -34,20 +34,16 @@ public class SemaphoreAccessCoordinator {
   private final Condition _condition;
   private final Lock _lock;
   private final ConcurrentHashMap.KeySetView<Integer, Boolean> _segmentSequenceNumSet;
-  private final int _partitionGroupId;
-  private final RealtimeTableDataManager _realtimeTableDataManager;
-  private volatile boolean _preloaded;
+  private final BooleanSupplier _isTableReady;
 
-  public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder, int partitionGroupId,
-      RealtimeTableDataManager realtimeTableDataManager) {
+  public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
+      BooleanSupplier isTableReady) {
     _semaphore = semaphore;
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
     _segmentSequenceNumSet = ConcurrentHashMap.newKeySet();
-    _partitionGroupId = partitionGroupId;
-    _realtimeTableDataManager = realtimeTableDataManager;
-    _preloaded = false;
+    _isTableReady = isTableReady;
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -89,9 +85,11 @@ public class SemaphoreAccessCoordinator {
 
   private void waitForPrevSegment(int prevSeqNum)
       throws InterruptedException {
-    if (!_preloaded) {
-      preload();
+
+    while (!_isTableReady.getAsBoolean()) {
+      Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
     }
+
     _lock.lock();
     try {
       while (!_segmentSequenceNumSet.contains(prevSeqNum)) {
@@ -100,27 +98,5 @@ public class SemaphoreAccessCoordinator {
     } finally {
       _lock.unlock();
     }
-  }
-
-  private synchronized void preload()
-      throws InterruptedException {
-
-    if (_preloaded) {
-      return;
-    }
-
-    while (!_realtimeTableDataManager.getIsTableReadyToConsumeData().getAsBoolean()) {
-      Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-    }
-
-    for (String segment : _realtimeTableDataManager.getSegments()) {
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
-      Preconditions.checkNotNull(llcSegmentName);
-      if (llcSegmentName.getPartitionGroupId() == _partitionGroupId) {
-        _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
-      }
-    }
-
-    _preloaded = true;
   }
 }
