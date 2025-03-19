@@ -50,6 +50,8 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
@@ -162,6 +164,13 @@ public class S3PinotFS extends BasePinotFS {
       if (s3Config.getStorageClass() != null) {
         _storageClass = StorageClass.fromValue(s3Config.getStorageClass());
         assert (_storageClass != StorageClass.UNKNOWN_TO_SDK_VERSION);
+      }
+
+      if (s3Config.getRequestChecksumCalculationWhenRequired() == RequestChecksumCalculation.WHEN_REQUIRED) {
+        s3ClientBuilder.responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+      }
+      if (s3Config.getResponseChecksumValidationWhenRequired() == ResponseChecksumValidation.WHEN_REQUIRED) {
+        s3ClientBuilder.requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED);
       }
 
       _s3Client = s3ClientBuilder.build();
@@ -562,7 +571,8 @@ public class S3PinotFS extends BasePinotFS {
   private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> objectVisitor,
       // S3 has a concept of CommonPrefixes which act like subdirectories:
       // https://docs.aws.amazon.com/AmazonS3/latest/API/API_CommonPrefix.html
-      @Nullable Consumer<CommonPrefix> commonPrefixVisitor) throws IOException {
+      @Nullable Consumer<CommonPrefix> commonPrefixVisitor)
+      throws IOException {
     try {
       String continuationToken = null;
       boolean isDone = false;

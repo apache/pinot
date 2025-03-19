@@ -29,6 +29,8 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 
@@ -80,6 +82,8 @@ public class S3Config {
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT = "connectionAcquisitionTimeout";
   private static final String CROSS_REGION_ACCESS_ENABLED = "crossRegionAccessEnabled";
   public static final String ANONYMOUS_CREDENTIALS_PROVIDER = "anonymousCredentialsProvider";
+  public static final String REQUEST_CHECKSUM_CALCULATION = "requestChecksumCalculation";
+  public static final String RESPONSE_CHECKSUM_VALIDATION = "responseChecksumValidation";
 
   private final String _accessKey;
   private final String _secretKey;
@@ -103,6 +107,8 @@ public class S3Config {
   private final ApacheHttpClient.Builder _httpClientBuilder;
   private final boolean _enableCrossRegionAccess;
   private final boolean _anonymousCredentialsProvider;
+  private final RequestChecksumCalculation _requestChecksumCalculationWhenRequired;
+  private final ResponseChecksumValidation _responseChecksumValidationWhenRequired;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -112,6 +118,10 @@ public class S3Config {
     _endpoint = pinotConfig.getProperty(ENDPOINT);
     _anonymousCredentialsProvider = Boolean.parseBoolean(
         pinotConfig.getProperty(ANONYMOUS_CREDENTIALS_PROVIDER, "false"));
+    _requestChecksumCalculationWhenRequired = RequestChecksumCalculation.fromValue(
+        pinotConfig.getProperty(REQUEST_CHECKSUM_CALCULATION, RequestChecksumCalculation.WHEN_REQUIRED.name()));
+    _responseChecksumValidationWhenRequired = ResponseChecksumValidation.fromValue(
+        pinotConfig.getProperty(RESPONSE_CHECKSUM_VALIDATION, ResponseChecksumValidation.WHEN_REQUIRED.name()));
 
     _storageClass = pinotConfig.getProperty(STORAGE_CLASS);
     if (_storageClass != null) {
@@ -282,5 +292,13 @@ public class S3Config {
 
   public boolean isAnonymousCredentialsProvider() {
     return _anonymousCredentialsProvider;
+  }
+
+  public RequestChecksumCalculation getRequestChecksumCalculationWhenRequired() {
+    return _requestChecksumCalculationWhenRequired;
+  }
+
+  public ResponseChecksumValidation getResponseChecksumValidationWhenRequired() {
+    return _responseChecksumValidationWhenRequired;
   }
 }

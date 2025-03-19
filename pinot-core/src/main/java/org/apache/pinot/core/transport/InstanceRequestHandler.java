@@ -51,6 +51,7 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.thrift.TDeserializer;
@@ -125,9 +126,10 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
     byte[] requestBytes = null;
     String tableNameWithType = null;
 
-    try {
+    try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open()) {
       // Put all code inside try block to catch all exceptions.
       int requestSize = msg.readableBytes();
+      QueryThreadContext.setQueryEngine("sse");
 
       instanceRequest = new InstanceRequest();
       ServerQueryRequest queryRequest;
@@ -141,6 +143,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       msg.readBytes(requestBytes);
       _deserializer.get().deserialize(instanceRequest, requestBytes);
       queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics, queryArrivalTimeMs);
+      queryRequest.registerOnQueryThreadLocal();
       queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
           .stopAndRecord();
       tableNameWithType = queryRequest.getTableNameWithType();

@@ -43,6 +43,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,13 +115,21 @@ public abstract class QueryScheduler {
   /**
    * Create a future task for the query
    * @param queryRequest incoming query request
-   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor
+   * @param executorService executor service to use for parallelizing query. This is passed to the QueryExecutor.
+   *                        This is not the executor that runs the returned future task but the one that can be
+   *                        internally used to parallelize query processing.
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
-   * should be executed on a different executor service than {@code e} to avoid deadlock.
+   * should be executed on a different executor service than {@code executorService} to avoid deadlock.
    */
   protected ListenableFutureTask<byte[]> createQueryFutureTask(ServerQueryRequest queryRequest,
       ExecutorService executorService) {
-    return ListenableFutureTask.create(() -> processQueryAndSerialize(queryRequest, executorService));
+    @Nullable
+    QueryThreadContext.Memento memento = QueryThreadContext.isInitialized() ? QueryThreadContext.createMemento() : null;
+    return ListenableFutureTask.create(() -> {
+      try (QueryThreadContext.CloseableContext closeme = QueryThreadContext.open(memento)) {
+        return processQueryAndSerialize(queryRequest, executorService);
+      }
+    });
   }
 
   /**
@@ -134,7 +143,6 @@ public abstract class QueryScheduler {
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
-    queryRequest.registerInMdc();
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());
@@ -179,7 +187,6 @@ public abstract class QueryScheduler {
 
       return responseBytes;
     } finally {
-      queryRequest.unregisterFromMdc();
       Tracing.ThreadAccountantOps.clear();
     }
   }

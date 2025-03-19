@@ -112,9 +112,7 @@ public class ResourceManagerAccountingTest {
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
-            ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                threadExecutionContext);
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadExecutionContext);
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
               Tracing.ThreadAccountantOps.sample();
               for (int m = 0; m < 1000; m++) {
@@ -173,9 +171,7 @@ public class ResourceManagerAccountingTest {
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           rm.getQueryWorkers().submit(() -> {
-            ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                threadExecutionContext);
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalJ + 1) * 10; i++) {
               Tracing.ThreadAccountantOps.sample();
@@ -516,9 +512,7 @@ public class ResourceManagerAccountingTest {
         for (int j = 0; j < 10; j++) {
           int finalJ = j;
           futuresThread[j] = rm.getQueryWorkers().submit(() -> {
-            ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadResourceUsageProvider,
-                threadExecutionContext);
+            Tracing.ThreadAccountantOps.setupWorker(finalJ, threadExecutionContext);
             long[][] a = new long[1000][];
             for (int i = 0; i < (finalK + 1) * 80; i++) {
               Tracing.ThreadAccountantOps.sample();

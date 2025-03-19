@@ -25,12 +25,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.transform.function.DateTimeConversionTransformFunction;
+import org.apache.pinot.core.operator.transform.function.DateTruncTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TimeConversionTransformFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -38,6 +40,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.sql.FilterKind;
+import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +56,18 @@ import org.slf4j.LoggerFactory;
  *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
  *     not common on time column, and they cannot be optimized to a single range predicate.
  *   </li>
+ *   <li>
+ *     Optimizes DATE_TRUNC function with range/equality predicates by either rounding up or down to closest granularity
+ *     step
+ *     <p>E.g. "dateTrunc('DAY', col, 'MILLISECONDS') > 1620777600000" will be optimized
+ *     to "col > 1620863999999" as 1620863999999 is the largest value that can be truncated to 1620777600000
+ *     <p>E.g. "datetrunc('DAY', col, 'MILLISECONDS') <= 1620777600010" will be optimized
+ *     to col <= 1620863999999 as the next granularity step lower than 1620777600010 is 1620777600000 and 1620863999999
+ *     is the largest value that truncates to be lower than the specified literal.
+ *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
+ *     not common on time column, and they cannot be optimized to a single range predicate.
+ *     <p>NOTE: Timezones are not yet supported for the datetrunc optimizer</p>
+ *   </li>
  * </ul>
  *
  * NOTE: This optimizer is followed by the {@link MergeRangeFilterOptimizer}, which can merge the generated ranges.
@@ -66,7 +81,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   }
 
   @VisibleForTesting
-  Expression optimize(Expression filterExpression) {
+  static Expression optimize(Expression filterExpression) {
     Function filterFunction = filterExpression.getFunctionCall();
     FilterKind filterKind = FilterKind.valueOf(filterFunction.getOperator());
     List<Expression> operands = filterFunction.getOperands();
@@ -84,6 +99,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           optimizeTimeConvert(filterFunction, filterKind);
         } else if (functionName.equalsIgnoreCase(DateTimeConversionTransformFunction.FUNCTION_NAME)) {
           optimizeDateTimeConvert(filterFunction, filterKind);
+        } else if (functionName.equalsIgnoreCase(DateTruncTransformFunction.FUNCTION_NAME)) {
+          optimizeDateTrunc(filterFunction, filterKind);
         }
       }
     }
@@ -94,7 +111,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper method to optimize TIME_CONVERT function with range/equality predicate to directly apply the predicate to
    * the inner expression. Changes are applied in-place of the filter function.
    */
-  private void optimizeTimeConvert(Function filterFunction, FilterKind filterKind) {
+  private static void optimizeTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> timeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
     Preconditions.checkArgument(timeConvertOperands.size() == 3,
@@ -246,7 +263,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
    * Helper method to optimize DATE_TIME_CONVERT function with range/equality predicate to directly apply the predicate
    * to the inner expression. Changes are applied in-place of the filter function.
    */
-  private void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
+  private static void optimizeDateTimeConvert(Function filterFunction, FilterKind filterKind) {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTimeConvertOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
@@ -411,12 +428,116 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     }
   }
 
-  private boolean isStringLiteral(Expression expression) {
+  private static void optimizeDateTrunc(Function filterFunction, FilterKind filterKind) {
+    List<Expression> filterOperands = filterFunction.getOperands();
+    List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
+
+    long lowerMillis;
+    long upperMillis;
+    boolean lowerInclusive = true;
+    boolean upperInclusive = true;
+    String unit = dateTruncOperands.get(0).getLiteral().getStringValue();
+    String inputTimeUnit = (dateTruncOperands.size() >= 3) ? dateTruncOperands.get(2).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
+    if (dateTruncOperands.size() >= 4) {
+      if (!dateTruncOperands.get(3).getLiteral().getStringValue().equals("UTC")) {
+        // Leave query unoptimized if working with non-UTC time zones
+        return;
+      }
+    }
+    ISOChronology chronology = ISOChronology.getInstanceUTC();
+    String outputTimeUnit = (dateTruncOperands.size() == 5) ? dateTruncOperands.get(4).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
+
+    switch (filterKind) {
+      case EQUALS: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the filter is
+        // impossible and is converted to an impossible filter that is optimized away downstream
+        if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
+          lowerMillis = Long.MAX_VALUE;
+          upperMillis = Long.MIN_VALUE;
+          String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
+          rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
+          return;
+        }
+        break;
+      }
+      case GREATER_THAN: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        lowerInclusive = false;
+        upperMillis = Long.MAX_VALUE;
+        break;
+      }
+      case GREATER_THAN_OR_EQUAL: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
+        upperMillis = Long.MAX_VALUE;
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the equality portion
+        // of the filter is impossible and is converted to a regular greater than filter
+        if (lowerMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(lowerMillis)) {
+          lowerInclusive = false;
+          lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        }
+        break;
+      }
+      case LESS_THAN: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = Long.MIN_VALUE;
+        upperInclusive = false;
+        upperMillis = dateTruncFloor(timeValue, outputTimeUnit);
+        // If the roundFloor of the upperMillis does not equal upperMillis, this implies that upperMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the maximum value
+        // that will truncate to a value lower than the literal will be equal to the ceiling of the inverse
+        if (upperMillis != DateTimeUtils.getTimestampField(chronology, unit).roundFloor(upperMillis)) {
+          upperInclusive = true;
+          upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        }
+        break;
+      }
+      case LESS_THAN_OR_EQUAL: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = Long.MIN_VALUE;
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        break;
+      }
+      case BETWEEN: {
+        long timeValue = getLongValue(filterOperands.get(1));
+        lowerMillis = dateTruncFloor(timeValue, outputTimeUnit);
+        // If the roundFloor of the lowerMillis does not equal lowerMillis, this implies that lowerMillis (the literal
+        // comparative in the filter) is not aligned with the interval step of the unit. Therefore, the lowerMillis must
+        // be equal to the ceiling (non-inclusive) of the inverse
+        if (TimeUnit.valueOf(outputTimeUnit).convert(lowerMillis, TimeUnit.MILLISECONDS)
+            != getLongValue(filterOperands.get(1))) {
+          lowerInclusive = false;
+          lowerMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        }
+        timeValue = getLongValue(filterOperands.get(2));
+        upperMillis = dateTruncCeil(unit, timeValue, outputTimeUnit);
+        break;
+      }
+      default:
+        throw new IllegalStateException();
+    }
+
+    // Convert values back into columnar unit
+    lowerMillis = TimeUnit.valueOf(inputTimeUnit).convert(lowerMillis, TimeUnit.MILLISECONDS);
+    upperMillis = TimeUnit.valueOf(inputTimeUnit).convert(upperMillis, TimeUnit.MILLISECONDS);
+    String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
+    rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
+  }
+
+  private static boolean isStringLiteral(Expression expression) {
     Literal literal = expression.getLiteral();
     return literal != null && literal.isSetStringValue();
   }
 
-  private long getLongValue(Expression expression) {
+  private static long getLongValue(Expression expression) {
     Literal literal = expression.getLiteral();
     Preconditions.checkArgument(literal != null, "Got non-literal expression: %s", expression);
     switch (literal.getSetField()) {
@@ -434,7 +555,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   /**
    * Helper method to round up the given value based on the granularity.
    */
-  private long ceil(long millisValue, long granularityMillis) {
+  private static long ceil(long millisValue, long granularityMillis) {
     return (millisValue + granularityMillis - 1) / granularityMillis * granularityMillis;
   }
 
@@ -445,5 +566,23 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     newOperands.add(expression);
     newOperands.add(RequestUtils.getLiteralExpression(rangeString));
     filterFunction.setOperands(newOperands);
+  }
+
+  /**
+   * Helper function to find the floor of acceptable values truncating to a specified value
+   * Computes floor inverse of date trunc function
+   */
+  private static long dateTruncFloor(long timeValue, String outputTimeUnit) {
+    return TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
+  }
+
+  /**
+   * Helper function that finds the maximum value (ceiling) that truncates to specified value
+   * Computes ceiling inverse of date trunc function
+   */
+  private static long dateTruncCeil(String unit, long timeValue, String outputTimeUnit) {
+    long floorMillis = dateTruncFloor(timeValue, outputTimeUnit);
+    return DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundFloor(floorMillis)
+        + DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(1) - 1;
   }
 }
