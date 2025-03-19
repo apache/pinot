@@ -919,7 +919,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private boolean enforceConsumptionInOrder() {
     if (_tableConfig.getIngestionConfig() == null
         || _tableConfig.getIngestionConfig().getStreamIngestionConfig() == null) {
-      return (isDedupEnabled() || isPartialUpsertEnabled());
+      return false;
     }
     return _tableConfig.getIngestionConfig().getStreamIngestionConfig().isEnforceConsumptionInOrder() && (
         isDedupEnabled() || isPartialUpsertEnabled());
