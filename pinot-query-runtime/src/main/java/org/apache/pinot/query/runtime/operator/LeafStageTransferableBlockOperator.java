@@ -379,8 +379,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
-          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-          Tracing.ThreadAccountantOps.setupWorker(1, threadResourceUsageProvider, parentContext);
+          Tracing.ThreadAccountantOps.setupWorker(1, parentContext);
 
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
@@ -413,8 +412,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
             ServerQueryRequest request = _requests.get(i);
             int taskId = i;
             futures[i] = _executorService.submit(() -> {
-              ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-              Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
+              Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
               try {
                 InstanceResponseBlock instanceResponseBlock =

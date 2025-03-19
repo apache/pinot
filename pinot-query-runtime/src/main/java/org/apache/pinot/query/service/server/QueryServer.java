@@ -169,7 +169,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         responseObserver.onCompleted();
         return;
       } finally {
-        Tracing.getThreadAccountant().clear();
+        Tracing.ThreadAccountantOps.clear();
       }
       responseObserver.onNext(
           Worker.QueryResponse.newBuilder()

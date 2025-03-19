@@ -351,7 +351,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
       } finally {
-        Tracing.getThreadAccountant().clear();
+        Tracing.ThreadAccountantOps.clear();
         onQueryFinish(requestId);
       }
       long executionEndTimeNs = System.nanoTime();
@@ -384,6 +384,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
+
+      // Track number of queries with number of groups limit reached
+      if (brokerResponse.isNumGroupsLimitReached()) {
+        for (String table : tableNames) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
+        }
+      }
 
       // Set total query processing time
       // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
