@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
 /**
@@ -26,72 +28,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
  * is 4 and _replicasToRebalance is 16.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonPropertyOrder({"status", "startTimeMs", "timeToCompleteRebalanceInSeconds", "completionStatusMsg",
+    "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
+    "currentToTargetConvergence", "externalViewToIdealStateConvergence"})
 public class TableRebalanceProgressStats {
-  public static class RebalanceStateStats {
-    @JsonProperty("segmentsMissingFromSource")
-    public int _segmentsMissingFromSource;
-    @JsonProperty("uniqueSegmentsToRebalance")
-    public int _uniqueSegmentsToRebalance;
-    @JsonProperty("percentRemainingSegmentsToRebalance")
-    public double _percentRemainingSegmentsToRebalance;
-    @JsonProperty("totalSegmentsToRebalance")
-    public int _totalSegmentsToRebalance;
-
-    RebalanceStateStats() {
-      _segmentsMissingFromSource = 0;
-      _uniqueSegmentsToRebalance = 0;
-      _totalSegmentsToRebalance = 0;
-      _percentRemainingSegmentsToRebalance = 0.0;
-    }
-  }
-
-  // These rebalance stats specifically track the total segments added / deleted across all replicas
-  public static class RebalanceProgressStats {
-    // Total segments - across all replicas
-    @JsonProperty("totalSegmentsToBeAdded")
-    public int _totalSegmentsToBeAdded;
-    @JsonProperty("totalSegmentsToBeDeleted")
-    public int _totalSegmentsToBeDeleted;
-    // Total segments processed so far - across all replicas
-    @JsonProperty("totalRemainingSegmentsToBeAdded")
-    public int _totalRemainingSegmentsToBeAdded;
-    @JsonProperty("totalRemainingSegmentsToBeDeleted")
-    public int _totalRemainingSegmentsToBeDeleted;
-    // Total new segments stats (not tracked by rebalance)
-    @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
-    public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
-    // Derived
-    @JsonProperty("percentageTotalSegmentsAddsRemaining")
-    public double _percentageTotalSegmentsAddsRemaining;
-    @JsonProperty("percentageTotalSegmentDeletesRemaining")
-    public double _percentageTotalSegmentDeletesRemaining;
-    @JsonProperty("estimatedTimeToCompleteAddsInSeconds")
-    public double _estimatedTimeToCompleteAddsInSeconds;
-    @JsonProperty("estimatedTimeToCompleteDeletesInSeconds")
-    public double _estimatedTimeToCompleteDeletesInSeconds;
-    @JsonProperty("averageSegmentSizeInBytes")
-    public long _averageSegmentSizeInBytes;
-    @JsonProperty("totalEstimatedDataToBeMovedInBytes")
-    public long _totalEstimatedDataToBeMovedInBytes;
-    // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
-    @JsonProperty("startTimeMs")
-    public long _startTimeMs;
-
-    RebalanceProgressStats() {
-      _totalSegmentsToBeAdded = 0;
-      _totalSegmentsToBeDeleted = 0;
-      _totalRemainingSegmentsToBeAdded = 0;
-      _totalRemainingSegmentsToBeDeleted = 0;
-      _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
-      _percentageTotalSegmentsAddsRemaining = 0.0;
-      _percentageTotalSegmentDeletesRemaining = 0.0;
-      _estimatedTimeToCompleteAddsInSeconds = 0;
-      _estimatedTimeToCompleteDeletesInSeconds = 0;
-      _averageSegmentSizeInBytes = 0;
-      _totalEstimatedDataToBeMovedInBytes = 0;
-      _startTimeMs = 0;
-    }
-  }
 
   // Done/In_progress/Failed
   private RebalanceResult.Status _status;
@@ -220,5 +161,71 @@ public class TableRebalanceProgressStats {
       return true;
     }
     return false;
+  }
+
+  public static class RebalanceStateStats {
+    @JsonProperty("segmentsMissingFromSource")
+    public int _segmentsMissingFromSource;
+    @JsonProperty("uniqueSegmentsToRebalance")
+    public int _uniqueSegmentsToRebalance;
+    @JsonProperty("percentRemainingSegmentsToRebalance")
+    public double _percentRemainingSegmentsToRebalance;
+    @JsonProperty("totalSegmentsToRebalance")
+    public int _totalSegmentsToRebalance;
+
+    RebalanceStateStats() {
+      _segmentsMissingFromSource = 0;
+      _uniqueSegmentsToRebalance = 0;
+      _totalSegmentsToRebalance = 0;
+      _percentRemainingSegmentsToRebalance = 0.0;
+    }
+  }
+
+  // These rebalance stats specifically track the total segments added / deleted across all replicas
+  public static class RebalanceProgressStats {
+    // Total segments - across all replicas
+    @JsonProperty("totalSegmentsToBeAdded")
+    public int _totalSegmentsToBeAdded;
+    @JsonProperty("totalSegmentsToBeDeleted")
+    public int _totalSegmentsToBeDeleted;
+    // Total segments processed so far - across all replicas
+    @JsonProperty("totalRemainingSegmentsToBeAdded")
+    public int _totalRemainingSegmentsToBeAdded;
+    @JsonProperty("totalRemainingSegmentsToBeDeleted")
+    public int _totalRemainingSegmentsToBeDeleted;
+    // Total new segments stats (not tracked by rebalance)
+    @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
+    public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
+    // Derived
+    @JsonProperty("percentageTotalSegmentsAddsRemaining")
+    public double _percentageTotalSegmentsAddsRemaining;
+    @JsonProperty("percentageTotalSegmentDeletesRemaining")
+    public double _percentageTotalSegmentDeletesRemaining;
+    @JsonProperty("estimatedTimeToCompleteAddsInSeconds")
+    public double _estimatedTimeToCompleteAddsInSeconds;
+    @JsonProperty("estimatedTimeToCompleteDeletesInSeconds")
+    public double _estimatedTimeToCompleteDeletesInSeconds;
+    @JsonProperty("averageSegmentSizeInBytes")
+    public long _averageSegmentSizeInBytes;
+    @JsonProperty("totalEstimatedDataToBeMovedInBytes")
+    public long _totalEstimatedDataToBeMovedInBytes;
+    // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
+    @JsonProperty("startTimeMs")
+    public long _startTimeMs;
+
+    RebalanceProgressStats() {
+      _totalSegmentsToBeAdded = 0;
+      _totalSegmentsToBeDeleted = 0;
+      _totalRemainingSegmentsToBeAdded = 0;
+      _totalRemainingSegmentsToBeDeleted = 0;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
+      _percentageTotalSegmentsAddsRemaining = 0.0;
+      _percentageTotalSegmentDeletesRemaining = 0.0;
+      _estimatedTimeToCompleteAddsInSeconds = 0;
+      _estimatedTimeToCompleteDeletesInSeconds = 0;
+      _averageSegmentSizeInBytes = 0;
+      _totalEstimatedDataToBeMovedInBytes = 0;
+      _startTimeMs = 0;
+    }
   }
 }
