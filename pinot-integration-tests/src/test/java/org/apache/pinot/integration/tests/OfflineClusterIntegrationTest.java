@@ -4237,13 +4237,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TagNameUtils.getOfflineTagForTenant(getServerTenant()));
     assertEquals(summaryResult.getTenantsInfo().get(0).getNumServerParticipants(), newNumServers);
     assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(),
-        summaryResult.getTenantsInfo().get(0).getNumSegmentsReceived());
+        summaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload());
     // For this single tenant, the number of unchanged segments and the number of received segments should add up to
     // the total present segment
     assertEquals(summaryResult.getSegmentInfo().getNumSegmentsAcrossAllReplicas().getExpectedValueAfterRebalance(),
         summaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged() + summaryResult.getTenantsInfo()
             .get(0)
-            .getNumSegmentsReceived());
+            .getNumSegmentsToDownload());
     if (_tableSize > 0) {
       assertTrue(summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes() > 0L,
           "Avg segment size expected to be > 0 but found to be 0");
