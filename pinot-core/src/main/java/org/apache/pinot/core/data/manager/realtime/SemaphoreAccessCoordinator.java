@@ -69,7 +69,7 @@ public class SemaphoreAccessCoordinator {
           System.currentTimeMillis() - startTimeMs);
 
       if (!isSegmentInProgress(llcSegmentName.getSegmentName())) {
-        throw new SegmentAlreadyExistsException(
+        throw new SegmentAlreadyConsumedException(
             "segment: " + llcSegmentName.getSegmentName() + " status must be in progress");
       }
     }
@@ -113,7 +113,7 @@ public class SemaphoreAccessCoordinator {
               System.currentTimeMillis() - startTimeMs);
 
           if (!isSegmentInProgress(currSegmentName)) {
-            throw new SegmentAlreadyExistsException("segment: " + currSegmentName + " status must be in progress.");
+            throw new SegmentAlreadyConsumedException("segment: " + currSegmentName + " status must be in progress.");
           }
         }
       }

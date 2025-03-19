@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-public class SegmentAlreadyExistsException extends RuntimeException {
+public class SegmentAlreadyConsumedException extends RuntimeException {
 
-  public SegmentAlreadyExistsException(String msg) {
+  public SegmentAlreadyConsumedException(String msg) {
     super(msg);
   }
 }
