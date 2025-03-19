@@ -28,52 +28,68 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class TableRebalanceProgressStats {
   public static class RebalanceStateStats {
-    public int segmentsMissingFromSource;
-    public int uniqueSegmentsToRebalance;
-    public double percentRemainingSegmentsToRebalance;
-    public int totalSegmentsToRebalance;
+    @JsonProperty("segmentsMissingFromSource")
+    public int _segmentsMissingFromSource;
+    @JsonProperty("uniqueSegmentsToRebalance")
+    public int _uniqueSegmentsToRebalance;
+    @JsonProperty("percentRemainingSegmentsToRebalance")
+    public double _percentRemainingSegmentsToRebalance;
+    @JsonProperty("totalSegmentsToRebalance")
+    public int _totalSegmentsToRebalance;
 
     RebalanceStateStats() {
-      segmentsMissingFromSource = 0;
-      uniqueSegmentsToRebalance = 0;
-      totalSegmentsToRebalance = 0;
-      percentRemainingSegmentsToRebalance = 0.0;
+      _segmentsMissingFromSource = 0;
+      _uniqueSegmentsToRebalance = 0;
+      _totalSegmentsToRebalance = 0;
+      _percentRemainingSegmentsToRebalance = 0.0;
     }
   }
 
   // These rebalance stats specifically track the total segments added / deleted across all replicas
   public static class RebalanceProgressStats {
     // Total segments - across all replicas
-    public int totalSegmentsToBeAdded;
-    public int totalSegmentsToBeDeleted;
+    @JsonProperty("totalSegmentsToBeAdded")
+    public int _totalSegmentsToBeAdded;
+    @JsonProperty("totalSegmentsToBeDeleted")
+    public int _totalSegmentsToBeDeleted;
     // Total segments processed so far - across all replicas
-    public int totalRemainingSegmentsToBeAdded;
-    public int totalRemainingSegmentsToBeDeleted;
+    @JsonProperty("totalRemainingSegmentsToBeAdded")
+    public int _totalRemainingSegmentsToBeAdded;
+    @JsonProperty("totalRemainingSegmentsToBeDeleted")
+    public int _totalRemainingSegmentsToBeDeleted;
     // Total new segments stats (not tracked by rebalance)
-    public int totalUniqueNewUntrackedSegmentsDuringRebalance;
+    @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
+    public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
     // Derived
-    public double percentageTotalSegmentsAddsRemaining;
-    public double percentageTotalSegmentDeletesRemaining;
-    public double estimatedTimeToCompleteAddsInSeconds;
-    public double estimatedTimeToCompleteDeletesInSeconds;
-    public long averageSegmentSizeInBytes;
-    public long totalEstimatedDataToBeMovedInBytes;
+    @JsonProperty("percentageTotalSegmentsAddsRemaining")
+    public double _percentageTotalSegmentsAddsRemaining;
+    @JsonProperty("percentageTotalSegmentDeletesRemaining")
+    public double _percentageTotalSegmentDeletesRemaining;
+    @JsonProperty("estimatedTimeToCompleteAddsInSeconds")
+    public double _estimatedTimeToCompleteAddsInSeconds;
+    @JsonProperty("estimatedTimeToCompleteDeletesInSeconds")
+    public double _estimatedTimeToCompleteDeletesInSeconds;
+    @JsonProperty("averageSegmentSizeInBytes")
+    public long _averageSegmentSizeInBytes;
+    @JsonProperty("totalEstimatedDataToBeMovedInBytes")
+    public long _totalEstimatedDataToBeMovedInBytes;
     // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
-    public long startTimeMs;
+    @JsonProperty("startTimeMs")
+    public long _startTimeMs;
 
     RebalanceProgressStats() {
-      totalSegmentsToBeAdded = 0;
-      totalSegmentsToBeDeleted = 0;
-      totalRemainingSegmentsToBeAdded = 0;
-      totalRemainingSegmentsToBeDeleted = 0;
-      totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
-      percentageTotalSegmentsAddsRemaining = 0.0;
-      percentageTotalSegmentDeletesRemaining = 0.0;
-      estimatedTimeToCompleteAddsInSeconds = 0;
-      estimatedTimeToCompleteDeletesInSeconds = 0;
-      averageSegmentSizeInBytes = 0;
-      totalEstimatedDataToBeMovedInBytes = 0;
-      startTimeMs = 0;
+      _totalSegmentsToBeAdded = 0;
+      _totalSegmentsToBeDeleted = 0;
+      _totalRemainingSegmentsToBeAdded = 0;
+      _totalRemainingSegmentsToBeDeleted = 0;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
+      _percentageTotalSegmentsAddsRemaining = 0.0;
+      _percentageTotalSegmentDeletesRemaining = 0.0;
+      _estimatedTimeToCompleteAddsInSeconds = 0;
+      _estimatedTimeToCompleteDeletesInSeconds = 0;
+      _averageSegmentSizeInBytes = 0;
+      _totalEstimatedDataToBeMovedInBytes = 0;
+      _startTimeMs = 0;
     }
   }
 
@@ -181,26 +197,26 @@ public class TableRebalanceProgressStats {
   }
 
   public static boolean progressStatsDiffer(RebalanceProgressStats base, RebalanceProgressStats compare) {
-    return base.totalSegmentsToBeAdded != compare.totalSegmentsToBeAdded
-        || base.totalSegmentsToBeDeleted != compare.totalSegmentsToBeDeleted
-        || base.totalRemainingSegmentsToBeAdded != compare.totalRemainingSegmentsToBeAdded
-        || base.totalRemainingSegmentsToBeDeleted != compare.totalRemainingSegmentsToBeDeleted
-        || base.totalUniqueNewUntrackedSegmentsDuringRebalance
-        != compare.totalUniqueNewUntrackedSegmentsDuringRebalance
-        || base.percentageTotalSegmentsAddsRemaining != compare.percentageTotalSegmentsAddsRemaining
-        || base.percentageTotalSegmentDeletesRemaining != compare.percentageTotalSegmentDeletesRemaining
-        || base.estimatedTimeToCompleteAddsInSeconds != compare.estimatedTimeToCompleteAddsInSeconds
-        || base.estimatedTimeToCompleteDeletesInSeconds != compare.estimatedTimeToCompleteDeletesInSeconds
-        || base.averageSegmentSizeInBytes != compare.averageSegmentSizeInBytes
-        || base.totalEstimatedDataToBeMovedInBytes != compare.totalEstimatedDataToBeMovedInBytes
-        || base.startTimeMs != compare.startTimeMs;
+    return base._totalSegmentsToBeAdded != compare._totalSegmentsToBeAdded
+        || base._totalSegmentsToBeDeleted != compare._totalSegmentsToBeDeleted
+        || base._totalRemainingSegmentsToBeAdded != compare._totalRemainingSegmentsToBeAdded
+        || base._totalRemainingSegmentsToBeDeleted != compare._totalRemainingSegmentsToBeDeleted
+        || base._totalUniqueNewUntrackedSegmentsDuringRebalance
+        != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
+        || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
+        || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
+        || base._estimatedTimeToCompleteAddsInSeconds != compare._estimatedTimeToCompleteAddsInSeconds
+        || base._estimatedTimeToCompleteDeletesInSeconds != compare._estimatedTimeToCompleteDeletesInSeconds
+        || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
+        || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes
+        || base._startTimeMs != compare._startTimeMs;
   }
 
   public static boolean statsDiffer(RebalanceStateStats base, RebalanceStateStats compare) {
-    if (base.totalSegmentsToRebalance != compare.totalSegmentsToRebalance
-        || base.uniqueSegmentsToRebalance != compare.uniqueSegmentsToRebalance
-        || base.segmentsMissingFromSource != compare.segmentsMissingFromSource
-        || base.percentRemainingSegmentsToRebalance != compare.percentRemainingSegmentsToRebalance) {
+    if (base._totalSegmentsToRebalance != compare._totalSegmentsToRebalance
+        || base._uniqueSegmentsToRebalance != compare._uniqueSegmentsToRebalance
+        || base._segmentsMissingFromSource != compare._segmentsMissingFromSource
+        || base._percentRemainingSegmentsToRebalance != compare._percentRemainingSegmentsToRebalance) {
       return true;
     }
     return false;

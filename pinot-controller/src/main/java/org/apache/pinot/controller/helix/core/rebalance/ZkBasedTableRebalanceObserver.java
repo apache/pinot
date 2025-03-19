@@ -298,8 +298,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       Map<String, String> sourceInstanceStateMap = sourceState.get(segmentName);
       if (sourceInstanceStateMap == null) {
         // Skip the missing segment
-        rebalanceStats.segmentsMissingFromSource++;
-        rebalanceStats.uniqueSegmentsToRebalance++;
+        rebalanceStats._segmentsMissingFromSource++;
+        rebalanceStats._uniqueSegmentsToRebalance++;
         continue;
       }
       Map<String, String> targetStateInstanceStateMap = entry.getValue();
@@ -314,17 +314,17 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         String instanceName = instanceStateEntry.getKey();
         String sourceInstanceState = sourceInstanceStateMap.get(instanceName);
         if (!targetStateInstanceState.equals(sourceInstanceState)) {
-          rebalanceStats.totalSegmentsToRebalance++;
+          rebalanceStats._totalSegmentsToRebalance++;
           hasSegmentConverged = false;
         }
       }
       if (!hasSegmentConverged) {
-        rebalanceStats.uniqueSegmentsToRebalance++;
+        rebalanceStats._uniqueSegmentsToRebalance++;
       }
     }
     int totalSegments = targetState.size();
-    rebalanceStats.percentRemainingSegmentsToRebalance =
-        (totalSegments == 0) ? 0 : ((double) rebalanceStats.uniqueSegmentsToRebalance / totalSegments) * 100.0;
+    rebalanceStats._percentRemainingSegmentsToRebalance =
+        (totalSegments == 0) ? 0 : ((double) rebalanceStats._uniqueSegmentsToRebalance / totalSegments) * 100.0;
     return rebalanceStats;
   }
 
@@ -341,15 +341,15 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       TableRebalanceProgressStats.RebalanceProgressStats lastStepStats,
       TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
     int numAdditionalSegmentsAdded =
-        latestStepStats.totalSegmentsToBeAdded - lastStepStats.totalSegmentsToBeAdded;
+        latestStepStats._totalSegmentsToBeAdded - lastStepStats._totalSegmentsToBeAdded;
     int numAdditionalSegmentsDeleted =
-        latestStepStats.totalSegmentsToBeDeleted - lastStepStats.totalSegmentsToBeDeleted;
-    int numSegmentAddsProcessedInLastStep = Math.abs(lastStepStats.totalRemainingSegmentsToBeAdded
-        - latestStepStats.totalRemainingSegmentsToBeAdded);
-    int numSegmentDeletesProcessedInLastStep = Math.abs(lastStepStats.totalRemainingSegmentsToBeDeleted
-        - latestStepStats.totalRemainingSegmentsToBeDeleted);
-    int numberNewUntrackedSegmentsAdded = latestStepStats.totalUniqueNewUntrackedSegmentsDuringRebalance
-        - lastStepStats.totalUniqueNewUntrackedSegmentsDuringRebalance;
+        latestStepStats._totalSegmentsToBeDeleted - lastStepStats._totalSegmentsToBeDeleted;
+    int numSegmentAddsProcessedInLastStep = Math.abs(lastStepStats._totalRemainingSegmentsToBeAdded
+        - latestStepStats._totalRemainingSegmentsToBeAdded);
+    int numSegmentDeletesProcessedInLastStep = Math.abs(lastStepStats._totalRemainingSegmentsToBeDeleted
+        - latestStepStats._totalRemainingSegmentsToBeDeleted);
+    int numberNewUntrackedSegmentsAdded = latestStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance
+        - lastStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance;
 
     TableRebalanceProgressStats.RebalanceProgressStats overallProgressStats =
         rebalanceProgressStats.getRebalanceProgressStatsOverall();
@@ -357,37 +357,37 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     TableRebalanceProgressStats.RebalanceProgressStats newOverallProgressStats =
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
-    newOverallProgressStats.totalSegmentsToBeAdded = overallProgressStats.totalSegmentsToBeAdded
+    newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded
         + numAdditionalSegmentsAdded;
-    newOverallProgressStats.totalSegmentsToBeDeleted = overallProgressStats.totalSegmentsToBeDeleted
+    newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted
         + numAdditionalSegmentsDeleted;
-    newOverallProgressStats.totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
-        ? overallProgressStats.totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
-        : overallProgressStats.totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
-    newOverallProgressStats.totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
-        ? overallProgressStats.totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
-        : overallProgressStats.totalRemainingSegmentsToBeAdded + numSegmentDeletesProcessedInLastStep;
-    newOverallProgressStats.totalUniqueNewUntrackedSegmentsDuringRebalance =
-        overallProgressStats.totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
-    newOverallProgressStats.percentageTotalSegmentsAddsRemaining =
-        calculatePercentageChange(newOverallProgressStats.totalSegmentsToBeAdded,
-            newOverallProgressStats.totalRemainingSegmentsToBeAdded);
-    newOverallProgressStats.percentageTotalSegmentDeletesRemaining =
-        calculatePercentageChange(newOverallProgressStats.totalSegmentsToBeDeleted,
-            newOverallProgressStats.totalRemainingSegmentsToBeDeleted);
+    newOverallProgressStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
+        ? overallProgressStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+    newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
+        ? overallProgressStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
+        : overallProgressStats._totalRemainingSegmentsToBeAdded + numSegmentDeletesProcessedInLastStep;
+    newOverallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
+        overallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
+    newOverallProgressStats._percentageTotalSegmentsAddsRemaining =
+        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeAdded,
+            newOverallProgressStats._totalRemainingSegmentsToBeAdded);
+    newOverallProgressStats._percentageTotalSegmentDeletesRemaining =
+        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeDeleted,
+            newOverallProgressStats._totalRemainingSegmentsToBeDeleted);
     // Calculate elapsed time based on start of rebalance (global)
-    newOverallProgressStats.estimatedTimeToCompleteAddsInSeconds =
+    newOverallProgressStats._estimatedTimeToCompleteAddsInSeconds =
         calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
-            newOverallProgressStats.totalSegmentsToBeAdded, newOverallProgressStats.totalRemainingSegmentsToBeAdded);
-    newOverallProgressStats.estimatedTimeToCompleteDeletesInSeconds =
+            newOverallProgressStats._totalSegmentsToBeAdded, newOverallProgressStats._totalRemainingSegmentsToBeAdded);
+    newOverallProgressStats._estimatedTimeToCompleteDeletesInSeconds =
         calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
-            newOverallProgressStats.totalSegmentsToBeDeleted,
-            newOverallProgressStats.totalRemainingSegmentsToBeDeleted);
-    newOverallProgressStats.averageSegmentSizeInBytes = overallProgressStats.averageSegmentSizeInBytes;
-    newOverallProgressStats.totalEstimatedDataToBeMovedInBytes =
-        overallProgressStats.totalEstimatedDataToBeMovedInBytes
-            + (numAdditionalSegmentsAdded * overallProgressStats.averageSegmentSizeInBytes);
-    newOverallProgressStats.startTimeMs = rebalanceProgressStats.getStartTimeMs();
+            newOverallProgressStats._totalSegmentsToBeDeleted,
+            newOverallProgressStats._totalRemainingSegmentsToBeDeleted);
+    newOverallProgressStats._averageSegmentSizeInBytes = overallProgressStats._averageSegmentSizeInBytes;
+    newOverallProgressStats._totalEstimatedDataToBeMovedInBytes =
+        overallProgressStats._totalEstimatedDataToBeMovedInBytes
+            + (numAdditionalSegmentsAdded * overallProgressStats._averageSegmentSizeInBytes);
+    newOverallProgressStats._startTimeMs = rebalanceProgressStats.getStartTimeMs();
 
     return newOverallProgressStats;
   }
@@ -486,76 +486,76 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     switch (trigger) {
       case START_TRIGGER:
       case NEXT_ASSINGMENT_CALCULATION_TRIGGER:
-        progressStats.totalSegmentsToBeAdded = totalSegmentsToBeAdded;
-        progressStats.totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats.totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
-        progressStats.totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats.totalUniqueNewUntrackedSegmentsDuringRebalance = totalNewSegmentsNotMonitored;
-        progressStats.percentageTotalSegmentsAddsRemaining = 100.0;
-        progressStats.percentageTotalSegmentDeletesRemaining = 100.0;
-        progressStats.estimatedTimeToCompleteAddsInSeconds = -1;
-        progressStats.estimatedTimeToCompleteDeletesInSeconds = -1;
-        progressStats.averageSegmentSizeInBytes = rebalanceContext.getEstimatedAverageSegmentSizeInBytes();
-        progressStats.totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(0,
+        progressStats._totalSegmentsToBeAdded = totalSegmentsToBeAdded;
+        progressStats._totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
+        progressStats._totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
+        progressStats._totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
+        progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance = totalNewSegmentsNotMonitored;
+        progressStats._percentageTotalSegmentsAddsRemaining = 100.0;
+        progressStats._percentageTotalSegmentDeletesRemaining = 100.0;
+        progressStats._estimatedTimeToCompleteAddsInSeconds = -1;
+        progressStats._estimatedTimeToCompleteDeletesInSeconds = -1;
+        progressStats._averageSegmentSizeInBytes = rebalanceContext.getEstimatedAverageSegmentSizeInBytes();
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(0,
             rebalanceContext.getEstimatedAverageSegmentSizeInBytes(), totalSegmentsToBeAdded);
-        progressStats.startTimeMs = trigger == Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER
+        progressStats._startTimeMs = trigger == Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER
             ? System.currentTimeMillis() : rebalanceProgressStats.getStartTimeMs();
         break;
       case IDEAL_STATE_CHANGE_TRIGGER:
         TableRebalanceProgressStats.RebalanceProgressStats existingOverallProgressStats =
             rebalanceProgressStats.getRebalanceProgressStatsOverall();
-        progressStats.totalSegmentsToBeAdded =
-            existingOverallProgressStats.totalSegmentsToBeAdded + newSegsAddedInThisAssignment;
-        progressStats.totalSegmentsToBeDeleted =
-            existingOverallProgressStats.totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
-        progressStats.totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
-        progressStats.totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats.totalUniqueNewUntrackedSegmentsDuringRebalance =
-            existingOverallProgressStats.totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
-        progressStats.percentageTotalSegmentsAddsRemaining =
-            calculatePercentageChange(existingOverallProgressStats.totalSegmentsToBeAdded, totalSegmentsToBeAdded);
-        progressStats.percentageTotalSegmentDeletesRemaining =
-            calculatePercentageChange(existingOverallProgressStats.totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
+        progressStats._totalSegmentsToBeAdded =
+            existingOverallProgressStats._totalSegmentsToBeAdded + newSegsAddedInThisAssignment;
+        progressStats._totalSegmentsToBeDeleted =
+            existingOverallProgressStats._totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
+        progressStats._totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
+        progressStats._totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
+        progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
+            existingOverallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
+        progressStats._percentageTotalSegmentsAddsRemaining =
+            calculatePercentageChange(existingOverallProgressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
+        progressStats._percentageTotalSegmentDeletesRemaining =
+            calculatePercentageChange(existingOverallProgressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         // Calculate elapsed time based on start of rebalance (global)
-        progressStats.estimatedTimeToCompleteAddsInSeconds =
+        progressStats._estimatedTimeToCompleteAddsInSeconds =
             calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
-                progressStats.totalSegmentsToBeAdded, progressStats.totalRemainingSegmentsToBeAdded);
-        progressStats.estimatedTimeToCompleteDeletesInSeconds =
+                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+        progressStats._estimatedTimeToCompleteDeletesInSeconds =
             calculateEstimatedTimeToCompleteChange(rebalanceProgressStats.getStartTimeMs(),
-                progressStats.totalSegmentsToBeDeleted, progressStats.totalRemainingSegmentsToBeDeleted);
-        progressStats.averageSegmentSizeInBytes = existingOverallProgressStats.averageSegmentSizeInBytes;
-        progressStats.totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
-            existingOverallProgressStats.totalEstimatedDataToBeMovedInBytes, progressStats.averageSegmentSizeInBytes,
+                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
+        progressStats._averageSegmentSizeInBytes = existingOverallProgressStats._averageSegmentSizeInBytes;
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
+            existingOverallProgressStats._totalEstimatedDataToBeMovedInBytes, progressStats._averageSegmentSizeInBytes,
             newSegsAddedInThisAssignment);
-        progressStats.startTimeMs = rebalanceProgressStats.getStartTimeMs();
+        progressStats._startTimeMs = rebalanceProgressStats.getStartTimeMs();
         break;
       case EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER:
         TableRebalanceProgressStats.RebalanceProgressStats existingProgressStats =
             rebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
-        progressStats.totalSegmentsToBeAdded =
-            existingProgressStats.totalSegmentsToBeAdded + newSegsAddedInThisAssignment;
-        progressStats.totalSegmentsToBeDeleted =
-            existingProgressStats.totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
-        progressStats.totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
-        progressStats.totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
-        progressStats.totalUniqueNewUntrackedSegmentsDuringRebalance =
-            existingProgressStats.totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
-        progressStats.percentageTotalSegmentsAddsRemaining =
-            calculatePercentageChange(progressStats.totalSegmentsToBeAdded, totalSegmentsToBeAdded);
-        progressStats.percentageTotalSegmentDeletesRemaining =
-            calculatePercentageChange(progressStats.totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
+        progressStats._totalSegmentsToBeAdded =
+            existingProgressStats._totalSegmentsToBeAdded + newSegsAddedInThisAssignment;
+        progressStats._totalSegmentsToBeDeleted =
+            existingProgressStats._totalSegmentsToBeDeleted + newSegsDeletedInThisAssignment;
+        progressStats._totalRemainingSegmentsToBeAdded = totalSegmentsToBeAdded;
+        progressStats._totalRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted;
+        progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
+            existingProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
+        progressStats._percentageTotalSegmentsAddsRemaining =
+            calculatePercentageChange(progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
+        progressStats._percentageTotalSegmentDeletesRemaining =
+            calculatePercentageChange(progressStats._totalSegmentsToBeDeleted, totalSegmentsToBeDeleted);
         // Calculate elapsed time based on start time in existing progress stats
-        progressStats.estimatedTimeToCompleteAddsInSeconds =
-            calculateEstimatedTimeToCompleteChange(existingProgressStats.startTimeMs,
-                progressStats.totalSegmentsToBeAdded, progressStats.totalRemainingSegmentsToBeAdded);
-        progressStats.estimatedTimeToCompleteDeletesInSeconds =
-            calculateEstimatedTimeToCompleteChange(existingProgressStats.startTimeMs,
-                progressStats.totalSegmentsToBeDeleted, progressStats.totalRemainingSegmentsToBeDeleted);
-        progressStats.averageSegmentSizeInBytes = existingProgressStats.averageSegmentSizeInBytes;
-        progressStats.totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
-            existingProgressStats.totalEstimatedDataToBeMovedInBytes, progressStats.averageSegmentSizeInBytes,
+        progressStats._estimatedTimeToCompleteAddsInSeconds =
+            calculateEstimatedTimeToCompleteChange(existingProgressStats._startTimeMs,
+                progressStats._totalSegmentsToBeAdded, progressStats._totalRemainingSegmentsToBeAdded);
+        progressStats._estimatedTimeToCompleteDeletesInSeconds =
+            calculateEstimatedTimeToCompleteChange(existingProgressStats._startTimeMs,
+                progressStats._totalSegmentsToBeDeleted, progressStats._totalRemainingSegmentsToBeDeleted);
+        progressStats._averageSegmentSizeInBytes = existingProgressStats._averageSegmentSizeInBytes;
+        progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(
+            existingProgressStats._totalEstimatedDataToBeMovedInBytes, progressStats._averageSegmentSizeInBytes,
             newSegsAddedInThisAssignment);
-        progressStats.startTimeMs = existingProgressStats.startTimeMs;
+        progressStats._startTimeMs = existingProgressStats._startTimeMs;
         break;
       default:
         break;
