@@ -511,11 +511,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void doAddConsumingSegment(String segmentName)
       throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-    if ((zkMetadata.getStatus() != Status.IN_PROGRESS) && (!_enforceConsumptionInOrder)) {
+    if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
       //       Helix, then we can rely on the following CONSUMING -> ONLINE state transition to add it.
       _logger.warn("Segment: {} is already committed, skipping adding it as CONSUMING segment", segmentName);
+      if (_enforceConsumptionInOrder) {
+        LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+        Preconditions.checkNotNull(llcSegmentName);
+        getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId()).trackSegment(llcSegmentName);
+      }
       return;
     }
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
