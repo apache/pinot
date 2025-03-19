@@ -31,12 +31,12 @@ public interface RebalancePreChecker {
       double diskUtilizationThreshold);
 
   class PreCheckContext {
-    public final String _rebalanceJobId;
-    public final String _tableNameWithType;
-    public final TableConfig _tableConfig;
-    public final Map<String, Map<String, String>> _currentAssignment;
-    public final Map<String, Map<String, String>> _targetAssignment;
-    public final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+    protected final String _rebalanceJobId;
+    protected final String _tableNameWithType;
+    protected final TableConfig _tableConfig;
+    protected final Map<String, Map<String, String>> _currentAssignment;
+    protected final Map<String, Map<String, String>> _targetAssignment;
+    protected final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
 
     public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
