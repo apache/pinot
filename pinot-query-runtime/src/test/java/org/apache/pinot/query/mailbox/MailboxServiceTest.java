@@ -623,7 +623,7 @@ public class MailboxServiceTest {
     ReceivingMailbox.MseBlockWithStats block = receivingMailbox.poll();
     assertNotNull(block);
     assertTrue(block.getBlock().isData());
-    List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
+    List<Object[]> rows = ((MseBlock.Data) block.getBlock()).asRowHeap().getRows();
     return rows;
   }
 
