@@ -38,11 +38,11 @@ private[pinot] object PinotClusterClient extends Logging {
   private val ROUTING_TABLE_TEMPLATE = "http://%s/debug/routingTable/sql?query=%s"
   private val INSTANCES_API_TEMPLATE = "http://%s/instances/%s"
 
-  def getTableSchema(controllerUrl: String, tableName: String): Schema = {
+  def getTableSchema(controllerUrl: String, tableName: String, authorization: String): Schema = {
     val rawTableName = TableNameBuilder.extractRawTableName(tableName)
     Try {
       val uri = new URI(String.format(TABLE_SCHEMA_TEMPLATE, controllerUrl, rawTableName))
-      val response = HttpUtils.sendGetRequest(uri)
+      val response = HttpUtils.sendGetRequest(uri, authorization)
       Schema.fromString(response)
     } match {
       case Success(response) =>
