@@ -21,14 +21,19 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -42,19 +47,27 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   public static final String NEEDS_RELOAD_STATUS = "needsReloadStatus";
   public static final String IS_MINIMIZE_DATA_MOVEMENT = "isMinimizeDataMovement";
+  public static final String DISK_UTILIZATION_DURING_REBALANCE = "diskUtilizationDuringRebalance";
+  public static final String DISK_UTILIZATION_AFTER_REBALANCE = "diskUtilizationAfterRebalance";
+
+  private static double _diskUtilizationThreshold;
 
   protected PinotHelixResourceManager _pinotHelixResourceManager;
   protected ExecutorService _executorService;
 
   @Override
-  public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService) {
+  public void init(PinotHelixResourceManager pinotHelixResourceManager, @Nullable ExecutorService executorService,
+      double diskUtilizationThreshold) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
+    _diskUtilizationThreshold = diskUtilizationThreshold;
   }
 
   @Override
-  public Map<String, RebalancePreCheckerResult> check(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig) {
+  public Map<String, RebalancePreCheckerResult> check(PreCheckContext preCheckContext) {
+    String rebalanceJobId = preCheckContext._rebalanceJobId;
+    String tableNameWithType = preCheckContext._tableNameWithType;
+    TableConfig tableConfig = preCheckContext._tableConfig;
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
@@ -63,6 +76,16 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check whether minimizeDataMovement is set in TableConfig
     preCheckResult.put(IS_MINIMIZE_DATA_MOVEMENT, checkIsMinimizeDataMovement(rebalanceJobId,
         tableNameWithType, tableConfig));
+    // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
+    // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
+    preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
+        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
+            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, true));
+    // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
+    // TODO: give this check a separate threshold other than the disk utilization threshold
+    preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
+        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
+            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, false));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
@@ -91,7 +114,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
-              + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
+          + "rebalanceJobId: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType, rebalanceJobId);
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
         LOGGER.warn("Received {} failed responses from servers and needsReload is false from returned responses, "
@@ -183,5 +206,88 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
       return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
     }
+  }
+
+  private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,
+      Map<String, Map<String, String>> targetAssignment,
+      TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, double threshold, boolean worstCase) {
+    boolean isDiskUtilSafe = true;
+    StringBuilder message =
+        new StringBuilder("UNSAFE. Servers with unsafe disk utilization (>" + (short) (threshold * 100) + "%): ");
+    String sep = "";
+    Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
+    Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
+
+    for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
+      }
+    }
+
+    for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(entrySet.getKey());
+      }
+    }
+
+    long avgSegmentSize = getAverageSegmentSize(tableSubTypeSizeDetails, currentAssignment);
+
+    for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
+      String server = entry.getKey();
+      DiskUsageInfo diskUsage = getDiskUsageInfoOfInstance(server);
+
+      if (diskUsage.getTotalSpaceBytes() < 0) {
+        return RebalancePreCheckerResult.warn(
+            "Disk usage info has not been updated. Try later or set controller.resource.utilization.checker.initial"
+                + ".delay to a"
+                + " shorter period");
+      }
+
+      Set<String> segmentSet = entry.getValue();
+
+      Set<String> newSegmentSet = new HashSet<>(segmentSet);
+      Set<String> existingSegmentSet = new HashSet<>();
+      Set<String> intersection = new HashSet<>();
+      if (existingServersToSegmentMap.containsKey(server)) {
+        Set<String> segmentSetForServer = existingServersToSegmentMap.get(server);
+        existingSegmentSet.addAll(segmentSetForServer);
+        intersection.addAll(segmentSetForServer);
+        intersection.retainAll(newSegmentSet);
+      }
+      newSegmentSet.removeAll(intersection);
+      Set<String> removedSegmentSet = new HashSet<>(existingSegmentSet);
+      removedSegmentSet.removeAll(intersection);
+
+      long diskUtilizationGain = newSegmentSet.size() * avgSegmentSize;
+      long diskUtilizationLoss = removedSegmentSet.size() * avgSegmentSize;
+
+      long diskUtilizationFootprint =
+          diskUsage.getUsedSpaceBytes() + diskUtilizationGain - (worstCase ? 0 : diskUtilizationLoss);
+      double diskUtilizationFootprintRatio =
+          (double) diskUtilizationFootprint / diskUsage.getTotalSpaceBytes();
+
+      if (diskUtilizationFootprintRatio >= threshold) {
+        isDiskUtilSafe = false;
+        message.append(sep)
+            .append(server)
+            .append(String.format(" (%d%%)", (short) (diskUtilizationFootprintRatio * 100)));
+        sep = ", ";
+      }
+    }
+    return isDiskUtilSafe ? RebalancePreCheckerResult.pass(
+        String.format("Within threshold (<%d%%)", (short) (threshold * 100)))
+        : RebalancePreCheckerResult.error(message.toString());
+  }
+
+  private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
+    // This method currently depends on the controller's periodic task that fetches disk utilization of all instances
+    // every 5 minutes by default.
+    return ResourceUtilizationInfo.getDiskUsageInfo(instanceId);
+  }
+
+  private long getAverageSegmentSize(TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails,
+      Map<String, Map<String, String>> currentAssignment) {
+    long tableSizePerReplicaInBytes = tableSubTypeSizeDetails._reportedSizePerReplicaInBytes;
+    return tableSizePerReplicaInBytes / ((long) currentAssignment.size());
   }
 }
