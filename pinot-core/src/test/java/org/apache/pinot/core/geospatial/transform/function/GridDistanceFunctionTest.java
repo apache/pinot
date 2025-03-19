@@ -18,20 +18,22 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
+import com.uber.h3core.H3CoreV3;
+import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunctionTest;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
-import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
 public class GridDistanceFunctionTest extends BaseTransformFunctionTest {
 
   @Test
-  public void testGridDistance() {
+  public void testGridDistance() throws IOException {
+    H3CoreV3 h3CoreV3 = H3CoreV3.newInstance();
     // Test points in San Francisco
     double lat1 = 37.7749;
     double lon1 = -122.4194;
@@ -40,13 +42,13 @@ public class GridDistanceFunctionTest extends BaseTransformFunctionTest {
     int resolution = 9;
 
     // Convert points to H3 indexes
-    long h3Index1 = H3Utils.H3_CORE.geoToH3(lat1, lon1, resolution);
-    long h3Index2 = H3Utils.H3_CORE.geoToH3(lat2, lon2, resolution);
+    long h3Index1 = h3CoreV3.geoToH3(lat1, lon1, resolution);
+    long h3Index2 = h3CoreV3.geoToH3(lat2, lon2, resolution);
 
     // Calculate expected grid distance
     long expectedDistance = 0;
     for (int k = 1; k <= 100; k++) {
-      java.util.List<java.util.List<Long>> ringsWithDistances = H3Utils.H3_CORE.kRingDistances(h3Index1, k);
+      java.util.List<java.util.List<Long>> ringsWithDistances = h3CoreV3.kRingDistances(h3Index1, k);
       boolean found = false;
       for (int distance = 0; distance < ringsWithDistances.size(); distance++) {
         if (ringsWithDistances.get(distance).contains(h3Index2)) {

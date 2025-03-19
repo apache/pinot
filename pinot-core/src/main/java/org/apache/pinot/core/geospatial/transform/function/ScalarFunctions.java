@@ -265,6 +265,6 @@ public class ScalarFunctions {
     if (firstH3Index == secondH3Index) {
       return 0;
     }
-    return H3Utils.H3_CORE_INSTANCE.gridDistance(firstH3Index, secondH3Index);
+    return H3Utils.H3_CORE.gridDistance(firstH3Index, secondH3Index);
   }
 }
