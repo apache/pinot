@@ -29,7 +29,9 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -37,7 +39,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-public class ErrorCodesIntegrationTest extends BaseClusterIntegrationTestSet {
+public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
   private static final int NUM_SEGMENTS = 1;
@@ -102,6 +104,13 @@ public class ErrorCodesIntegrationTest extends BaseClusterIntegrationTestSet {
     FileUtils.deleteDirectory(_tempDir);
   }
 
+  public abstract boolean useMultiStageQueryEngine();
+
+  /**
+   * If true, tests will query the controller instead of the broker.
+   */
+  public abstract boolean queryController();
+
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     return Collections.singletonList(
@@ -109,38 +118,98 @@ public class ErrorCodesIntegrationTest extends BaseClusterIntegrationTestSet {
             FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testParsingError(boolean useMultiStageQueryEngine)
+  @Test
+  public void testParsingError()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testParsingError();
+    testQueryException("POTATO", QueryErrorCode.SQL_PARSING);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testTableDoesNotExist(boolean useMultiStageQueryEngine)
+  @Test
+  public void testTableDoesNotExist()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testTableDoesNotExist();
+    testQueryException("SELECT COUNT(*) FROM potato", QueryErrorCode.TABLE_DOES_NOT_EXIST);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testFunctionDoesNotExist(boolean useMultiStageQueryEngine)
+  @Test
+  public void testFunctionDoesNotExist()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testFunctionDoesNotExist();
+    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryErrorCode.QUERY_VALIDATION);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testInvalidCasting(boolean useMultiStageQueryEngine)
+  @Test
+  public void testInvalidCasting()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testInvalidCasting();
+    // ArrTime expects a numeric type
+    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
+        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testInvalidAggregationArg(boolean useMultiStageQueryEngine)
+  @Test
+  public void testInvalidAggregationArg()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testInvalidAggregationArg();
+    // Cannot use numeric aggregate function for string column
+    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
+        QueryErrorCode.QUERY_VALIDATION);
+  }
+
+  private void testQueryException(@Language("sql") String query, QueryErrorCode errorCode)
+      throws Exception {
+    QueryAssert queryAssert;
+    if (queryController()) {
+      queryAssert = assertControllerQuery(query);
+    } else {
+      queryAssert = assertQuery(query);
+    }
+    queryAssert
+        .firstException()
+        .hasErrorCode(errorCode);
+  }
+
+  public static class MultiStageBrokerTestCase extends ErrorCodesIntegrationTest {
+    @Override
+    public boolean useMultiStageQueryEngine() {
+      return true;
+    }
+
+    @Override
+    public boolean queryController() {
+      return false;
+    }
+  }
+
+  public static class SingleStageBrokerTestCase extends ErrorCodesIntegrationTest {
+    @Override
+    public boolean useMultiStageQueryEngine() {
+      return false;
+    }
+
+    @Override
+    public boolean queryController() {
+      return false;
+    }
+  }
+
+  public static class MultiStageControllerTestCase extends ErrorCodesIntegrationTest {
+    @Override
+    public boolean useMultiStageQueryEngine() {
+      return true;
+    }
+
+    @Override
+    public boolean queryController() {
+      return true;
+    }
+  }
+
+  public static class SingleStageControllerTestCase extends ErrorCodesIntegrationTest {
+    @Override
+    public boolean useMultiStageQueryEngine() {
+      return false;
+    }
+
+    @Override
+    public boolean queryController() {
+      return true;
+    }
   }
 }

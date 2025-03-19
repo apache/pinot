@@ -41,13 +41,11 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
@@ -498,59 +496,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
     }
-  }
-
-  /**
-   * Test invalid queries which should cause query exceptions.
-   *
-   * @throws Exception
-   * @deprecated Use sub-tests to test specific query exceptions
-   */
-  @Deprecated
-  public void testQueryExceptions()
-      throws Exception {
-    testParsingError();
-    testTableDoesNotExist();
-    testFunctionDoesNotExist();
-    testInvalidCasting();
-    testInvalidAggregationArg();
-  }
-
-  public void testParsingError()
-      throws Exception {
-    testQueryException("POTATO", QueryErrorCode.SQL_PARSING);
-  }
-
-  public void testTableDoesNotExist()
-      throws Exception {
-    testQueryException("SELECT COUNT(*) FROM potato", QueryErrorCode.TABLE_DOES_NOT_EXIST);
-  }
-
-  public void testFunctionDoesNotExist()
-      throws Exception {
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryErrorCode.QUERY_VALIDATION);
-  }
-
-  public void testInvalidCasting()
-      throws Exception {
-
-    // ArrTime expects a numeric type
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
-  }
-
-  public void testInvalidAggregationArg()
-      throws Exception {
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryErrorCode.QUERY_VALIDATION);
-  }
-
-  private void testQueryException(@Language("sql") String query, QueryErrorCode errorCode)
-      throws Exception {
-    assertQuery(query)
-        .firstException()
-        .hasErrorCode(errorCode);
   }
 
   /**

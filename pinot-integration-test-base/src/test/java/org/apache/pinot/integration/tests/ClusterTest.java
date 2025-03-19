@@ -533,6 +533,11 @@ public abstract class ClusterTest extends ControllerTest {
     return QueryAssert.assertThat(postQuery(query));
   }
 
+  public QueryAssert assertControllerQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQueryToController(query));
+  }
+
   protected Map<String, String> getExtraQueryProperties() {
     return Map.of();
   }
