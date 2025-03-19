@@ -221,8 +221,9 @@ public class PinotQueryResource {
     QueryEnvironment queryEnvironment =
         new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
     List<String> tableNames;
-    try {
-      tableNames = queryEnvironment.getTableNamesForQuery(query);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      tableNames = new ArrayList<>(compiledQuery.getTableNames());
     } catch (QueryException e) {
       if (e.getErrorCode() != QueryErrorCode.UNKNOWN) {
         throw e;

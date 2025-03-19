@@ -96,6 +96,13 @@ import org.slf4j.LoggerFactory;
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  * It is also used to execute some static analysis on the query like to determine if it can be compiled or get the
  * tables involved in the query.
+ *
+ * Queries are first compiled with Calcite into {@link CompiledQuery} objects, which can then be used to plan, explain
+ * or get the tables involved in the query. These later processes are Pinot specific. They include for example how to
+ * distribute the query to the workers, which is not a Calcite native concept.
+ *
+ * To learn more about Calcite compilation process, read
+ * <a href="https://www.querifylabs.com/blog/relational-operators-in-apache-calcite">this Querify Labs post</a>.
  */
 
 //TODO: We should consider splitting this class in two: One that is used for parsing and one that is used for
@@ -154,8 +161,13 @@ public class QueryEnvironment {
         sqlNodeAndOptions.getOptions(), _envConfig, format);
   }
 
-  public Set<String> getResolvedTables() {
-    return _catalog.getResolvedTables();
+  /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long) ] the returned query instead
+  @VisibleForTesting
+  @Deprecated
+  public DispatchableSubPlan planQuery(String sqlQuery) {
+    try (CompiledQuery compiledQuery = compile(sqlQuery)) {
+      return compiledQuery.planQuery(0).getQueryPlan();
+    }
   }
 
   @Nullable
@@ -182,48 +194,6 @@ public class QueryEnvironment {
     }
   }
 
-  /**
-   * Plan a SQL query.
-   *
-   * This function is thread safe since we construct a new PlannerContext every time.
-   *
-   * TODO: follow benchmark and profile to measure whether it make sense for the latency-concurrency trade-off
-   * between reusing plannerImpl vs. create a new planner for each query.
-   *
-   * @param sqlQuery SQL query string.
-   * @param sqlNodeAndOptions parsed SQL query.
-   * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
-   */
-  public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
-      return compiledQuery.planQuery(requestId);
-    }
-  }
-
-  @VisibleForTesting
-  public DispatchableSubPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
-  }
-
-  /**
-   * Explain a SQL query.
-   *
-   * Similar to {@link QueryEnvironment#planQuery(String, SqlNodeAndOptions, long)}, this API runs the query
-   * compilation. But it doesn't run the distributed {@link DispatchableSubPlan} generation, instead it only
-   * returns the explained logical plan.
-   *
-   * @param sqlQuery SQL query string.
-   * @param sqlNodeAndOptions parsed SQL query.
-   * @param onServerExplainer the callback to explain the query plan on the server side.
-   * @return QueryPlannerResult containing the explained query plan and the relRoot.
-   */
-  public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
-      @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
-    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
-      return compiledQuery.explain(requestId, onServerExplainer);
-    }
-  }
-
   private QueryEnvironment.QueryPlannerResult getQueryPlannerResult(PlannerContext plannerContext,
       DispatchableSubPlan dispatchableSubPlan, String explainStr, Set<String> tableNames) {
     Map<String, String> extraFields = new HashMap<>();
@@ -234,13 +204,28 @@ public class QueryEnvironment {
     return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
   }
 
+  /// @deprecated Use [#compile] and then [explain][CompiledQuery#explain(long) ] the returned query instead
   @VisibleForTesting
+  @Deprecated
   public String explainQuery(String sqlQuery, long requestId) {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    QueryPlannerResult queryPlannerResult = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, null);
-    return queryPlannerResult.getExplainPlan();
+    try (CompiledQuery compiledQuery = compile(sqlQuery, sqlNodeAndOptions)) {
+      QueryPlannerResult queryPlannerResult = compiledQuery.explain(requestId, null);
+      return queryPlannerResult.getExplainPlan();
+    }
   }
 
+  public CompiledQuery compile(String sqlQuery) {
+    return compile(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery));
+  }
+
+  /// Given a query, parses, validates and optimizes the query into a [CompiledQuery].
+  ///
+  /// The returned query can then be planned, explained or used to get the tables involved in the query.
+  ///
+  /// @throws QueryException if the query cannot be compiled. Usual error types are [QueryErrorCode#SQL_PARSING] and
+  /// [QueryErrorCode#QUERY_VALIDATION]. [QueryErrorCode#QUERY_EXECUTION] is also possible if there is an error when
+  /// a function call is reduced into a constant.
   public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = null;
     try {
@@ -265,6 +250,9 @@ public class QueryEnvironment {
     }
   }
 
+  /// @deprecated Use [#compile] and then [getTableNames][CompiledQuery#getTableNames()] the returned query instead
+  @VisibleForTesting
+  @Deprecated
   public List<String> getTableNamesForQuery(String sqlQuery) {
     try (CompiledQuery compiledQuery = compile(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery))) {
       return new ArrayList<>(compiledQuery.getTableNames());
@@ -275,27 +263,10 @@ public class QueryEnvironment {
    * Returns whether the query can be successfully compiled in this query environment
    */
   public boolean canCompileQuery(String query) {
-    return getRelRootIfCanCompile(query) != null;
-  }
-
-  /**
-   * Returns the RelRoot node if the query can be compiled, null otherwise.
-   */
-  @Nullable
-  public RelRoot getRelRootIfCanCompile(String query) {
-    try {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions);
-      SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
-      if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
-        sqlNode = ((SqlExplain) sqlNode).getExplicandum();
-      }
-      RelRoot node = compileQuery(sqlNode, plannerContext);
-      LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
-      return node;
-    } catch (Throwable t) {
-      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, t);
-      return null;
+    try (CompiledQuery compiledQuery = compile(query)) {
+      return true;
+    } catch (QueryException e) {
+      return false;
     }
   }
 
@@ -344,6 +315,19 @@ public class QueryEnvironment {
     return relation.withRel(optimized);
   }
 
+  /// Query validation is a transformation from SqlNode to SqlNode where each node is validated.
+  ///
+  /// In Calcite a SqlNode is a tree of nodes where each node is a part of the SQL query. These nodes are the output of
+  /// the parsing process and are actually bound to the SQL text being written (ie they include the line and column
+  /// where each node starts and ends in the SQL text).
+  ///
+  /// The parser is responsible for creating these nodes, but doesn't validate their semantic. For example, they may
+  /// be using tables that doesn't exist or calling functions with arguments of an incorrect type. The validation
+  /// process is where these errors are caught.
+  ///
+  /// In case there is no error, the returned tree is semantically the same as the input tree, but it is now typed and
+  /// may be slightly different. For example, a function call may have its arguments casted to the correct type (only
+  /// in case it was legal to apply an automatic cast for these types!).
   private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
       SqlNode validated = plannerContext.getValidator().validate(sqlNode);
@@ -361,6 +345,16 @@ public class QueryEnvironment {
     }
   }
 
+  /// Converts a validated SqlNode into a relational expression formed by a [RelRoot] which contains a [RelNode].
+  ///
+  /// In Calcite a RelNode is a tree of nodes where each node is a part of the relational algebra. Contrary to
+  /// SqlNode, RelNode is not bound to the SQL text being written and they are always typed.
+  ///
+  /// The tree returned here may have been slightly modifies. For example, function calls whose arguments are constants
+  /// may have been reduced to a constant. Some other modifications may have also been applied.
+  /// See [SqlToRelConverter.Config#isExpand()].
+  ///
+  /// It is important to notice that the returned tree is not yet [optimized][#optimize(RelRoot, PlannerContext)].
   private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
@@ -397,6 +391,15 @@ public class QueryEnvironment {
     }
   }
 
+  /// Optimizes a relational expression formed by a [RelRoot], returning an equivalent optimized [RelNode].
+  ///
+  /// In order to optimize the query, we use different [programs][HepProgram] that are composed of a sequence of
+  /// [rules][RelOptRule]. These rules are applied to the tree of nodes that form the relational expression and
+  /// optionally generate new nodes.
+  ///
+  /// The result of the method is an optimized tree of nodes that is semantically equivalent to the input tree, but
+  /// may be more efficient to execute. This doesn't mean that the query is ready to use. In fact, in fact it can be
+  /// further optimized by applying Pinot specific. But this is the further we can go with Calcite.
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
     // TODO: add support for cost factory
     try {
@@ -544,6 +547,15 @@ public class QueryEnvironment {
     WorkerManager getWorkerManager();
   }
 
+  /// A query that have been parsed, validates, transformed into a [RelNode] and optimized with Calcite.
+  ///
+  /// This represents the last point where Calcite is being used. This object can then be:
+  /// - Used to get the tables involved in the query (see [#getTableNames])
+  /// - Used to explain the query plan (see [#explain])
+  /// - Used to plan how to evaluate the query using Pinot Engine (see [#planQuery])
+  ///
+  /// Compiled queries are craeted by calling [QueryEnvironment#compile] and should be closed.
+  /// They are also not static classes. Instead they are bound to the [QueryEnvironment] that created them.
   public class CompiledQuery implements Closeable {
     private final String _database;
     private final String _textQuery;
@@ -552,7 +564,7 @@ public class QueryEnvironment {
     private final SqlNodeAndOptions _sqlNodeAndOptions;
     private final Set<String> _tableNames;
 
-    public CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
+    private CompiledQuery(String database, String textQuery, RelRoot relRoot, PlannerContext plannerContext,
         SqlNodeAndOptions sqlNodeAndOptions) {
       _database = database;
       _textQuery = textQuery;
@@ -572,6 +584,9 @@ public class QueryEnvironment {
       return _sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN);
     }
 
+    /// Explain the query plan.
+    /// The original query must be an EXPLAIN query and way it will be explained depends on the options of the EXPLAIN
+    /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
     public QueryEnvironment.QueryPlannerResult explain(long requestId,
         @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
       try {
@@ -617,6 +632,7 @@ public class QueryEnvironment {
       }
     }
 
+    /// Plan the query, returning a [QueryPlannerResult] that can be then sent to the workers to execute the query.
     public QueryPlannerResult planQuery(long requestId) {
       try {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
@@ -650,6 +666,14 @@ public class QueryEnvironment {
 
     public Map<String, String> getOptions() {
       return _sqlNodeAndOptions.getOptions();
+    }
+
+    public RelRoot getRelRoot() {
+      return _relRoot;
+    }
+
+    public RelNode getRelNode() {
+      return _relRoot.rel;
     }
   }
 }
