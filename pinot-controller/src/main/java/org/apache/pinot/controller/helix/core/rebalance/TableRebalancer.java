@@ -72,6 +72,7 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -698,6 +699,20 @@ public class TableRebalancer {
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
+    Set<String> consumingSegments = new HashSet<>();
+    boolean isOfflineTable = TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE;
+    Integer consumingSegmentsToBeMoved = isOfflineTable ? null : 0;
+    if (!isOfflineTable) {
+      for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+        String segmentName = entry.getKey();
+        Map<String, String> instanceStateMap = entry.getValue();
+        // As long as the segment has been committed by one instance, it is no longer considered a consuming segment
+        if (instanceStateMap.containsValue(SegmentStateModel.CONSUMING) && !instanceStateMap.containsValue(
+            SegmentStateModel.ONLINE)) {
+          consumingSegments.add(segmentName);
+        }
+      }
+    }
     int maxSegmentsAddedToServer = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
@@ -726,6 +741,13 @@ public class TableRebalancer {
       int segmentsAdded = newSegmentSet.size();
       if (segmentsAdded > 0) {
         serversGettingNewSegments.add(server);
+      }
+      if (!isOfflineTable) {
+        for (String segment : newSegmentSet) {
+          if (consumingSegments.contains(segment)) {
+            consumingSegmentsToBeMoved++;
+          }
+        }
       }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
       int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
@@ -793,7 +815,7 @@ public class TableRebalancer {
     //       rebalance time can vary with number of segments added
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
         maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
-        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas);
+        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentsToBeMoved);
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
