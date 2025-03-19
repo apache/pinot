@@ -724,7 +724,7 @@ public class TableRebalancer {
         RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoEntry.getValue();
         if (serverTags.contains(tenantNameWithType)) {
           tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
-          tenantInfo.increaseNumSegmentsReceived(segmentsAdded);
+          tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
           tenantInfo.increaseNumServerParticipants(1);
         }
       }
