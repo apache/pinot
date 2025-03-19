@@ -721,7 +721,7 @@ public class TableRebalancer {
       if (serverTags.isEmpty()) {
         LOGGER.warn(
             "Server: {} was assigned to table: {} but does not have any tags. Race condition might happen during the "
-                + "instance assignment.",
+                + "instance assignment. This could make the tenantInfo in rebalance summary inconsistent.",
             server, tableNameWithType);
         continue;
       }
