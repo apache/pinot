@@ -244,11 +244,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
 
-    private final MultiStageQueryStats _stats;
+    private final int _stageId;
+    @Nullable
+    private volatile MultiStageQueryStats _stats;
 
     public OfTransferableBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
       super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
@@ -264,17 +267,26 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected void onConsumerFinish(TransferableBlock element) {
-      if (element.getQueryStats() != null) {
-        _stats.mergeUpstream(element.getQueryStats());
-      } else {
-        _stats.mergeUpstream(element.getSerializedStatsByStage());
+      try {
+        MultiStageQueryStats stats = _stats;
+        if (stats != null) {
+          if (element.getQueryStats() != null) {
+            stats.mergeUpstream(element.getQueryStats());
+          } else {
+            stats.mergeUpstream(element.getSerializedStatsByStage());
+          }
+        }
+      } catch (Exception e) {
+        // If there is any error merging stats, continue without them
+        LOGGER.warn("Error merging stats", e);
+        _stats = null;
       }
     }
 
     @Override
     protected TransferableBlock onTimeout() {
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Timed out on stage " + _stats.getCurrentStageId() + " waiting for data sent by a child stage";
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
       // - The trace is not useful (the log message is good enough to find where we failed)
@@ -287,7 +299,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected TransferableBlock onException(Exception e) {
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Found an error on stage " + _stats.getCurrentStageId() + " while reading from a child stage";
+      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
@@ -296,7 +308,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected TransferableBlock onEos() {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_stats);
+      MultiStageQueryStats stats = _stats;
+      if (stats == null) { // possible in case of error
+        stats = MultiStageQueryStats.emptyStats(_stageId);
+      }
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(stats);
     }
   }
 }

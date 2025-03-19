@@ -79,7 +79,7 @@ public class QueryServerEnclosure {
     HelixManager helixManager = mockHelixManager(factory.buildSchemaMap());
     _queryRunner = new QueryRunner();
     _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, helixManager, mockServiceMetrics(),
-        null);
+        null, () -> true);
   }
 
   private HelixManager mockHelixManager(Map<String, Schema> schemaMap) {

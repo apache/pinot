@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
@@ -101,6 +104,15 @@ public class PipelineBreakerExecutorTest {
     _mocks.close();
   }
 
+  @VisibleForTesting
+  @Nullable
+  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
+    return PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan,
+        opChainMetadata, requestId, deadlineMs, null, true);
+  }
+
   @AfterClass
   public void tearDown() {
     ExecutorServiceUtils.close(_executor);
@@ -120,7 +132,7 @@ public class PipelineBreakerExecutorTest {
         TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(1)));
 
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -156,7 +168,7 @@ public class PipelineBreakerExecutorTest {
         TransferableBlockUtils.getEndOfStreamTransferableBlock(OperatorTestUtil.getDummyStats(2)));
 
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -184,7 +196,7 @@ public class PipelineBreakerExecutorTest {
 
     // when
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -212,7 +224,7 @@ public class PipelineBreakerExecutorTest {
     });
 
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, System.currentTimeMillis() + 100);
 
     // then
@@ -245,7 +257,7 @@ public class PipelineBreakerExecutorTest {
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1));
 
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
@@ -278,7 +290,7 @@ public class PipelineBreakerExecutorTest {
         TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
+        executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
             ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
