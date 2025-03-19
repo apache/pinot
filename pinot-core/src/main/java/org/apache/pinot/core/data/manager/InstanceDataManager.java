@@ -202,4 +202,9 @@ public interface InstanceDataManager {
    * Returns consumer directory paths on the instance
    */
   List<File> getConsumerDirPaths();
+
+  /**
+   * Returns the instance data directory
+   */
+  String getInstanceDataDir();
 }

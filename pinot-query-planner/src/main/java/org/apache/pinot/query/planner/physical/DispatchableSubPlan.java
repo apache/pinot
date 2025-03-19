@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 
@@ -40,24 +43,59 @@ import org.apache.pinot.core.util.QueryMultiThreadingUtils;
  */
 public class DispatchableSubPlan {
   private final PairList<Integer, String> _queryResultFields;
-  private final List<DispatchablePlanFragment> _queryStageList;
+
+  /**
+   * Map from stage id to stage plan.
+   */
+  private final Map<Integer, DispatchablePlanFragment> _queryStageMap;
   private final Set<String> _tableNames;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
 
-  public DispatchableSubPlan(PairList<Integer, String> fields, List<DispatchablePlanFragment> queryStageList,
+  public DispatchableSubPlan(PairList<Integer, String> fields,
+      Map<Integer, DispatchablePlanFragment> queryStageMap,
       Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap) {
     _queryResultFields = fields;
-    _queryStageList = queryStageList;
+    _queryStageMap = queryStageMap;
     _tableNames = tableNames;
     _tableToUnavailableSegmentsMap = tableToUnavailableSegmentsMap;
   }
 
   /**
-   * Get the list of stage plan root node.
+   * Get a map from stage id to stage plan.
    * @return stage plan map.
    */
-  public List<DispatchablePlanFragment> getQueryStageList() {
-    return _queryStageList;
+  public Map<Integer, DispatchablePlanFragment> getQueryStageMap() {
+    return _queryStageMap;
+  }
+
+  private static Comparator<DispatchablePlanFragment> byStageIdComparator() {
+    return Comparator.comparing(d -> d.getPlanFragment().getFragmentId());
+  }
+
+  /**
+   * Get the query stages.
+   *
+   * The returned set is sorted by stage id.
+   */
+  public SortedSet<DispatchablePlanFragment> getQueryStages() {
+    TreeSet<DispatchablePlanFragment> treeSet = new TreeSet<>(byStageIdComparator());
+    treeSet.addAll(_queryStageMap.values());
+    return treeSet;
+  }
+
+  /**
+   * Get the query stages without the root stage.
+   *
+   * The returned set is sorted by stage id.
+   */
+  public SortedSet<DispatchablePlanFragment> getQueryStagesWithoutRoot() {
+    SortedSet<DispatchablePlanFragment> result = getQueryStages();
+
+    DispatchablePlanFragment root = _queryStageMap.get(0);
+    if (root != null) {
+      result.remove(root);
+    }
+    return result;
   }
 
   /**
@@ -90,7 +128,7 @@ public class DispatchableSubPlan {
   public int getEstimatedNumQueryThreads() {
     int estimatedNumQueryThreads = 0;
     // Skip broker reduce root stage
-    for (DispatchablePlanFragment stage : _queryStageList.subList(1, _queryStageList.size())) {
+    for (DispatchablePlanFragment stage : getQueryStagesWithoutRoot()) {
       // Non-leaf stage
       if (stage.getWorkerIdToSegmentsMap().isEmpty()) {
         estimatedNumQueryThreads += stage.getWorkerMetadataList().size();

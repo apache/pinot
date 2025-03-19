@@ -29,13 +29,18 @@ This package contains code for Pinot Controller UI.
 ```shell
 cd pinot-controller/src/main/resources
 ```
-3. Install Required Packages. Make sure you are using node v16 or more specifically v16.15.0
+3. Switch to node `v16.15.0`.
+Use nvm to switch to the required Node.js version (specified in .npmrc). If you don’t have nvm, install it from [here](https://github.com/nvm-sh/nvm).
+```shell
+nvm use
+```
+4. Install Required Packages. Make sure you are using node v16 or more specifically v16.15.0
 ```shell
 npm install 
 ```
-4. Start the Development Server
+5. Start the Development Server
 ```shell
 npm run dev
 ```
 
-5. App should be running on [http://localhost:8080](http://localhost:8080)
+6. App should be running on [http://localhost:8080](http://localhost:8080)

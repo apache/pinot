@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,13 +36,19 @@ import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -61,6 +68,8 @@ public class InstanceResource {
   private String _instanceId;
   @Inject
   private HelixManager _helixManager;
+  @Inject
+  private ServerInstance _serverInstance;
 
   @GET
   @Path("tags")
@@ -96,5 +105,25 @@ public class InstanceResource {
     }
     Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
     return pools == null ? Collections.emptyMap() : pools;
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/diskUtilization")
+  @ApiOperation(value = "Show disk utilization", notes = "Disk capacity and usage shown in bytes")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal Server Error – Invalid disk utilization path in header")
+  })
+  public String getDiskUsageInfo(@Context HttpHeaders headers)
+      throws WebApplicationException, IOException {
+    // Use the instance data directory as the path to compute disk usage. Note that the diskUtilizationPath passed in
+    // the header is ignored as of now.
+    String pathStr = _serverInstance.getInstanceDataManager().getInstanceDataDir();
+    if (StringUtils.isEmpty(pathStr)) {
+      throw new WebApplicationException("Disk utilization path(instanceDataDir) was null or empty.", 500);
+    }
+    DiskUsageInfo diskUsageInfo = DiskUtilization.computeDiskUsage(_instanceId, pathStr);
+    return ResourceUtils.convertToJsonString(diskUsageInfo);
   }
 }

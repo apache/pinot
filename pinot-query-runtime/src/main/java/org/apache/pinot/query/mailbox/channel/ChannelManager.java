@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -51,7 +51,7 @@ public class ChannelManager {
               .forAddress(k.getLeft(), k.getRight())
               .maxInboundMessageSize(
                   CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
-              .sslContext(GrpcQueryClient.buildSslContext(_tlsConfig))
+              .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig))
               .build()
       );
     } else {

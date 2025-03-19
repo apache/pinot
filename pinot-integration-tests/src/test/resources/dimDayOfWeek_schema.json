@@ -1,0 +1,16 @@
+{
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "dayId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "dayName"
+    }
+  ],
+  "schemaName": "daysOfWeek",
+  "primaryKeyColumns": [
+    "dayId"
+  ]
+}

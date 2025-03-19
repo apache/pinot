@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
  */
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _resultType;
   private final TransformResultMetadata _resultMetadata;
 
@@ -54,7 +54,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
 
   public ScalarTransformFunctionWrapper(FunctionInfo functionInfo) {
     _name = functionInfo.getMethod().getName();
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
     PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
     int numParameters = parameterClasses.length;

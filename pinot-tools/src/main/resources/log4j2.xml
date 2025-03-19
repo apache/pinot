@@ -23,7 +23,12 @@
 
   <Properties>
     <Property name="LOG_ROOT">logs</Property>
-    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Property>
+    <!--
+    See
+      https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-not-empty
+      and https://logging.apache.org/log4j/2.x/manual/pattern-layout.html#converter-thread-context-map
+    -->
+    <Property name="LOG_PATTERN">%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t]%notEmpty{ [cid=%X{pinot.query.cid}%notEmpty{,stg=%X{pinot.mse.stageId}}]} %m%n</Property>
     <Property name="PINOT_COMPONENT">all</Property>
   </Properties>
   <Appenders>

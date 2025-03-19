@@ -126,9 +126,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         new HashSet<>(Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)));
     nonExistingSegmentNames.removeAll(segmentNamesForTable);
     if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
-      throw new RuntimeException(
-          String.format("table: %s does not have the following segments to process: %s", tableNameWithType,
-              nonExistingSegmentNames));
+      throw new RuntimeException("table: " + tableNameWithType + " does not have the following segments to process: "
+          + nonExistingSegmentNames);
     }
   }
 
@@ -202,9 +201,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       for (int i = 0; i < downloadURLs.length; i++) {
         String segmentName = segmentNames[i];
         // Download and decompress the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Downloading and decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
-                downloadURLs.length));
+        _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading and decompressing segment from: " + downloadURLs[i]
+            + " (" + (i + 1) + " out of " + downloadURLs.length + ")");
         File indexDir;
         try {
           indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURLs[i], taskType,
@@ -241,9 +239,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         reportSegmentUploadMetrics(convertedSegmentDir, tableNameWithType, taskType);
 
         // Tar the converted segment
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
-                numOutputSegments));
+        _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: "
+            + segmentConversionResult.getSegmentName() + " (" + (count++) + " out of " + numOutputSegments + ")");
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedSegmentTarFile);
@@ -280,8 +277,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         String resultSegmentName = segmentConversionResult.getSegmentName();
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Uploading segment: %s (%d out of %d)", resultSegmentName, (i + 1), numOutputSegments));
+        _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + resultSegmentName + " (" + (i + 1)
+            + " out of " + numOutputSegments + ")");
         String pushMode = taskConfigs.getOrDefault(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.name());
         URI outputSegmentTarURI;
@@ -361,8 +358,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       PushJobSpec pushJobSpec) {
     String segmentName = segmentConversionResult.getSegmentName();
     if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
-      throw new RuntimeException(String.format("Output dir URI missing for metadata push while processing segment: %s",
-          segmentName));
+      throw new RuntimeException("Output dir URI missing for metadata push while processing segment: " + segmentName);
     }
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     Map<String, String> localSegmentUriToTarPathMap =
@@ -423,7 +419,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     if (tableType != null) {
       params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.toString()));
     } else {
-      throw new RuntimeException(String.format("Failed to determine the tableType from name: %s", tableNameWithType));
+      throw new RuntimeException("Failed to determine the tableType from name: " + tableNameWithType);
     }
     return params;
   }
@@ -514,8 +510,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
           URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentTarURI)) {
-        throw new RuntimeException(String.format("Output file: %s already exists. "
-            + "Set 'overwriteOutput' to true to ignore this error", outputSegmentTarURI));
+        throw new RuntimeException("Output file: " + outputSegmentTarURI + " already exists. Set 'overwriteOutput' to "
+            + "true to ignore this error");
       } else {
         outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       }

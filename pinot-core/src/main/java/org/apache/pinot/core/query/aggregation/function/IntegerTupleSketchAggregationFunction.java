@@ -29,9 +29,11 @@ import org.apache.datasketches.tuple.Sketches;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -261,6 +263,17 @@ public class IntegerTupleSketchAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(TupleIntSketchAccumulator tupleIntSketchAccumulator) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TupleIntSketchAccumulator.getValue(),
+        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE.serialize(tupleIntSketchAccumulator));
+  }
+
+  @Override
+  public TupleIntSketchAccumulator deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

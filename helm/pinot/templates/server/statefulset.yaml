@@ -59,6 +59,8 @@ spec:
 {{ toYaml .Values.server.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.server.tolerations | indent 8 }}
+      initContainers:
+{{ toYaml .Values.server.initContainers | indent 8 }}
       containers:
       - name: server
         securityContext:

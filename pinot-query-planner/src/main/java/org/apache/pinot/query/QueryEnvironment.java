@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,6 +63,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PlannerContext;
+import org.apache.pinot.query.context.RuleTimingPlannerListener;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
@@ -93,9 +95,9 @@ import org.slf4j.LoggerFactory;
  * tables involved in the query.
  */
 
- //TODO: We should consider splitting this class in two: One that is used for parsing and one that is used for
- // executing queries. This would allow us to remove the worker manager from the parsing environment and therefore
- // make sure there is a worker manager when executing queries.
+//TODO: We should consider splitting this class in two: One that is used for parsing and one that is used for
+// executing queries. This would allow us to remove the worker manager from the parsing environment and therefore
+// make sure there is a worker manager when executing queries.
 @Value.Enclosing
 public class QueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
@@ -138,8 +140,15 @@ public class QueryEnvironment {
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     HepProgram traitProgram = getTraitProgram(workerManager);
+    SqlExplainFormat format = SqlExplainFormat.DOT;
+    if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
+      SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
+      if (explain.getFormat() != null) {
+        format = explain.getFormat();
+      }
+    }
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram,
-        sqlNodeAndOptions.getOptions(), _envConfig);
+        sqlNodeAndOptions.getOptions(), _envConfig, format);
   }
 
   public Set<String> getResolvedTables() {
@@ -189,7 +198,7 @@ public class QueryEnvironment {
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
       DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-      return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
+      return getQueryPlannerResult(plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery + "': " + e.getMessage() + "'", e);
     } catch (Throwable t) {
@@ -219,19 +228,20 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      SqlExplainFormat format = plannerContext.getSqlExplainFormat();
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
         DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-        return new QueryPlannerResult(null, PhysicalExplainPlanVisitor.explain(dispatchableSubPlan),
-            dispatchableSubPlan.getTableNames());
+        return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
+            PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
       } else {
         // get the logical plan for query.
-        SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
         SqlExplainLevel level =
             explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
         Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
         if (!explain.withImplementation() || onServerExplainer == null) {
-          return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
+          return getQueryPlannerResult(plannerContext, null, PlannerUtils.explainPlan(relRoot.rel, format, level),
+              tableNames);
         } else {
           Map<String, String> options = sqlNodeAndOptions.getOptions();
           boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
@@ -247,16 +257,25 @@ public class QueryEnvironment {
               onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
           RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
-              dispatchableSubPlan.getQueryStageList(), nodeTracker, serversExplainer);
+              dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
 
-          String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
-
-          return new QueryPlannerResult(null, explainStr, dispatchableSubPlan.getTableNames());
+          return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
+              PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
         }
       }
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
+  }
+
+  private QueryEnvironment.QueryPlannerResult getQueryPlannerResult(PlannerContext plannerContext,
+      DispatchableSubPlan dispatchableSubPlan, String explainStr, Set<String> tableNames) {
+    Map<String, String> extraFields = new HashMap<>();
+    if (plannerContext.getPlannerOutput().containsKey(RuleTimingPlannerListener.RULE_TIMINGS)) {
+      extraFields.put(RuleTimingPlannerListener.RULE_TIMINGS,
+          plannerContext.getPlannerOutput().get(RuleTimingPlannerListener.RULE_TIMINGS));
+    }
+    return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
   }
 
   @VisibleForTesting
@@ -316,12 +335,14 @@ public class QueryEnvironment {
     private final DispatchableSubPlan _dispatchableSubPlan;
     private final String _explainPlan;
     private final Set<String> _tableNames;
+    private final Map<String, String> _extraFields;
 
     QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
-        Set<String> tableNames) {
+        Set<String> tableNames, Map<String, String> extraFields) {
       _dispatchableSubPlan = dispatchableSubPlan;
       _explainPlan = explainPlan;
       _tableNames = tableNames;
+      _extraFields = extraFields;
     }
 
     public String getExplainPlan() {
@@ -334,6 +355,10 @@ public class QueryEnvironment {
 
     public Set<String> getTableNames() {
       return _tableNames;
+    }
+
+    public Map<String, String> getExtraFields() {
+      return _extraFields;
     }
   }
 
@@ -391,7 +416,11 @@ public class QueryEnvironment {
     try {
       RelOptPlanner optPlanner = plannerContext.getRelOptPlanner();
       optPlanner.setRoot(relRoot.rel);
+      RuleTimingPlannerListener listener = new RuleTimingPlannerListener(plannerContext);
+      optPlanner.addListener(listener);
       RelNode optimized = optPlanner.findBestExp();
+      listener.printRuleTimings();
+      listener.populateRuleTimings();
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
@@ -485,7 +514,10 @@ public class QueryEnvironment {
   public interface Config {
     String getDatabase();
 
-    @Nullable // In theory nullable only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
+    /**
+     * In theory nullable only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
+     */
+    @Nullable
     TableCache getTableCache();
 
     /**
@@ -514,7 +546,7 @@ public class QueryEnvironment {
 
     @Value.Default
     default boolean defaultEnableGroupTrim() {
-      return CommonConstants.Broker.DEFAULT_BROKER_ENABLE_GROUP_TRIM;
+      return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
     }
 
     /**

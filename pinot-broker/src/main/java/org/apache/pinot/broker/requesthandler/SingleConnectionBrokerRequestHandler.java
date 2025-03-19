@@ -32,7 +32,6 @@ import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
@@ -50,6 +49,7 @@ import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -154,13 +154,12 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
     Exception brokerRequestSendException = asyncQueryResponse.getException();
     if (brokerRequestSendException != null) {
-      String errorMsg = QueryException.getTruncatedStackTrace(brokerRequestSendException);
       brokerResponse.addException(
-          new QueryProcessingException(QueryException.BROKER_REQUEST_SEND_ERROR_CODE, errorMsg));
+          new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND, brokerRequestSendException.getMessage()));
     }
     int numServersNotResponded = serversNotResponded.size();
     if (numServersNotResponded != 0) {
-      brokerResponse.addException(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
 
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
@@ -179,19 +178,26 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   /**
    * Check if a server that was previously detected as unhealthy is now healthy.
    */
-  public boolean retryUnhealthyServer(String instanceId) {
+  public FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Retrying unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
+
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
+
+    // Could occur if the cluster is only serving multi-stage queries
+    if (!_queryRouter.hasChannel(serverInstance)) {
+      return FailureDetector.ServerState.UNKNOWN;
+    }
+
     if (_queryRouter.connect(serverInstance)) {
       LOGGER.info("Successfully connect to server: {}, marking it healthy", instanceId);
-      return true;
+      return FailureDetector.ServerState.HEALTHY;
     } else {
       LOGGER.warn("Still cannot connect to server: {}, retry later", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
   }
 }

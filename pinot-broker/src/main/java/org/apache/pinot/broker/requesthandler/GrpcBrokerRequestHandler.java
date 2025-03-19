@@ -36,14 +36,15 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
-import org.apache.pinot.common.utils.grpc.GrpcRequestBuilder;
+import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
+import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +58,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
   private final StreamingReduceService _streamingReduceService;
-  private final PinotStreamingQueryClient _streamingQueryClient;
+  private final PinotServerStreamingQueryClient _streamingQueryClient;
   private final FailureDetector _failureDetector;
 
   // TODO: Support TLS
@@ -66,7 +67,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       FailureDetector failureDetector) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _streamingReduceService = new StreamingReduceService(config);
-    _streamingQueryClient = new PinotStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
+    _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
   }
@@ -123,9 +124,16 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       List<String> segments = routingEntry.getValue().getSegments();
       // TODO: enable throttling on per host bases.
       try {
+        String cid = QueryThreadContext.getCid() == null ? QueryThreadContext.getCid() : Long.toString(requestId);
         Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverInstance,
-            new GrpcRequestBuilder().setRequestId(requestId).setBrokerId(_brokerId).setEnableTrace(trace)
-                .setEnableStreaming(true).setBrokerRequest(brokerRequest).setSegments(segments).build());
+            new ServerGrpcRequestBuilder()
+                .setRequestId(requestId)
+                .setCid(cid)
+                .setBrokerId(_brokerId)
+                .setEnableTrace(trace)
+                .setEnableStreaming(true)
+                .setBrokerRequest(brokerRequest)
+                .setSegments(segments).build());
         responseMap.put(serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.GRPC),
             streamingResponse);
       } catch (Exception e) {
@@ -135,29 +143,27 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     }
   }
 
-  public static class PinotStreamingQueryClient {
-    private final Map<String, GrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
-    private final Map<String, String> _instanceIdToHostnamePortMap = new ConcurrentHashMap<>();
+  public static class PinotServerStreamingQueryClient {
+    private final Map<String, ServerGrpcQueryClient> _grpcQueryClientMap = new ConcurrentHashMap<>();
     private final GrpcConfig _config;
 
-    public PinotStreamingQueryClient(GrpcConfig config) {
+    public PinotServerStreamingQueryClient(GrpcConfig config) {
       _config = config;
     }
 
     public Iterator<Server.ServerResponse> submit(ServerInstance serverInstance, Server.ServerRequest serverRequest) {
-      GrpcQueryClient client = getOrCreateGrpcQueryClient(serverInstance);
+      ServerGrpcQueryClient client = getOrCreateGrpcQueryClient(serverInstance);
       return client.submit(serverRequest);
     }
 
-    private GrpcQueryClient getOrCreateGrpcQueryClient(ServerInstance serverInstance) {
+    private ServerGrpcQueryClient getOrCreateGrpcQueryClient(ServerInstance serverInstance) {
       String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());
-      _instanceIdToHostnamePortMap.put(serverInstance.getInstanceId(), hostnamePort);
       return _grpcQueryClientMap.computeIfAbsent(hostnamePort,
-          k -> new GrpcQueryClient(serverInstance.getHostname(), serverInstance.getGrpcPort(), _config));
+          k -> new ServerGrpcQueryClient(serverInstance.getHostname(), serverInstance.getGrpcPort(), _config));
     }
 
     public void shutdown() {
-      for (GrpcQueryClient client : _grpcQueryClientMap.values()) {
+      for (ServerGrpcQueryClient client : _grpcQueryClientMap.values()) {
         client.close();
       }
     }
@@ -166,22 +172,30 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   /**
    * Check if a server that was previously detected as unhealthy is now healthy.
    */
-  private boolean retryUnhealthyServer(String instanceId) {
+  private FailureDetector.ServerState retryUnhealthyServer(String instanceId) {
     LOGGER.info("Checking gRPC connection to unhealthy server: {}", instanceId);
     ServerInstance serverInstance = _routingManager.getEnabledServerInstanceMap().get(instanceId);
     if (serverInstance == null) {
       LOGGER.info("Failed to find enabled server: {} in routing manager, skipping the retry", instanceId);
-      return false;
+      return FailureDetector.ServerState.UNHEALTHY;
     }
 
-    String hostnamePort = _streamingQueryClient._instanceIdToHostnamePortMap.get(instanceId);
-    GrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
+    String hostnamePort = String.format("%s_%d", serverInstance.getHostname(), serverInstance.getGrpcPort());
+    ServerGrpcQueryClient client = _streamingQueryClient._grpcQueryClientMap.get(hostnamePort);
 
+    // Could occur if the cluster is only serving multi-stage queries
     if (client == null) {
-      LOGGER.warn("No GrpcQueryClient found for server with instanceId: {}", instanceId);
-      return false;
+      LOGGER.debug("No GrpcQueryClient found for server with instanceId: {}", instanceId);
+      return FailureDetector.ServerState.UNKNOWN;
     }
 
-    return client.getChannel().getState(true) == ConnectivityState.READY;
+    ConnectivityState connectivityState = client.getChannel().getState(true);
+    if (connectivityState == ConnectivityState.READY) {
+      LOGGER.info("Successfully connected to server: {}", instanceId);
+      return FailureDetector.ServerState.HEALTHY;
+    } else {
+      LOGGER.info("Still can't connect to server: {}, current state: {}", instanceId, connectivityState);
+      return FailureDetector.ServerState.UNHEALTHY;
+    }
   }
 }

@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
+
   private final MailboxService _mailboxService;
   private final long _requestId;
   private final long _deadlineMs;

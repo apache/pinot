@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,6 +170,14 @@ public class QueryRouter {
     asyncQueryResponse.markQueryFailed(serverRoutingInstance, e);
   }
 
+  public boolean hasChannel(ServerInstance serverInstance) {
+    if (_serverChannelsTls != null) {
+      return _serverChannelsTls.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+    } else {
+      return _serverChannels.hasChannel(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+    }
+  }
+
   /**
    * Connects to the given server, returns {@code true} if the server is successfully connected.
    */
@@ -215,6 +224,7 @@ public class QueryRouter {
       ServerRouteInfo segments) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
+    instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setQuery(brokerRequest);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions != null) {

@@ -32,7 +32,7 @@ import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -123,7 +123,7 @@ public class PurgeTaskExecutorTest {
   public void testConvert()
       throws Exception {
     PurgeTaskExecutor purgeTaskExecutor = new PurgeTaskExecutor();
-    purgeTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    purgeTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE, Collections
         .singletonMap(MinionConstants.TABLE_NAME_KEY, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
     File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR).getFile();

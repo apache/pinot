@@ -187,7 +187,14 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false),
 
   // Number of reingested segments getting uploaded
-  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true);
+  REINGESTED_SEGMENT_UPLOADS_IN_PROGRESS("reingestedSegmentUploadsInProgress", true),
+
+  // Resource utilization is within limits or not for a table
+  RESOURCE_UTILIZATION_LIMIT_EXCEEDED("ResourceUtilizationLimitExceeded", false),
+
+  // The number of segments in deepstore that do not have corresponding metadata in ZooKeeper.
+  // These segments are untracked and should be considered for deletion based on retention policies.
+  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false);
 
   private final String _gaugeName;
   private final String _unit;

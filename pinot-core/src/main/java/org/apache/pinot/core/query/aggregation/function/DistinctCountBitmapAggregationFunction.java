@@ -20,10 +20,12 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -317,6 +319,17 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(RoaringBitmap roaringBitmap) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.RoaringBitmap.getValue(),
+        ObjectSerDeUtils.ROARING_BITMAP_SER_DE.serialize(roaringBitmap));
+  }
+
+  @Override
+  public RoaringBitmap deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.ROARING_BITMAP_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

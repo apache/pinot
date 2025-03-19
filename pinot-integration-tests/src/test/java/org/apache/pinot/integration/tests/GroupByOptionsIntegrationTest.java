@@ -531,9 +531,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
 
     String errorMessage = toResultStr(result);
 
-    Assert.assertTrue(errorMessage.startsWith("QueryExecutionError:\n"
-            + "Received error query execution result block: {1000=NUM_GROUPS_LIMIT has been reached at "),
-        errorMessage);
+    Assert.assertTrue(errorMessage.contains("NUM_GROUPS_LIMIT has been reached at "), errorMessage);
   }
 
   // for debug only

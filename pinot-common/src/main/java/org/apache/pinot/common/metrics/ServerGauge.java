@@ -79,7 +79,9 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_INGESTION_OFFSET_LAG("offsetLag", false),
   REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false),
   REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false),
-  REALTIME_CONSUMER_DIR_USAGE("bytes", true);
+  REALTIME_CONSUMER_DIR_USAGE("bytes", true),
+  SEGMENT_DOWNLOAD_SPEED("bytes", true),
+  PREDOWNLOAD_SPEED("bytes", true);
 
   private final String _gaugeName;
   private final String _unit;

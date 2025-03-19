@@ -33,13 +33,15 @@
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
-- [Features](#features)
-- [When should I use Pinot?](#when-should-i-use-pinot)
-- [Building Pinot](#building-pinot)
-- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
-- [Join the Community](#join-the-community)
-- [Documentation](#documentation)
-- [License](#license)
+  - [Features](#features)
+  - [When should I use Pinot?](#when-should-i-use-pinot)
+  - [Contributing to Pinot](#contributing-to-pinot)
+  - [Apache Pinot YouTube Channel](#apache-pinot-youtube-channel)
+  - [Building Pinot](#building-pinot)
+  - [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+  - [Join the Community](#join-the-community)
+  - [Documentation](#documentation)
+  - [License](#license)
 
 # What is Apache Pinot?
 
@@ -103,7 +105,12 @@ If you have a bug or an idea for a new feature, browse the [open issues](https:/
 
 We also tagged some [beginner issues](https://github.com/apache/pinot/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner-task) new contributors can tackle.
 
+## Apache Pinot YouTube Channel
 
+Share Your Pinot Videos with the Community!
+
+Have a Pinot use case, tutorial, or conference/meetup recording to share? We’d love to feature it on the [Pinot OSS YouTube channel](https://www.youtube.com/@Apache_Pinot/videos)!
+Drop your video or a link to your session in the [#pinot-youtube-channel](https://apache-pinot.slack.com/archives/C08GH2MAVT4) on Pinot Slack, and we’ll showcase it for the community!
 
 ## Building Pinot
 
@@ -133,7 +140,7 @@ For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, whic
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
 ## Deploying Pinot to Kubernetes
-Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](kubernetes/helm/superset.yaml).
+Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 
 ## Join the Community
  - Ask questions on [Apache Pinot Slack](https://join.slack.com/t/apache-pinot/shared_invite/zt-5z7pav2f-yYtjZdVA~EDmrGkho87Vzw)

@@ -121,17 +121,33 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         nullBitmaps[i] = new RoaringBitmap();
       }
       dataTableBuilder.startRow();
-      for (int i = 0; i < numColumns; i++) {
-        Object result =
-            returnFinalResult ? _aggregationFunctions[i].extractFinalResult(_results.get(i)) : _results.get(i);
-        if (result == null) {
-          result = columnDataTypes[i].getNullPlaceholder();
-          nullBitmaps[i].add(0);
-        }
-        if (!returnFinalResult) {
-          setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
-        } else {
+      if (returnFinalResult) {
+        for (int i = 0; i < numColumns; i++) {
+          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+          if (result == null) {
+            result = columnDataTypes[i].getNullPlaceholder();
+            nullBitmaps[i].add(0);
+          }
+          assert result != null;
           setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+        }
+      } else {
+        for (int i = 0; i < numColumns; i++) {
+          Object result = _results.get(i);
+          if (columnDataTypes[i] == ColumnDataType.OBJECT) {
+            if (result == null) {
+              dataTableBuilder.setNull(i);
+            } else {
+              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+            }
+          } else {
+            if (result == null) {
+              result = columnDataTypes[i].getNullPlaceholder();
+              nullBitmaps[i].add(0);
+            }
+            assert result != null;
+            setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+          }
         }
       }
       dataTableBuilder.finishRow();
@@ -140,13 +156,21 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       }
     } else {
       dataTableBuilder.startRow();
-      for (int i = 0; i < numColumns; i++) {
-        Object result = _results.get(i);
-        if (!returnFinalResult) {
-          setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
-        } else {
-          result = _aggregationFunctions[i].extractFinalResult(result);
+      if (returnFinalResult) {
+        for (int i = 0; i < numColumns; i++) {
+          Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
+          assert result != null;
           setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+        }
+      } else {
+        for (int i = 0; i < numColumns; i++) {
+          Object result = _results.get(i);
+          assert result != null;
+          if (columnDataTypes[i] == ColumnDataType.OBJECT) {
+            dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+          } else {
+            setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+          }
         }
       }
       dataTableBuilder.finishRow();
@@ -155,8 +179,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   private void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
-      Object result)
-      throws IOException {
+      Object result) {
     ColumnDataType columnDataType = columnDataTypes[index];
     switch (columnDataType) {
       case INT:
@@ -167,9 +190,6 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         break;
       case DOUBLE:
         dataTableBuilder.setColumn(index, (double) result);
-        break;
-      case OBJECT:
-        dataTableBuilder.setColumn(index, result);
         break;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);

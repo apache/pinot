@@ -20,12 +20,20 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskObserverStorageManager;
 
 
 /**
  * Default no-op minion event observer which can be extended.
  */
 public class DefaultMinionEventObserver implements MinionEventObserver {
+
+  protected MinionTaskObserverStorageManager _observerStorageManager;
+
+  @Override
+  public void init(MinionTaskObserverStorageManager observerStorageManager) {
+    _observerStorageManager = observerStorageManager;
+  }
 
   @Override
   public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
@@ -41,5 +49,9 @@ public class DefaultMinionEventObserver implements MinionEventObserver {
 
   @Override
   public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
+  }
+
+  @Override
+  public void cleanup() {
   }
 }

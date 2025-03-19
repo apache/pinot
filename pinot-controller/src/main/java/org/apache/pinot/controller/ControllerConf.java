@@ -241,6 +241,10 @@ public class ControllerConf extends PinotConfiguration {
     public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
         "controller.realtime.segment.tmpFileRetentionInSeconds";
 
+    // Enables the deletion of untracked segments during the retention manager run.
+    // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
+    public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
+        "controller.retentionManager.untrackedSegmentDeletionEnabled";
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -293,12 +297,21 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
   public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";
+  public static final String REBALANCE_PRE_CHECKER_CLASS = "controller.rebalance.pre.checker.class";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  private static final String DISK_UTILIZATION_THRESHOLD = "controller.disk.utilization.threshold"; // 0 < threshold < 1
+  private static final String DISK_UTILIZATION_CHECK_TIMEOUT_MS = "controller.disk.utilization.check.timeoutMs";
+  private static final String DISK_UTILIZATION_PATH = "controller.disk.utilization.path";
+  private static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
+  private static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
+      "controller.resource.utilization.checker.initial.delay";
+  private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
+      "controller.resource.utilization.checker.frequency";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
@@ -316,10 +329,18 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
   private static final String DEFAULT_LINEAGE_MANAGER =
       "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
+  private static final String DEFAULT_REBALANCE_PRE_CHECKER =
+      "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  private static final double DEFAULT_DISK_UTILIZATION_THRESHOLD = 0.95;
+  private static final int DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS = 30_000;
+  private static final String DEFAULT_DISK_UTILIZATION_PATH = "/home/pinot/data";
+  private static final boolean DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK = false;
+  private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
+  private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   // Disallow any high level consumer (HLC) table
   private static final boolean DEFAULT_ALLOW_HLC_TABLES = false;
@@ -952,6 +973,14 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(LINEAGE_MANAGER_CLASS, lineageModifierClass);
   }
 
+  public String getRebalancePreCheckerClass() {
+    return getProperty(REBALANCE_PRE_CHECKER_CLASS, DEFAULT_REBALANCE_PRE_CHECKER);
+  }
+
+  public void setRebalancePreCheckerClass(String rebalancePreCheckerClass) {
+    setProperty(REBALANCE_PRE_CHECKER_CLASS, rebalancePreCheckerClass);
+  }
+
   public long getSegmentUploadTimeoutInMillis() {
     return getProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS);
   }
@@ -974,6 +1003,30 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getEnableStorageQuotaCheck() {
     return getProperty(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
+  }
+
+  public String getDiskUtilizationPath() {
+    return getProperty(DISK_UTILIZATION_PATH, DEFAULT_DISK_UTILIZATION_PATH);
+  }
+
+  public double getDiskUtilizationThreshold() {
+    return getProperty(DISK_UTILIZATION_THRESHOLD, DEFAULT_DISK_UTILIZATION_THRESHOLD);
+  }
+
+  public int getDiskUtilizationCheckTimeoutMs() {
+    return getProperty(DISK_UTILIZATION_CHECK_TIMEOUT_MS, DEFAULT_DISK_UTILIZATION_CHECK_TIMEOUT_MS);
+  }
+
+  public long getResourceUtilizationCheckerInitialDelay() {
+    return getProperty(RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY, DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY);
+  }
+
+  public long getResourceUtilizationCheckerFrequency() {
+    return getProperty(RESOURCE_UTILIZATION_CHECKER_FREQUENCY, DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY);
+  }
+
+  public boolean isResourceUtilizationCheckEnabled() {
+    return getProperty(ENABLE_RESOURCE_UTILIZATION_CHECK, DEFAULT_ENABLE_RESOURCE_UTILIZATION_CHECK);
   }
 
   public boolean getEnableBatchMessageMode() {
@@ -1031,6 +1084,15 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
+
+  public boolean getUntrackedSegmentDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+  }
+
+  public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
+    setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
+  }
+
 
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();

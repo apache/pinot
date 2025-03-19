@@ -187,7 +187,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static long geoToH3(double longitude, double latitude, int resolution) {
-    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+    return H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
   }
 
   /**
@@ -201,7 +201,7 @@ public class ScalarFunctions {
     Geometry geometry = GeometrySerializer.deserialize(geoBytes);
     double latitude = geometry.getCoordinate().y;
     double longitude = geometry.getCoordinate().x;
-    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+    return H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
   }
 
   @ScalarFunction
