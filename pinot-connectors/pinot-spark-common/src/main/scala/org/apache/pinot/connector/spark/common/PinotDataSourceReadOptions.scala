@@ -75,9 +75,10 @@ object PinotDataSourceReadOptions {
 
     // pinot cluster options
     val controller = options.getOrDefault(CONFIG_CONTROLLER, DEFAULT_CONTROLLER)
+    val authorization = options.getOrDefault(CONFIG_API_TOKEN, "")
     val broker = options.get(PinotDataSourceReadOptions.CONFIG_BROKER) match {
       case s if s == null || s.isEmpty =>
-        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName)
+        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName, authorization)
         Random.shuffle(brokerInstances).head
       case s => s
     }
@@ -92,7 +93,6 @@ object PinotDataSourceReadOptions {
       .split(QUERY_OPTIONS_DELIMITER).filter(_.nonEmpty).toSet
     val failOnInvalidSegments = options.getBoolean(CONFIG_FAIL_ON_INVALID_SEGMENTS,
       DEFAULT_FAIL_ON_INVALID_SEGMENTS)
-    val authorization = options.getOrDefault(CONFIG_API_TOKEN, "")
 
     PinotDataSourceReadOptions(
       tableName,
