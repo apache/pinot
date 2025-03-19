@@ -19,7 +19,6 @@
 package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
-import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -307,7 +306,7 @@ public class DataFetcher implements AutoCloseable {
    *
    * TODO: Type conversion for BOOLEAN and TIMESTAMP is not handled
    */
-  private class ColumnValueReader implements Closeable {
+  private class ColumnValueReader implements AutoCloseable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
     final DataType _storedType;
@@ -600,12 +599,17 @@ public class DataFetcher implements AutoCloseable {
    */
   @Override
   public void close() {
-    try {
-      for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
+    boolean failedToCloseAll = false;
+    for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
+      try {
         columnValueReader.close();
+      } catch (IOException e) {
+        failedToCloseAll = true;
       }
-    } catch (IOException e) {
-      // do nothing
+    }
+
+    if (failedToCloseAll) {
+      throw new RuntimeException("Failed to close the DataFetcher and release all query resources");
     }
   }
 }

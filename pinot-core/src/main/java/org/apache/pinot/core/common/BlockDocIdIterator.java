@@ -47,4 +47,11 @@ public interface BlockDocIdIterator {
    * @see {https://github.com/RoaringBitmap/RoaringBitmap/pull/243#issuecomment-381278304}
    */
   int OPTIMAL_ITERATOR_BATCH_SIZE = 256;
+
+  /**
+   * Close resources if applicable.
+   */
+  default void close() {
+    // do nothing by default
+  }
 }

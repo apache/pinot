@@ -80,10 +80,11 @@ public class ProjectPlanNode implements PlanNode {
     DocIdSetOperator docIdSetOperator =
         _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall,
             _filterOperator).run() : null;
-    try (ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator)) {
-      return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
-          : projectionOperator;
-    }
+
+    // TODO: figure out a way to close this operator, as it may hold reader context
+    ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
+    return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
+        : projectionOperator;
   }
 }

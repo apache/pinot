@@ -81,13 +81,14 @@ public class StarTreeProjectPlanNode implements PlanNode {
         new StarTreeDocIdSetPlanNode(_queryContext, _starTreeV2, _predicateEvaluatorsMap, groupByColumns).run();
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(column -> dataSourceMap.put(column, _starTreeV2.getDataSource(column)));
-    try (ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator)) {
-      // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
-      //       - They are all columns (not functions or constants), where no transform is required
-      //       - We never call TransformOperator.getResultColumnContext() on them
-      return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator,
-          Arrays.asList(_groupByExpressions)) : projectionOperator;
-    }
+
+    // TODO: figure out a way to close this operator, as it may hold reader context
+    ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
+    // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
+    //       - They are all columns (not functions or constants), where no transform is required
+    //       - We never call TransformOperator.getResultColumnContext() on them
+    return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator,
+        Arrays.asList(_groupByExpressions)) : projectionOperator;
   }
 }

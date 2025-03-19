@@ -375,7 +375,7 @@ public class VarByteChunkForwardIndexReaderV4
 
   private static final class CompressedReaderContext extends ReaderContext {
 
-    private ByteBuffer _decompressedBuffer;
+    private final ByteBuffer _decompressedBuffer;
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
 

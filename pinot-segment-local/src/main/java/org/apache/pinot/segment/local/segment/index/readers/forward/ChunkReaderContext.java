@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,11 +51,8 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
-    }
+  public void close() {
+    CleanerUtil.cleanQuietly(_chunkBuffer);
   }
 
   public ByteBuffer getChunkBuffer() {
