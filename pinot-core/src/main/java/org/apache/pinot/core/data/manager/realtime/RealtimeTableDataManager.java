@@ -909,7 +909,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private SemaphoreAccessCoordinator getSemaphoreAccessCoordinator(int partitionGroupId) {
     return _partitionGroupIdToSemaphoreCoordinatorMap.computeIfAbsent(partitionGroupId,
-        k -> new SemaphoreAccessCoordinator(new Semaphore(1), _enforceConsumptionInOrder, _isTableReadyToConsumeData));
+        k -> new SemaphoreAccessCoordinator(new Semaphore(1), _enforceConsumptionInOrder, this));
+  }
+
+  public BooleanSupplier getIsTableReadyToConsumeData() {
+    return _isTableReadyToConsumeData;
   }
 
   private boolean enforceConsumptionInOrder() {
