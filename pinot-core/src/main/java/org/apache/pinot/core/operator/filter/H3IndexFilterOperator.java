@@ -78,7 +78,15 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
     _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
-    _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
+
+    // choose current hexagon's longest edge instead of average for the resolution;
+    // at the same resolution hexagon sizes vary depending on location
+    double maxLength = 0;
+    List<Long> edges = H3Utils.H3_CORE.getH3UnidirectionalEdgesFromHexagon(_h3Id);
+    for (int i = 0, len = edges.size(); i < len; i++) {
+      maxLength = Math.max(maxLength, H3Utils.H3_CORE.exactEdgeLength(edges.get(i), LengthUnit.m));
+    }
+    _edgeLength = maxLength;
 
     RangePredicate rangePredicate = (RangePredicate) predicate;
     if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
@@ -188,30 +196,42 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   }
 
   /**
-   * Returns the H3 ids that is ALWAYS fully covered by the circle with the given distance as the radius and a point
-   * within the _h3Id hexagon as the center.
-   * <p>The farthest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code sqrt(3) * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
-   * to the edge length, it is guaranteed that the hexagons in the nth ring are always fully covered if:
-   * {@code distance >= (sqrt(3) * n + 2) * edgeLength}.
+   * Hexagons in the nth ring are always fully covered if:
+   * {@code maxDistance >= sqrt(3) * edgeLength * n + 2 * edgeLength} because:
+   * - edgeLength is the same as circumradius
+   * - reference point could be up to edgeLength away from center of hexagon identified by _h3Id
+   *  (but not all points that up to edgeLength away from center do belong to hexagon, we use edgeLength to be
+   *  conservative )
+   * - all points in n-th ring should not be further away from center of _h3Id hexagon than hex_distance + edgeLength
+   * - hexagon's spherical dimensions are not constant (they are biggest around center of icosahedron faces and
+   * shrink towards the edges)
    */
   private List<Long> getAlwaysMatchH3Ids(double distance) {
-    // NOTE: Pick a constant slightly larger than sqrt(3) to be conservative
     int numRings = (int) Math.floor((distance / _edgeLength - 2) / 1.7321);
-    return numRings >= 0 ? getH3Ids(numRings) : Collections.emptyList();
+
+    if (numRings <= 0) {
+      return Collections.emptyList();
+    }
+
+    Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
+    return H3Utils.H3_CORE.kRing(_h3Id, numRings);
   }
 
   /**
    * Returns the H3 ids that MIGHT BE fully/partially covered by the circle with the given distance as the radius and a
    * point within the _h3Id hexagon as the center.
    * <p>The shortest distance from the center of the center hexagon to the center of a hexagon in the nth ring is
-   * {@code >= 1.5 * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
+   * {@code >= 1.4 * n * edgeLength}. Counting the distance from the center to a point in the hexagon, which is up
    * to the edge length, it is guaranteed that the hexagons in the nth ring are always not fully/partially covered if:
-   * {@code distance < (1.5 * n - 2) * edgeLength}.
+   * {@code distance < (1.4 * n - 2) * edgeLength}.
+   *
+   * Since hexagon spherical distance (center to center) is not uniform, possible match hexagons will be spread over
+   * a number of rings.
+   * For a given ring number, the smallest distance from center hexagon seems to be around 1.43 * edge length.
+   * Since hexagon distance calculations aren't precise, we need to be more greedy as to not lose valid points.
    */
   private List<Long> getPossibleMatchH3Ids(double distance) {
-    // NOTE: Add a small delta (0.001) to be conservative
-    int numRings = (int) Math.floor((distance / _edgeLength + 2) / 1.5 + 0.001);
+    int numRings = (int) Math.floor((distance / _edgeLength + 2) / 1.4);
     return getH3Ids(numRings);
   }
 
@@ -222,6 +242,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
    * case, the operator will fallback to ExpressionFilterOperator.
    */
   private List<Long> getH3Ids(int numRings) {
+    // 100 rings give about 30k ids at resolution 5
     Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
     return H3Utils.H3_CORE.kRing(_h3Id, numRings);
   }
