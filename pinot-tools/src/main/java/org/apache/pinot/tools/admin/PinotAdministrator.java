@@ -21,6 +21,9 @@ package org.apache.pinot.tools.admin;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.utils.tls.JvmDefaultSslContext;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -205,12 +208,18 @@ public class PinotAdministrator {
   }
 
   public static void main(String[] args) {
+    LoggerContext context = (LoggerContext) org.apache.logging.log4j.LogManager.getContext(false);
+    Configuration config = context.getConfiguration();
+    ConfigurationSource source = config.getConfigurationSource();
+
+    System.out.println("Log4j2 is using configuration from: " + source.getURI());
+
     PluginManager.get().init();
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
     if ((pinotAdministrator._status != 0)
         && Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
-        System.exit(pinotAdministrator._status);
+      System.exit(pinotAdministrator._status);
     }
   }
 }

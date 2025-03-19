@@ -69,7 +69,7 @@
       <AppenderRef ref="pinotLog"/>
       <AppenderRef ref="console" level="error"/>
     </Root>
-    <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
+    <Logger name="org.apache.pinot.tools.admin" level="error" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>

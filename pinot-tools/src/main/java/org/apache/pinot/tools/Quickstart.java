@@ -62,6 +62,7 @@ public class Quickstart extends QuickStartBase {
     File quickstartTmpDir =
         _setCustomDataDir ? _dataDir : new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File quickstartRunnerDir = new File(quickstartTmpDir, "quickstart");
+    System.out.println("getAbsolutePath" + quickstartRunnerDir.getAbsolutePath());
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapOfflineTableDirectories(quickstartTmpDir);
 
@@ -145,6 +146,7 @@ public class Quickstart extends QuickStartBase {
 
   public static void main(String[] args)
       throws Exception {
+    System.out.println("try something new");
     List<String> arguments = new ArrayList<>();
     arguments.addAll(Arrays.asList("QuickStart", "-type", "BATCH"));
     arguments.addAll(Arrays.asList(args));
