@@ -33,6 +33,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,8 +59,11 @@ public class SemaphoreAccessCoordinator {
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
     _realtimeTableDataManager = realtimeTableDataManager;
-    Preconditions.checkNotNull(_realtimeTableDataManager.getStreamIngestionConfig());
-    boolean trackSegmentSeqNumber = _realtimeTableDataManager.getStreamIngestionConfig().isTrackSegmentSeqNumber();
+    StreamIngestionConfig streamIngestionConfig = realtimeTableDataManager.getStreamIngestionConfig();
+    boolean trackSegmentSeqNumber = false;
+    if (streamIngestionConfig != null) {
+      trackSegmentSeqNumber = streamIngestionConfig.isTrackSegmentSeqNumber();
+    }
     // if trackSegmentSeqNumber is false, server relies on ideal state to fetch previous segment to a segment.
     if (trackSegmentSeqNumber) {
       _segmentSequenceNumSet = new HashSet<>();
