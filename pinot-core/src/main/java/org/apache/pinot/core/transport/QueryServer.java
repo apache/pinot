@@ -36,6 +36,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -60,6 +61,8 @@ public class QueryServer {
   private final Class<? extends ServerSocketChannel> _channelClass;
   private final ChannelHandler _instanceRequestHandler;
   private ServerSocketChannel _channel;
+  private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels = new ConcurrentHashMap<>();
+
 
   /**
    * Create an unsecured server instance
@@ -129,6 +132,9 @@ public class QueryServer {
           .option(ChannelOption.ALLOCATOR, bufAllocator).childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
+              _allChannels.put(ch, true);
+
+              ch.pipeline().addLast(new DirectOOMServerHandler(_allChannels, _channel));
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
@@ -138,6 +144,9 @@ public class QueryServer {
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
               ch.pipeline().addLast(_instanceRequestHandler);
+              ch.closeFuture().addListener(future -> {
+                _allChannels.remove(ch);
+              });
             }
           }).bind(_port).sync().channel();
     } catch (Exception e) {
