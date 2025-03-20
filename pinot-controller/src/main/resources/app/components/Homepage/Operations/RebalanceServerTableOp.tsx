@@ -19,7 +19,6 @@
 
 import React from 'react';
 import {
-  DialogContentText,
   Grid,
   Box,
   Typography,
@@ -27,7 +26,6 @@ import {
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
-import CustomCodemirror from '../../CustomCodemirror';
 import {RebalanceServerDialogHeader} from "./RebalanceServer/RebalanceServerDialogHeader";
 import {
   RebalanceServerSection
@@ -140,13 +138,6 @@ export default function RebalanceServerTableOp({
         : 
           <React.Fragment>
             <RebalanceResponse response={rebalanceResponse} />
-            <DialogContentText>
-              Operation Status:
-            </DialogContentText>
-            <CustomCodemirror
-              data={rebalanceResponse}
-              isEditable={false}
-            />
           </React.Fragment>
         }
     </Dialog>
