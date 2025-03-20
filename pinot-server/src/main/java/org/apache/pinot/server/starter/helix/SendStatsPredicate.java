@@ -160,7 +160,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         return true;
       }
       if (versionStr.equals(PinotVersion.VERSION)) {
-        return true;
+        return false;
       }
       // Lets try to parse 1.x versions
       String[] splits = versionStr.trim().split("\\.");
