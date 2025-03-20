@@ -918,7 +918,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "The number of replicas (" + getNumReplicas() + ") is less than minAvailableReplicas. The rebalance would fail.\n",
+        "The number of replicas (" + getNumReplicas()
+            + ") is less than minAvailableReplicas. The rebalance would fail.\n",
         RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Disable dry-run
