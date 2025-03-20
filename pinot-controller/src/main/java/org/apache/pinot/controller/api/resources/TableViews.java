@@ -189,14 +189,20 @@ public class TableViews {
 
   public TableView getSegmentsView(TableViews.TableView tableView, List<String> segmentNames) {
     TableView tableViewResult = new TableView();
-    tableViewResult._offline = new HashMap<>();
-    tableViewResult._realtime = new HashMap<>();
-    for (String segmentName : segmentNames) {
-      if (tableView._offline != null) {
-        tableViewResult._offline.put(segmentName, tableView._offline.get(segmentName));
+    if (tableView._offline != null) {
+      tableViewResult._offline = new HashMap<>();
+      for (String segmentName : segmentNames) {
+        if (tableView._offline.get(segmentName) != null) {
+          tableViewResult._offline.put(segmentName, tableView._offline.get(segmentName));
+        }
       }
-      if (tableView._realtime != null) {
-        tableViewResult._realtime.put(segmentName, tableView._realtime.get(segmentName));
+    }
+    if (tableView._realtime != null) {
+      tableViewResult._realtime = new HashMap<>();
+      for (String segmentName : segmentNames) {
+        if (tableView._realtime.get(segmentName) != null) {
+          tableViewResult._realtime.put(segmentName, tableView._realtime.get(segmentName));
+        }
       }
     }
     return tableViewResult;
