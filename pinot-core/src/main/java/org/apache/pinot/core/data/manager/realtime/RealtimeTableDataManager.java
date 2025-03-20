@@ -560,8 +560,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               _isTableReadyToConsumeData);
     } catch (SegmentAlreadyConsumedException e) {
       // Don't do anything since segment was already committed by another instance.
-      // Eventually this server should receive a CONSUMING -> ONLINE helix state transition
-      // to add it.
+      // Eventually this server should receive a CONSUMING -> ONLINE/OFFLINE helix state transition
       return;
     }
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
