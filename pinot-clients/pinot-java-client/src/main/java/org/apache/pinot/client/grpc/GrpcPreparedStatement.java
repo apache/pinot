@@ -20,7 +20,6 @@ package org.apache.pinot.client.grpc;
 
 import java.io.IOException;
 import java.util.Iterator;
-import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.proto.Broker;
 
 
@@ -61,9 +60,9 @@ public class GrpcPreparedStatement {
    *
    * @return The query results
    */
-  public ResultSetGroup execute()
+  public GrpcResultSetGroup execute()
       throws IOException {
-    return _connection.execute(fillStatementWithParameters());
+    return _connection.executeGrpc(fillStatementWithParameters());
   }
 
   /**
@@ -71,8 +70,8 @@ public class GrpcPreparedStatement {
    *
    * @return The query results
    */
-  public Iterator<Broker.BrokerResponse> executeAsync() {
-    return _connection.executeAsync(fillStatementWithParameters());
+  public Iterator<Broker.BrokerResponse> executeWithIterator() {
+    return _connection.executeWithIterator(fillStatementWithParameters());
   }
 
   /**

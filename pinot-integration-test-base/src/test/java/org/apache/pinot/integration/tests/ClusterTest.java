@@ -530,7 +530,7 @@ public abstract class ClusterTest extends ControllerTest {
       throws IOException {
     GrpcConnection grpcConnection =
         ConnectionFactory.fromHostListGrpc(new Properties(), List.of(getBrokerGrpcEndpoint()));
-    return grpcConnection.execute(query, metadataMap);
+    return grpcConnection.getJsonResponse(query, metadataMap);
   }
 
   /**

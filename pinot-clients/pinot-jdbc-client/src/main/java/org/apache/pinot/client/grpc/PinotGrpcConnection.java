@@ -32,6 +32,7 @@ import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
@@ -39,13 +40,19 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
   public static final String BROKER_LIST = "brokers";
   protected static final String[] POSSIBLE_QUERY_OPTIONS = {
       QueryOptionKey.ENABLE_NULL_HANDLING,
-      QueryOptionKey.USE_MULTISTAGE_ENGINE
+      QueryOptionKey.USE_MULTISTAGE_ENGINE,
+  };
+
+  protected static final String[] POSSIBLE_METADATA_MAP_OPTIONS = {
+      CommonConstants.Broker.Grpc.BLOCK_ROW_SIZE,
+      CommonConstants.Broker.Grpc.COMPRESSION,
   };
   private GrpcConnection _session;
   private PinotControllerTransport _controllerTransport;
   private boolean _closed;
   private final String _controllerURL;
   private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
+  private final Map<String, String> _metadataMap = new HashMap<>();
 
   public PinotGrpcConnection(String controllerURL, String tenant, PinotControllerTransport controllerTransport) {
     this(new Properties(), controllerURL, tenant, controllerTransport);
@@ -74,6 +81,12 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
         _queryOptions.put(possibleQueryOption, DriverUtils.parseOptionValue(property));
       }
     }
+    for (String possibleMetadataMapOption : POSSIBLE_METADATA_MAP_OPTIONS) {
+      Object property = properties.getProperty(possibleMetadataMapOption);
+      if (property != null) {
+        _metadataMap.put(possibleMetadataMapOption, property.toString());
+      }
+    }
   }
 
   public GrpcConnection getSession() {
@@ -82,6 +95,10 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
 
   public Map<String, Object> getQueryOptions() {
     return _queryOptions;
+  }
+
+  public Map<String, String> getMetadataMap() {
+    return _metadataMap;
   }
 
   private List<String> getBrokerList(String controllerURL, String tenant) {

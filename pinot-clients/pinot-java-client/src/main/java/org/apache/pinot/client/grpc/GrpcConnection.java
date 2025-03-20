@@ -22,13 +22,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.BrokerSelector;
@@ -36,14 +36,10 @@ import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.SimpleBrokerSelector;
-import org.apache.pinot.common.compression.CompressionFactory;
-import org.apache.pinot.common.compression.Compressor;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Broker;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.grpc.BrokerGrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +90,20 @@ public class GrpcConnection {
    */
   public ResultSetGroup execute(String query)
       throws PinotClientException, IOException {
-    BrokerResponse brokerResponse = BrokerResponse.fromJson(execute(query, new HashMap<>()));
+    return execute(query, new HashMap<>());
+  }
+
+  /**
+   * Executes a query.
+   *
+   * @param query The query to execute
+   * @param metadataMap The query metadata
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup execute(String query, Map<String, String> metadataMap)
+      throws PinotClientException, IOException {
+    BrokerResponse brokerResponse = BrokerResponse.fromJson(getJsonResponse(query, metadataMap));
     if (!brokerResponse.getExceptions().isEmpty() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + brokerResponse.getExceptions());
     }
@@ -105,24 +114,73 @@ public class GrpcConnection {
    * Executes a query.
    *
    * @param query The query to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public GrpcResultSetGroup executeGrpc(String query)
+      throws PinotClientException, IOException {
+    return executeGrpc(query, new HashMap<>());
+  }
+
+  /**
+   * Executes a query.
+   *
+   * @param query The query to execute
+   * @param metadataMap The query metadata
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public GrpcResultSetGroup executeGrpc(String query, Map<String, String> metadataMap)
+      throws PinotClientException, IOException {
+    Iterator<Broker.BrokerResponse> brokerResponseIterator = executeWithIterator(query, metadataMap);
+    return new GrpcResultSetGroup(brokerResponseIterator);
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public CompletableFuture<ResultSetGroup> executeAsync(String query)
+      throws PinotClientException {
+    return executeAsync(query, new HashMap<>());
+  }
+
+  /**
+   * Executes a query asynchronously.
+   *
+   * @param query The query to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public CompletableFuture<ResultSetGroup> executeAsync(String query, Map<String, String> metadataMap)
+      throws PinotClientException {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        return new ResultSetGroup(BrokerResponse.fromJson(getJsonResponse(query, metadataMap)));
+      } catch (IOException e) {
+        throw new PinotClientException("Failed to execute query: " + query, e);
+      }
+    });
+  }
+
+  /**
+   * Executes a query.
+   *
+   * @param query The query to execute
+   * @param metadataMap The query metadata
    * @return The JsonNode result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public JsonNode execute(String query, Map<String, String> metadataMap)
+  public JsonNode getJsonResponse(String query, Map<String, String> metadataMap)
       throws IOException {
-    Iterator<org.apache.pinot.common.proto.Broker.BrokerResponse> response = executeAsync(query, metadataMap);
-    org.apache.pinot.common.proto.Broker.BrokerResponse brokerResponse;
+    Iterator<org.apache.pinot.common.proto.Broker.BrokerResponse> response = executeWithIterator(query, metadataMap);
     // Process metadata
     ObjectNode brokerResponseJson = JsonUtils.newObjectNode();
     if (response.hasNext()) {
-      brokerResponse = response.next();
-      JsonNode jsonNode = JsonUtils.bytesToJsonNode(brokerResponse.getPayload().toByteArray());
-      Iterator<String> fieldNamesIterator = jsonNode.fieldNames();
-      while (fieldNamesIterator.hasNext()) {
-        String fieldName = fieldNamesIterator.next();
-        brokerResponseJson.set(fieldName, jsonNode.get(fieldName));
-      }
-      brokerResponseJson.set("metadataMap", JsonUtils.objectToJsonNode(brokerResponse.getMetadataMap()));
+      brokerResponseJson.setAll(GrpcUtils.extractMetadataJson(response.next()));
     }
     // Directly return when there is exception
     if (brokerResponseJson.has("exceptions") && !brokerResponseJson.get("exceptions").isEmpty()) {
@@ -131,43 +189,12 @@ public class GrpcConnection {
     // Process schema
     JsonNode schemaJsonNode = null;
     if (response.hasNext()) {
-      brokerResponse = response.next();
-      DataSchema schema = DataSchema.fromBytes(brokerResponse.getPayload().asReadOnlyByteBuffer());
-      schemaJsonNode = JsonUtils.objectToJsonNode(schema);
+      schemaJsonNode = GrpcUtils.extractSchemaJson(response.next());
     }
-    int compressedRowBytes = 0;
-    int decompressedRowBytes = 0;
     // Process rows
     ArrayNode rows = JsonUtils.newArrayNode();
-    String compressionAlgorithm = metadataMap.getOrDefault(CommonConstants.Broker.Grpc.COMPRESSION,
-        CommonConstants.Broker.Grpc.DEFAULT_COMPRESSION);
-    Compressor compressor = CompressionFactory.getCompressor(compressionAlgorithm);
     while (response.hasNext()) {
-      brokerResponse = response.next();
-      byte[] respBytes = brokerResponse.getPayload().toByteArray();
-      compressedRowBytes += respBytes.length;
-      int rowSize = Integer.parseInt(brokerResponse.getMetadataOrThrow("rowSize"));
-      byte[] uncompressedPayload;
-      try {
-        uncompressedPayload = compressor.decompress(respBytes);
-        decompressedRowBytes += uncompressedPayload.length;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-      ArrayNode jsonRows = JsonUtils.newArrayNode();
-      int bytesRead = 0;
-      ByteBuffer byteBuffer = ByteBuffer.wrap(uncompressedPayload);
-      for (int i = 0; i < rowSize; i++) {
-        int nextRowSize = byteBuffer.getInt(bytesRead);
-        bytesRead += 4;
-        byte[] rowBytes = new byte[nextRowSize];
-        byteBuffer.position(bytesRead);
-        byteBuffer.get(rowBytes);
-        bytesRead += nextRowSize;
-        String rowString = new String(rowBytes);
-        jsonRows.add(JsonUtils.stringToJsonNode(rowString));
-      }
-      rows.addAll(jsonRows);
+      rows.addAll(GrpcUtils.extractRowsJson(response.next()));
     }
     if (schemaJsonNode != null && rows != null) {
       ObjectNode resultTable = JsonUtils.newObjectNode();
@@ -186,9 +213,9 @@ public class GrpcConnection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Iterator<Broker.BrokerResponse> executeAsync(String query)
+  public Iterator<Broker.BrokerResponse> executeWithIterator(String query)
       throws PinotClientException {
-    return executeAsync(query, new HashMap<>());
+    return executeWithIterator(query, new HashMap<>());
   }
 
   /**
@@ -198,7 +225,7 @@ public class GrpcConnection {
    * @return A future containing the result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public Iterator<Broker.BrokerResponse> executeAsync(String query, Map<String, String> metadata)
+  public Iterator<Broker.BrokerResponse> executeWithIterator(String query, Map<String, String> metadata)
       throws PinotClientException {
     String[] tableNames = Connection.resolveTableName(query);
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);

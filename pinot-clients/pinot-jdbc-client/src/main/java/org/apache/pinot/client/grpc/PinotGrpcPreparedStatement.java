@@ -26,13 +26,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.Iterator;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.PinotClientException;
-import org.apache.pinot.client.PinotResultSet;
-import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.base.AbstractBasePreparedStatement;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.common.proto.Broker;
 
 
 public class PinotGrpcPreparedStatement extends AbstractBasePreparedStatement {
@@ -40,7 +40,7 @@ public class PinotGrpcPreparedStatement extends AbstractBasePreparedStatement {
 
   private PinotGrpcConnection _connection;
   private GrpcConnection _session;
-  private ResultSetGroup _resultSetGroup;
+  private Iterator<Broker.BrokerResponse> _brokerResponseIterator;
   private GrpcPreparedStatement _preparedStatement;
   private String _query;
   private boolean _closed;
@@ -168,12 +168,7 @@ public class PinotGrpcPreparedStatement extends AbstractBasePreparedStatement {
   public boolean execute()
       throws SQLException {
     _resultSet = executeQuery();
-    if (_resultSet.next()) {
-      _resultSet.beforeFirst();
-      return true;
-    } else {
-      return false;
-    }
+    return _resultSet != null;
   }
 
   @Override
@@ -181,12 +176,9 @@ public class PinotGrpcPreparedStatement extends AbstractBasePreparedStatement {
       throws SQLException {
     validateState();
     try {
-      _resultSetGroup = _session.execute(DriverUtils.enableQueryOptions(sql, _connection.getQueryOptions()));
-      if (_resultSetGroup.getResultSetCount() == 0) {
-        _resultSet = PinotResultSet.empty();
-        return _resultSet;
-      }
-      _resultSet = new PinotResultSet(_resultSetGroup.getResultSet(0));
+      _brokerResponseIterator =
+          _session.executeWithIterator(DriverUtils.enableQueryOptions(sql, _connection.getQueryOptions()));
+      _resultSet = new PinotGrpcResultSet(_brokerResponseIterator);
       return _resultSet;
     } catch (PinotClientException | IOException e) {
       throw new SQLException(String.format("Failed to execute query : %s", sql), e);
@@ -198,13 +190,8 @@ public class PinotGrpcPreparedStatement extends AbstractBasePreparedStatement {
       throws SQLException {
     validateState();
     try {
-      _resultSetGroup = _preparedStatement.execute();
-
-      if (_resultSetGroup.getResultSetCount() == 0) {
-        _resultSet = PinotResultSet.empty();
-      } else {
-        _resultSet = new PinotResultSet(_resultSetGroup.getResultSet(0));
-      }
+      _brokerResponseIterator = _preparedStatement.executeWithIterator();
+      _resultSet = new PinotGrpcResultSet(_brokerResponseIterator);
       return _resultSet;
     } catch (PinotClientException | IOException e) {
       throw new SQLException(String.format("Failed to execute query : %s", _query), e);

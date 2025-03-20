@@ -22,11 +22,12 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.client.PinotClientException;
-import org.apache.pinot.client.PinotResultSet;
-import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.base.AbstractBaseStatement;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.common.proto.Broker;
 
 
 public class PinotGrpcStatement extends AbstractBaseStatement {
@@ -67,13 +68,11 @@ public class PinotGrpcStatement extends AbstractBaseStatement {
       if (!DriverUtils.queryContainsLimitStatement(sql)) {
         sql += " " + LIMIT_STATEMENT + " " + _maxRows;
       }
-      String enabledSql = DriverUtils.enableQueryOptions(sql, _connection.getQueryOptions());
-      ResultSetGroup resultSetGroup = _session.execute(enabledSql);
-      if (resultSetGroup.getResultSetCount() == 0) {
-        _resultSet = PinotResultSet.empty();
-        return _resultSet;
-      }
-      _resultSet = new PinotResultSet(resultSetGroup.getResultSet(0));
+      Map<String, Object> queryOptions = _connection.getQueryOptions();
+      String enabledSql = DriverUtils.enableQueryOptions(sql, queryOptions);
+      Iterator<Broker.BrokerResponse> brokerResponseIterator =
+          _session.executeWithIterator(enabledSql, _connection.getMetadataMap());
+      _resultSet = new PinotGrpcResultSet(brokerResponseIterator);
       return _resultSet;
     } catch (PinotClientException | IOException e) {
       throw new SQLException(String.format("Failed to execute query : %s", sql), e);
