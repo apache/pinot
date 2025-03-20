@@ -34,7 +34,7 @@ public class CalciteContextExceptionClassifier {
 
   /// Analyzes the exception and classifies it as a [QueryErrorCode] if possible.
   ///
-  /// Returns a [QueryException#QUERY_VALIDATION] exception if the exception is not recognized.
+  /// Returns a [QueryErrorCode#QUERY_VALIDATION] exception if the exception is not recognized.
   public static QueryException classifyValidationException(CalciteContextException e) {
     String message = e.getMessage();
     if (message != null) {
