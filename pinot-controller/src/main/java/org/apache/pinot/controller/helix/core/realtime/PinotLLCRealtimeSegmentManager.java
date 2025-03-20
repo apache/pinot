@@ -1095,7 +1095,7 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * An instance is reporting that it cannot build segment due to non-recoverable error, usually due to size too large.
-   * Reduce the segment "segment.flush.threshold.size" to its half value.
+   * Reduce the segment "segment.flush.threshold.size" to half of the current segment size target.
    */
   public void reduceSegmentSizeAndReset(LLCSegmentName llcSegmentName, int prevNumRows) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");

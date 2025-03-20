@@ -298,7 +298,7 @@ public class LLCSegmentCompletionHandlers {
   }
 
   @GET
-  @Path(SegmentCompletionProtocol.MSG_TYPE_CANNOT_BUILD)
+  @Path(SegmentCompletionProtocol.MSG_TYPE_BUILD_DETERMINISTIC_FAILURE)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String reduceSegmentSize(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,

@@ -267,7 +267,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentBuildDescriptor _segmentBuildDescriptor;
-  private boolean _segmentCannotBuild = false;
+  private boolean _segmentBuildFailedWithDeterministicError = false;
   private final StreamConsumerFactory _streamConsumerFactory;
   private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
 
@@ -869,12 +869,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   // We could not build the segment. Go into error state.
                   _state = State.ERROR;
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
-                  if (_segmentCannotBuild && _tableConfig.getIngestionConfig().isRetryOnSegmentBuildPrecheckFailure()) {
+                  if (_segmentBuildFailedWithDeterministicError
+                      && _tableConfig.getIngestionConfig().isRetryOnSegmentBuildPrecheckFailure()) {
                     _segmentLogger.error(
                         "Found non-recoverable segment build error for {}, from offset {} to {},"
                             + "sending notifyCannotBuild event.",
                         _segmentNameStr, _startOffset, _currentOffset);
-                    notifySegmentCannotBuild();
+                    notifySegmentBuildFailedWithDeterministicError();
                   }
                   break;
                 }
@@ -1123,7 +1124,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             new SegmentErrorInfo(now(), "Could not build segment", e));
         if (e instanceof IllegalStateException) {
           // Precondition checks fail, the segment build would fail consistently
-          _segmentCannotBuild = true;
+          _segmentBuildFailedWithDeterministicError = true;
         }
         return null;
       }
@@ -1223,7 +1224,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
-  void notifySegmentCannotBuild() {
+  void notifySegmentBuildFailedWithDeterministicError() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())

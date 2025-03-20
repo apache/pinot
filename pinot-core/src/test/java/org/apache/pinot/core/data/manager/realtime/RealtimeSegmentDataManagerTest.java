@@ -55,6 +55,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -146,6 +147,10 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
+    if (tableConfig.getIngestionConfig() == null) {
+      tableConfig.setIngestionConfig(new IngestionConfig());
+    }
+    tableConfig.getIngestionConfig().setRetryOnSegmentBuildPrecheckFailure(true);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
@@ -248,7 +253,7 @@ public class RealtimeSegmentDataManagerTest {
 
     consumer.run();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
-    Assert.assertTrue(segmentDataManager._notifySegmentCannotBuildCalled);
+    Assert.assertTrue(segmentDataManager._notifySegmentBuildFailedWithDeterministicErrorCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.ERROR);
     segmentDataManager.close();
   }
@@ -907,7 +912,7 @@ public class RealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
-    public Field _segmentCannotBuild;
+    public Field _segmentBuildFailedWithDeterministicError;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -917,7 +922,7 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
-    private boolean _notifySegmentCannotBuildCalled = false;
+    private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
     public Map<Integer, Semaphore> _semaphoreMap;
@@ -949,8 +954,9 @@ public class RealtimeSegmentDataManagerTest {
       _shouldStop.setAccessible(true);
       _stopReason = RealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
-      _segmentCannotBuild = RealtimeSegmentDataManager.class.getDeclaredField("_segmentCannotBuild");
-      _segmentCannotBuild.setAccessible(true);
+      _segmentBuildFailedWithDeterministicError =
+          RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
+      _segmentBuildFailedWithDeterministicError.setAccessible(true);
       _semaphoreMap = semaphoreMap;
       _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
@@ -1028,8 +1034,8 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void notifySegmentCannotBuild() {
-      _notifySegmentCannotBuildCalled = true;
+    protected void notifySegmentBuildFailedWithDeterministicError() {
+      _notifySegmentBuildFailedWithDeterministicErrorCalled = true;
     }
 
 
@@ -1063,7 +1069,7 @@ public class RealtimeSegmentDataManagerTest {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         try {
-          _segmentCannotBuild.set(this, true);
+          _segmentBuildFailedWithDeterministicError.set(this, true);
         } catch (Exception e) {
           Assert.fail();
         }
