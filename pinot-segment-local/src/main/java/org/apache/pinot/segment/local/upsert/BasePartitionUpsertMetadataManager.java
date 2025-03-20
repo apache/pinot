@@ -853,7 +853,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTime = System.currentTimeMillis();
     try {
       while (!_snapshotLock.writeLock().tryLock(5, TimeUnit.MINUTES)) {
-        _logger.info("Unable to acquire snapshotLock.writeLock in: {}", System.currentTimeMillis() - startTime);
+        _logger.warn("Unable to acquire snapshotLock.writeLock in: {}", System.currentTimeMillis() - startTime);
       }
       doTakeSnapshot();
       long duration = System.currentTimeMillis() - startTime;
