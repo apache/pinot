@@ -45,6 +45,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -102,8 +103,8 @@ public class TableViews {
       String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    TableViews.TableView tableIdealStateView = getTableState(tableName, EXTERNALVIEW, tableType);
-    if (segmentNames != null && !segmentNames.isEmpty()) {
+    TableViews.TableView tableIdealStateView = getTableState(tableName, IDEALSTATE, tableType);
+    if (StringUtils.isNotEmpty(segmentNames)) {
       List<String> segmentNamesList =
           Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
       return getSegmentsView(tableIdealStateView, segmentNamesList);
@@ -124,7 +125,7 @@ public class TableViews {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
     TableViews.TableView tableExternalView = getTableState(tableName, EXTERNALVIEW, tableType);
-    if (segmentNames != null && !segmentNames.isEmpty()) {
+    if (StringUtils.isNotEmpty(segmentNames)) {
       List<String> segmentNamesList =
           Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
       return getSegmentsView(tableExternalView, segmentNamesList);
