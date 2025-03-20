@@ -37,6 +37,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class is a utility class that helps to consume multiple mailboxes in a blocking manner by a single thread.
+ *
+ * The reader entry point is {@link #readBlockBlocking()} which will block until some of the mailboxes is ready to be
+ * read. The method is blocking and will return the next block to be consumed. This method is designed to be called by
+ * a single thread we call the consumer thread.
+ *
+ * All other methods but the ones specifically specified can only be called by the consumer thread.
+ * @param <E>
+ */
 public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiStreamConsumer.class);
   private final Object _id;
@@ -61,54 +71,105 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     _lastRead = _mailboxes.size() - 1;
   }
 
-  /// This method is called to test if an element is considered an error.
+  /**
+   * Returns whether the element is considered an error element or not.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract boolean isError(E element);
 
-  /// This method is called to test if an element is considered a success.
+  /**
+   * Returns whether the element is considered a successful end of stream element or not.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract boolean isSuccess(E element);
 
   /**
-   * This method is called whenever one of the consumer sends a successful EOS.
+   * This method is called whenever a {@link #isSuccess(Object) successful EOS} is read from one of the mailboxes.
+   *
    * It is guaranteed that the received element is an EOS as defined by {@link #isSuccess(Object)}.
-   * No more messages from that consumer are going to be read.
+   * No more messages are going to be read from that mailbox.
+   *
+   * This method is called by the consumer thread.
    */
   protected abstract void onMailboxSuccess(E element);
 
-  /// This method is called when a timeout is found processing the mailboxes.
+  /**
+   * This method is called whenever a timeout is reached while reading an element.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onTimeout();
 
-  /// This method is called when an exception different to a timeout is found processing the mailboxes.
+  /**
+   * This method is called whenever an exception (other than timeout) is thrown while reading an element.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onException(Exception e);
 
-  /// This method is called when all mailboxes have been successfully consumed.
+  /**
+   * This method is called whenever all mailboxes emitted EOS.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onSuccess();
 
-  /// This method is called when an error is found in any of the mailboxes.
-  /// After this method is called no more messages are going to be read from the mailboxes.
+  /**
+   * This method is called when an error is found in any of the mailboxes.
+   *
+   * After this method is called no more messages are going to be read from the mailboxes.
+   */
   protected abstract void onError(E element);
 
+  /**
+   * This method must be called when the consumer is not going to read anymore from the mailboxes.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   @Override
   public void close() {
     cancelRemainingMailboxes();
   }
 
+  /**
+   * This method is called whenever the consumer is cancelled.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   public void cancel(Throwable t) {
     cancelRemainingMailboxes();
   }
 
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * This method is called by the consumer thread.
+   */
   public void earlyTerminate() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.earlyTerminate();
     }
   }
 
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   protected void cancelRemainingMailboxes() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.cancel();
     }
   }
 
-  public void onData() {
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * <strong>This method can be called by any thread</strong>, although it is expected to be called by producer threads.
+   */
+  protected void onData() {
     if (_newDataReady.offer(Boolean.TRUE)) {
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace("New data notification delivered on " + _id + ". " + System.identityHashCode(_newDataReady));
@@ -132,7 +193,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    * Right now the implementation tries to be fair. If one call returned the block from mailbox {@code i}, then next
    * call will look for mailbox {@code i+1}, {@code i+2}... in a circular manner.
    *
-   * In order to unblock a thread blocked here, {@link #onData()} should be called.   *
+   * In order to unblock a thread blocked here, {@link #onData()} should be called.
+   *
+   * This method is called by the consumer thread.
    */
   public E readBlockBlocking() {
     if (LOGGER.isTraceEnabled()) {
@@ -275,11 +338,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// block and then call [#calculateStats()] to get the stats once the stream finishes.
   public static class OfMseBlock extends BlockingMultiStreamConsumer<ReceivingMailbox.MseBlockWithStats> {
 
-    private final MultiStageQueryStats _stats;
+    private final int _stageId;
+    @Nullable
+    private MultiStageQueryStats _stats;
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers) {
       super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
@@ -295,22 +361,31 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected void onMailboxSuccess(ReceivingMailbox.MseBlockWithStats element) {
-      synchronized (_stats) {
-        _stats.mergeUpstream(element.getSerializedStats());
-      }
+      mergeStats(element);
     }
 
     @Override
     protected void onError(ReceivingMailbox.MseBlockWithStats element) {
-      synchronized (_stats) {
-        _stats.mergeUpstream(element.getSerializedStats());
+      mergeStats(element);
+    }
+
+    private void mergeStats(ReceivingMailbox.MseBlockWithStats element) {
+      try {
+        MultiStageQueryStats stats = _stats;
+        if (_stats != null) {
+          stats.mergeUpstream(element.getSerializedStats(), true);
+        }
+      } catch (Exception e) {
+        // If there is any error merging stats, continue without them
+        LOGGER.warn("Error merging stats", e);
+        _stats = null;
       }
     }
 
     @Override
     protected ReceivingMailbox.MseBlockWithStats onTimeout() {
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Timed out on stage " + _stats.getCurrentStageId() + " waiting for data sent by a child stage";
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
       // - The trace is not useful (the log message is good enough to find where we failed)
@@ -323,7 +398,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected ReceivingMailbox.MseBlockWithStats onException(Exception e) {
       // TODO: Add the sender stage id to the error message
-      String errMsg = "Found an error on stage " + _stats.getCurrentStageId() + " while reading from a child stage";
+      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
@@ -333,8 +408,10 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     private ReceivingMailbox.MseBlockWithStats onException(QueryErrorCode code, String errMsg) {
       List<DataBuffer> serializedStats;
       try {
-        synchronized (_stats) {
+        if (_stats != null) {
           serializedStats = _stats.serialize();
+        } else {
+          serializedStats = Collections.emptyList();
         }
       } catch (IOException ioEx) {
         LOGGER.warn("Could not serialize stats", ioEx);
@@ -350,9 +427,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
 
     public MultiStageQueryStats calculateStats() {
-      synchronized (_stats) {
-        return MultiStageQueryStats.copy(_stats);
+      MultiStageQueryStats stats = _stats;
+      if (_stats == null) { // possible in case of error
+        stats = MultiStageQueryStats.emptyStats(_stageId);
       }
+      return MultiStageQueryStats.copy(stats);
     }
 
     /// Reads the next block for any ready mailbox or blocks until some of them is ready.

@@ -203,14 +203,26 @@ public class MultiStageQueryStats {
 
   /**
    * Merge upstream stats from another MultiStageQueryStats object into this one.
+   *
+   * This method is equivalent to calling {@link #mergeUpstream(MultiStageQueryStats, boolean)} with bubbleUp set to
+   * false.
+   */
+  public void mergeUpstream(MultiStageQueryStats otherStats) {
+    mergeUpstream(otherStats, false);
+  }
+
+  /**
+   * Merge upstream stats from another MultiStageQueryStats object into this one.
    * <p>
    * Only the stages whose id is higher than the current one are merged. The reason to do so is that upstream stats
    * should be already closed while current stage may need some extra tuning.
    * <p>
    * For example set operations may need to merge the stats from all its upstreams before concatenating stats of the
    * current stage.
+   *
+   * @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
    */
-  public void mergeUpstream(MultiStageQueryStats otherStats) {
+  public void mergeUpstream(MultiStageQueryStats otherStats, boolean bubbleUp) {
     Preconditions.checkArgument(_currentStageId <= otherStats._currentStageId,
         "Cannot merge stats from early stage %s into stats of later stage %s",
         otherStats._currentStageId, _currentStageId);
@@ -244,12 +256,28 @@ public class MultiStageQueryStats {
           myStats.merge(otherStatsForStage);
         }
       } catch (IllegalArgumentException | IllegalStateException ex) {
+        if (bubbleUp) {
+          throw ex;
+        }
         LOGGER.warn("Error merging stats on stage {}. Ignoring the new stats", i, ex);
       }
     }
   }
 
+  /**
+   * Merge upstream stats from a list of DataBuffer objects into this one.
+   *
+   * This method is equivalent to calling {@link #mergeUpstream(List, boolean)} with bubbleUp set to false.
+   */
   public void mergeUpstream(List<DataBuffer> otherStats) {
+    mergeUpstream(otherStats, false);
+  }
+
+  /**
+   * Merge upstream stats from a list of DataBuffer objects into this one.
+   * @param bubbleUp true if and only if runtime exceptions should be thrown when merging stats.
+   */
+  public void mergeUpstream(List<DataBuffer> otherStats, boolean bubbleUp) {
     for (int i = 0; i <= _currentStageId && i < otherStats.size(); i++) {
       if (otherStats.get(i) != null) {
         throw new IllegalArgumentException("Cannot merge stats from early stage " + i + " into stats of "
@@ -271,8 +299,14 @@ public class MultiStageQueryStats {
             myStats.merge(dis);
           }
         } catch (IOException ex) {
+          if (bubbleUp) {
+            throw new RuntimeException("Error merging stats on stage " + i, ex);
+          }
           LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
         } catch (IllegalArgumentException | IllegalStateException ex) {
+          if (bubbleUp) {
+            throw ex;
+          }
           LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
         }
       }
@@ -417,6 +451,10 @@ public class MultiStageQueryStats {
       return _operatorStats.size() - 1;
     }
 
+    public boolean isEmpty() {
+      return _operatorTypes.isEmpty();
+    }
+
     public void forEach(BiConsumer<MultiStageOperator.Type, StatMap<?>> consumer) {
       Iterator<MultiStageOperator.Type> typeIterator = _operatorTypes.iterator();
       Iterator<StatMap<?>> statIterator = _operatorStats.iterator();
@@ -527,10 +565,10 @@ public class MultiStageQueryStats {
             throw new IOException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
           } catch (Exception e) {
-            throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
+            throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
                 + _operatorTypes + " operators, got " + numOperators, e);
           }
-          throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
+          throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
               + _operatorTypes + " operators, got " + deserialized._operatorTypes
               + ". Deserialized stats: " + deserialized);
         }

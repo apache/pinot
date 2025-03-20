@@ -860,6 +860,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     updated |= HelixHelper.addDefaultTags(instanceConfig,
         () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }

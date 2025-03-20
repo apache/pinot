@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -36,7 +37,10 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -50,8 +54,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MailboxReceiveOperatorTest {
@@ -234,6 +237,43 @@ public class MailboxReceiveOperatorTest {
       // Assure that early terminate signal goes into each mailbox
       verify(_mailbox1).earlyTerminate();
       verify(_mailbox2).earlyTerminate();
+    }
+  }
+
+  @Test
+  public void differentUpstreamStatsProduceEmptyStats()
+      throws IOException {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    List<DataBuffer> stats1 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+                .close())
+        .build()
+        .serialize();
+    ReceivingMailbox.MseBlockWithStats block1 = OperatorTestUtil.eosWithStats(stats1);
+    when(_mailbox1.poll()).thenReturn(block1);
+
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    List<DataBuffer> stats2 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+                .close())
+        .build()
+        .serialize();
+    ReceivingMailbox.MseBlockWithStats block2 = OperatorTestUtil.eosWithStats(stats2);
+    when(_mailbox2.poll()).thenReturn(block2);
+
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.SINGLETON)) {
+      while (!operator.nextBlock().isEos()) {
+        // drain
+      }
+
+      MultiStageQueryStats stats = operator.calculateStats();
+      MultiStageQueryStats.StageStats.Closed upstreamStats = stats.getUpstreamStageStats(1);
+      assertNull(upstreamStats, "Upstream stats should be null in case of error merging stats");
     }
   }
 

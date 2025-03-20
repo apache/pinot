@@ -197,7 +197,7 @@ public class MailboxSendOperatorTest {
     StageMetadata stageMetadata = new StageMetadata(SENDER_STAGE_ID, List.of(workerMetadata), Map.of());
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, Map.of(), stageMetadata, workerMetadata,
-            null, null);
+            null, null, true);
     return new MailboxSendOperator(context, _input, statMap -> _exchange);
   }
 

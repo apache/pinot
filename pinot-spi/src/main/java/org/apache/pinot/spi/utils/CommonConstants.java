@@ -205,6 +205,7 @@ public class CommonConstants {
       public static final String MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY = "queryMailboxPort";
 
       public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
+      public static final String PINOT_VERSION_KEY = "pinotVersion";
     }
 
     public static final String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -1474,6 +1475,23 @@ public class CommonConstants {
      */
     public static final String KEY_OF_MAX_ROWS_IN_JOIN = "pinot.query.join.max.rows";
     public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
+
+    /// Specifies the send stats mode used in MSE.
+    ///
+    /// Valid values are (in lower or upper case):
+    /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
+    /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
+    /// - "NEVER": MSE will never send stats.
+    ///
+    /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
+    /// 1. Some queries using intersection generate incorrect stats
+    /// 2. When stats from other nodes are sent but are different from expected, the query fails.
+    ///
+    /// In 1.4.0 the first issue is solved and instead of failing when unexpected stats are received, the query
+    /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
+    /// running 1.3.0 may fail, which breaks backward compatibility.
+    public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
+    public static final String DEFAULT_SEND_STATS_MODE = "safe";
 
     public enum JoinOverFlowMode {
       THROW, BREAK

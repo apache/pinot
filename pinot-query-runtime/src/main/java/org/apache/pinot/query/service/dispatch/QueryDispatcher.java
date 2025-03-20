@@ -497,7 +497,7 @@ public class QueryDispatcher {
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext);
+            workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = receiveNode.getDataSchema();

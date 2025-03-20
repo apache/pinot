@@ -204,7 +204,11 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       MseBlock block = _input.nextBlock();
       if (block.isEos()) {
-        sendEos((MseBlock.Eos) block);
+        if (_context.isSendStats()) {
+          sendEos((MseBlock.Eos) block);
+        } else {
+          sendEos(SuccessMseBlock.INSTANCE);
+        }
       } else {
         if (sendMseBlock(((MseBlock.Data) block))) {
           earlyTerminate();
