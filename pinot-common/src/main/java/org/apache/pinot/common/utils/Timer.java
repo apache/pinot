@@ -45,7 +45,7 @@ public class Timer {
    */
   public long getRemainingTimeMs() {
     long remainingNs = _deadlineNs - _clock.nanos();
-    return Math.max(remainingNs / 1000, 0);
+    return Math.max(remainingNs / 1_000_000, 0);
   }
 
   /**
