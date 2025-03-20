@@ -106,7 +106,7 @@ private[pinot] object PinotClusterClient extends Logging {
       // pinot converts the given table name to the offline table name automatically
       val uri = new URI(String.format(TIME_BOUNDARY_TEMPLATE, brokerUrl, rawTableName))
       val response = HttpUtils.sendGetRequest(uri)
-      decodeTo(response, classOf[TimeBoundaryInfo]) // Updated to use the new decodeTo function
+      decodeTo(response, classOf[TimeBoundaryInfo])
     } match {
       case Success(decodedResponse) =>
         logDebug(s"Received time boundary for table $tableName, $decodedResponse")
@@ -203,7 +203,6 @@ private[pinot] object PinotClusterClient extends Logging {
       val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedSqlQueryParam))
       val response = HttpUtils.sendGetRequest(uri)
 
-      // Use the updated decodeTo function with Jackson
       decodeTo(response, classOf[Map[String, List[String]]])
     } match {
       case Success(decodedResponse) =>
