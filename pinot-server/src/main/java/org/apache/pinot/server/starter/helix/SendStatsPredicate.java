@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.helix.NotificationContext;
@@ -28,6 +30,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,14 +44,14 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
     String modeStr = configuration.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE,
         CommonConstants.MultiStageQueryRunner.DEFAULT_SEND_STATS_MODE).toUpperCase(Locale.ENGLISH);
-    for (Mode mode : Mode.values()) {
-      if (mode.name().equals(modeStr)) {
-        return mode.create();
-      }
+    Mode mode;
+    try {
+      mode = Mode.valueOf(modeStr.trim().toUpperCase(Locale.ENGLISH));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid value " + modeStr + " for "
+          + CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE, e);
     }
-
-    throw new IllegalStateException("Invalid value " + modeStr + " for "
-        + CommonConstants.MultiStageQueryRunner.KEY_OF_SEND_STATS_MODE);
+    return mode.create();
   }
 
   public enum Mode {
@@ -104,25 +107,28 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
 
     @Override
     public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-      boolean sendStats = true;
-      // TODO: Right now we read all configs, while only broker and servers are actually important
-      //  But it isn't clear how to detect for sure that an instance config belongs to a broker or server
+      Map<String, String> problematicVersionsById = new HashMap<>();
       for (InstanceConfig instanceConfig : instanceConfigs) {
-        String otherVersion = instanceConfig.getRecord()
-            .getStringField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, null);
-        if (otherVersion == null || otherVersion.equals(PinotVersion.UNKNOWN)) {
-          LOGGER.warn("Instance {} does not have version", instanceConfig.getInstanceName());
-          continue;
-        }
-        if (isProblematicVersion(otherVersion)) {
-          LOGGER.info("Found problematic version {} on instance {}. Stats may not be recognized", otherVersion,
-              instanceConfig.getInstanceName());
-          sendStats = false;
-          break;
+        switch (InstanceTypeUtils.getInstanceType(instanceConfig.getInstanceName())) {
+          case BROKER:
+          case SERVER:
+            String otherVersion = instanceConfig.getRecord()
+                .getStringField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, null);
+            if (isProblematicVersion(otherVersion)) {
+              problematicVersionsById.put(instanceConfig.getInstanceName(), otherVersion);
+            }
+            break;
+          default:
+            continue;
         }
       }
+      boolean sendStats = problematicVersionsById.isEmpty();
       if (_sendStats.getAndSet(sendStats) != sendStats) {
-        LOGGER.warn("Send MSE stats is now {}", sendStats ? "enabled" : "disabled");
+        if (sendStats) {
+          LOGGER.warn("Send MSE stats is now enabled");
+        } else {
+          LOGGER.warn("Send MSE stats is now disabled (problematic versions: {})", problematicVersionsById);
+        }
       }
     }
 
@@ -135,6 +141,9 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         return true;
       }
       if (versionStr.equals(PinotVersion.UNKNOWN)) {
+        return true;
+      }
+      if (versionStr.equals(PinotVersion.VERSION)) {
         return true;
       }
       // Lets try to parse 1.x versions
