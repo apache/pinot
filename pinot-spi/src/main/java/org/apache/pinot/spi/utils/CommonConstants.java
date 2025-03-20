@@ -1478,10 +1478,10 @@ public class CommonConstants {
 
     /// Specifies the send stats mode used in MSE.
     ///
-    /// Valid values are:
-    /// - "safe": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
-    /// - "always": MSE will always send stats, regardless of the version of the instances in the cluster.
-    /// - "never": MSE will never send stats.
+    /// Valid values are (in lower or upper case):
+    /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
+    /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
+    /// - "NEVER": MSE will never send stats.
     ///
     /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
     /// 1. Some queries using intersection generate incorrect stats
