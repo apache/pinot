@@ -73,14 +73,6 @@ public class SemaphoreAccessCoordinator {
     String segmentName = llcSegmentName.getSegmentName();
 
     if (_enforceConsumptionInOrder) {
-      // current table state of server needs to be equal to ideal state.
-      // because consumption in order required prev segment to be loaded.
-      if (!_realtimeTableDataManager.getIsTableReadyToConsumeData().getAsBoolean()) {
-        LOGGER.warn("Waiting for table to be in ready state for segment: {}", segmentName);
-        // TODO: Fix bug where server keeps on waiting on waitUntilTableIsReady when the latest offline -> consuming
-        //  helix transition segment turns online.
-        waitUntilTableIsReady();
-      }
       waitForPrevSegment(llcSegmentName);
     }
 
