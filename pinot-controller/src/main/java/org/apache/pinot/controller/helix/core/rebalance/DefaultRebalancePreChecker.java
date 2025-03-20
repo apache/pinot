@@ -65,9 +65,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   @Override
   public Map<String, RebalancePreCheckerResult> check(PreCheckContext preCheckContext) {
-    String rebalanceJobId = preCheckContext._rebalanceJobId;
-    String tableNameWithType = preCheckContext._tableNameWithType;
-    TableConfig tableConfig = preCheckContext._tableConfig;
+    String rebalanceJobId = preCheckContext.getRebalanceJobId();
+    String tableNameWithType = preCheckContext.getTableNameWithType();
+    TableConfig tableConfig = preCheckContext.getTableConfig();
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
@@ -79,13 +79,13 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     // Check if all servers involved in the rebalance have enough disk space for rebalance operation.
     // Notice this check could have false positives (disk utilization is subject to change by other operations anytime)
     preCheckResult.put(DISK_UTILIZATION_DURING_REBALANCE,
-        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
-            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, true));
+        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
+            preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, true));
     // Check if all servers involved in the rebalance will have enough disk space after the rebalance.
     // TODO: give this check a separate threshold other than the disk utilization threshold
     preCheckResult.put(DISK_UTILIZATION_AFTER_REBALANCE,
-        checkDiskUtilization(preCheckContext._currentAssignment, preCheckContext._targetAssignment,
-            preCheckContext._tableSubTypeSizeDetails, _diskUtilizationThreshold, false));
+        checkDiskUtilization(preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment(),
+            preCheckContext.getTableSubTypeSizeDetails(), _diskUtilizationThreshold, false));
 
     LOGGER.info("End pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
     return preCheckResult;
