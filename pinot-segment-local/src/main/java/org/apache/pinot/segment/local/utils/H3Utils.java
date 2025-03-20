@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.uber.h3core.H3CoreV3;
+import com.uber.h3core.H3Core;
 import com.uber.h3core.util.LatLng;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -41,11 +39,11 @@ public class H3Utils {
   private H3Utils() {
   }
 
-  public static final H3CoreV3 H3_CORE;
+  public static final H3Core H3_CORE;
 
   static {
     try {
-      H3_CORE = H3CoreV3.newInstance();
+      H3_CORE = H3Core.newInstance();
     } catch (IOException e) {
       throw new RuntimeException("Failed to instantiate H3 V3 instance", e);
     }
@@ -60,14 +58,14 @@ public class H3Utils {
     if (numEndPoints == 0) {
       return LongSets.EMPTY_SET;
     }
-    long previousCell = H3_CORE.geoToH3(endPoints[0].y, endPoints[0].x, resolution);
+    long previousCell = H3_CORE.latLngToCell(endPoints[0].y, endPoints[0].x, resolution);
     if (numEndPoints == 1) {
       return LongSets.singleton(previousCell);
     }
     LongSet coveringCells = new LongOpenHashSet();
     for (int i = 1; i < numEndPoints; i++) {
-      long currentCell = H3_CORE.geoToH3(endPoints[i].y, endPoints[i].x, resolution);
-      coveringCells.addAll(H3_CORE.h3Line(previousCell, currentCell));
+      long currentCell = H3_CORE.latLngToCell(endPoints[i].y, endPoints[i].x, resolution);
+      coveringCells.addAll(H3_CORE.gridPathCells(previousCell, currentCell));
       previousCell = currentCell;
     }
     return coveringCells;
@@ -79,9 +77,12 @@ public class H3Utils {
   private static Pair<LongSet, LongSet> coverPolygonInH3(Polygon polygon, int resolution) {
     // TODO: this can be further optimized to use native H3 implementation. They have plan to support natively.
     // https://github.com/apache/pinot/issues/8547
-    List<Long> polyfillCells = H3_CORE.polyfill(Arrays.stream(polygon.getExteriorRing().getCoordinates())
-            .map(coordinate -> new LatLng(coordinate.y, coordinate.x)).collect(Collectors.toList()),
-        Collections.emptyList(), resolution);
+    Coordinate[] coordinates = polygon.getExteriorRing().getCoordinates();
+    List<LatLng> points = new ArrayList<>(coordinates.length);
+    for (Coordinate coordinate : coordinates) {
+      points.add(new LatLng(coordinate.y, coordinate.x));
+    }
+    List<Long> polyfillCells = H3_CORE.polygonToCells(points, List.of(), resolution);
     if (polyfillCells.isEmpty()) {
       // If the polyfill cells are empty, meaning the polygon might be smaller than a single cell in the H3 system.
       // So just get whatever one. here choose the first one. the follow up kRing(firstCell, 1) will cover the whole
@@ -89,7 +90,7 @@ public class H3Utils {
       // ref: https://github.com/uber/h3/issues/456#issuecomment-827760163
       Coordinate represent = polygon.getCoordinate();
       return Pair.of(LongSets.EMPTY_SET,
-          new LongOpenHashSet(H3_CORE.kRing(H3_CORE.geoToH3(represent.y, represent.x, resolution), 1)));
+          new LongOpenHashSet(H3_CORE.gridDisk(H3_CORE.latLngToCell(represent.y, represent.x, resolution), 1)));
     }
 
     LongSet fullyCoveredCells = new LongOpenHashSet();
@@ -98,17 +99,22 @@ public class H3Utils {
       if (polygon.contains(createPolygonFromH3Cell(cell))) {
         fullyCoveredCells.add(cell);
       }
-      potentiallyCoveredCells.addAll(H3_CORE.kRing(cell, 1));
+      potentiallyCoveredCells.addAll(H3_CORE.gridDisk(cell, 1));
     }
     potentiallyCoveredCells.removeAll(fullyCoveredCells);
     return Pair.of(fullyCoveredCells, potentiallyCoveredCells);
   }
 
   private static Polygon createPolygonFromH3Cell(long h3Cell) {
-    List<LatLng> boundary = H3_CORE.h3ToGeoBoundary(h3Cell);
-    boundary.add(boundary.get(0));
-    return GeometryUtils.GEOMETRY_FACTORY.createPolygon(
-        boundary.stream().map(geoCoord -> new Coordinate(geoCoord.lng, geoCoord.lat)).toArray(Coordinate[]::new));
+    List<LatLng> boundary = H3_CORE.cellToBoundary(h3Cell);
+    int numVertices = boundary.size();
+    Coordinate[] coordinates = new Coordinate[numVertices + 1];
+    for (int i = 0; i < numVertices; i++) {
+      LatLng vertex = boundary.get(i);
+      coordinates[i] = new Coordinate(vertex.lng, vertex.lat);
+    }
+    coordinates[numVertices] = coordinates[0];
+    return GeometryUtils.GEOMETRY_FACTORY.createPolygon(coordinates);
   }
 
   /**
@@ -117,7 +123,7 @@ public class H3Utils {
   public static Pair<LongSet, LongSet> coverGeometryInH3(Geometry geometry, int resolution) {
     if (geometry instanceof Point) {
       return Pair.of(LongSets.EMPTY_SET,
-          LongSets.singleton(H3_CORE.geoToH3(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution)));
+          LongSets.singleton(H3_CORE.latLngToCell(geometry.getCoordinate().y, geometry.getCoordinate().x, resolution)));
     } else if (geometry instanceof LineString) {
       return Pair.of(LongSets.EMPTY_SET, coverLineInH3(((LineString) geometry), resolution));
     } else if (geometry instanceof Polygon) {

@@ -24,9 +24,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.memory.Memory;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -248,6 +250,17 @@ public class FrequentLongsSketchAggregationFunction
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(LongsSketch longsSketch) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FrequentLongsSketch.getValue(),
+        ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.serialize(longsSketch));
+  }
+
+  @Override
+  public LongsSketch deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FREQUENT_LONGS_SKETCH_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

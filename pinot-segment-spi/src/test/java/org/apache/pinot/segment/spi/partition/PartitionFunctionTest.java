@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -89,17 +90,22 @@ public class PartitionFunctionTest {
    */
   @Test
   public void testMurmurPartitioner() {
+    // Both Murmur and Murmur2 are aliases for MurmurPartitionFunction
+    testMurmurPartitioner("mUrmur");
+    testMurmurPartitioner("mUrMuR2");
+  }
+
+  private void testMurmurPartitioner(String functionName) {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {
       int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
 
-      String functionName = "mUrmur";
       PartitionFunction partitionFunction =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
 
-      testBasicProperties(partitionFunction, functionName, numPartitions);
+      testBasicProperties(partitionFunction, "murmur", numPartitions);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
@@ -383,15 +389,15 @@ public class PartitionFunctionTest {
   }
 
   /**
-   * Tests the equivalence of org.apache.kafka.common.utils.Utils::murmur2 and
+   * Tests the equivalence of org.apache.kafka.common.utils.Utils::murmurHash2 and
    * {@link MurmurPartitionFunction#getPartition}
-   * Our implementation of murmur2 has been copied over from Utils::murmur2
+   * Our implementation of murmurHash2 has been copied over from Utils::murmurHash2
    */
   @Test
   public void testMurmurEquivalence() {
 
     // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied org.apache.kafka.common.utils.Utils::murmur2 to those values and stored in expectedMurmurValues
+    // Applied org.apache.kafka.common.utils.Utils::murmurHash2 to those values and stored in expectedMurmurValues
     int[] expectedMurmurValues = new int[]{
         -1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453, 1819695080,
         -931669296
@@ -401,12 +407,12 @@ public class PartitionFunctionTest {
     Random random = new Random(seed);
 
     // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
-    // Apply {@link MurmurPartitionFunction::murmur2
+    // Apply {@link MurmurPartitionFunction::murmurHash2
     // compare with stored results
     byte[] bytes = new byte[7];
     for (int expectedMurmurValue : expectedMurmurValues) {
       random.nextBytes(bytes);
-      assertEquals(MurmurPartitionFunction.murmur2(bytes), expectedMurmurValue);
+      assertEquals(MurmurHashFunctions.murmurHash2(bytes), expectedMurmurValue);
     }
   }
 
@@ -419,8 +425,8 @@ public class PartitionFunctionTest {
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding
-    // {@MurmurPartitionFunction::murmur2} with org
-    // .apache.kafka.common.utils.Utils::murmur2
+    // {@MurmurPartitionFunction::murmurHash2} with org
+    // .apache.kafka.common.utils.Utils::murmurHash2
     // stored the results in expectedPartitions
     int[] expectedPartitions = new int[]{1, 4, 4, 1, 1, 2, 0, 4, 2, 3};
 
@@ -549,8 +555,8 @@ public class PartitionFunctionTest {
     for (int expectedHashValue : expectedHashValues) {
       random.nextBytes(bytes);
       String nextString = new String(bytes, UTF_8);
-      int actualHashValue = useX64 ? Murmur3PartitionFunction.murmur3Hash32BitsX64(nextString, hashSeed)
-          : Murmur3PartitionFunction.murmur3Hash32BitsX86(bytes, hashSeed);
+      int actualHashValue = useX64 ? MurmurHashFunctions.murmurHash3X64Bit32(nextString, hashSeed)
+          : MurmurHashFunctions.murmurHash3X86Bit32(bytes, hashSeed);
       assertEquals(actualHashValue, expectedHashValue);
     }
   }

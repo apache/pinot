@@ -67,7 +67,12 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /**
    * The queue size of ServerRoutingStatsManager main executor service.
    */
-  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true);
+  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
+
+  /**
+   * The estimated number of query server threads for all currently running multi-stage queries.
+   */
+  ESTIMATED_MSE_SERVER_THREADS("number", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

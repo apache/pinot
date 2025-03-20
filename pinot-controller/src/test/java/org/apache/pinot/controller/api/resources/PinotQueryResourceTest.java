@@ -19,11 +19,11 @@
 package org.apache.pinot.controller.api.resources;
 
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.AdditionalAnswers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -63,14 +63,14 @@ public class PinotQueryResourceTest {
   public void testV2QueryOnV1() {
     String response =
         _pinotQueryResource.handleGetSql("WITH tmp AS (SELECT * FROM a) SELECT * FROM tmp", null, null, null);
-    Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
+    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())));
     Assert.assertTrue(response.contains("retry the query using the multi-stage query engine"));
   }
 
   @Test
   public void testInvalidQuery() {
     String response = _pinotQueryResource.handleGetSql("INVALID QUERY", null, null, null);
-    Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
+    Assert.assertTrue(response.contains(String.valueOf(QueryErrorCode.SQL_PARSING.getId())));
     Assert.assertFalse(response.contains("retry the query using the multi-stage query engine"));
   }
 }

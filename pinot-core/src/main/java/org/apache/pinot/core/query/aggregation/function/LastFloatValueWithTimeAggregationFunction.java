@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -98,6 +99,17 @@ public class LastFloatValueWithTimeAggregationFunction extends LastWithTimeAggre
   @Override
   public String getResultColumnName() {
     return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'FLOAT')";
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Float> floatLongPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatLongPair.getValue(),
+        ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.serialize((FloatLongPair) floatLongPair));
+  }
+
+  @Override
+  public ValueLongPair<Float> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

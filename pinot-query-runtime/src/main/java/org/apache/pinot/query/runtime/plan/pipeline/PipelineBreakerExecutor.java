@@ -68,8 +68,6 @@ public class PipelineBreakerExecutor {
    * @param workerMetadata worker metadata for the current worker.
    * @param stagePlan the distributed stage plan to run pipeline breaker on.
    * @param opChainMetadata request metadata, including query options
-   * @param requestId request ID
-   * @param deadlineMs execution deadline
    * @param parentContext Parent thread metadata
    * @return pipeline breaker result;
    *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.

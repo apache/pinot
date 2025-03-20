@@ -34,16 +34,17 @@ import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-
 
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
  * {@link org.apache.pinot.common.proto.Mailbox}.
  */
+@SuppressWarnings("rawtypes")
 public class TransferableBlock implements Block {
   private final DataBlock.Type _type;
   @Nullable
@@ -56,12 +57,21 @@ public class TransferableBlock implements Block {
   @Nullable
   private final MultiStageQueryStats _queryStats;
 
+  @Nullable
+  private AggregationFunction[] _aggFunctions;
+
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type type) {
+    this(container, dataSchema, type, null);
+  }
+
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type type,
+      @Nullable AggregationFunction[] aggFunctions) {
     _container = container;
     _dataSchema = dataSchema;
     Preconditions.checkArgument(type == DataBlock.Type.ROW || type == DataBlock.Type.COLUMNAR,
         "Container cannot be used to construct block of type: %s", type);
     _type = type;
+    _aggFunctions = aggFunctions;
     _numRows = _container.size();
     // NOTE: Use assert to avoid breaking production code.
     assert _numRows > 0 : "Container should not be empty";
@@ -91,7 +101,7 @@ public class TransferableBlock implements Block {
     if (isSuccessfulEndOfStreamBlock()) {
       List<DataBuffer> statsByStage;
       if (_dataBlock instanceof MetadataBlock) {
-        statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
+        statsByStage = _dataBlock.getStatsByStage();
         if (statsByStage == null) {
           return new ArrayList<>();
         }
@@ -172,10 +182,10 @@ public class TransferableBlock implements Block {
       try {
         switch (_type) {
           case ROW:
-            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema, _aggFunctions);
             break;
           case COLUMNAR:
-            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
+            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema, _aggFunctions);
             break;
           case METADATA:
             _dataBlock = new MetadataBlock(getSerializedStatsByStage());
@@ -205,6 +215,11 @@ public class TransferableBlock implements Block {
    */
   public DataBlock.Type getType() {
     return _type;
+  }
+
+  @Nullable
+  public AggregationFunction[] getAggFunctions() {
+    return _aggFunctions;
   }
 
   /**

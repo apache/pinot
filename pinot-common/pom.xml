@@ -287,10 +287,6 @@
       <artifactId>pinot-dropwizard</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>net.sourceforge.fmpp</groupId>
-      <artifactId>fmpp</artifactId>
-    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -410,8 +406,15 @@
                 </configuration>
               </execution>
             </executions>
+            <dependencies>
+              <dependency>
+                <groupId>net.sourceforge.fmpp</groupId>
+                <artifactId>fmpp</artifactId>
+                <version>0.9.16</version>
+              </dependency>
+            </dependencies>
           </plugin>
-          <plugin> <!-- Enforce javacc-maven-plugin executions after fmpp-maven-plugin -->
+          <plugin> <!-- Enforce javacc-maven-plugin executions after maven-antrun-plugin -->
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>javacc-maven-plugin</artifactId>
           </plugin>

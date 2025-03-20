@@ -48,6 +48,7 @@ import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -67,6 +68,8 @@ public class InstanceResource {
   private String _instanceId;
   @Inject
   private HelixManager _helixManager;
+  @Inject
+  private ServerInstance _serverInstance;
 
   @GET
   @Path("tags")
@@ -110,13 +113,15 @@ public class InstanceResource {
   @ApiOperation(value = "Show disk utilization", notes = "Disk capacity and usage shown in bytes")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 400, message = "Bad Request – Invalid disk utilization path in header")
+      @ApiResponse(code = 500, message = "Internal Server Error – Invalid disk utilization path in header")
   })
   public String getDiskUsageInfo(@Context HttpHeaders headers)
       throws WebApplicationException, IOException {
-    String pathStr = headers.getHeaderString("diskUtilizationPath");
+    // Use the instance data directory as the path to compute disk usage. Note that the diskUtilizationPath passed in
+    // the header is ignored as of now.
+    String pathStr = _serverInstance.getInstanceDataManager().getInstanceDataDir();
     if (StringUtils.isEmpty(pathStr)) {
-      throw new WebApplicationException("Invalid disk utilization path in header", 400);
+      throw new WebApplicationException("Disk utilization path(instanceDataDir) was null or empty.", 500);
     }
     DiskUsageInfo diskUsageInfo = DiskUtilization.computeDiskUsage(_instanceId, pathStr);
     return ResourceUtils.convertToJsonString(diskUsageInfo);
