@@ -38,10 +38,9 @@ class PinotDataSource extends TableProvider with DataSourceRegister {
     val readParameters = PinotDataSourceReadOptions.from(options)
     val tableName = readParameters.tableName
     val controller = readParameters.controller
-    val authorization = readParameters.authorization
 
     val pinotTableSchema =
-      PinotClusterClient.getTableSchema(controller, tableName, authorization)
+      PinotClusterClient.getTableSchema(controller, tableName)
     DataExtractor.pinotSchemaToSparkSchema(pinotTableSchema)
   }
 

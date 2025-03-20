@@ -51,7 +51,7 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         useGrpcServer = false,
         Set("a=1", "b=2"),
         failOnInvalidSegments = false,
-        authorization = ""
+        apiToken = ""
       )
 
     pinotDataSourceReadOptions shouldEqual expected
