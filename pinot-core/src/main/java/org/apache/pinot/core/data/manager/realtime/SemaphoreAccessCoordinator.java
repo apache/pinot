@@ -1,14 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
- * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
- * License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
- * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.pinot.core.data.manager.realtime;
 
@@ -43,7 +49,7 @@ public class SemaphoreAccessCoordinator {
   @Nullable
   private Set<Integer> _segmentSequenceNumSet = null;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final AtomicBoolean isFirstTransitionSuccessful;
+  private final AtomicBoolean _isFirstTransitionSuccessful;
 
   public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
       RealtimeTableDataManager realtimeTableDataManager) {
@@ -58,7 +64,7 @@ public class SemaphoreAccessCoordinator {
     if (trackSegmentSeqNumber) {
       _segmentSequenceNumSet = new HashSet<>();
     }
-    isFirstTransitionSuccessful = new AtomicBoolean(false);
+    _isFirstTransitionSuccessful = new AtomicBoolean(false);
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -124,7 +130,7 @@ public class SemaphoreAccessCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
 
-    if ((_segmentSequenceNumSet == null) || (!isFirstTransitionSuccessful.get())) {
+    if ((_segmentSequenceNumSet == null) || (!_isFirstTransitionSuccessful.get())) {
       // if _segmentSequenceNumSet is null or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
       String previousSegment = getPreviousSegment(currSegment);
@@ -156,7 +162,7 @@ public class SemaphoreAccessCoordinator {
       // the first transition will always be prone to error, consider edge case where segment previous to current
       // helix transition's segment was deleted and this server came alive after successful deletion. the prev
       // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
-      isFirstTransitionSuccessful.compareAndSet(false, true);
+      _isFirstTransitionSuccessful.compareAndSet(false, true);
       return;
     }
 
