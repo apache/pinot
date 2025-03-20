@@ -516,11 +516,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
       //       Helix, then we can rely on the following CONSUMING -> ONLINE state transition to add it.
       _logger.warn("Segment: {} is already committed, skipping adding it as CONSUMING segment", segmentName);
-      if (_enforceConsumptionInOrder) {
-        LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-        Preconditions.checkNotNull(llcSegmentName);
-        getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId()).trackSegment(llcSegmentName);
-      }
       return;
     }
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
@@ -823,14 +818,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+    SegmentDataManager oldSegmentDataManager = super.registerSegment(segmentName, segmentDataManager);
     if (_enforceConsumptionInOrder) {
+      // helix threads might be waiting for their respective previous segments to be loaded.
+      // they need to be notified here.
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       Preconditions.checkNotNull(llcSegmentName);
       SemaphoreAccessCoordinator semaphoreAccessCoordinator =
           getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
       semaphoreAccessCoordinator.trackSegment(llcSegmentName);
     }
-    return super.registerSegment(segmentName, segmentDataManager);
+    return oldSegmentDataManager;
   }
 
   /**

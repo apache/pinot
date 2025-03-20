@@ -45,9 +45,9 @@ public class SemaphoreAccessCoordinator {
   private final boolean _enforceConsumptionInOrder;
   private final Condition _condition;
   private final Lock _lock;
-  private final Set<Integer> _segmentSequenceNumSet;
+  @Nullable
+  private Set<Integer> _segmentSequenceNumSet = null;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final boolean _relyOnIdealState;
 
   public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
       RealtimeTableDataManager realtimeTableDataManager) {
@@ -55,10 +55,13 @@ public class SemaphoreAccessCoordinator {
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
-    _segmentSequenceNumSet = new HashSet<>();
     _realtimeTableDataManager = realtimeTableDataManager;
     Preconditions.checkNotNull(_realtimeTableDataManager.getStreamIngestionConfig());
-    _relyOnIdealState = !_realtimeTableDataManager.getStreamIngestionConfig().isTrackSegmentSeqNumber();
+    boolean trackSegmentSeqNumber = _realtimeTableDataManager.getStreamIngestionConfig().isTrackSegmentSeqNumber();
+    // if trackSegmentSeqNumber is false, server relies on ideal state to fetch previous segment to a segment.
+    if (trackSegmentSeqNumber) {
+      _segmentSequenceNumSet = new HashSet<>();
+    }
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -67,8 +70,12 @@ public class SemaphoreAccessCoordinator {
     String segmentName = llcSegmentName.getSegmentName();
 
     if (_enforceConsumptionInOrder) {
+      // current table state of server needs to be equal to ideal state.
+      // because consumption in order required prev segment to be loaded.
       if (!_realtimeTableDataManager.getIsTableReadyToConsumeData().getAsBoolean()) {
         LOGGER.warn("Waiting for table to be in ready state for segment: {}", segmentName);
+        // TODO: Fix bug where server keeps on waiting on waitUntilTableIsReady when the latest offline -> consuming
+        //  helix transition segment turns online.
         waitUntilTableIsReady();
       }
       waitForPrevSegment(llcSegmentName);
@@ -79,6 +86,8 @@ public class SemaphoreAccessCoordinator {
       LOGGER.warn("Failed to acquire partitionGroup consumer semaphore in: {} ms. Retrying.",
           System.currentTimeMillis() - startTimeMs);
 
+      // if segment is marked online/offline by any instance, just return the current offline -> consuming
+      // transition.
       if (!isSegmentInProgress(segmentName)) {
         throw new SegmentAlreadyConsumedException("segment: " + segmentName + " status must be in progress");
       }
@@ -96,9 +105,10 @@ public class SemaphoreAccessCoordinator {
   public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      if (!_relyOnIdealState) {
+      if (_segmentSequenceNumSet != null) {
         _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
       }
+      // notify all helix threads waiting for their offline -> consuming segment to be loaded
       _condition.signalAll();
     } finally {
       _lock.unlock();
@@ -117,20 +127,27 @@ public class SemaphoreAccessCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
 
-    if (_relyOnIdealState) {
+    if (_segmentSequenceNumSet == null) {
+      // if _segmentSequenceNumSet is null, it means rely of ideal state to fetch previous segment.
       String previousSegment = getPreviousSegment(currSegment);
       if (previousSegment == null) {
+        // previous segment can only be null if either all the previous segments are deleted or this is the starting
+        // sequence segment of the partition Group.
         return;
       }
 
       SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
-      _lock.lock();
       try {
+        _lock.lock();
         while (segmentDataManager == null) {
+          // if segmentDataManager == null, it means segment is not loaded in the server.
+          // wait until it's loaded.
           while (!_condition.await(5, TimeUnit.MINUTES)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waiting on previous segment: {} since: {} ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
 
+            // if segment is marked online/offline by any instance, just return the current offline -> consuming
+            // transition.
             if (!isSegmentInProgress(currSegment.getSegmentName())) {
               throw new SegmentAlreadyConsumedException(
                   "segment: " + currSegment.getSegmentName() + " status must be in progress.");
@@ -152,11 +169,15 @@ public class SemaphoreAccessCoordinator {
     _lock.lock();
     try {
       while (!_segmentSequenceNumSet.contains(prevSeqNum)) {
+        // if _segmentSequenceNumSet does not contain prev segment's seq num, it means segment is not loaded in the
+        // server. Wait until it's loaded.
         while (!_condition.await(5, TimeUnit.MINUTES)) {
           LOGGER.warn("Semaphore access denied to segment: {}."
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
               prevSeqNum, System.currentTimeMillis() - startTimeMs);
 
+          // if segment is marked online/offline by any instance, just return the current offline -> consuming
+          // transition.
           if (!isSegmentInProgress(currSegment.getSegmentName())) {
             throw new SegmentAlreadyConsumedException(
                 "segment: " + currSegment.getSegmentName() + " status must be in progress.");
@@ -170,6 +191,8 @@ public class SemaphoreAccessCoordinator {
 
   @Nullable
   private String getPreviousSegment(LLCSegmentName currSegment) {
+    // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
+    // created before current segment
     int maxSequenceNumBelowCurrentSegment = -1;
     String previousSegment = null;
     int currPartitionGroupId = currSegment.getPartitionGroupId();
@@ -188,6 +211,9 @@ public class SemaphoreAccessCoordinator {
       Map<String, String> instanceStateMap = entry.getValue();
 
       if (!instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)) {
+        // if server is looking for previous segment to current transition's segment, it means the previous segment
+        // has to be online in any instance. If all previous segments are not online, we just allow the current helix
+        // transition to go ahead.
         continue;
       }
 
@@ -195,15 +221,18 @@ public class SemaphoreAccessCoordinator {
       Preconditions.checkNotNull(llcSegmentName);
 
       if (llcSegmentName.getPartitionGroupId() != currPartitionGroupId) {
+        // ignore segments of different partitions.
         continue;
       }
 
       if (llcSegmentName.getSequenceNumber() >= currSequenceNum) {
+        // ignore segments with higher sequence number than existing helix transition segment.
         continue;
       }
 
       if (llcSegmentName.getSequenceNumber() > maxSequenceNumBelowCurrentSegment) {
         maxSequenceNumBelowCurrentSegment = llcSegmentName.getSequenceNumber();
+        // also track the name of segment
         previousSegment = segmentName;
       }
     }

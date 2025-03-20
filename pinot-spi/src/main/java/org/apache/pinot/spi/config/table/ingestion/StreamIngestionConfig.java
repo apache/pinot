@@ -47,7 +47,7 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   private boolean _enforceConsumptionInOrder = false;
 
   @JsonPropertyDescription("If enabled, Server in-memory tracks the sequence number of all loaded segments")
-  private boolean _trackSegmentSeqNumber = false;
+  private boolean _trackSegmentSeqNumber = true;
 
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
