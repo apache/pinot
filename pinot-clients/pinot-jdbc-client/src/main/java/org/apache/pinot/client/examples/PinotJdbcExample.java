@@ -42,8 +42,8 @@ public class PinotJdbcExample {
       // Print results
       ResultSetMetaData metaData = resultSet.getMetaData();
       int columnCount = metaData.getColumnCount();
-
       while (resultSet.next()) {
+        System.out.print("Row Id: " + resultSet.getRow() + "\t");
         for (int i = 1; i <= columnCount; i++) {
           System.out.print(metaData.getColumnName(i) + ": " + resultSet.getString(i) + "\t");
         }
@@ -55,8 +55,10 @@ public class PinotJdbcExample {
   }
 
   public static void main(String[] args) {
-    String query = "SELECT count(*) FROM airlineStats";
-    testPinotJdbcForQuickStart("jdbc:pinot://localhost:9000", query);
-    testPinotJdbcForQuickStart("jdbc:pinotgrpc://localhost:9000?brokers=localhost:8010", query);
+    String query;
+    // query = "SELECT count(*) FROM airlineStats";
+    query = "SELECT * FROM airlineStats";
+    // testPinotJdbcForQuickStart("jdbc:pinot://localhost:9000", query);
+    testPinotJdbcForQuickStart("jdbc:pinotgrpc://localhost:9000?brokers=localhost:8010&blockRowSize=100", query);
   }
 }

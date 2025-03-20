@@ -31,10 +31,11 @@ public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
   private final ExecutionStats _executionStats;
   private final List<PinotClientException> _exceptions;
+  private final BrokerResponse _brokerResponse;
 
   public ResultSetGroup(BrokerResponse brokerResponse) {
+    _brokerResponse = brokerResponse;
     _resultSets = new ArrayList<>();
-
     if (brokerResponse.getResultTable() != null) {
       _resultSets.add(new ResultTableResultSet(brokerResponse.getResultTable()));
     } else {
@@ -96,6 +97,10 @@ public class ResultSetGroup {
 
   public List<PinotClientException> getExceptions() {
     return _exceptions;
+  }
+
+  public BrokerResponse getBrokerResponse() {
+    return _brokerResponse;
   }
 
   @Override
