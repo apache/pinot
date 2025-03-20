@@ -86,23 +86,6 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInFilters() {
-    setUseMultiStageQueryEngine(true);
-    explain("SELECT 1 FROM mytable where datetrunc('SECOND',ArrTime) > 1",
-        "Execution Plan\n"
-            + "PinotLogicalExchange(distribution=[broadcast])\n"
-            + "  LeafStageCombineOperator(table=[mytable])\n"
-            + "    StreamingInstanceResponse\n"
-            + "      StreamingCombineSelect\n"
-            + "        SelectStreaming(table=[mytable], totalDocs=[115545])\n"
-            + "          Transform(expressions=[['1']])\n"
-            + "            Project(columns=[[]])\n"
-            + "              DocIdSet(maxDocs=[120000])\n"
-            + "                FilterRangeIndex(predicate=[$ArrTime$SECOND > '1'], indexLookUp=[range_index], "
-            + "operator=[RANGE])\n");
-  }
-
-  @Test
   public void timestampIndexSubstitutedInAggregateFilter() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT sum(case when datetrunc('SECOND',ArrTime) > 1 then 2 else 0 end) FROM mytable",

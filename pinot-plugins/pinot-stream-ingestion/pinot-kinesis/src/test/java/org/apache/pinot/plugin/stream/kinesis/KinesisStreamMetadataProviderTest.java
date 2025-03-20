@@ -64,7 +64,6 @@ public class KinesisStreamMetadataProviderTest {
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     props.put(StreamConfigProperties.STREAM_TYPE, "kinesis");
-    props.put("stream.kinesis.consumer.type", "lowLevel");
     props.put("stream.kinesis.topic.name", STREAM_NAME);
     props.put("stream.kinesis.decoder.class.name", "ABCD");
     props.put("stream.kinesis.consumer.factory.class.name",

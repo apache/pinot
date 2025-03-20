@@ -59,6 +59,8 @@ spec:
 {{ toYaml .Values.controller.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.controller.tolerations | indent 8 }}
+      initContainers:
+{{ toYaml .Values.controller.initContainers | indent 8 }}
       containers:
       - name: controller
         securityContext:

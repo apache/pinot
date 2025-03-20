@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -30,6 +31,8 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonPropertyOrder({"jobId", "status", "description", "preChecksResult", "rebalanceSummaryResult",
+    "instanceAssignment", "tierInstanceAssignment", "segmentAssignment"})
 public class RebalanceResult {
   private final String _jobId;
   private final Status _status;

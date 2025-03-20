@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -162,6 +163,17 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     }
     return _singleStageBrokerRequestHandler.cancelQueryByClientId(
         clientQueryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
+  @Override
+  public OptionalLong getRequestIdByClientId(String clientQueryId) {
+    if (_multiStageBrokerRequestHandler != null) {
+      OptionalLong mseReqId = _multiStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
+      if (mseReqId.isPresent()) {
+        return mseReqId;
+      }
+    }
+    return _singleStageBrokerRequestHandler.getRequestIdByClientId(clientQueryId);
   }
 
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)

@@ -279,24 +279,20 @@ public class Tracing {
     /**
      * Setup metadata of query worker threads. This function assumes that the workers are for Single Stage Engine.
      * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
-     * @param threadResourceUsageProvider Object that measures resource usage.
      * @param threadExecutionContext Context holds metadata about the query.
      */
-    public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
-        ThreadExecutionContext threadExecutionContext) {
-      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
+    public static void setupWorker(int taskId, ThreadExecutionContext threadExecutionContext) {
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadExecutionContext);
     }
 
     /**
      * Setup metadata of query worker threads.
      * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
-     * @param threadResourceUsageProvider Object that measures resource usage.
      * @param threadExecutionContext Context holds metadata about the query.
      */
     public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-        ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
+      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       String queryId = null;
       if (threadExecutionContext != null) {
         queryId = threadExecutionContext.getQueryId();
