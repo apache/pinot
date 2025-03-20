@@ -912,7 +912,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Rebalance is expected to fail because there's one available replica. Rebalance config check should warn
-    rebalanceConfig.setMinAvailableReplicas(1);
+    rebalanceConfig.setMinAvailableReplicas(getNumReplicas());
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
