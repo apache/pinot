@@ -58,8 +58,7 @@ class PinotSplitterTest extends BaseTest {
       1000,
       false,
       Set(),
-      false,
-      "")
+      false)
   }
 
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 3") {
@@ -117,8 +116,7 @@ class PinotSplitterTest extends BaseTest {
       1000,
       true,
       Set(),
-      false,
-      "")
+      false)
 
     val inputGrpcPortReader = (server: String) => {
       InstanceInfo(server, "192.168.1.100", "9000", 8090)
