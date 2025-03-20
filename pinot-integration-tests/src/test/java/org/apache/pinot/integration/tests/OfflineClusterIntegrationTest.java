@@ -2079,14 +2079,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.getIndexingConfig().getNoDictionaryColumns().remove("NewAddedRawDerivedMVIntDimension");
     updateTableConfig(tableConfig);
 
-    // Need to first delete then add the schema because removing columns is backward-incompatible change
-    deleteSchema(getTableName());
+    // Need to force update the schema because removing columns is backward-incompatible change
     Schema schema = createSchema();
     schema.removeField("AirlineID");
     schema.removeField("ArrTime");
     schema.removeField("AirTime");
     schema.removeField("ArrDel15");
-    addSchema(schema);
+    forceUpdateSchema(schema);
 
     // Trigger reload
     reloadAllSegments(SELECT_STAR_QUERY, true, getCountStarResult());
