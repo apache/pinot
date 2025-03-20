@@ -329,6 +329,13 @@ public abstract class PinotPrometheusMetricsTest {
         List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME, ExportedLabelKeys.TABLETYPE,
             ExportedLabelValues.TABLETYPE_REALTIME, ExportedLabelKeys.TASKTYPE,
             ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
+
+    public static final List<String> JOBSTATUS_TABLE_NAME_WITH_TYPE =
+        List.of(STATUS, ExportedLabelValues.DONE, TABLE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME);
+
+    public static final List<String> TASKTYPE_TABLE_NAME_WITH_TYPE =
+        List.of(TASKTYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TABLE,
+            ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME);
   }
 
   public static class ExportedLabelKeys {
@@ -351,6 +358,7 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String CONTROLLER_PERIODIC_TASK_CHC = "ClusterHealthCheck";
     public static final String MINION_TASK_SEGMENT_IMPORT = "SegmentImportTask";
     public static final String IN_PROGRESS = "IN_PROGRESS";
+    public static final String DONE = "DONE";
   }
 
   /*
