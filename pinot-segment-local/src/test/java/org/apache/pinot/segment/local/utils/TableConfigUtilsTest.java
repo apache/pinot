@@ -1848,7 +1848,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
         .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(stringTypeDelCol);
@@ -1971,7 +1970,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.BOOLEAN).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDropOutOfOrderRecord(dropOutOfOrderRecord);
@@ -1992,7 +1990,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setOutOfOrderRecordColumn(outOfOrderRecordColumn);
@@ -2094,7 +2091,6 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol1")).build();
 
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.IGNORE);
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -2191,7 +2187,6 @@ public class TableConfigUtilsTest {
    */
   private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.IGNORE);
@@ -2447,7 +2442,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
@@ -2457,7 +2451,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getKafkaStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
@@ -2469,7 +2462,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getPulsarStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "pulsar");
-    streamConfigs.put("stream.pulsar.consumer.type", "lowlevel");
     streamConfigs.put("stream.pulsar.topic.name", "test");
     streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
     streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");
