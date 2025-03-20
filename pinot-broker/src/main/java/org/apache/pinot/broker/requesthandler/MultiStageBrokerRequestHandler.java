@@ -508,7 +508,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    *
    * The only exception that can be thrown by this method is a QueryException. All other exceptions are caught and
    * wrapped in a QueryException. Specifically, {@link TimeoutException} is caught and wrapped in a QueryException with
-   * the error code {@link QueryErrorCode#BROKER_TIMEOUT} and other exceptions are treated as internal errors.K
+   * the error code {@link QueryErrorCode#BROKER_TIMEOUT} and other exceptions are treated as internal errors.
    */
   private <E> E callAsync(long requestId, String query, Callable<E> queryPlannerResultCallable, Timer timer)
       throws QueryException {
