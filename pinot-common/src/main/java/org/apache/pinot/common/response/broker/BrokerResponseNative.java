@@ -44,14 +44,14 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This class can be used to serialize/deserialize the broker response.
  */
 @JsonPropertyOrder({
-    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
-    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
-    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
+    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
+    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
+    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
 })
@@ -70,6 +70,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
+  private boolean _numGroupsWarningLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _clientRequestId;
@@ -199,6 +200,15 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public boolean isNumGroupsWarningLimitReached() {
+    return _numGroupsWarningLimitReached;
+  }
+
+  public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
   }
 
   @JsonIgnore

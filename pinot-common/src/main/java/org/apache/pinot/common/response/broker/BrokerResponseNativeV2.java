@@ -38,17 +38,17 @@ import org.apache.pinot.common.response.ProcessingException;
  * TODO: Currently this class cannot be used to deserialize the JSON response.
  */
 @JsonPropertyOrder({
-    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
-    "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "clientRequestId",
-    "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
-    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
-    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid",
-    "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs",
-    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
-    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
-    "realtimeTotalCpuTimeNs", "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo",
-    "tablesQueried"
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
+    "numGroupsWarningLimitReached", "maxRowsInJoinReached", "maxRowsInWindowReached", "timeUsedMs", "stageStats",
+    "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
+    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
+    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
+    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -127,6 +127,15 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void mergeNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _brokerStats.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, numGroupsLimitReached);
+  }
+
+  @Override
+  public boolean isNumGroupsWarningLimitReached() {
+    return _brokerStats.getBoolean(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
+  }
+
+  public void mergeNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
   }
 
   @Override
@@ -386,7 +395,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

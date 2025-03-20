@@ -22,10 +22,13 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -141,6 +144,13 @@ public class Quickstart extends QuickStartBase {
     printStatus(Color.GREEN, "***************************************************");
 
     runVectorQueryExamples(runner);
+  }
+
+  @Override
+  protected Map<String, Object> getConfigOverrides() {
+    Map<String, Object> cfg = new HashMap<>(super.getConfigOverrides());
+    cfg.put(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR, 0.001);
+    return cfg;
   }
 
   public static void main(String[] args)
