@@ -31,12 +31,12 @@ public interface RebalancePreChecker {
       double diskUtilizationThreshold);
 
   class PreCheckContext {
-    protected final String _rebalanceJobId;
-    protected final String _tableNameWithType;
-    protected final TableConfig _tableConfig;
-    protected final Map<String, Map<String, String>> _currentAssignment;
-    protected final Map<String, Map<String, String>> _targetAssignment;
-    protected final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+    private final String _rebalanceJobId;
+    private final String _tableNameWithType;
+    private final TableConfig _tableConfig;
+    private final Map<String, Map<String, String>> _currentAssignment;
+    private final Map<String, Map<String, String>> _targetAssignment;
+    private final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
 
     public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
@@ -47,6 +47,30 @@ public interface RebalancePreChecker {
       _currentAssignment = currentAssignment;
       _targetAssignment = targetAssignment;
       _tableSubTypeSizeDetails = tableSubTypeSizeDetails;
+    }
+
+    public String getRebalanceJobId() {
+      return _rebalanceJobId;
+    }
+
+    public String getTableNameWithType() {
+      return _tableNameWithType;
+    }
+
+    public TableConfig getTableConfig() {
+      return _tableConfig;
+    }
+
+    public Map<String, Map<String, String>> getCurrentAssignment() {
+      return _currentAssignment;
+    }
+
+    public Map<String, Map<String, String>> getTargetAssignment() {
+      return _targetAssignment;
+    }
+
+    public TableSizeReader.TableSubTypeSizeDetails getTableSubTypeSizeDetails() {
+      return _tableSubTypeSizeDetails;
     }
   }
 
