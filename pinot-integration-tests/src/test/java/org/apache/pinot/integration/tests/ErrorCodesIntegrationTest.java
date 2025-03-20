@@ -40,9 +40,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final int NUM_BROKERS = 1;
-  private static final int NUM_SERVERS = 1;
-  private static final int NUM_SEGMENTS = 1;
 
   @BeforeClass
   public void setUp()
