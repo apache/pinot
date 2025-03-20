@@ -102,7 +102,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": true,
-        "toolTip": "Enabling can cause downtime if replication > 1"
+        "toolTip": "Enabling can cause downtime, double check if downtime is okay if replication > 1"
     },
     {
         "name": "minAvailableReplicas",
@@ -133,7 +133,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": true,
-        "toolTip": "Enabling can cause downtime even if downtime = true"
+        "toolTip": "Enabling can cause downtime even if downtime=false"
     },
     {
         "name": "externalViewStabilizationTimeoutInMs",
