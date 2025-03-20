@@ -34,7 +34,23 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/// A class used to determine whether MSE should to send stats or not.
+///
+/// The stat mechanism used in MSE is very efficient, so contrary to what we do in SSE, we decided to always collect and
+/// send stats in MSE. However, there are some versions of Pinot that have known issues with the stats mechanism, so we
+/// created this class as a mechanism to disable stats sending in case of problematic versions.
+///
+/// Specifically, Pinot 1.3.0 and lower have known issues when they receive unexpected stats from upstream stages, but
+/// even these versions are prepared to receive empty stats from upstream stages.
+/// Therefore the cleanest and safer solution is to not send stats when we know a problematic version is in the cluster.
+///
+/// We support three modes:
+/// - SAFE: This is the default mode. In this mode, we will send stats unless we detect a problematic version in the
+///  cluster. This doesn't require human intervention and is the recommended mode.
+/// - ALWAYS: In this mode, we will always send stats, regardless of the version of the cluster. This mimics the
+///  behavior in 1.3.0 and lower versions.
+/// - NEVER: In this mode, we will never send stats, regardless of the version of the cluster. This is useful for
+/// testing purposes or if for whatever reason you want to disable stats.
 public abstract class SendStatsPredicate implements InstanceConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SendStatsPredicate.class);
 
@@ -144,7 +160,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         return true;
       }
       if (versionStr.equals(PinotVersion.VERSION)) {
-        return true;
+        return false;
       }
       // Lets try to parse 1.x versions
       String[] splits = versionStr.trim().split("\\.");

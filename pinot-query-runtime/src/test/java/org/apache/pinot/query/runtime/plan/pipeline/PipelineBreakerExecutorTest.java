@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -104,7 +103,6 @@ public class PipelineBreakerExecutorTest {
     _mocks.close();
   }
 
-  @VisibleForTesting
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
