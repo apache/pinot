@@ -704,10 +704,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
-    response = postQuery(sqlQuery);
-    assertThat(response.get("exceptions").get(0).get("message").asText())
-        .as("First exception message")
-        .contains("Illegal base64 character");
+    try (QueryAssert.QueryErrorAssert.Soft assertion = assertQuery(sqlQuery).softFirstException()) {
+      assertion.hasErrorCode(QueryErrorCode.QUERY_PLANNING);
+      assertion.containsMessage("Illegal base64 character");
+    }
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
