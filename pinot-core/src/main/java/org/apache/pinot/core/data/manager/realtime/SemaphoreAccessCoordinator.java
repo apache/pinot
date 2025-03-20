@@ -103,7 +103,7 @@ public class SemaphoreAccessCoordinator {
       if (_segmentSequenceNumSet != null) {
         _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
       }
-      // notify all helix threads waiting for their offline -> consuming segment to be loaded
+      // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
       _condition.signalAll();
     } finally {
       _lock.unlock();
