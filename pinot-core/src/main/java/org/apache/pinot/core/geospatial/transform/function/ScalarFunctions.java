@@ -88,7 +88,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stGeomFromGeoJson(String geoJson)
-  throws ParseException {
+      throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_GEO_JSON_READER.read(geoJson));
   }
 
@@ -97,7 +97,7 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static byte[] stGeogFromGeoJson(String geoJson)
-  throws ParseException {
+      throws ParseException {
     return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_GEO_JSON_READER.read(geoJson));
   }
 

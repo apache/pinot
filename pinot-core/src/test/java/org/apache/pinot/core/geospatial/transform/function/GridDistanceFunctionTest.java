@@ -29,10 +29,12 @@ import org.apache.pinot.core.operator.transform.function.TransformFunctionFactor
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
+
 public class GridDistanceFunctionTest extends BaseTransformFunctionTest {
 
   @Test
-  public void testGridDistance() throws IOException {
+  public void testGridDistance()
+      throws IOException {
     H3CoreV3 h3CoreV3 = H3CoreV3.newInstance();
     // Test points in San Francisco
     double lat1 = 37.7749;
@@ -69,19 +71,16 @@ public class GridDistanceFunctionTest extends BaseTransformFunctionTest {
     // Test the function
     ExpressionContext expression = ExpressionContext.forFunction(
         new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDistance",
-            Arrays.asList(
-                ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1),
+            Arrays.asList(ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1),
                 ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index2))));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     testTransformFunction(transformFunction, expectedValues);
 
     // Test with same point (distance should be 0)
     Arrays.fill(expectedValues, 0);
-    expression = ExpressionContext.forFunction(
-        new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDistance",
-            Arrays.asList(
-                ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1),
-                ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1))));
+    expression = ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDistance",
+        Arrays.asList(ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1),
+            ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index1))));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     testTransformFunction(transformFunction, expectedValues);
   }

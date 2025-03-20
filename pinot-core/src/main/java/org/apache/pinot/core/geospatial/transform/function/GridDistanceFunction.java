@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
 /**
  * Function that calculates the grid distance between two H3 indexes.
  * The function takes two arguments:
@@ -46,8 +47,7 @@ public class GridDistanceFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    Preconditions.checkArgument(arguments.size() == 2,
-        "Transform function %s requires 2 arguments", getName());
+    Preconditions.checkArgument(arguments.size() == 2, "Transform function %s requires 2 arguments", getName());
 
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
@@ -74,7 +74,7 @@ public class GridDistanceFunction extends BaseTransformFunction {
     long[] secondH3Indexes = _secondArgument.transformToLongValuesSV(valueBlock);
 
     for (int i = 0; i < numDocs; i++) {
-        _longValuesSV[i] = ScalarFunctions.gridDistance(firstH3Indexes[i], secondH3Indexes[i]);
+      _longValuesSV[i] = ScalarFunctions.gridDistance(firstH3Indexes[i], secondH3Indexes[i]);
     }
 
     return _longValuesSV;
