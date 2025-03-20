@@ -180,7 +180,7 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      for (String meterType : METER_TYPES) {
+      for (String meterType : TIMER_TYPES) {
         PromMetric expectedTimer =
             PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels);
         Assert.assertTrue(promMetrics.contains(expectedTimer),
