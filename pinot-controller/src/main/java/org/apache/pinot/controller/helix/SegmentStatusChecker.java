@@ -272,6 +272,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    if (externalView != null) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_SIZE,
+          externalView.toString().length());
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_BYTE_SIZE,
+          externalView.serialize(RECORD_SERIALIZER).length);
+    }
 
     // Maximum number of replicas that is up (ONLINE/CONSUMING) in ideal state
     int maxISReplicasUp = Integer.MIN_VALUE;

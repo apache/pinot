@@ -29,8 +29,10 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
@@ -68,6 +70,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
   private static final String PERIODIC_TASK_FREQUENCY_PERIOD = "5s";
   private static final String PERIODIC_TASK_WAIT_FOR_PUSH_TIME_PERIOD = "5s";
+  private static final ZNRecordSerializer RECORD_SERIALIZER = new ZNRecordSerializer();
 
   private static final int NUM_REPLICAS = 2;
   private static final String TENANT_NAME = "TestTenant";
@@ -233,29 +236,34 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           numTables)) {
         return false;
       }
-      if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(emptyTable), null, NUM_REPLICAS,
+      if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(emptyTable), null, null,
+          NUM_REPLICAS,
           100, 0, 100)) {
         return false;
       }
-      if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), null, 0, 0, 0,
+      if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), null, null, 0, 0,
+          0,
           0)) {
         return false;
       }
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
       IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, NUM_REPLICAS, 100, 0, 100)) {
+      ExternalView externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
+      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableWithOfflineSegment);
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
+      externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
       //noinspection PointlessArithmeticExpression
-      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, NUM_REPLICAS - 1,
+      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS - 1,
           100 * (NUM_REPLICAS - 1) / NUM_REPLICAS, 0, 100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, NUM_REPLICAS, 100, 0, 100)) {
+      externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
+      if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
       return checkGlobalGaugeValue(ControllerGauge.OFFLINE_TABLE_COUNT, 4) && checkGlobalGaugeValue(
@@ -297,6 +305,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
   }
 
   private boolean checkSegmentStatusCheckerMetrics(String tableNameWithType, @Nullable IdealState idealState,
+      @Nullable ExternalView externalView,
       long expectedNumReplicas, long expectedPercentReplicas, long expectedSegmentsInErrorState,
       long expectedPercentSegmentsAvailable) {
     if (idealState != null) {
@@ -304,8 +313,22 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           idealState.toString().length())) {
         return false;
       }
+      if (!checkTableGaugeValue(ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE, tableNameWithType,
+          idealState.serialize(RECORD_SERIALIZER).length)) {
+        return false;
+      }
       if (!checkTableGaugeValue(ControllerGauge.SEGMENT_COUNT, tableNameWithType,
           idealState.getPartitionSet().size())) {
+        return false;
+      }
+    }
+    if (externalView != null) {
+      if (!checkTableGaugeValue(ControllerGauge.EXTERNALVIEW_ZNODE_SIZE, tableNameWithType,
+          externalView.toString().length())) {
+        return false;
+      }
+      if (!checkTableGaugeValue(ControllerGauge.EXTERNALVIEW_ZNODE_BYTE_SIZE, tableNameWithType,
+          externalView.serialize(RECORD_SERIALIZER).length)) {
         return false;
       }
     }
