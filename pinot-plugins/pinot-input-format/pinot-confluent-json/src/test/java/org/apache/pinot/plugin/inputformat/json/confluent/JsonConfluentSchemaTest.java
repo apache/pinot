@@ -126,14 +126,19 @@ public class JsonConfluentSchemaTest {
       Map<String, Object> originalValue = recordList.get(i);
       GenericRow decodedValue = result.get(i);
 
-      Assert.assertEquals(decodedValue.getValue("name"), originalValue.get("name"), "Unexpected 'name' value");
-      Assert.assertEquals(decodedValue.getValue("id"), originalValue.get("id"), "Unexpected 'id' value");
-      Assert.assertEquals(decodedValue.getValue("email"), originalValue.get("email"), "Unexpected 'email' value");
+      Assert.assertEquals(decodedValue.getValue("name"),
+          originalValue.get("name"), "Unexpected 'name' value");
+      Assert.assertEquals(decodedValue.getValue("id"),
+          originalValue.get("id"), "Unexpected 'id' value");
+      Assert.assertEquals(decodedValue.getValue("email"),
+          originalValue.get("email"), "Unexpected 'email' value");
 
       Object[] expectedFriends = ((List<String>) originalValue.get("friends")).toArray(new String[0]);
-      Assert.assertEquals(decodedValue.getValue("friends"), expectedFriends, "Unexpected 'friends' value");
+      Assert.assertEquals(decodedValue.getValue("friends"),
+          expectedFriends, "Unexpected 'friends' value");
       String expectedOptionalField = i % 2 == 0 ? (String) originalValue.get("optionalField") : null;
-      Assert.assertEquals(decodedValue.getValue("optionalField"), expectedOptionalField, "Unexpected 'optionalField' value");
+      Assert.assertEquals(decodedValue.getValue("optionalField"),
+          expectedOptionalField, "Unexpected 'optionalField' value");
     }
   }
 
