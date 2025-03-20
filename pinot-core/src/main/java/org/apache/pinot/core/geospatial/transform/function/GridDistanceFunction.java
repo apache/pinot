@@ -74,9 +74,7 @@ public class GridDistanceFunction extends BaseTransformFunction {
     long[] secondH3Indexes = _secondArgument.transformToLongValuesSV(valueBlock);
 
     for (int i = 0; i < numDocs; i++) {
-      try {
         _longValuesSV[i] = ScalarFunctions.gridDistance(firstH3Indexes[i], secondH3Indexes[i]);
-      } catch (Exception e) { }
     }
 
     return _longValuesSV;
