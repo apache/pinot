@@ -161,7 +161,7 @@ public class QueryEnvironment {
         sqlNodeAndOptions.getOptions(), _envConfig, format);
   }
 
-  /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long) ] the returned query instead
+  /// @deprecated Use [#compile] and then [plan][CompiledQuery#planQuery(long)] the returned query instead
   @VisibleForTesting
   @Deprecated
   public DispatchableSubPlan planQuery(String sqlQuery) {
@@ -223,8 +223,8 @@ public class QueryEnvironment {
   ///
   /// The returned query can then be planned, explained or used to get the tables involved in the query.
   ///
-  /// @throws QueryException if the query cannot be compiled. Usual error types are [QueryErrorCode#SQL_PARSING] and
-  /// [QueryErrorCode#QUERY_VALIDATION]. [QueryErrorCode#QUERY_EXECUTION] is also possible if there is an error when
+  /// @throws QueryException if the query cannot be compiled. Usual error types are QueryErrorCode.SQL_PARSING and
+  /// QueryErrorCode.QUERY_VALIDATION. QueryErrorCode.QUERY_EXECUTION is also possible if there is an error when
   /// a function call is reduced into a constant.
   public CompiledQuery compile(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions) {
     PlannerContext plannerContext = null;
@@ -554,7 +554,8 @@ public class QueryEnvironment {
   /// - Used to explain the query plan (see [#explain])
   /// - Used to plan how to evaluate the query using Pinot Engine (see [#planQuery])
   ///
-  /// Compiled queries are craeted by calling [QueryEnvironment#compile] and should be closed.
+  /// Compiled queries are created by calling [QueryEnvironment#compile] and should be closed to release resources,
+  /// including the [PlannerContext].
   /// They are also not static classes. Instead they are bound to the [QueryEnvironment] that created them.
   public class CompiledQuery implements Closeable {
     private final String _database;
