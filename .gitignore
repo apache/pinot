@@ -57,3 +57,5 @@ kubernetes/helm/**/Chart.lock
 #Develocity
 .mvn/.gradle-enterprise/
 .mvn/.develocity/
+/.metals
+pinot-segment-local/column1.dictVars
