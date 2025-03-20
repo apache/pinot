@@ -93,7 +93,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("millis", true),
-  STARTUP_FAILURE_DURATION_MS("millis", true);
+  STARTUP_FAILURE_DURATION_MS("millis", true),
+
+  PREDOWNLOAD_TIME("millis", true);
 
   private final String _timerName;
   private final boolean _global;

@@ -35,7 +35,6 @@
       "realtime.segment.flush.threshold.time": "864",
       "streamType" : "kafka",
       "stream.kafka.broker.list" : "localhost:9092",
-      "stream.kafka.consumer.type" : "simple",
       "stream.kafka.consumer.prop.auto.offset.reset": "largest",
       "stream.kafka.topic.name" : "demand_topic"
     },

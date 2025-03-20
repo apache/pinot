@@ -166,7 +166,6 @@ public final class TableConfigUtils {
       validateValidationConfig(tableConfig, schema);
       validateIngestionConfig(tableConfig, schema);
 
-      // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
         List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
         if (streamConfigMaps.size() > 1) {

@@ -606,22 +606,22 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
       boolean dryRun,
-      @ApiParam(value = "Whether to return dry-run summary instead of full, dry-run must be enabled to use this")
-      @DefaultValue("false") @QueryParam("summary")
-      boolean summary,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
-      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
+      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
-      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
+      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
       @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to enable minimize data movement on rebalance, DEFAULT will use "
+          + "the minimizeDataMovement in table config") @DefaultValue("ENABLE")
+      @QueryParam("minimizeDataMovement") RebalanceConfig.MinimizeDataMovementOptions minimizeDataMovement,
       @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
           + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
-          + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
+          + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
       @ApiParam(value = "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
           + "segments will first be offloaded from servers, then added to servers after offload is done while "
@@ -651,10 +651,10 @@ public class PinotTableRestletResource {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
-    rebalanceConfig.setSummary(summary);
     rebalanceConfig.setPreChecks(preChecks);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
+    rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
@@ -672,7 +672,7 @@ public class PinotTableRestletResource {
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
-      if (dryRun || summary || preChecks || downtime) {
+      if (dryRun || preChecks || downtime) {
         // For dry-run, preChecks or rebalance with downtime, directly return the rebalance result as it should return
         // immediately
         return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);

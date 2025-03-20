@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -33,6 +32,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
@@ -349,7 +349,7 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
+    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -373,7 +373,7 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
+    assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains("testInnerJoinLeftError"));
   }
 
   @Test
@@ -401,9 +401,9 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of(), nodeHint);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
         .contains("Cannot build in memory hash table"));
   }
 
@@ -465,9 +465,9 @@ public class HashJoinOperatorTest {
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
         .contains("reached number of rows limit"));
-    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+    assertTrue(block.getExceptions().get(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.getId())
         .contains("Cannot process join"));
   }
 

@@ -24,9 +24,9 @@ import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -39,7 +39,7 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
  */
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
-  private final FunctionInvoker _functionInvoker;
+  private final QueryFunctionInvoker _functionInvoker;
   private final ColumnDataType _functionInvokerResultType;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
@@ -74,7 +74,7 @@ public class FunctionOperand implements TransformOperand {
         throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
       }
     }
-    _functionInvoker = new FunctionInvoker(functionInfo);
+    _functionInvoker = new QueryFunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {
       Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
       PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();

@@ -42,6 +42,7 @@ import org.apache.pinot.segment.local.utils.SegmentPreloadUtils;
 import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -309,6 +310,11 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   }
 
   protected double getMaxDedupTime(IndexSegment segment) {
+    if (segment instanceof MutableSegment) {
+      // MutableSegment doesn't have columnMetadataMap to get the max dedup time, so returning the largest value seen
+      // so far to process this segment, as mutable segment is always considered to be within TTL
+      return _largestSeenTime.get();
+    }
     return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
         .getMaxValue()).doubleValue();
   }
