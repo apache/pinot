@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.json.confluent;
 
-import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializerConfig;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,15 +54,15 @@ public class JsonConfluentSchemaTest {
   public void setup() {
     _schemaRegistry = SchemaRegistryStarter.startLocalInstance(9093);
 
-    Properties jsonBufProducerProps = new Properties();
-    jsonBufProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+    Properties jsonProducerProps = new Properties();
+    jsonProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
         _schemaRegistry._kafkaContainer.getBootstrapServers());
-    jsonBufProducerProps.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
-    jsonBufProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+    jsonProducerProps.put(KafkaJsonSchemaSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
+    jsonProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
-    jsonBufProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
-        "io.confluent.kafka.serializers.json.KafkaJsonSerializer");
-    _jsonProducer = new KafkaProducer<>(jsonBufProducerProps);
+    jsonProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+        "io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer");
+    _jsonProducer = new KafkaProducer<>(jsonProducerProps);
   }
 
   @Test
@@ -89,7 +89,7 @@ public class JsonConfluentSchemaTest {
 
     Properties consumerProps = new Properties();
     consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _schemaRegistry._kafkaContainer.getBootstrapServers());
-    consumerProps.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
+    consumerProps.put(KafkaJsonSchemaSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
