@@ -900,7 +900,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.WARN, "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setMinAvailableReplicas(-1);
     tableConfig.setInstanceAssignmentConfigMap(null);
@@ -912,7 +912,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Rebalance is expected to fail because there's one available replica. Rebalance config check should warn
-    rebalanceConfig.setMinAvailableReplicas(2);
+    rebalanceConfig.setMinAvailableReplicas(1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
         "Instance assignment not allowed, no need for minimizeDataMovement",
