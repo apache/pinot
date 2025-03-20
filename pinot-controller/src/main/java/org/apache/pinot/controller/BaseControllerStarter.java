@@ -136,10 +136,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -591,26 +588,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);
-    List<String> existingHlcTables = new ArrayList<>();
-    _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
-      TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
-      if (tableConfig != null) {
-        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-        try {
-          for (Map<String, String> streamConfigMap : streamConfigMaps) {
-            StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-                streamConfigMap);
-          }
-        } catch (Exception e) {
-          existingHlcTables.add(rt);
-        }
-      }
-    });
-    if (existingHlcTables.size() > 0) {
-      LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
-          + "following HLC tables before proceeding: {}\n", existingHlcTables);
-      throw new RuntimeException("Unable to start controller due to existing HLC tables!");
-    }
 
     // One time job to fix schema name in all tables
     // This method can be removed after the next major release.

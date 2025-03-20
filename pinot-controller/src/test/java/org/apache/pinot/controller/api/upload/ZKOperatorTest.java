@@ -100,7 +100,6 @@ public class ZKOperatorTest {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
     streamConfigs.put("stream.kafka.consumer.factory.class.name",
