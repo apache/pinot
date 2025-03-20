@@ -287,7 +287,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * @param sourceState - A given state that needs to converge to targetState
    * @return RebalanceStats
    */
-  public static TableRebalanceProgressStats.RebalanceStateStats getDifferenceBetweenTableRebalanceStates(
+  @VisibleForTesting
+  static TableRebalanceProgressStats.RebalanceStateStats getDifferenceBetweenTableRebalanceStates(
       Map<String, Map<String, String>> targetState, Map<String, Map<String, String>> sourceState) {
 
     TableRebalanceProgressStats.RebalanceStateStats rebalanceStats =
@@ -336,7 +337,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * @param latestStepStats latest step level stats calculated in this iteration
    * @return the newly calculated overall progress stats
    */
-  public static TableRebalanceProgressStats.RebalanceProgressStats updateOverallProgressStatsFromStep(
+  @VisibleForTesting
+  static TableRebalanceProgressStats.RebalanceProgressStats updateOverallProgressStatsFromStep(
       TableRebalanceProgressStats rebalanceProgressStats,
       TableRebalanceProgressStats.RebalanceProgressStats lastStepStats,
       TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
@@ -397,7 +399,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * Calculates the progress stats for the given step or for the overall based on the trigger type
    * @return the calculated step or progress stats
    */
-  public static TableRebalanceProgressStats.RebalanceProgressStats calculateOverallProgressStats(
+  @VisibleForTesting
+  static TableRebalanceProgressStats.RebalanceProgressStats calculateOverallProgressStats(
       Map<String, Map<String, String>> targetAssignment, Map<String, Map<String, String>> currentAssignment,
       RebalanceContext rebalanceContext, Trigger trigger, TableRebalanceProgressStats rebalanceProgressStats) {
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
@@ -507,7 +510,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._percentageTotalSegmentsAddsRemaining = totalSegmentsToBeAdded == 0 ? 0.0 : 100.0;
         progressStats._percentageTotalSegmentDeletesRemaining = totalSegmentsToBeDeleted == 0 ? 0.0 : 100.0;
         progressStats._estimatedTimeToCompleteAddsInSeconds = totalSegmentsToBeAdded == 0 ? 0.0 : -1.0;
-        progressStats._estimatedTimeToCompleteDeletesInSeconds = totalSegmentsToBeAdded == 0 ? 0.0 : -1.0;
+        progressStats._estimatedTimeToCompleteDeletesInSeconds = totalSegmentsToBeDeleted == 0 ? 0.0 : -1.0;
         progressStats._averageSegmentSizeInBytes = rebalanceContext.getEstimatedAverageSegmentSizeInBytes();
         progressStats._totalEstimatedDataToBeMovedInBytes = calculateNewEstimatedDataToBeMovedInBytes(0,
             rebalanceContext.getEstimatedAverageSegmentSizeInBytes(), totalSegmentsToBeAdded);
@@ -565,7 +568,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       int remainingSegmentsToChange) {
     double elapsedTimeInSeconds = (double) (System.currentTimeMillis() - startTime) / 1000.0;
     int segmentsAlreadyChanged = totalSegmentsToChange - remainingSegmentsToChange;
-    return segmentsAlreadyChanged == 0 ? -1
+    return segmentsAlreadyChanged == 0 ? totalSegmentsToChange == 0 ? 0.0 : -1.0
         : (double) remainingSegmentsToChange / (double) segmentsAlreadyChanged * elapsedTimeInSeconds;
   }
 

@@ -138,6 +138,8 @@ public class TableRebalanceProgressStats {
   }
 
   public static boolean progressStatsDiffer(RebalanceProgressStats base, RebalanceProgressStats compare) {
+    // Don't check for changes in the estimated time for completion as this will always be updated since it is
+    // newly calculated for each iteration based on current time and start time
     return base._totalSegmentsToBeAdded != compare._totalSegmentsToBeAdded
         || base._totalSegmentsToBeDeleted != compare._totalSegmentsToBeDeleted
         || base._totalRemainingSegmentsToBeAdded != compare._totalRemainingSegmentsToBeAdded
@@ -147,8 +149,6 @@ public class TableRebalanceProgressStats {
         != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
         || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
         || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
-        || base._estimatedTimeToCompleteAddsInSeconds != compare._estimatedTimeToCompleteAddsInSeconds
-        || base._estimatedTimeToCompleteDeletesInSeconds != compare._estimatedTimeToCompleteDeletesInSeconds
         || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
         || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes
         || base._startTimeMs != compare._startTimeMs;
