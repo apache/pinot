@@ -102,7 +102,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": true,
-        "toolTip": "Enabling can cause downtime, double check if downtime is okay if replication > 1"
+        "toolTip": "Enabling can cause downtime, double check if downtime is acceptable if replication > 1"
     },
     {
         "name": "minAvailableReplicas",
