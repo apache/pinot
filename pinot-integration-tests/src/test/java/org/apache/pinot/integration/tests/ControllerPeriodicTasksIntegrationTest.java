@@ -248,13 +248,13 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       }
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
       IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      ExternalView externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
+      ExternalView externalView = _helixResourceManager.getTableExternalView(tableNameWithType);
       if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableWithOfflineSegment);
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
+      externalView = _helixResourceManager.getTableExternalView(tableNameWithType);
       //noinspection PointlessArithmeticExpression
       if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS - 1,
           100 * (NUM_REPLICAS - 1) / NUM_REPLICAS, 0, 100)) {
@@ -262,7 +262,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       }
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
       idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
-      externalView =  _helixResourceManager.getTableExternalView(tableNameWithType);
+      externalView = _helixResourceManager.getTableExternalView(tableNameWithType);
       if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
