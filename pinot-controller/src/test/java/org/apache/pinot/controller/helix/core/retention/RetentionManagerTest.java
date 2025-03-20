@@ -24,12 +24,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -40,9 +45,17 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -178,8 +191,12 @@ public class RetentionManagerTest {
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     conf.setUntrackedSegmentDeletionEnabled(true);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
@@ -375,9 +392,11 @@ public class RetentionManagerTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-
-    RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+        controllerMetrics, brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
@@ -390,6 +409,90 @@ public class RetentionManagerTest {
     verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
   }
 
+  @Test
+  public void testManageRetentionForHybridTable() {
+    // setup
+    String tableName = "myTable";
+    String realtimeTableName = "myTable_REALTIME";
+    String offlineTableName = "myTable_OFFLINE";
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY", false));
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(realtimeTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("7").setRetentionTimeUnit("DAYS")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(offlineTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("90").setRetentionTimeUnit("DAYS")
+        .build();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setTimeColumnName("ms");
+    offlineTableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    when(mockPinotHelixResourceManager.getOfflineTableConfig(offlineTableName)).thenReturn(offlineTableConfig);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+
+    // create realtime table schema
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
+    String realtimeTableSchemaJson = schema.toSingleLineJsonString();
+    ZNRecord tableZNRecord = new ZNRecord(tableName);
+    tableZNRecord.setSimpleField("schemaJSON", realtimeTableSchemaJson);
+    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+
+    InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort("8000");
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerBrokerProtocol("http");
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
+        .thenReturn(Collections.singletonList(instanceConfig));
+
+    CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
+
+    // Mock responses
+    Map<String, String> responseMap = new HashMap<>();
+    responseMap.put("http://localhost:8000/debug/timeBoundary/" + offlineTableName,
+        "{ \"timeColumn\": \"ts\", \"timeValue\": 7776000000}");
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    serviceResponse._httpResponses = responseMap;
+    when(mockServiceHelper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(), anyString()))
+        .thenReturn(serviceResponse);
+
+    // create segment ZK metadata for realtime table
+    SegmentZKMetadata realtimeSeg1 = new SegmentZKMetadata("realtime_seg1");
+    realtimeSeg1.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    SegmentZKMetadata realtimeSeg2 = new SegmentZKMetadata("realtime_seg2");
+    realtimeSeg2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    realtimeSeg2.setTimeUnit(TimeUnit.MILLISECONDS);
+    realtimeSeg2.setEndTime(86_400_000 * 8);
+
+    List<SegmentZKMetadata> realtimeSegments = Arrays.asList(realtimeSeg1, realtimeSeg2);
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)).thenReturn(realtimeSegments);
+
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, controllerConf, null, null);
+    brokerServiceHelper.setCompletionServiceHelper(mockServiceHelper);
+
+    // test
+    RetentionManager retentionManager =
+        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
+            brokerServiceHelper);
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
+
+    // verify
+    verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
+  }
 
   private TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setRetentionTimeUnit("DAYS")
@@ -493,8 +596,12 @@ public class RetentionManagerTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-    RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+        controllerMetrics, brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
@@ -526,8 +633,12 @@ public class RetentionManagerTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 

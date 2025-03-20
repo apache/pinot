@@ -314,6 +314,8 @@ public class ControllerConf extends PinotConfiguration {
   private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
+      "controller.enable.hybrid.table.retention.strategy";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -344,6 +346,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY = 300L; // 5 minutes
   private static final long DEFAULT_RESOURCE_UTILIZATION_CHECKER_FREQUENCY = 300L; // 5 minutes
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
+  private static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
@@ -1035,6 +1038,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getEnableBatchMessageMode() {
     return getProperty(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
+  }
+
+  public boolean isHybridTableRetentionStrategyEnabled() {
+    return getProperty(ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
