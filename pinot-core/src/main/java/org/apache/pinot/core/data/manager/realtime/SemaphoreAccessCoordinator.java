@@ -88,7 +88,7 @@ public class SemaphoreAccessCoordinator {
 
       // if segment is marked online/offline by any instance, just return the current offline -> consuming
       // transition.
-      if (!isSegmentInProgress(segmentName)) {
+      if (!_enforceConsumptionInOrder && !isSegmentInProgress(segmentName)) {
         throw new SegmentAlreadyConsumedException("segment: " + segmentName + " status must be in progress");
       }
     }
@@ -145,13 +145,6 @@ public class SemaphoreAccessCoordinator {
           while (!_condition.await(5, TimeUnit.MINUTES)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waiting on previous segment: {} since: {} ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
-
-            // if segment is marked online/offline by any instance, just return the current offline -> consuming
-            // transition.
-            if (!isSegmentInProgress(currSegment.getSegmentName())) {
-              throw new SegmentAlreadyConsumedException(
-                  "segment: " + currSegment.getSegmentName() + " status must be in progress.");
-            }
           }
           segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
         }
@@ -175,13 +168,6 @@ public class SemaphoreAccessCoordinator {
           LOGGER.warn("Semaphore access denied to segment: {}."
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
               prevSeqNum, System.currentTimeMillis() - startTimeMs);
-
-          // if segment is marked online/offline by any instance, just return the current offline -> consuming
-          // transition.
-          if (!isSegmentInProgress(currSegment.getSegmentName())) {
-            throw new SegmentAlreadyConsumedException(
-                "segment: " + currSegment.getSegmentName() + " status must be in progress.");
-          }
         }
       }
     } finally {
