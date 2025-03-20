@@ -237,13 +237,11 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(emptyTable), null, null,
-          NUM_REPLICAS,
-          100, 0, 100)) {
+          NUM_REPLICAS, 100, 0, 100)) {
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), null, null, 0, 0,
-          0,
-          0)) {
+          0, 0)) {
         return false;
       }
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
