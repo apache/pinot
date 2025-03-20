@@ -21,9 +21,11 @@ package org.apache.pinot.broker.routing.instanceselector;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import javax.annotation.Nullable;
+import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.broker.routing.instanceselector.zoneaware.ZoneAwareInstanceSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -46,19 +48,27 @@ public class InstanceSelectorFactory {
   @VisibleForTesting
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig) {
-    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(), brokerConfig);
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(), brokerConfig, null);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
       @Nullable AdaptiveServerSelector adaptiveServerSelector, PinotConfiguration brokerConfig) {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
-        brokerConfig);
+        brokerConfig, null);
+  }
+  
+  public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
+        brokerConfig, null);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig) {
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig,
+      @Nullable HelixManager helixManager) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     boolean useFixedReplica = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA,
@@ -90,6 +100,30 @@ public class InstanceSelectorFactory {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
         return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
             adaptiveServerSelector, clock, useFixedReplica, newSegmentExpirationTimeInSeconds);
+      }
+      if (ZoneAwareInstanceSelector.ZONE_AWARE_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
+          routingConfig.getInstanceSelectorType())) {
+        LOGGER.info("Using ZoneAwareInstanceSelector for table: {}", tableNameWithType);
+        
+        // Get zone-aware specific configuration
+        double sameZonePreference = brokerConfig.getProperty(
+            ZoneAwareInstanceSelector.CONFIG_OF_SAME_ZONE_PREFERENCE, 
+            ZoneAwareInstanceSelector.DEFAULT_SAME_ZONE_PREFERENCE);
+        boolean strictZoneMatch = brokerConfig.getProperty(
+            ZoneAwareInstanceSelector.CONFIG_OF_STRICT_ZONE_MATCH,
+            ZoneAwareInstanceSelector.DEFAULT_STRICT_ZONE_MATCH);
+        String brokerZone = brokerConfig.getProperty(ZoneAwareInstanceSelector.CONFIG_OF_BROKER_ZONE, (String) null);
+        
+        ZoneAwareInstanceSelector instanceSelector = new ZoneAwareInstanceSelector(tableNameWithType, propertyStore, 
+            brokerMetrics, adaptiveServerSelector, clock, useFixedReplica, newSegmentExpirationTimeInSeconds,
+            sameZonePreference, strictZoneMatch, brokerZone);
+        
+        // Set the HelixManager if provided
+        if (helixManager != null) {
+          instanceSelector.setHelixManager(helixManager);
+        }
+        
+        return instanceSelector;
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
