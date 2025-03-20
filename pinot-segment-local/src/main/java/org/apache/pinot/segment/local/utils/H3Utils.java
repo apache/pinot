@@ -45,7 +45,7 @@ public class H3Utils {
     try {
       H3_CORE = H3Core.newInstance();
     } catch (IOException e) {
-      throw new RuntimeException("Failed to instantiate H3 V3 instance", e);
+      throw new RuntimeException("Failed to instantiate H3 instance", e);
     }
   }
 
