@@ -336,9 +336,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         MultiStageQueryStats stats = _stats;
         if (stats != null) {
           if (element.getQueryStats() != null) {
-            stats.mergeUpstream(element.getQueryStats());
+            stats.mergeUpstream(element.getQueryStats(), true);
           } else {
-            stats.mergeUpstream(element.getSerializedStatsByStage());
+            stats.mergeUpstream(element.getSerializedStatsByStage(), true);
           }
         }
       } catch (Exception e) {
