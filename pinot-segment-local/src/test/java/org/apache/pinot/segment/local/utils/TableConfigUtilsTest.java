@@ -75,8 +75,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import static org.testng.Assert.assertThrows;
 
+import static org.testng.Assert.assertThrows;
 
 
 /**
