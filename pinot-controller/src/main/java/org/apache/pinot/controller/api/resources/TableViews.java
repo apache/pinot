@@ -28,9 +28,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -96,10 +98,17 @@ public class TableViews {
   public TableView getIdealState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    return getTableState(tableName, IDEALSTATE, tableType);
+    TableViews.TableView tableIdealStateView = getTableState(tableName, EXTERNALVIEW, tableType);
+    if (segmentNames != null && !segmentNames.isEmpty()) {
+      List<String> segmentNamesList =
+          Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+      return getSegmentsView(tableIdealStateView, segmentNamesList);
+    }
+    return tableIdealStateView;
   }
 
   @GET
@@ -110,10 +119,17 @@ public class TableViews {
   public TableView getExternalView(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("tableType") String tableTypeStr,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Comma separated segment names", required = false) @QueryParam("segmentNames")
+      String segmentNames, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = validateTableType(tableTypeStr);
-    return getTableState(tableName, EXTERNALVIEW, tableType);
+    TableViews.TableView tableExternalView = getTableState(tableName, EXTERNALVIEW, tableType);
+    if (segmentNames != null && !segmentNames.isEmpty()) {
+      List<String> segmentNamesList =
+          Arrays.stream(segmentNames.split(",")).map(String::trim).collect(Collectors.toList());
+      return getSegmentsView(tableExternalView, segmentNamesList);
+    }
+    return tableExternalView;
   }
 
   @GET
@@ -168,6 +184,21 @@ public class TableViews {
       }
     }
     return segmentStatusInfoList;
+  }
+
+  public TableView getSegmentsView(TableViews.TableView tableView, List<String> segmentNames) {
+    TableView tableViewResult = new TableView();
+    tableViewResult._offline = new HashMap<>();
+    tableViewResult._realtime = new HashMap<>();
+    for (String segmentName : segmentNames) {
+      if (tableView._offline != null) {
+        tableViewResult._offline.put(segmentName, tableView._offline.get(segmentName));
+      }
+      if (tableView._realtime != null) {
+        tableViewResult._realtime.put(segmentName, tableView._realtime.get(segmentName));
+      }
+    }
+    return tableViewResult;
   }
 
   private Map<String, Map<String, String>> getStateMap(TableViews.TableView view) {
