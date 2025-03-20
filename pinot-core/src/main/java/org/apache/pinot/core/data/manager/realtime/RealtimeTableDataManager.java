@@ -882,6 +882,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return Collections.emptyMap();
   }
 
+  @Nullable
+  public StreamIngestionConfig getStreamIngestionConfig() {
+    if (_tableConfig.getIngestionConfig() == null) {
+      return null;
+    }
+    return _tableConfig.getIngestionConfig().getStreamIngestionConfig();
+  }
+
   /**
    * Validate a schema against the table config for real-time record consumption.
    * Ideally, we should validate these things when schema is added or table is created, but either of these
@@ -927,11 +935,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private boolean enforceConsumptionInOrder() {
-    if (_tableConfig.getIngestionConfig() == null
-        || _tableConfig.getIngestionConfig().getStreamIngestionConfig() == null) {
+    StreamIngestionConfig streamIngestionConfig = getStreamIngestionConfig();
+    if (streamIngestionConfig == null) {
       return false;
     }
-    return _tableConfig.getIngestionConfig().getStreamIngestionConfig().isEnforceConsumptionInOrder() && (
-        isDedupEnabled() || isPartialUpsertEnabled());
+    return streamIngestionConfig.isEnforceConsumptionInOrder() && (isDedupEnabled() || isPartialUpsertEnabled());
   }
 }

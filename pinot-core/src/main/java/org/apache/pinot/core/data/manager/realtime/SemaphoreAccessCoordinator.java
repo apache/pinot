@@ -47,7 +47,7 @@ public class SemaphoreAccessCoordinator {
   private final Lock _lock;
   private final Set<Integer> _segmentSequenceNumSet;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private static final boolean RELY_ON_IDEAL_STATE = false;
+  private final boolean _relyOnIdealState;
 
   public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
       RealtimeTableDataManager realtimeTableDataManager) {
@@ -57,6 +57,8 @@ public class SemaphoreAccessCoordinator {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
     _segmentSequenceNumSet = new HashSet<>();
     _realtimeTableDataManager = realtimeTableDataManager;
+    Preconditions.checkNotNull(_realtimeTableDataManager.getStreamIngestionConfig());
+    _relyOnIdealState = !_realtimeTableDataManager.getStreamIngestionConfig().isTrackSegmentSeqNumber();
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -94,7 +96,7 @@ public class SemaphoreAccessCoordinator {
   public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      if (!RELY_ON_IDEAL_STATE) {
+      if (!_relyOnIdealState) {
         _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
       }
       _condition.signalAll();
@@ -115,7 +117,7 @@ public class SemaphoreAccessCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
 
-    if (RELY_ON_IDEAL_STATE) {
+    if (_relyOnIdealState) {
       String previousSegment = getPreviousSegment(currSegment);
       if (previousSegment == null) {
         return;
