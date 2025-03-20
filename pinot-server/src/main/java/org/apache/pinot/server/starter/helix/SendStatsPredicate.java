@@ -67,7 +67,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         return new SendStatsPredicate() {
           @Override
           public boolean getSendStats() {
-            return false;
+            return true;
           }
 
           @Override
