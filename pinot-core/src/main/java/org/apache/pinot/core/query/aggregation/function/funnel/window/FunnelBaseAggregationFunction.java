@@ -25,15 +25,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public abstract class FunnelBaseAggregationFunction<F extends Comparable>
@@ -230,13 +233,27 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     if (intermediateResult2 == null) {
       return intermediateResult1;
     }
+
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
     intermediateResult1.addAll(intermediateResult2);
     return intermediateResult1;
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(PriorityQueue<FunnelStepEvent> funnelStepEvents) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FunnelStepEventAccumulator.getValue(),
+        ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.serialize(funnelStepEvents));
+  }
+
+  @Override
+  public PriorityQueue<FunnelStepEvent> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   /**
