@@ -49,7 +49,7 @@ public class SemaphoreAccessCoordinator {
   @Nullable
   private Set<Integer> _segmentSequenceNumSet = null;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final AtomicBoolean _isFirstTransitionSuccessful;
+  private final AtomicBoolean _isFirstTransitionProcessed;
 
   public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
       RealtimeTableDataManager realtimeTableDataManager) {
@@ -64,7 +64,7 @@ public class SemaphoreAccessCoordinator {
     if (trackSegmentSeqNumber) {
       _segmentSequenceNumSet = new HashSet<>();
     }
-    _isFirstTransitionSuccessful = new AtomicBoolean(false);
+    _isFirstTransitionProcessed = new AtomicBoolean(false);
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -122,7 +122,7 @@ public class SemaphoreAccessCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
 
-    if ((_segmentSequenceNumSet == null) || (!_isFirstTransitionSuccessful.get())) {
+    if ((_segmentSequenceNumSet == null) || (!_isFirstTransitionProcessed.get())) {
       // if _segmentSequenceNumSet is null or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
       String previousSegment = getPreviousSegment(currSegment);
@@ -154,7 +154,7 @@ public class SemaphoreAccessCoordinator {
       // the first transition will always be prone to error, consider edge case where segment previous to current
       // helix transition's segment was deleted and this server came alive after successful deletion. the prev
       // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
-      _isFirstTransitionSuccessful.compareAndSet(false, true);
+      _isFirstTransitionProcessed.compareAndSet(false, true);
       return;
     }
 
