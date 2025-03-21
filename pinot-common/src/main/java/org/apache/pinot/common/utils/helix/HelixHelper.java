@@ -45,6 +45,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -641,5 +642,16 @@ public class HelixHelper {
     boolean listUpdated = record.getListFields().remove(disabledPartitionsKey) != null;
     boolean mapUpdated = record.getMapFields().remove(disabledPartitionsKey) != null;
     return listUpdated | mapUpdated;
+  }
+
+  public static boolean updatePinotVersion(InstanceConfig instanceConfig) {
+    ZNRecord record = instanceConfig.getRecord();
+    String currentVer = PinotVersion.VERSION;
+    String oldVer = record.getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY);
+    if (!currentVer.equals(oldVer)) {
+      record.setSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, currentVer);
+      return true;
+    }
+    return false;
   }
 }

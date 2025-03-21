@@ -51,14 +51,6 @@ public class PipelineBreakerExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
 
-  @Nullable
-  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
-    return executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan, opChainMetadata, requestId,
-        deadlineMs, null);
-  }
-
   /**
    * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
    *    execute mailbox receive pipeline breaker.
@@ -77,7 +69,7 @@ public class PipelineBreakerExecutor {
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs,
-      @Nullable ThreadExecutionContext parentContext) {
+      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -87,7 +79,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
-                stagePlan.getStageMetadata(), workerMetadata, null, parentContext);
+                stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
