@@ -19,9 +19,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.base.Preconditions;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,8 +45,8 @@ public class SemaphoreAccessCoordinator {
   private final boolean _enforceConsumptionInOrder;
   private final Condition _condition;
   private final Lock _lock;
-  @Nullable
-  private Set<Integer> _segmentSequenceNumSet = null;
+  private int _maxSegmentSeqNumLoaded = -1;
+  private boolean _relyOnIdealState = false;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _isFirstTransitionProcessed;
 
@@ -65,8 +63,8 @@ public class SemaphoreAccessCoordinator {
       trackSegmentSeqNumber = streamIngestionConfig.isTrackSegmentSeqNumber();
     }
     // if trackSegmentSeqNumber is false, server relies on ideal state to fetch previous segment to a segment.
-    if (trackSegmentSeqNumber) {
-      _segmentSequenceNumSet = new HashSet<>();
+    if (!trackSegmentSeqNumber) {
+      _relyOnIdealState = true;
     }
     _isFirstTransitionProcessed = new AtomicBoolean(false);
   }
@@ -104,8 +102,8 @@ public class SemaphoreAccessCoordinator {
   public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      if (_segmentSequenceNumSet != null) {
-        _segmentSequenceNumSet.add(llcSegmentName.getSequenceNumber());
+      if (!_relyOnIdealState) {
+        _maxSegmentSeqNumLoaded = Math.max(_maxSegmentSeqNumLoaded, llcSegmentName.getSequenceNumber());
       }
       // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
       _condition.signalAll();
@@ -114,19 +112,12 @@ public class SemaphoreAccessCoordinator {
     }
   }
 
-  private void waitUntilTableIsReady()
-      throws InterruptedException {
-    while (!_realtimeTableDataManager.getIsTableReadyToConsumeData().getAsBoolean()) {
-      Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-    }
-  }
-
   private void waitForPrevSegment(LLCSegmentName currSegment)
       throws InterruptedException {
 
     long startTimeMs = System.currentTimeMillis();
 
-    if ((_segmentSequenceNumSet == null) || (!_isFirstTransitionProcessed.get())) {
+    if ((_relyOnIdealState) || (!_isFirstTransitionProcessed.get())) {
       // if _segmentSequenceNumSet is null or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
       String previousSegment = getPreviousSegment(currSegment);
@@ -165,9 +156,8 @@ public class SemaphoreAccessCoordinator {
     int prevSeqNum = currSegment.getSequenceNumber() - 1;
     _lock.lock();
     try {
-      while (!_segmentSequenceNumSet.contains(prevSeqNum)) {
-        // if _segmentSequenceNumSet does not contain prev segment's seq num, it means segment is not loaded in the
-        // server. Wait until it's loaded.
+      while (_maxSegmentSeqNumLoaded < prevSeqNum) {
+        // it means all segments until _maxSegmentSeqNumLoaded is not loaded in the server. Wait until it's loaded.
         while (!_condition.await(5, TimeUnit.MINUTES)) {
           LOGGER.warn("Semaphore access denied to segment: {}."
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
