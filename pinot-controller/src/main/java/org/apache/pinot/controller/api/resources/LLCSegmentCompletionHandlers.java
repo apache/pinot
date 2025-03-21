@@ -297,6 +297,28 @@ public class LLCSegmentCompletionHandlers {
     return response;
   }
 
+  @GET
+  @Path(SegmentCompletionProtocol.MSG_TYPE_BUILD_DETERMINISTIC_FAILURE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Produces(MediaType.APPLICATION_JSON)
+  public String reduceSegmentSize(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
+    if (instanceId == null || segmentName == null || numRows <= 0) {
+      LOGGER.error("Invalid call: segmentName={}, instanceId={}, numRowsCount={}", segmentName, instanceId,
+          numRows);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params()
+        .withInstanceId(instanceId)
+        .withSegmentName(segmentName)
+        .withNumRows(numRows);
+    LOGGER.info("Processing segmentStoppedConsuming: {}", requestParams);
+
+    return _segmentCompletionManager.reduceSegmentSizeAndReset(requestParams).toJsonString();
+  }
+
   /**
    * Extracts the segment file from the form into a local temporary file under file upload temporary directory.
    */

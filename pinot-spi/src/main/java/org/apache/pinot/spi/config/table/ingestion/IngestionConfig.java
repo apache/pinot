@@ -66,6 +66,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Configs related to skip any row which has error and continue during ingestion")
   private boolean _continueOnError;
 
+  @JsonPropertyDescription(
+      "Configs related to retry segment build on reduced size when previous build fails on Preconditions check")
+  private boolean _retryOnSegmentBuildPrecheckFailure;
+
   @JsonPropertyDescription("Configs related to validate time value for each record during ingestion")
   private boolean _rowTimeValueCheck;
 
@@ -136,6 +140,10 @@ public class IngestionConfig extends BaseJsonConfig {
     return _continueOnError;
   }
 
+  public boolean isRetryOnSegmentBuildPrecheckFailure() {
+    return _retryOnSegmentBuildPrecheckFailure;
+  }
+
   public boolean isRowTimeValueCheck() {
     return _rowTimeValueCheck;
   }
@@ -179,6 +187,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setContinueOnError(boolean continueOnError) {
     _continueOnError = continueOnError;
+  }
+
+  public void setRetryOnSegmentBuildPrecheckFailure(boolean retryOnSegmentBuildPrecheckFailure) {
+    _retryOnSegmentBuildPrecheckFailure = retryOnSegmentBuildPrecheckFailure;
   }
 
   public void setRowTimeValueCheck(boolean rowTimeValueCheck) {
