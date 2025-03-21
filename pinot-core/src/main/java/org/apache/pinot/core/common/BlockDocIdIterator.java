@@ -51,6 +51,7 @@ public interface BlockDocIdIterator extends AutoCloseable {
   /**
    * Close resources if applicable.
    */
+  @Override
   default void close() {
     // do nothing by default
   }
