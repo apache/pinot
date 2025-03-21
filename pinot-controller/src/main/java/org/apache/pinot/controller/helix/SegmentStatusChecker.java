@@ -256,7 +256,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         segmentNamesBytesSize += segmentName.getBytes().length;
       }
     }
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE, segmentNamesBytesSize);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
+        segmentNamesBytesSize);
 
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
