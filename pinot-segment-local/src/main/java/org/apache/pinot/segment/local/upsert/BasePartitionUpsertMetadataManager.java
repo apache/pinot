@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
@@ -107,7 +106,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
   protected volatile boolean _gotFirstConsumingSegment = false;
-  protected final ReadWriteLock _snapshotLock;
+  protected final ReentrantReadWriteLock _snapshotLock;
 
   protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
   protected int _numOutOfOrderEvents = 0;
@@ -849,9 +848,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip taking snapshot because metadata manager is already stopped");
       return;
     }
-    _snapshotLock.writeLock().lock();
+
     try {
       long startTime = System.currentTimeMillis();
+      while (!_snapshotLock.writeLock().tryLock(5, TimeUnit.MINUTES)) {
+        _logger.warn("Unable to acquire snapshotLock.writeLock in: {}", System.currentTimeMillis() - startTime);
+      }
       doTakeSnapshot();
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
@@ -859,7 +861,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     } catch (Exception e) {
       _logger.warn("Caught exception while taking snapshot", e);
     } finally {
-      _snapshotLock.writeLock().unlock();
+      if (_snapshotLock.writeLock().isHeldByCurrentThread()) {
+        _snapshotLock.writeLock().unlock();
+      }
       finishOperation();
     }
   }
