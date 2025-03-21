@@ -165,8 +165,8 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      for (String meterType : TIMER_TYPES) {
-        PromMetric expectedTimer = PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType);
+      for (String timerType : TIMER_TYPES) {
+        PromMetric expectedTimer = PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + timerType);
         Assert.assertTrue(promMetrics.contains(expectedTimer),
             "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
@@ -180,9 +180,9 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      for (String meterType : TIMER_TYPES) {
+      for (String timerType : TIMER_TYPES) {
         PromMetric expectedTimer =
-            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels);
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + timerType, labels);
         Assert.assertTrue(promMetrics.contains(expectedTimer),
             "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
