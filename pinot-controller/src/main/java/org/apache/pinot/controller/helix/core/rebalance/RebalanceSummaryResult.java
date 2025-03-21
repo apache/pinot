@@ -306,6 +306,45 @@ public class RebalanceSummaryResult {
     }
   }
 
+  public static class ConsumingSegmentSummary {
+    private final int _numConsumingSegmentsToBeMoved;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Integer _maxBytesConsumingSegmentsToCatchUp;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private final Map<String, Integer> _bytesConsumingSegmentsToCatchUpPerServer;
+
+    /**
+     * Constructor for ConsumingSegmentInfo
+     * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
+     * @param maxBytesConsumingSegmentsToCatchUp maximum bytes of consuming segments to be moved to catch up
+     * @param bytesConsumingSegmentsToCatchUpPerServer bytes of consuming segments to be moved to catch up per server
+     */
+    @JsonCreator
+    public ConsumingSegmentSummary(@JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
+        @JsonProperty("maxBytesConsumingSegmentsToCatchUp") @Nullable Integer maxBytesConsumingSegmentsToCatchUp,
+        @JsonProperty("bytesConsumingSegmentsToCatchUpPerServer") @Nullable
+        Map<String, Integer> bytesConsumingSegmentsToCatchUpPerServer) {
+      _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
+      _maxBytesConsumingSegmentsToCatchUp = maxBytesConsumingSegmentsToCatchUp;
+      _bytesConsumingSegmentsToCatchUpPerServer = bytesConsumingSegmentsToCatchUpPerServer;
+    }
+
+    @JsonProperty
+    public int getNumConsumingSegmentsToBeMoved() {
+      return _numConsumingSegmentsToBeMoved;
+    }
+
+    @JsonProperty
+    public Integer getMaxBytesConsumingSegmentsToCatchUp() {
+      return _maxBytesConsumingSegmentsToCatchUp;
+    }
+
+    @JsonProperty
+    public Map<String, Integer> getBytesConsumingSegmentsToCatchUpPerServer() {
+      return _bytesConsumingSegmentsToCatchUpPerServer;
+    }
+  }
+
   public static class SegmentInfo {
     // TODO: Add a metric to estimate the total time it will take to rebalance
     private final int _totalSegmentsToBeMoved;
@@ -319,7 +358,7 @@ public class RebalanceSummaryResult {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private final Integer _consumingSegmentsToBeMoved;
+    private final ConsumingSegmentSummary _consumingSegmentSummary;
 
     /**
      * Constructor for SegmentInfo
@@ -339,7 +378,7 @@ public class RebalanceSummaryResult {
         @JsonProperty("replicationFactor") @Nullable RebalanceChangeInfo replicationFactor,
         @JsonProperty("numSegmentsInSingleReplica") @Nullable RebalanceChangeInfo numSegmentsInSingleReplica,
         @JsonProperty("numSegmentsAcrossAllReplicas") @Nullable RebalanceChangeInfo numSegmentsAcrossAllReplicas,
-        @JsonProperty("consumingSegmentsToBeMoved") @Nullable Integer consumingSegmentsToBeMoved) {
+        @JsonProperty("consumingSegmentSummary") @Nullable ConsumingSegmentSummary consumingSegmentSummary) {
       _totalSegmentsToBeMoved = totalSegmentsToBeMoved;
       _maxSegmentsAddedToASingleServer = maxSegmentsAddedToASingleServer;
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
@@ -347,7 +386,7 @@ public class RebalanceSummaryResult {
       _replicationFactor = replicationFactor;
       _numSegmentsInSingleReplica = numSegmentsInSingleReplica;
       _numSegmentsAcrossAllReplicas = numSegmentsAcrossAllReplicas;
-      _consumingSegmentsToBeMoved = consumingSegmentsToBeMoved;
+      _consumingSegmentSummary = consumingSegmentSummary;
     }
 
     @JsonProperty
@@ -386,8 +425,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public Integer getConsumingSegmentsToBeMoved() {
-      return _consumingSegmentsToBeMoved;
+    public ConsumingSegmentSummary getConsumingSegmentSummary() {
+      return _consumingSegmentSummary;
     }
   }
 

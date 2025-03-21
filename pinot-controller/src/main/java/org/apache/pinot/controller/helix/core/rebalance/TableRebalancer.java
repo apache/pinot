@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
@@ -37,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -50,6 +52,8 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -58,11 +62,13 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -127,10 +133,15 @@ public class TableRebalancer {
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
+  private final ExecutorService _executorService;
+  private final HttpClientConnectionManager _connectionManager;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader) {
+      @Nullable TableSizeReader tableSizeReader, @Nullable ExecutorService executorService,
+      @Nullable HttpClientConnectionManager connectionManager,
+      @Nullable PinotHelixResourceManager pinotHelixResourceManager) {
     _helixManager = helixManager;
     if (tableRebalanceObserver != null) {
       _tableRebalanceObserver = tableRebalanceObserver;
@@ -141,10 +152,20 @@ public class TableRebalancer {
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
     _tableSizeReader = tableSizeReader;
+    _executorService = executorService;
+    _connectionManager = connectionManager;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
+  }
+
+  public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
+      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
+      @Nullable TableSizeReader tableSizeReader) {
+    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader, null, null,
+        null);
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null, null);
+    this(helixManager, null, null, null, null, null, null, null);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -701,8 +722,17 @@ public class TableRebalancer {
     int segmentsNotMoved = 0;
     Set<String> consumingSegments = new HashSet<>();
     boolean isOfflineTable = TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE;
-    Integer consumingSegmentsToBeMoved = isOfflineTable ? null : 0;
+    Integer consumingSegmentsToBeMoved = null;
+    Integer maxBytesToCatchUpForConsumingSegments = null;
+    Map<String, Integer> bytesToCatchUpForSegments = null;
+    Map<String, Integer> bytesToCatchUpForServers = null;
     if (!isOfflineTable) {
+      consumingSegmentsToBeMoved = 0;
+      bytesToCatchUpForSegments = getConsumingSegmentsBytesToCatchUp(tableNameWithType);
+      if (bytesToCatchUpForSegments != null) {
+        maxBytesToCatchUpForConsumingSegments = 0;
+        bytesToCatchUpForServers = new HashMap<>();
+      }
       for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
         String segmentName = entry.getKey();
         Map<String, String> instanceStateMap = entry.getValue();
@@ -743,9 +773,17 @@ public class TableRebalancer {
         serversGettingNewSegments.add(server);
       }
       if (!isOfflineTable) {
+        if (bytesToCatchUpForServers != null) {
+          bytesToCatchUpForServers.put(server, 0);
+        }
         for (String segment : newSegmentSet) {
           if (consumingSegments.contains(segment)) {
             consumingSegmentsToBeMoved++;
+            if (bytesToCatchUpForSegments != null) {
+              int bytesToCatchUp = bytesToCatchUpForSegments.getOrDefault(segment, 0);
+              maxBytesToCatchUpForConsumingSegments = Math.max(maxBytesToCatchUpForConsumingSegments, bytesToCatchUp);
+              bytesToCatchUpForServers.put(server, bytesToCatchUpForServers.get(server) + bytesToCatchUp);
+            }
           }
         }
       }
@@ -813,9 +851,12 @@ public class TableRebalancer {
         serversGettingNewSegments, serverSegmentChangeInfoMap);
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
+    RebalanceSummaryResult.ConsumingSegmentSummary consumingSegmentSummary =
+        isOfflineTable ? null : new RebalanceSummaryResult.ConsumingSegmentSummary(
+            consumingSegmentsToBeMoved, maxBytesToCatchUpForConsumingSegments, bytesToCatchUpForServers);
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
         maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
-        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentsToBeMoved);
+        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentSummary);
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
@@ -826,6 +867,57 @@ public class TableRebalancer {
     InstanceConfig instanceConfig =
         _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(serverName));
     return instanceConfig.getTags();
+  }
+
+  @VisibleForTesting
+  ConsumingSegmentInfoReader getConsumingSegmentInfoReader() {
+    if (_executorService == null || _connectionManager == null || _pinotHelixResourceManager == null) {
+      return null;
+    }
+    return new ConsumingSegmentInfoReader(_executorService, _connectionManager, _pinotHelixResourceManager);
+  }
+
+  private Map<String, Integer> getConsumingSegmentsBytesToCatchUp(String tableNameWithType) {
+    ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
+    if (consumingSegmentInfoReader == null) {
+      LOGGER.warn("ConsumingSegmentInfoReader is null, cannot calculate consuming segments info for table: {}",
+          tableNameWithType);
+      return null;
+    }
+    Map<String, Integer> segmentToBytesToCatchUp = new HashMap<>();
+    try {
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
+          consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 30_000);
+      for (Map.Entry<String, List<ConsumingSegmentInfoReader.ConsumingSegmentInfo>> entry
+          : consumingSegmentsInfoMap._segmentToConsumingInfoMap.entrySet()) {
+        String segmentName = entry.getKey();
+        List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfoList = entry.getValue();
+        SegmentZKMetadata segmentZKMetadata =
+            ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType,
+                segmentName);
+        if (segmentZKMetadata == null) {
+          LOGGER.warn("Cannot find SegmentZKMetadata for segment: {} in table: {}", segmentName, tableNameWithType);
+          continue;
+        }
+        if (consumingSegmentInfoList != null) {
+          String startOffset = segmentZKMetadata.getStartOffset();
+          if (startOffset == null) {
+            LOGGER.warn("Start offset is null for segment: {} in table: {}", segmentName, tableNameWithType);
+            continue;
+          }
+          Integer bytesToCatchUp = null;
+          if (!consumingSegmentInfoList.isEmpty()) {
+            bytesToCatchUp = consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
+                .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
+          }
+          segmentToBytesToCatchUp.put(segmentName, bytesToCatchUp);
+        }
+      }
+    } catch (InvalidConfigException e) {
+      LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);
+      return null;
+    }
+    return segmentToBytesToCatchUp;
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {

@@ -326,7 +326,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
    * @return A new instance of PinotHelixResourceManager.
    */
   protected PinotHelixResourceManager createHelixResourceManager() {
-    return new PinotHelixResourceManager(_config, _executorService);
+    return new PinotHelixResourceManager(_config, _executorService, _connectionManager);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
