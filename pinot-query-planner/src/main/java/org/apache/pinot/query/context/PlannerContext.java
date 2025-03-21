@@ -33,6 +33,7 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.logical.LogicalPlanner;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.validate.Validator;
 
 
@@ -53,10 +54,12 @@ public class PlannerContext implements AutoCloseable {
   private final Map<String, String> _options;
   private final Map<String, String> _plannerOutput;
   private final SqlExplainFormat _sqlExplainFormat;
+  private final PhysicalPlannerContext _physicalPlannerContext;
+  private final boolean _usePhysicalOptimizer;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
       HepProgram optProgram, HepProgram traitProgram, Map<String, String> options, QueryEnvironment.Config envConfig,
-      SqlExplainFormat sqlExplainFormat) {
+      SqlExplainFormat sqlExplainFormat, long requestId, boolean usePhysicalOptimizer) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
@@ -65,6 +68,18 @@ public class PlannerContext implements AutoCloseable {
     _options = options;
     _plannerOutput = new HashMap<>();
     _sqlExplainFormat = sqlExplainFormat;
+    WorkerManager workerManager = envConfig.getWorkerManager();
+    if (workerManager != null) {
+      _physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
+          workerManager.getHostName(), workerManager.getPort(), requestId, workerManager.getInstanceId());
+    } else {
+      _physicalPlannerContext = new PhysicalPlannerContext();
+    }
+    _usePhysicalOptimizer = usePhysicalOptimizer;
+  }
+
+  public boolean usePhysicalOptimizer() {
+    return _usePhysicalOptimizer;
   }
 
   public PlannerImpl getPlanner() {
@@ -98,5 +113,9 @@ public class PlannerContext implements AutoCloseable {
 
   public SqlExplainFormat getSqlExplainFormat() {
     return _sqlExplainFormat;
+  }
+
+  public PhysicalPlannerContext getPhysicalPlannerContext() {
+    return _physicalPlannerContext;
   }
 }
