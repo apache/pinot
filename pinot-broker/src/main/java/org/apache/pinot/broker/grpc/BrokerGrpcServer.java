@@ -322,15 +322,15 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
   static GrpcConfig createQueryClientConfig(PinotConfiguration brokerConf) {
     Map<String, Object> target = brokerConf.toMap();
     target.put(GrpcConfig.CONFIG_USE_PLAIN_TEXT,
-        !brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_INTERNAL_TLS_ENABLED, false));
+        !brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_ENABLED, false));
     Map<String, Object> convertedTlsMap =
         target.keySet()
             .stream()
             .filter(propName -> propName.startsWith(
-                CommonConstants.Broker.Grpc.KEY_OF_GRPC_INTERNAL_TLS_PREFIX))
+                CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PREFIX))
             .collect(Collectors.toMap(
                 propName -> GrpcConfig.GRPC_TLS_PREFIX + "." + propName.substring(
-                    CommonConstants.Broker.Grpc.KEY_OF_GRPC_INTERNAL_TLS_PREFIX.length() + 1),
+                    CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PREFIX.length() + 1),
                 target::get
             ));
     target.putAll(convertedTlsMap);
@@ -340,5 +340,13 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
   public static boolean isEnabled(PinotConfiguration brokerConf) {
     return (brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1) > 0)
         || (brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PORT, -1) > 0);
+  }
+
+  public static int getGrpcPort(PinotConfiguration brokerConf) {
+    int secureGrpcPort = brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_TLS_PORT, -1);
+    if (secureGrpcPort > 0) {
+      return secureGrpcPort;
+    }
+    return brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1);
   }
 }

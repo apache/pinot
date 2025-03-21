@@ -61,7 +61,7 @@ public class GrpcConnection {
     LOGGER.info("Created connection to broker list {}", brokerList);
   }
 
-  GrpcConnection(Properties properties, BrokerSelector brokerSelector) {
+  public GrpcConnection(Properties properties, BrokerSelector brokerSelector) {
     _brokerSelector = brokerSelector;
     // Convert Properties properties to a Map
     Map<String, Object> propertiesMap = new HashMap<>();

@@ -23,16 +23,25 @@ public class CompressionFactory {
   }
 
   public static String[] getCompressionTypes() {
-    return new String[]{"LZ4_FAST", "LZ4_HIGH", "ZSTD", "DEFLATE", "GZIP", "SNAPPY", "NONE"};
+    return new String[]{
+        "LZ4", "LZ4_FAST", "LZ4_HIGH",
+        "ZSTD", "ZSTANDARD",
+        "DEFLATE",
+        "GZIP",
+        "SNAPPY",
+        "PASS_THROUGH", "NONE"
+    };
   }
 
   public static Compressor getCompressor(String type) {
     switch (type.toUpperCase()) {
+      case "LZ4":
       case "LZ4_FAST":
         return Lz4Compressor.FAST_INSTANCE;
       case "LZ4_HIGH":
         return Lz4Compressor.HIGH_INSTANCE;
       case "ZSTD":
+      case "ZSTANDARD":
         return ZstdCompressor.DEFAULT_INSTANCE;
       case "DEFLATE":
         return DeflateCompressor.INSTANCE;
@@ -40,6 +49,7 @@ public class CompressionFactory {
         return GzipCompressor.INSTANCE;
       case "SNAPPY":
         return SnappyCompressor.INSTANCE;
+      case "PASS_THROUGH":
       case "NONE":
         return NoCompressor.INSTANCE;
       default:
