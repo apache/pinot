@@ -883,6 +883,157 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelEventsFunctionEvalGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "userId, funnelEventsFunctionEval(timestampCol, '1000', 4, "
+            + "url = '/product/search', "
+            + "url = '/cart/add', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "3, timestampCol, userId, url"
+            + ") "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("query = " + query);
+    System.out.println("jsonNode = " + jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    System.out.println(rows);
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      System.out.println("row = " + row);
+      //assertEquals(row.size(), 2);
+      //assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          //assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 2:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 3:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelStepDurationStatsGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+                + "userId, funnelStepDurationStats(timestampCol, '1000', 4, "
+                + "url = '/product/search', "
+                + "url = '/cart/add', "
+                + "url = '/checkout/start', "
+                + "url = '/checkout/confirmation', "
+                + "'durationFunctions=count,avg,min,median,percentile95,max' "
+                + ") as statsArray "
+                + "FROM %s GROUP BY userId HAVING arrayLengthDouble(statsArray) > 0 ORDER BY userId LIMIT %d",
+            getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("query = " + query);
+    System.out.println("jsonNode = " + jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    System.out.println(rows);
+    //assertEquals(rows.size(), 40);
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      System.out.println("row = " + row);
+      //assertEquals(row.size(), 2);
+      //assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          //assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 2:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 3:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testFunnelStepDurationStatsGroupByQueries2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("WITH durationStats AS (SELECT "
+                + "/*+ aggOptions( is_partitioned_by_group_by_keys = 'true') */ "
+                + "userId, funnelStepDurationStats(timestampCol, '1000', 4, "
+                + "url = '/product/search', "
+                + "url = '/cart/add', "
+                + "url = '/checkout/start', "
+                + "url = '/checkout/confirmation', "
+                + "'durationFunctions=count,avg,median' "
+                + ") as stats "
+                + "FROM %s "
+                + "GROUP BY userId) "
+                + "SELECT "
+                + "sum(arrayElementAtDouble(stats, 1)) AS count_step0, "
+                + "AVG(arrayElementAtDouble(stats, 2)) AS avg_avg_step0_to_step1, "
+                + "AVG(arrayElementAtDouble(stats, 3)) AS avg_median_step0_to_step1, "
+                + "sum(arrayElementAtDouble(stats, 4)) AS count_step1, "
+                + "AVG(arrayElementAtDouble(stats, 5)) AS avg_avg_step1_to_step2, "
+                + "AVG(arrayElementAtDouble(stats, 6)) AS avg_median_step1_to_step2, "
+                + "sum(arrayElementAtDouble(stats, 7)) AS count_step2, "
+                + "AVG(arrayElementAtDouble(stats, 8)) AS avg_avg_step2_to_step3, "
+                + "AVG(arrayElementAtDouble(stats, 9)) AS avg_median_step2_to_step3, "
+                + "sum(arrayElementAtDouble(stats, 10)) AS count_step3 "
+                + "FROM durationStats "
+                + "OPTION(useMultistageEngine=true, numGroupsLimit=2000000, timeoutMs=1800000, "
+                + "serverReturnFinalResult=true, numThreadsForFinalReduce=4)",
+            getTableName());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("query = " + query);
+    System.out.println("jsonNode = " + jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    System.out.println(rows);
+    //assertEquals(rows.size(), 40);
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      System.out.println("row = " + row);
+      //assertEquals(row.size(), 2);
+      //assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          //assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 2:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 3:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
   @Override
   public String getTableName() {
     return WindowFunnelUtils.DEFAULT_TABLE_NAME;
