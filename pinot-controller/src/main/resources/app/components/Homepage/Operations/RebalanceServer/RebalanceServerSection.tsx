@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {Box, Typography} from "@material-ui/core";
+import {Box, Divider, Typography} from "@material-ui/core";
 import React, {ReactNode, useEffect, useRef, useState} from "react";
 import Link from "@material-ui/core/Link";
 
@@ -25,10 +25,11 @@ type RebalanceServerConfigurationSectionProps = {
     children: ReactNode;
     showSectionByDefault?: boolean;
     canHideSection?: boolean;
+    additionalSectionTitle?: ReactNode;
 }
 
-export const RebalanceServerConfigurationSection = (
-    { sectionTitle, children, showSectionByDefault = true, canHideSection = false }: RebalanceServerConfigurationSectionProps
+export const RebalanceServerSection = (
+    { sectionTitle, additionalSectionTitle, children, showSectionByDefault = true, canHideSection = false }: RebalanceServerConfigurationSectionProps
 ) => {
     const [showSection, setShowSection] = useState<boolean>(showSectionByDefault);
     const showHideSectionRef = useRef(null);
@@ -56,6 +57,7 @@ export const RebalanceServerConfigurationSection = (
                 <Typography variant='body1' style={{ fontWeight: 'bold', marginRight: 10 }}>
                     {sectionTitle}
                 </Typography>
+                {additionalSectionTitle}
                 {canHideSection && (
                     <Link style={{ cursor: 'pointer' }} onClick={() => setShowSection(visible => !visible)}>
                         { showSection ? "Hide" : "Show" }
