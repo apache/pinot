@@ -2238,7 +2238,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>4.6</version>
+          <version>5.0.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
