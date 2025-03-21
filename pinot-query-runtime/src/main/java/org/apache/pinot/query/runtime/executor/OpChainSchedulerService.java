@@ -28,7 +28,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,10 +53,8 @@ public class OpChainSchedulerService {
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
-          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
-              ThreadExecutionContext.TaskType.MSE, threadResourceUsageProvider,
-              operatorChain.getParentContext());
+              ThreadExecutionContext.TaskType.MSE, operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
           TransferableBlock result = operatorChain.getRoot().nextBlock();
           while (!result.isEndOfStreamBlock()) {

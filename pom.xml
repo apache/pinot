@@ -25,7 +25,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>33</version>
+    <version>34</version>
     <relativePath />
   </parent>
 
@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.2</aws.sdk.version>
+    <aws.sdk.version>2.31.5</aws.sdk.version>
     <azure.sdk.version>1.2.32</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
@@ -184,7 +184,6 @@
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
-    <circe.version>0.14.12</circe.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
@@ -200,7 +199,7 @@
     <commons-text.version>1.13.0</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
-    <commons-csv.version>1.13.0</commons-csv.version>
+    <commons-csv.version>1.14.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-beanutils.version>1.10.1</commons-beanutils.version>
     <commons-io.version>2.18.0</commons-io.version>
@@ -228,7 +227,7 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.4.2</httpclient5.version>
-    <httpcore5.version>5.3.3</httpcore5.version>
+    <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
@@ -236,7 +235,7 @@
     <google.cloud.libraries.version>26.56.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.36.0</google.errorprone.version>
+    <google.errorprone.version>2.37.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -1630,16 +1629,6 @@
         <version>${scala-xml.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.circe</groupId>
-        <artifactId>circe-parser_${scala.compat.version}</artifactId>
-        <version>${circe.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.circe</groupId>
-        <artifactId>circe-generic_${scala.compat.version}</artifactId>
-        <version>${circe.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.codehaus.plexus</groupId>
         <artifactId>plexus-classworlds</artifactId>
         <version>${plexus-classworlds.version}</version>
@@ -2249,7 +2238,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>4.6</version>
+          <version>5.0.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>

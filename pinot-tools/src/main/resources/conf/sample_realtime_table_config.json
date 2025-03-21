@@ -24,7 +24,6 @@
     ],
     "streamConfigs": {
       "streamType": "kafka",
-      "stream.kafka.consumer.type": "lowLevel",
       "stream.kafka.topic.name": "kafkaTopicName",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder",
       "stream.kafka.decoder.prop.schema.registry.rest.url": "http://localhost:2222/schemaRegistry",

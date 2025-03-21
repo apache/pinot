@@ -64,7 +64,6 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
@@ -382,8 +381,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
-          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-          Tracing.ThreadAccountantOps.setupWorker(1, threadResourceUsageProvider, parentContext);
+          Tracing.ThreadAccountantOps.setupWorker(1, parentContext);
 
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
@@ -416,8 +414,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
             ServerQueryRequest request = _requests.get(i);
             int taskId = i;
             futures[i] = _executorService.submit(() -> {
-              ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
-              Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
+              Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
               try {
                 InstanceResponseBlock instanceResponseBlock =

@@ -21,7 +21,6 @@
       "bootstrap.servers": "localhost:19092",
       "stream.kafka.broker.list": "localhost:19092",
       "streamType": "kafka",
-      "stream.kafka.consumer.type": "lowLevel",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
       "realtime.segment.flush.threshold.size": 30,
