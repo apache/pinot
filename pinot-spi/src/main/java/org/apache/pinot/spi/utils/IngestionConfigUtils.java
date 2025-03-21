@@ -19,15 +19,16 @@
 package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -67,10 +68,9 @@ public final class IngestionConfigUtils {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
         "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
-    if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      List<Map<String, String>> streamConfigMaps =
-          tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+      List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
       Preconditions.checkState(!streamConfigMaps.isEmpty(), "Table must have at least 1 stream");
       /*
       Apply the following checks if there are multiple streamConfigs
@@ -100,8 +100,9 @@ public final class IngestionConfigUtils {
       }
       return streamConfigMaps;
     }
-    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null) {
-      return Arrays.asList(tableConfig.getIndexingConfig().getStreamConfigs());
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig.getStreamConfigs() != null) {
+      return List.of(indexingConfig.getStreamConfigs());
     }
     throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
   }
