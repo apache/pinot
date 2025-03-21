@@ -105,6 +105,17 @@ public class ControllerRequestClient {
     }
   }
 
+  public void forceUpdateSchema(Schema schema)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forSchemaUpdate(schema.getSchemaName()) + "?force=true";
+    try {
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendMultipartPutRequest(url, schema.toSingleLineJsonString(), _headers));
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void deleteSchema(String schemaName)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaDelete(schemaName);

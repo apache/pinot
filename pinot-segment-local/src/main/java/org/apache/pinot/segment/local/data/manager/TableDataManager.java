@@ -308,7 +308,7 @@ public interface TableDataManager {
   /**
    * Constructs the index loading config for the table with the given table config and schema.
    */
-  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema);
+  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, Schema schema);
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED

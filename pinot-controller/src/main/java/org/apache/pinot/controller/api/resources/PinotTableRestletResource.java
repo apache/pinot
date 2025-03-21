@@ -112,7 +112,6 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -194,9 +193,8 @@ public class PinotTableRestletResource {
   HttpClientConnectionManager _connectionManager;
 
   /**
-   * API to create a table. Before adding, validations will be done (min number of replicas,
-   * checking offline and realtime table configs match, checking for tenants existing)
-   * @param tableConfigStr
+   * API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
+   * realtime table configs match, checking for tenants existing).
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
@@ -218,14 +216,13 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       tableConfig.setTableName(tableNameWithType);
-      // Handle legacy config
-      handleLegacySchemaConfig(tableConfig, httpHeaders);
 
       // validate permission
       ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
           AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
@@ -490,8 +487,6 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
-      // Handle legacy config
-      handleLegacySchemaConfig(tableConfig, headers);
       String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!tableNameFromPath.equals(tableNameWithType)) {
@@ -500,7 +495,8 @@ public class PinotTableRestletResource {
             Response.Status.BAD_REQUEST);
       }
 
-      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
@@ -559,24 +555,22 @@ public class PinotTableRestletResource {
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
     tableConfig.setTableName(tableNameWithType);
 
-    // Handle legacy config
-    handleLegacySchemaConfig(tableConfig, httpHeaders);
-
     // validate permission
     ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
         AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
-    ObjectNode validationResponse =
-        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
+    ObjectNode validationResponse = validateConfig(tableConfig, typesToSkip);
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 
-  private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+  private ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
+    String tableNameWithType = tableConfig.getTableName();
     try {
+      Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       if (schema == null) {
-        throw new SchemaNotFoundException("Got empty schema");
+        throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
@@ -588,7 +582,7 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr;
     } catch (Exception e) {
-      String msg = String.format("Invalid table config: %s. %s", tableConfig.getTableName(), e.getMessage());
+      String msg = String.format("Invalid table config: %s. %s", tableNameWithType, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }
@@ -1277,24 +1271,6 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
-  }
-
-  /**
-   * Handles the legacy schema configuration for a given table configuration.
-   * This method updates the schema name in the validation configuration of the table config
-   * to ensure it is correctly translated based on the provided HTTP headers.
-   * This is necessary to maintain compatibility with older configurations that may not
-   * have the schema name properly set or formatted.
-   *
-   * @param tableConfig The {@link TableConfig} object containing the table configuration.
-   * @param httpHeaders The {@link HttpHeaders} object containing the HTTP headers, used to
-   *                    translate the schema name if necessary.
-   */
-  private void handleLegacySchemaConfig(TableConfig tableConfig, HttpHeaders httpHeaders) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
   }
 
   /**
