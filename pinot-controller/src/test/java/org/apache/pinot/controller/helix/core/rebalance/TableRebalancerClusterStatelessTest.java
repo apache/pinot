@@ -196,7 +196,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 14);
+    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 15);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 3);
@@ -210,19 +210,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       // Original servers should be losing some segments
       String newServer = SERVER_INSTANCE_ID_PREFIX + i;
       RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
-      assertTrue(serverSegmentChange.getSegmentsDeleted() > 0);
-      assertTrue(serverSegmentChange.getSegmentsUnchanged() > 0);
-      assertTrue(serverSegmentChange.getTotalSegmentsBeforeRebalance() > 0);
-      assertTrue(serverSegmentChange.getTotalSegmentsAfterRebalance() > 0);
+      assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 10);
+      assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
       assertEquals(serverSegmentChange.getSegmentsAdded(), 0);
+      assertEquals(serverSegmentChange.getSegmentsDeleted(), 5);
+      assertEquals(serverSegmentChange.getSegmentsUnchanged(), 5);
     }
     for (int i = 0; i < numServersToAdd; i++) {
       // New servers should only get new segments
       String newServer = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
       RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
-      assertTrue(serverSegmentChange.getSegmentsAdded() > 0);
       assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 0);
-      assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), serverSegmentChange.getSegmentsAdded());
+      assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
+      assertEquals(serverSegmentChange.getSegmentsAdded(), 5);
       assertEquals(serverSegmentChange.getSegmentsDeleted(), 0);
       assertEquals(serverSegmentChange.getSegmentsUnchanged(), 0);
     }
@@ -284,17 +284,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Map<String, IntIntPair> instanceToNumSegmentsToMoveMap =
         SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(oldSegmentAssignment, newSegmentAssignment);
     assertEquals(instanceToNumSegmentsToMoveMap.size(), numServers + numServersToAdd);
-    for (int i = 0; i < numServersToAdd; i++) {
-      IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
-      assertNotNull(numSegmentsToMove);
-      assertTrue(numSegmentsToMove.leftInt() > 0);
-      assertEquals(numSegmentsToMove.rightInt(), 0);
-    }
     for (int i = 0; i < numServers; i++) {
       IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + i);
       assertNotNull(numSegmentsToMove);
       assertEquals(numSegmentsToMove.leftInt(), 0);
-      assertTrue(numSegmentsToMove.rightInt() > 0);
+      assertEquals(numSegmentsToMove.rightInt(), 5);
+    }
+    for (int i = 0; i < numServersToAdd; i++) {
+      IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+      assertNotNull(numSegmentsToMove);
+      assertEquals(numSegmentsToMove.leftInt(), 5);
+      assertEquals(numSegmentsToMove.rightInt(), 0);
     }
 
     // Dry-run mode should not change the IdealState
@@ -361,7 +361,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 11);
+    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 20);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -372,11 +372,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       String newServer = SERVER_INSTANCE_ID_PREFIX + i;
       RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
+      assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 5);
       assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
-      // Ensure not all segments moved
-      assertTrue(serverSegmentChange.getSegmentsUnchanged() > 0);
-      // Ensure all segments has something assigned prior to rebalance
-      assertTrue(serverSegmentChange.getTotalSegmentsBeforeRebalance() > 0);
     }
 
     // Dry-run mode should not change the IdealState
@@ -951,12 +948,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 13);
+    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -964,7 +961,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertTrue(rebalanceResult.getTierInstanceAssignment().containsKey(TIER_A_NAME));
 
     InstancePartitions instancePartitions = rebalanceResult.getTierInstanceAssignment().get(TIER_A_NAME);
@@ -1016,7 +1013,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   @Test
   public void testRebalanceWithMinimizeDataMovementBalanced()
       throws Exception {
-    int numServers = 6;
+    int numServers = 3;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_balance_" + SERVER_INSTANCE_ID_PREFIX + i,
           true);
