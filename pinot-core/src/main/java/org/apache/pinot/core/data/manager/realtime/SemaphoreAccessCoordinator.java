@@ -118,7 +118,7 @@ public class SemaphoreAccessCoordinator {
     long startTimeMs = System.currentTimeMillis();
 
     if ((_relyOnIdealState) || (!_isFirstTransitionProcessed.get())) {
-      // if _segmentSequenceNumSet is null or no offline -> consuming transition has been processed, it means rely on
+      // if _relyOnIdealState or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
       String previousSegment = getPreviousSegment(currSegment);
       if (previousSegment == null) {
