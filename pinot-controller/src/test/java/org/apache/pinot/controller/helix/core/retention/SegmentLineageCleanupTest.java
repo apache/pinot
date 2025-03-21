@@ -30,6 +30,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -64,8 +65,10 @@ public class SegmentLineageCleanupTest {
     ControllerConf controllerConf = new ControllerConf();
     controllerConf.setRetentionControllerFrequencyInSeconds(0);
     controllerConf.setDeletedSegmentsRetentionInDays(0);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(_resourceManager, controllerConf, null, null);
     _retentionManager = new RetentionManager(_resourceManager, mock(LeadControllerManager.class), controllerConf,
-        mock(ControllerMetrics.class));
+        mock(ControllerMetrics.class), brokerServiceHelper);
 
     // Create a schema
     TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(OFFLINE_TABLE_NAME));
