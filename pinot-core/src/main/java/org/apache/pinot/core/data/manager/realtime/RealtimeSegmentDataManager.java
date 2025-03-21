@@ -1078,7 +1078,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // complete.
     if (_allowConsumptionDuringBuild) {
       if (!_allowConsumptionDuringDownload) {
-        _segmentLogger.info("Releasing semaphore early before the build where forCommit:{}", forCommit);
+        _segmentLogger.info("Releasing partitionGroupConsumerSemaphore early before segment build, forCommit:{}",
+            forCommit);
       }
       closeStreamConsumers();
     }
