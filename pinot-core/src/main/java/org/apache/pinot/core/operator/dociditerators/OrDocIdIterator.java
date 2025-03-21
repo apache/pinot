@@ -118,9 +118,7 @@ public final class OrDocIdIterator implements BlockDocIdIterator {
     while (i < _numNotExhaustedIterators) {
       if (_nextDocIds[i] == Constants.EOF) {
         // Close the exhausted iterator
-        if (_docIdIterators[i] instanceof ScanBasedDocIdIterator) {
-          ((ScanBasedDocIdIterator) _docIdIterators[i]).close();
-        }
+        _docIdIterators[i].close();
 
         // Need to check the new iterator moved to this index, so do not increase the index
         _numNotExhaustedIterators--;

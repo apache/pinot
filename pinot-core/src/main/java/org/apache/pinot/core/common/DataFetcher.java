@@ -598,7 +598,7 @@ public class DataFetcher implements AutoCloseable {
   @Override
   public void close() {
     for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
-        columnValueReader.close();
+      columnValueReader.close();
     }
   }
 }

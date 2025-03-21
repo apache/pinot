@@ -75,9 +75,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
 
   private void closeIterators() {
     for (BlockDocIdIterator it : _docIdIterators) {
-      if (it instanceof ScanBasedDocIdIterator) {
-        ((ScanBasedDocIdIterator) it).close();
-      }
+      it.close();
     }
   }
 }
