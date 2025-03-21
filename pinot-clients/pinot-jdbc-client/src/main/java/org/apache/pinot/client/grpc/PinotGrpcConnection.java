@@ -54,10 +54,6 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
   private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
   private final Map<String, String> _metadataMap = new HashMap<>();
 
-  public PinotGrpcConnection(String controllerURL, String tenant, PinotControllerTransport controllerTransport) {
-    this(new Properties(), controllerURL, tenant, controllerTransport);
-  }
-
   public PinotGrpcConnection(Properties properties, String controllerURL, String tenant,
       PinotControllerTransport controllerTransport) {
     _closed = false;
@@ -71,7 +67,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
     if (properties.containsKey(BROKER_LIST)) {
       brokers = Arrays.asList(properties.getProperty(BROKER_LIST).split(";"));
     } else {
-      brokers = getBrokerList(controllerURL, tenant);
+      brokers = getBrokerGrpcList(controllerURL, tenant);
     }
     _session = new GrpcConnection(properties, brokers);
 
@@ -101,10 +97,10 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
     return _metadataMap;
   }
 
-  private List<String> getBrokerList(String controllerURL, String tenant) {
+  private List<String> getBrokerGrpcList(String controllerURL, String tenant) {
     ControllerTenantBrokerResponse controllerTenantBrokerResponse =
         _controllerTransport.getBrokersFromController(controllerURL, tenant);
-    return controllerTenantBrokerResponse.getBrokers();
+    return controllerTenantBrokerResponse.getBrokerGrpcConnections();
   }
 
   @Override

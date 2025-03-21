@@ -45,6 +45,7 @@ import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
@@ -127,7 +128,8 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     Map<String, InstanceInfo> brokers = new HashMap<>();
     for (InstanceConfig broker : brokerList) {
       brokers.put(getInstanceKey(broker.getHostName(), broker.getPort()),
-          new InstanceInfo(broker.getInstanceName(), broker.getHostName(), Integer.parseInt(broker.getPort())));
+          new InstanceInfo(broker.getInstanceName(), broker.getHostName(), Integer.parseInt(broker.getPort()),
+              Integer.parseInt(HelixHelper.getGrpcPort(broker))));
     }
 
     try {

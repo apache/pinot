@@ -728,14 +728,13 @@ public class CommonConstants {
 
     public static class Grpc {
       public static final String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
+      public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
       public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
-      public static final String KEY_OF_GRPC_INTERNAL_TLS_ENABLED = "pinot.broker.grpc.internal.tls.enabled";
-      public static final String KEY_OF_GRPC_INTERNAL_TLS_PREFIX = "pinot.broker.grpc.internal.grpc.tls";
+      public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
 
       public static final String BLOCK_ROW_SIZE = "blockRowSize";
-      public static final String COMPRESSION = "compression";
-
       public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
+      public static final String COMPRESSION = "compression";
       public static final String DEFAULT_COMPRESSION = "ZSTD";
     }
 

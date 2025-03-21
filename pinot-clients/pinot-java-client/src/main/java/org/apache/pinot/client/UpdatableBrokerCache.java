@@ -42,7 +42,7 @@ public interface UpdatableBrokerCache {
 
   /**
    * Returns all the brokers currently in the cache
-   * @return List of all avaliable brokers
+   * @return List of all available brokers
    */
   List<String> getBrokers();
 
