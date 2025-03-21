@@ -221,6 +221,7 @@ public enum TransformFunctionType {
       OperandTypes.or(OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.INTEGER),
           OperandTypes.family(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER))),
   GRID_DISTANCE("gridDistance", ReturnTypes.BIGINT, OperandTypes.NUMERIC_NUMERIC),
+  GRID_DISK("gridDisk", ReturnTypes.BIGINT, OperandTypes.NUMERIC_NUMERIC),
 
   // Vector functions
   // TODO: Once VECTOR type is defined, we should update here.
