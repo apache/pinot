@@ -132,6 +132,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
 
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
   // Multi-stage
   /**
    * Number of times the max number of rows in the hash table has been reached.
