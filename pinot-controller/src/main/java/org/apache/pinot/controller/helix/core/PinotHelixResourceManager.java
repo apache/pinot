@@ -62,6 +62,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -243,11 +244,14 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private final ExecutorService _executorService;
+  private final HttpClientConnectionManager _connectionManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
+      @Nullable ExecutorService executorService, @Nullable HttpClientConnectionManager connectionManager,
+      double diskUtilizationThreshold) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -270,8 +274,20 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _connectionManager = connectionManager;
+    _executorService = executorService;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
+  }
+
+  public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService,
+      @Nullable HttpClientConnectionManager connectionManager) {
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
+        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
+        LineageManagerFactory.create(controllerConf),
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
+        connectionManager, controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -279,7 +295,7 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService, null,
         controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
@@ -288,7 +304,7 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null, null,
         controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
@@ -3623,7 +3639,7 @@ public class PinotHelixResourceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker,
-            _tableSizeReader);
+            _tableSizeReader, _executorService, _connectionManager, this);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 

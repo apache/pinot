@@ -24,10 +24,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -37,6 +42,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
@@ -52,6 +58,7 @@ import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -113,8 +120,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 1);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-        _helixResourceManager.getTableSizeReader());
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader(),
+            executorService, null, _helixResourceManager);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -153,7 +161,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
-    assertNull(rebalanceSummaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
+    assertNull(rebalanceSummaryResult.getSegmentInfo().getConsumingSegmentSummary());
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertNotNull(rebalanceSummaryResult.getTagsInfo());
@@ -1576,7 +1584,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   public void testRebalanceConsumingSegmentSummary()
       throws Exception {
     int numServers = 3;
-    int numReplica = 2;
+    int numReplica = 3;
 
     for (int i = 0; i < numServers; i++) {
       String instanceId = "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i;
@@ -1584,8 +1592,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
 
     ExecutorService executorService = Executors.newFixedThreadPool(10);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null,
-        _helixResourceManager.getTableSizeReader());
+    TableRebalancer tableRebalancerOriginal = new TableRebalancer(_helixManager, null, null, null,
+        _helixResourceManager.getTableSizeReader(), executorService, null, _helixResourceManager);
+    // Spy the table rebalancer to mock the consuming segment info reader
+    TableRebalancer tableRebalancer = Mockito.spy(tableRebalancerOriginal);
+    ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -1596,12 +1607,37 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
-    // Add the segments
-    int numSegments = 10;
-    for (int i = 0; i < numSegments; i++) {
-      _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
-          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    // Get consuming segment names from ideal state
+    PropertyKey idealStatePropertyKey = _helixDataAccessor.keyBuilder().idealStates(REALTIME_TABLE_NAME);
+    IdealState currentIdealState = _helixDataAccessor.getProperty(idealStatePropertyKey);
+    Set<String> consumingSegmentSet = currentIdealState.getRecord().getMapFields().keySet();
+
+    // Generate mock ConsumingSegmentsInfoMap for the consuming segments
+    int mockOffsetSmall = 1000;
+    int mockOffsetBig = 2000;
+    TreeMap<String, List<ConsumingSegmentInfoReader.ConsumingSegmentInfo>> mockSegmentToConsumingInfoMap =
+        new TreeMap<>();
+    boolean isBig = true;
+    for (String segmentName : consumingSegmentSet) {
+      List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfoList = new ArrayList<>();
+      // Replica num = server num, each server has a replica of each consuming segment
+      for (int j = 0; j < numServers; j++) {
+        String offset = String.valueOf(isBig ? mockOffsetBig : mockOffsetSmall);
+        consumingSegmentInfoList.add(new ConsumingSegmentInfoReader.ConsumingSegmentInfo(
+            "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + j, "CONSUMING", 0, null,
+            new ConsumingSegmentInfoReader.PartitionOffsetInfo(
+                Collections.singletonMap("0", offset),
+                Collections.singletonMap("0", offset),
+                Collections.singletonMap("0", String.valueOf(0)),
+                Collections.singletonMap("0", "UNKNOWN"))));
+      }
+      isBig = false;
+      mockSegmentToConsumingInfoMap.put(segmentName, consumingSegmentInfoList);
     }
+    Mockito.when(
+            mockConsumingSegmentInfoReader.getConsumingSegmentsInfo(Mockito.eq(REALTIME_TABLE_NAME), Mockito.anyInt()))
+        .thenReturn(new ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap(mockSegmentToConsumingInfoMap, 0, 0));
+    Mockito.doReturn(mockConsumingSegmentInfoReader).when(tableRebalancer).getConsumingSegmentInfoReader();
 
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
@@ -1610,15 +1646,39 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(), 0);
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+        0);
+    assertEquals(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .size(), numServers);
+    assertTrue(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .allMatch(x -> x == 0));
 
     rebalanceConfig.setIncludeConsuming(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(), 0);
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+        0);
+    assertEquals(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .size(), numServers);
+    assertTrue(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .allMatch(x -> x == 0));
 
     for (int i = numServers; i < numServers * 2; i++) {
       String instanceId = "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i;
@@ -1632,9 +1692,21 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentsToBeMoved(),
+    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
+    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+        mockOffsetBig);
+    assertEquals(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .size(), numServers);
+    assertTrue(summaryResult.getSegmentInfo()
+        .getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .allMatch(x -> x == mockOffsetSmall * (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS - 1) + mockOffsetBig));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
