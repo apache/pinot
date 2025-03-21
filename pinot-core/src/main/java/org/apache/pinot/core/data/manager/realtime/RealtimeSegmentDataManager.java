@@ -328,7 +328,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
-  private final boolean _allowConsumptionDuringCommit;
+  private final boolean _allowConsumptionDuringBuild;
+  private final boolean _allowConsumptionDuringDownload;
   private boolean _trackFilteredMessageOffsets = false;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -1066,7 +1067,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
     // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
     // complete.
-    if (_allowConsumptionDuringCommit) {
+    if (_allowConsumptionDuringBuild) {
+      if (!_allowConsumptionDuringDownload) {
+        _segmentLogger.info("Releasing partitionGroupConsumerSemaphore early before segment build, forCommit:{}",
+            forCommit);
+      }
       closeStreamConsumers();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1432,10 +1437,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
-    if (_allowConsumptionDuringCommit) {
+    // for partial upsert and dedup tables, do not release _partitionGroupConsumerSemaphore proactively and rely on
+    // offload() to release the semaphore. This ensures new consuming segment is not consuming until the segment
+    // replacement is complete.
+    if (_allowConsumptionDuringDownload) {
       closeStreamConsumers();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
@@ -1689,7 +1694,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
       _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
           llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit();
+      _allowConsumptionDuringBuild = isConsumptionAllowedDuringBuild();
+      _allowConsumptionDuringDownload = isConsumptionAllowedDuringDownload();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1723,6 +1729,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  // Consumption while building the segment is not allowed for the following tables:
+  // 1. Partial Upserts
+  // For the above table types, Before the next consumer starts consumption, Snapshot is captured which
+  // might be invalid if immutable segment is not persisted.
+  private boolean isConsumptionAllowedDuringBuild() {
+    return (!_realtimeTableDataManager.isPartialUpsertEnabled() || _tableConfig.getUpsertConfig()
+        .isAllowPartialUpsertConsumptionDuringCommit());
+  }
+
   // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
   // 1. Partial Upserts
   // 2. Dedup Tables
@@ -1731,7 +1746,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
   // upsert tables. If tables are dedup/partial upsert enabled check for table and server config properties to see if
   // consumption is allowed
-  private boolean isConsumptionAllowedDuringCommit() {
+  private boolean isConsumptionAllowedDuringDownload() {
     return (!_realtimeTableDataManager.isDedupEnabled() || _tableConfig.getDedupConfig()
         .isAllowDedupConsumptionDuringCommit()) && (!_realtimeTableDataManager.isPartialUpsertEnabled()
         || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
