@@ -37,16 +37,16 @@ public class EnforcementProfile extends BaseJsonConfig {
   private static final long DEFAULT_ENFORCEMENT_PERIOD_MILLIS = 60000L;
 
   @JsonPropertyDescription("Max CPU cost allowed for the workload")
-  private double _cpuCost;
+  private long _cpuCost;
 
   @JsonPropertyDescription("Max memory cost allowed for the workload")
-  private double _memoryCost;
+  private long _memoryCost;
 
   @JsonPropertyDescription("Enforcement period in milliseconds")
   private long _enforcementPeriodMillis;
 
-  public EnforcementProfile(@JsonProperty(CPU_COST) double cpuCost, @JsonProperty(MEMORY_COST) double memoryCost,
-      @JsonProperty(ENFORCEMENT_PERIOD_MILLIS) @Nullable Integer enforcementPeriodMillis) {
+  public EnforcementProfile(@JsonProperty(CPU_COST) long cpuCost, @JsonProperty(MEMORY_COST) long memoryCost,
+      @JsonProperty(ENFORCEMENT_PERIOD_MILLIS) @Nullable Long enforcementPeriodMillis) {
     _cpuCost = cpuCost;
     _memoryCost = memoryCost;
     _enforcementPeriodMillis = enforcementPeriodMillis != null
@@ -54,11 +54,11 @@ public class EnforcementProfile extends BaseJsonConfig {
         : DEFAULT_ENFORCEMENT_PERIOD_MILLIS;
   }
 
-  public double getCpuCost() {
+  public long getCpuCost() {
     return _cpuCost;
   }
 
-  public double getMemoryCost() {
+  public long getMemoryCost() {
     return _memoryCost;
   }
 
@@ -66,11 +66,11 @@ public class EnforcementProfile extends BaseJsonConfig {
     return _enforcementPeriodMillis;
   }
 
-  public void setCpuCost(double cpuCost) {
+  public void setCpuCost(long cpuCost) {
     _cpuCost = cpuCost;
   }
 
-  public void setMemoryCost(double memoryCost) {
+  public void setMemoryCost(long memoryCost) {
     _memoryCost = memoryCost;
   }
 

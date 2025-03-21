@@ -24,10 +24,8 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -44,8 +42,6 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.workload.splitter.InstancesInfo;
-import org.apache.pinot.controller.workload.selector.QueryWorkloadInstanceSelectorHandler;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -158,35 +154,10 @@ public class PinotQueryWorkloadConfigRestletResource {
   public String getQueryWorkloadConfigForInstance(@PathParam("instanceName") String instanceName,
       @QueryParam("nodeType") String nodeTypeString, @Context HttpHeaders httpHeaders) {
     try {
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getQueryWorkloadConfigs();
-      if (queryWorkloadConfigs == null) {
-        throw new ControllerApplicationException(LOGGER, "No Workload configs found",
-            Response.Status.NOT_FOUND, null);
-      }
-      Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
-      NodeConfig.Type instanceNodeType = NodeConfig.Type.forValue(nodeTypeString);
-      QueryWorkloadInstanceSelectorHandler
-          queryWorkloadInstanceSelectorHandler = _pinotHelixResourceManager.getQueryWorkloadInstanceSelectorHandler();
-      // Loop through each workload config, and check if the instance is part of the workload
-      // If it is, get the instance cost for the instance and add it to the map
-      // TODO: This currently makes multiple calls to zk, to improve performance for this
-      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
-        Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
-        for (Map.Entry<NodeConfig.Type, NodeConfig> entry : nodeConfigs.entrySet()) {
-          NodeConfig.Type nodeType = entry.getKey();
-          NodeConfig nodeConfig = entry.getValue();
-          if (nodeType == instanceNodeType) {
-            Set<String> instances = queryWorkloadInstanceSelectorHandler.resolveInstances(nodeType, nodeConfig);
-            InstancesInfo instancesInfo = new InstancesInfo(instances);
-            InstanceCost instanceCost = _pinotHelixResourceManager.getCostSplitter().getInstanceCost(nodeConfig,
-                instancesInfo, instanceName);
-            if (instanceCost != null) {
-              workloadToInstanceCostMap.put(queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
-            }
-          }
-        }
-      }
-      if (workloadToInstanceCostMap.isEmpty()) {
+      NodeConfig.Type nodeType = NodeConfig.Type.forValue(nodeTypeString);
+      Map<String, InstanceCost> workloadToInstanceCostMap = _pinotHelixResourceManager.getQueryWorkloadManager()
+          .getWorkloadToInstanceCostFor(instanceName, nodeType);
+      if (workloadToInstanceCostMap == null || workloadToInstanceCostMap.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "No workload configs found for instance: " + instanceName,
             Response.Status.NOT_FOUND, null);
       }

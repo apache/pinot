@@ -38,7 +38,7 @@ public class QueryWorkloadConfigUtilsTest {
   @Test(dataProvider = "fromZNRecordDataProvider")
   public void testFromZNRecord(ZNRecord znRecord, QueryWorkloadConfig expectedQueryWorkloadConfig, boolean shouldFail) {
     try {
-      QueryWorkloadConfig actualQueryWorkloadConfig = WorkloadConfigUtils.fromZNRecord(znRecord);
+      QueryWorkloadConfig actualQueryWorkloadConfig = QueryWorkloadConfigUtils.fromZNRecord(znRecord);
       if (shouldFail) {
         Assert.fail("Expected an exception but none was thrown");
       }
@@ -55,7 +55,7 @@ public class QueryWorkloadConfigUtilsTest {
     List<Object[]> data = new ArrayList<>();
 
     // Shared, valid configuration
-    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100);
+    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100 ,100L);
 
     // Leaf node
     PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
@@ -107,7 +107,7 @@ public class QueryWorkloadConfigUtilsTest {
   public void testUpdateZNRecordWithWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig, ZNRecord znRecord,
       ZNRecord expectedZnRecord, boolean shouldFail) {
     try {
-      WorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
+      QueryWorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
       if (shouldFail) {
         Assert.fail("Expected an exception but none was thrown");
       }
@@ -123,7 +123,7 @@ public class QueryWorkloadConfigUtilsTest {
   public Object[][] updateZNRecordDataProvider() throws JsonProcessingException {
     List<Object[]> data = new ArrayList<>();
 
-    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100);
+    EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100, 100L);
     // Leaf node
     PropagationScheme leafPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         List.of("value1", "value2"));

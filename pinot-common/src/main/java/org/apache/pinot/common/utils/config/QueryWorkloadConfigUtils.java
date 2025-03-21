@@ -22,13 +22,15 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-public class WorkloadConfigUtils {
-  private WorkloadConfigUtils() {
+public class QueryWorkloadConfigUtils {
+  private QueryWorkloadConfigUtils() {
   }
 
   /**
@@ -72,6 +74,32 @@ public class WorkloadConfigUtils {
     } catch (Exception e) {
       String errorMessage = String.format("Failed to convert QueryWorkloadConfig : %s to ZNRecord",
           queryWorkloadConfig);
+      throw new RuntimeException(errorMessage, e);
+    }
+  }
+
+  public static void updateZNRecordWithInstanceCost(ZNRecord znRecord, String queryWorkloadName,
+      InstanceCost instanceCost) {
+    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
+    Preconditions.checkNotNull(instanceCost, "InstanceCost cannot be null");
+    try {
+      znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadName);
+      znRecord.setSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST, JsonUtils.objectToString(instanceCost));
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to convert InstanceCost : %s to ZNRecord",
+          instanceCost);
+      throw new RuntimeException(errorMessage, e);
+    }
+  }
+
+  public static InstanceCost getInstanceCostFromZNRecord(ZNRecord znRecord) {
+    Preconditions.checkNotNull(znRecord, "ZNRecord cannot be null");
+    String instanceCostJson = znRecord.getSimpleField(QueryWorkloadRefreshMessage.INSTANCE_COST);
+    Preconditions.checkNotNull(instanceCostJson, "InstanceCost cannot be null");
+    try {
+      return JsonUtils.stringToObject(instanceCostJson, InstanceCost.class);
+    } catch (Exception e) {
+      String errorMessage = String.format("Failed to convert ZNRecord : %s to InstanceCost", znRecord);
       throw new RuntimeException(errorMessage, e);
     }
   }

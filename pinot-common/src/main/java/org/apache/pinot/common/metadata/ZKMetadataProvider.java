@@ -39,8 +39,8 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.common.utils.config.WorkloadConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -858,8 +858,7 @@ public class ZKMetadataProvider {
   }
 
   @Nullable
-  public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore)
-      throws Exception {
+  public static List<QueryWorkloadConfig> getQueryWorkloadConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     List<ZNRecord> znRecords =
         propertyStore.getChildren(getPropertyStoreWorkloadConfigsPrefix(), null, AccessOption.PERSISTENT,
             CommonConstants.Helix.ZkClient.RETRY_COUNT, CommonConstants.Helix.ZkClient.RETRY_INTERVAL_MS);
@@ -867,7 +866,7 @@ public class ZKMetadataProvider {
       int numZNRecords = znRecords.size();
       List<QueryWorkloadConfig> queryWorkloadConfigs = new ArrayList<>(numZNRecords);
       for (ZNRecord znRecord : znRecords) {
-        queryWorkloadConfigs.add(WorkloadConfigUtils.fromZNRecord(znRecord));
+        queryWorkloadConfigs.add(QueryWorkloadConfigUtils.fromZNRecord(znRecord));
       }
       return queryWorkloadConfigs;
     }
@@ -882,7 +881,7 @@ public class ZKMetadataProvider {
     if (znRecord == null) {
       return null;
     }
-    return WorkloadConfigUtils.fromZNRecord(znRecord);
+    return QueryWorkloadConfigUtils.fromZNRecord(znRecord);
   }
 
   public static boolean setQueryWorkloadConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -893,7 +892,7 @@ public class ZKMetadataProvider {
     ZNRecord znRecord = isNewConfig ? new ZNRecord(queryWorkloadConfig.getQueryWorkloadName())
         : propertyStore.get(path, null, AccessOption.PERSISTENT);
     // Update the record with new workload configuration
-    WorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
+    QueryWorkloadConfigUtils.updateZNRecordWithWorkloadConfig(znRecord, queryWorkloadConfig);
     // Create or update based on existence
     return isNewConfig ? propertyStore.create(path, znRecord, AccessOption.PERSISTENT)
         : propertyStore.set(path, znRecord, AccessOption.PERSISTENT);

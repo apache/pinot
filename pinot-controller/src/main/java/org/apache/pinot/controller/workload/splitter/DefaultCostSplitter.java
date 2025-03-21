@@ -43,8 +43,8 @@ public class DefaultCostSplitter implements CostSplitter {
     long totalInstances = instancesInfo.getInstanceCount();
     EnforcementProfile enforcementProfile = nodeConfig.getEnforcementProfile();
 
-    double cpuCost = enforcementProfile.getCpuCost() / totalInstances;
-    double memoryCost = enforcementProfile.getMemoryCost() / totalInstances;
+    long cpuCost = enforcementProfile.getCpuCost() / totalInstances;
+    long memoryCost = enforcementProfile.getMemoryCost() / totalInstances;
     long periodMillis = enforcementProfile.getEnforcementPeriodMillis() / totalInstances;
 
     return new InstanceCost(cpuCost, memoryCost, periodMillis);

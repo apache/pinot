@@ -20,10 +20,9 @@ package org.apache.pinot.common.messages;
 
 import java.util.UUID;
 import org.apache.helix.model.Message;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -42,9 +41,7 @@ public class QueryWorkloadRefreshMessage extends Message {
     setMsgSubType(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
-    ZNRecord znRecord = getRecord();
-    znRecord.setSimpleField(QueryWorkloadConfig.QUERY_WORKLOAD_NAME, queryWorkloadName);
-    znRecord.setSimpleField(INSTANCE_COST, instanceCost.toString());
+    QueryWorkloadConfigUtils.updateZNRecordWithInstanceCost(getRecord(), queryWorkloadName, instanceCost);
   }
 
   /**
@@ -62,10 +59,6 @@ public class QueryWorkloadRefreshMessage extends Message {
   }
 
   public InstanceCost getInstanceCost() {
-    try {
-      return JsonUtils.stringToObject(getRecord().getSimpleField(INSTANCE_COST), InstanceCost.class);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to parse instance cost from message", e);
-    }
+    return QueryWorkloadConfigUtils.getInstanceCostFromZNRecord(getRecord());
   }
 }
