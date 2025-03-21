@@ -39,6 +39,8 @@ public class RebalanceSummaryResult {
   private final ServerInfo _serverInfo;
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final SegmentInfo _segmentInfo;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final List<TenantInfo> _tenantsInfo;
 
   /**
    * Constructor for RebalanceSummaryResult
@@ -47,9 +49,11 @@ public class RebalanceSummaryResult {
    */
   @JsonCreator
   public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
-      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo) {
+      @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo,
+      @JsonProperty("tenantsInfo") @Nullable List<TenantInfo> tenantsInfo) {
     _serverInfo = serverInfo;
     _segmentInfo = segmentInfo;
+    _tenantsInfo = tenantsInfo;
   }
 
   @JsonProperty
@@ -60,6 +64,11 @@ public class RebalanceSummaryResult {
   @JsonProperty
   public SegmentInfo getSegmentInfo() {
     return _segmentInfo;
+  }
+
+  @JsonProperty
+  public List<TenantInfo> getTenantsInfo() {
+    return _tenantsInfo;
   }
 
   public static class ServerSegmentChangeInfo {
@@ -158,6 +167,62 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public int getExpectedValueAfterRebalance() {
       return _expectedValueAfterRebalance;
+    }
+  }
+
+  public static class TenantInfo {
+    private final String _tenantName;
+    private int _numSegmentsUnchanged;
+    private int _numSegmentsToDownload;
+    private int _numServerParticipants;
+
+    @JsonCreator
+    public TenantInfo(
+        @JsonProperty("tenantName") String tenantName,
+        @JsonProperty("numSegmentsToDownload") int numSegmentsToDownload,
+        @JsonProperty("numSegmentsUnchanged") int numSegmentsUnchanged,
+        @JsonProperty("numServerParticipants") int numServerParticipants
+    ) {
+      _tenantName = tenantName;
+      _numSegmentsUnchanged = numSegmentsUnchanged;
+      _numSegmentsToDownload = numSegmentsToDownload;
+      _numServerParticipants = numServerParticipants;
+    }
+
+    public TenantInfo(String tenantName, List<String> usedAsTier) {
+      this(tenantName, 0, 0, 0);
+    }
+
+    @JsonProperty
+    public String getTenantName() {
+      return _tenantName;
+    }
+
+    @JsonProperty
+    public int getNumSegmentsUnchanged() {
+      return _numSegmentsUnchanged;
+    }
+
+    @JsonProperty
+    public int getNumSegmentsToDownload() {
+      return _numSegmentsToDownload;
+    }
+
+    @JsonProperty
+    public int getNumServerParticipants() {
+      return _numServerParticipants;
+    }
+
+    public void increaseNumSegmentsUnchanged(int numSegments) {
+      _numSegmentsUnchanged += numSegments;
+    }
+
+    public void increaseNumSegmentsToDownload(int numSegments) {
+      _numSegmentsToDownload += numSegments;
+    }
+
+    public void increaseNumServerParticipants(int numServers) {
+      _numServerParticipants += numServers;
     }
   }
 
