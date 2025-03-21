@@ -29,7 +29,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -47,15 +46,11 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -65,7 +60,6 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -338,67 +332,5 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _queriesById != null;
-  }
-
-  protected void updatePhaseTimingForTables(Set<String> tableNames, BrokerQueryPhase phase, long time) {
-    for (String tableName : tableNames) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      _brokerMetrics.addPhaseTiming(rawTableName, phase, time);
-    }
-  }
-
-  /**
-   * Validates whether the requester has access to all the tables.
-   */
-  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
-      RequestContext requestContext, HttpHeaders httpHeaders) {
-    final long startTimeNs = System.nanoTime();
-    AccessControl accessControl = _accessControlFactory.create();
-
-    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
-
-    Set<String> failedTables = tableNames.stream()
-        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
-        .collect(Collectors.toSet());
-
-    failedTables.addAll(tableAuthorizationResult.getFailedTables());
-
-    if (!failedTables.isEmpty()) {
-      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
-    } else {
-      tableAuthorizationResult = TableAuthorizationResult.success();
-    }
-
-    if (!tableAuthorizationResult.hasAccess()) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
-      requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
-    }
-
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
-
-    return tableAuthorizationResult;
-  }
-
-  /**
-   * Returns true if the QPS quota of query tables, database or application has been exceeded.
-   */
-  protected boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
-      RequestContext requestContext) {
-    if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
-      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
-      requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-      return true;
-    }
-    for (String tableName : tableNames) {
-      if (!_queryQuotaManager.acquire(tableName)) {
-        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
-        requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
-        return true;
-      }
-    }
-    return false;
   }
 }
