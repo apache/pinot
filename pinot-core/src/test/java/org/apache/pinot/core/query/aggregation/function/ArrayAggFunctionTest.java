@@ -18,10 +18,24 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.SyntheticBlockValSets;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
@@ -655,5 +669,59 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
             + "order by tags")
         .thenResultIs(new Object[]{"tag1", new int[]{0}}, new Object[]{"tag2", new int[]{0}},
             new Object[]{"tag3", new int[]{}});
+  }
+
+  @Test
+  public void testDoubleArrayAggMultipleBlocks() {
+    ArrayAggDistinctDoubleFunction arrayAggDistinctDoubleFunction = new ArrayAggDistinctDoubleFunction(
+        ExpressionContext.forIdentifier("myField"), false);
+    AggregationResultHolder aggregationResultHolder = arrayAggDistinctDoubleFunction.createAggregationResultHolder();
+    arrayAggDistinctDoubleFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0})));
+    arrayAggDistinctDoubleFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Double.create(null, new double[]{2.0, 3.0})));
+    DoubleOpenHashSet distinctResult = aggregationResultHolder.getResult();
+    assertEquals(distinctResult.size(), 3);
+
+    ArrayAggDoubleFunction arrayAggDoubleFunction = new ArrayAggDoubleFunction(
+        ExpressionContext.forIdentifier("myField"), false);
+    aggregationResultHolder = arrayAggDoubleFunction.createAggregationResultHolder();
+    arrayAggDoubleFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Double.create(null, new double[]{1.0, 2.0})));
+    arrayAggDoubleFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Double.create(null, new double[]{2.0, 3.0})));
+    DoubleArrayList result = aggregationResultHolder.getResult();
+    assertEquals(result.size(), 4);
+  }
+
+  @Test
+  public void testLongArrayAggMultipleBlocks() {
+    ArrayAggDistinctLongFunction arrayAggDistinctLongFunction = new ArrayAggDistinctLongFunction(
+        ExpressionContext.forIdentifier("myField"), FieldSpec.DataType.LONG, false);
+    AggregationResultHolder aggregationResultHolder = arrayAggDistinctLongFunction.createAggregationResultHolder();
+    arrayAggDistinctLongFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Long.create(null, new long[]{1L, 2L})));
+    arrayAggDistinctLongFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Long.create(null, new long[]{2L, 3L})));
+    LongOpenHashSet distinctResult = aggregationResultHolder.getResult();
+    assertEquals(distinctResult.size(), 3);
+
+    ArrayAggLongFunction arrayAggLongFunction = new ArrayAggLongFunction(
+        ExpressionContext.forIdentifier("myField"), FieldSpec.DataType.LONG, false);
+    aggregationResultHolder = arrayAggLongFunction.createAggregationResultHolder();
+    arrayAggLongFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Long.create(null, new long[]{1L, 2L})));
+    arrayAggLongFunction.aggregate(2, aggregationResultHolder,
+        Map.of(ExpressionContext.forIdentifier("myField"),
+            SyntheticBlockValSets.Long.create(null, new long[]{1L, 2L})));
+    LongArrayList result = aggregationResultHolder.getResult();
+    assertEquals(result.size(), 4);
   }
 }

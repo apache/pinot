@@ -38,7 +38,8 @@ public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayL
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     float[] value = blockValSet.getFloatValuesSV();
-    FloatArrayList valueArray = new FloatArrayList(length);
+    FloatArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new FloatArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

@@ -41,14 +41,15 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntSet>
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     int[] value = blockValSet.getIntValuesSV();
-    IntOpenHashSet valueArray = new IntOpenHashSet(length);
+    IntOpenHashSet valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntOpenHashSet(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
+        valueSet.add(value[i]);
       }
     });
-    aggregationResultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override

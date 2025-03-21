@@ -39,14 +39,15 @@ public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<D
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     double[] value = blockValSet.getDoubleValuesSV();
-    DoubleOpenHashSet valueArray = new DoubleOpenHashSet(length);
+    DoubleOpenHashSet valueSet = aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+        : new DoubleOpenHashSet(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
+        valueSet.add(value[i]);
       }
     });
-    aggregationResultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override

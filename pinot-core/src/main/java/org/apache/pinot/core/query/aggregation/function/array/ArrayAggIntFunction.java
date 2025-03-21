@@ -39,7 +39,8 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     int[] value = blockValSet.getIntValuesSV();
-    IntArrayList valueArray = new IntArrayList(length);
+    IntArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

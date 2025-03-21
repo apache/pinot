@@ -38,7 +38,8 @@ public class ArrayAggDoubleFunction extends BaseArrayAggDoubleFunction<DoubleArr
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     double[] value = blockValSet.getDoubleValuesSV();
-    DoubleArrayList valueArray = new DoubleArrayList(length);
+    DoubleArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new DoubleArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

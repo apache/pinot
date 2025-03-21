@@ -16,14 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.perf;
+package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -150,10 +149,6 @@ public class SyntheticBlockValSets {
       _values = values;
     }
 
-    public static Long create() {
-      return create(Distribution.createSupplier(42, "EXP(0.5)"));
-    }
-
     public static Long create(LongSupplier supplier) {
       return create(DocIdSetPlanNode.MAX_DOC_PER_CALL, null, supplier);
     }
@@ -170,6 +165,10 @@ public class SyntheticBlockValSets {
         values[i] = supplier.getAsLong();
       }
 
+      return new Long(nullBitmap, values);
+    }
+
+    public static Long create(@Nullable RoaringBitmap nullBitmap, long[] values) {
       return new Long(nullBitmap, values);
     }
 
@@ -209,10 +208,6 @@ public class SyntheticBlockValSets {
       _values = values;
     }
 
-    public static Double create() {
-      return create(Distribution.createSupplier(42, "EXP(0.5)"));
-    }
-
     public static Double create(DoubleSupplier supplier) {
       return create(DocIdSetPlanNode.MAX_DOC_PER_CALL, null, supplier);
     }
@@ -229,6 +224,10 @@ public class SyntheticBlockValSets {
         values[i] = supplier.getAsDouble();
       }
 
+      return new Double(nullBitmap, values);
+    }
+
+    public static Double create(@Nullable RoaringBitmap nullBitmap, double[] values) {
       return new Double(nullBitmap, values);
     }
 
