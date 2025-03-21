@@ -29,8 +29,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
@@ -241,6 +245,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           0)) {
         return false;
       }
+
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
       IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
       if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, NUM_REPLICAS, 100, 0, 100)) {
@@ -308,7 +313,25 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
           idealState.getPartitionSet().size())) {
         return false;
       }
+
+      ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
+      String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
+      List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
+      long expectedBytesSize = 0;
+      if (segmentNames != null) {
+        for (String segmentName : segmentNames) {
+          expectedBytesSize += segmentName.getBytes().length;
+        }
+      }
+
+      // Check if the metric matches the calculated byte size
+      long bytesSize = MetricValueUtils.getTableGaugeValue(ControllerMetrics.get(), tableNameWithType,
+          ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE);
+      if (bytesSize != expectedBytesSize) {
+        return false;
+      }
     }
+
     return checkTableGaugeValue(ControllerGauge.NUMBER_OF_REPLICAS, tableNameWithType, expectedNumReplicas)
         && checkTableGaugeValue(ControllerGauge.PERCENT_OF_REPLICAS, tableNameWithType, expectedPercentReplicas)
         && checkTableGaugeValue(ControllerGauge.SEGMENTS_IN_ERROR_STATE, tableNameWithType,
