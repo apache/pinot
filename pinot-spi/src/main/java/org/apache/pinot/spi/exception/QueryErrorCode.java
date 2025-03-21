@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.exception;
 
+import java.util.EnumMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +100,14 @@ public enum QueryErrorCode {
       return UNKNOWN;
     }
     return queryErrorCode;
+  }
+
+  public static <T> Map<QueryErrorCode, T> fromKeyMap(Map<Integer, T> originalMap) {
+    EnumMap<QueryErrorCode, T> newMap = new EnumMap<>(QueryErrorCode.class);
+    for (Map.Entry<Integer, T> entry : originalMap.entrySet()) {
+      newMap.put(QueryErrorCode.fromErrorCode(entry.getKey()), entry.getValue());
+    }
+    return newMap;
   }
 
   public QueryException asException() {

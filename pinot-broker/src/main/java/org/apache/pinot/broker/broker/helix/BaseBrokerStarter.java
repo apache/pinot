@@ -549,6 +549,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       instanceTags = instanceConfig.getTags();
       updated = true;
     }
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }

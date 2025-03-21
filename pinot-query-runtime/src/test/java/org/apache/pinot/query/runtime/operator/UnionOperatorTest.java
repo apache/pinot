@@ -24,8 +24,8 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -66,18 +66,18 @@ public class UnionOperatorTest {
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     UnionOperator unionOperator =
         new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     List<Object[]> resultRows = new ArrayList<>();
-    TransferableBlock result = unionOperator.nextBlock();
-    while (!result.isEndOfStreamBlock()) {
-      resultRows.addAll(result.getContainer());
+    MseBlock result = unionOperator.nextBlock();
+    while (result.isData()) {
+      resultRows.addAll(((MseBlock.Data) result).asRowHeap().getRows());
       result = unionOperator.nextBlock();
     }
     List<Object[]> expectedRows =

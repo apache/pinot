@@ -21,12 +21,12 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import java.util.Iterator;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -44,14 +44,13 @@ public class HashExchangeTest {
   private SendingMailbox _mailbox1;
   @Mock
   private SendingMailbox _mailbox2;
-  @Mock
-  TransferableBlock _block;
+  private RowHeapDataBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.ROW);
-    Mockito.when(_block.getDataSchema()).thenReturn(
+    _block = new RowHeapDataBlock(
+        ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
         new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
   }
 
@@ -66,21 +65,24 @@ public class HashExchangeTest {
       throws Exception {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
-    Mockito.when(_block.getContainer()).thenReturn(ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}));
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    new HashExchange(destinations, selector, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new HashExchange(destinations, selector, BlockSplitter.DEFAULT).route(destinations, _block);
 
     // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
 
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{0});
-    Assert.assertEquals(captor.getValue().getContainer().get(1), new Object[]{1});
+    Assert.assertTrue(captor.getValue().isData(), "Expected data block");
+    MseBlock.Data mailbox1DataBlock = captor.getValue();
+    Assert.assertEquals(mailbox1DataBlock.asRowHeap().getRows().get(0), new Object[]{0});
+    Assert.assertEquals(mailbox1DataBlock.asRowHeap().getRows().get(1), new Object[]{1});
 
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
-    Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{2});
+    Assert.assertTrue(captor.getValue().isData(), "Expected data block");
+    MseBlock.Data mailbox2DataBlock = captor.getValue();
+    Assert.assertEquals(mailbox2DataBlock.asRowHeap().getRows().get(0), new Object[]{2});
   }
 
   private static class TestSelector implements KeySelector<Object> {
