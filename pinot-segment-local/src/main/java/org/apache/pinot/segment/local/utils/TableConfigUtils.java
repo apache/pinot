@@ -1003,6 +1003,7 @@ public final class TableConfigUtils {
     if (indexingConfig.getBloomFilterConfigs() != null) {
       bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
     }
+
     for (String bloomFilterColumn : bloomFilterColumns) {
       columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
     }
@@ -1076,6 +1077,23 @@ public final class TableConfigUtils {
         Preconditions.checkState(
             schema.getFieldSpecFor(rangeIndexCol).getDataType().isNumeric() || !noDictionaryColumnsSet.contains(
                 rangeIndexCol), "Cannot create a range index on non-numeric/no-dictionary column " + rangeIndexCol);
+      }
+    }
+
+    // Bloom index semantic validation
+    // Bloom filter cannot be defined on boolean columns
+    if (indexingConfig.getBloomFilterColumns() != null) {
+      for (String bloomIndexCol : indexingConfig.getBloomFilterColumns()) {
+        Preconditions.checkState(
+            schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN,
+            "Cannot create a bloom filter on boolean column " + bloomIndexCol);
+      }
+    }
+    if (indexingConfig.getBloomFilterConfigs() != null) {
+      for (String bloomIndexCol: indexingConfig.getBloomFilterConfigs().keySet()) {
+        Preconditions.checkState(
+            schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN,
+            "Cannot create a bloom filter on boolean column " + bloomIndexCol);
       }
     }
 
@@ -1241,6 +1259,12 @@ public final class TableConfigUtils {
 
       // Validate the forward index disabled compatibility with other indexes if enabled for this column
       validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
+
+      // Validate bloom filter is not added to boolean column
+      if (fieldConfig.getIndexes() != null && fieldConfig.getIndexes().has("bloom")) {
+        Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
+          "Cannot create a bloom filter on boolean column " + columnName);
+      }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
