@@ -29,9 +29,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -43,14 +45,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
@@ -75,6 +78,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String DATABASE_NAME = "db1";
   private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
+
+  private static final String DIM_TABLE_DATA_PATH = "dimDayOfWeek_data.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "dimDayOfWeek_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimDayOfWeek_config.json";
+  private static final Integer DIM_NUMBER_OF_RECORDS = 7;
 
   @Override
   protected String getSchemaFileName() {
@@ -326,6 +334,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(pinotQuery);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 10000);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
+  }
+
+  @Test
+  void testDual()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery("SELECT 1");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
+  /**
+   * This test is added because SSE engine supports it and is used in production.
+   * Make sure that the difference in support is well-documented.
+   */
+  @Test
+  void testDualWithNotExistsTableMSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertEquals(queryResponse.get("exceptions").get(0).get("errorCode").asInt(),
+        QueryErrorCode.QUERY_PLANNING.getId()); // TODO: The right error is TABLE_DOES_NOT_EXIST
   }
 
   @Test
@@ -666,8 +696,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
-        : QueryException.SQL_PARSING_ERROR_CODE;
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING.getId()
+        : QueryErrorCode.SQL_PARSING.getId();
     Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
@@ -1075,11 +1105,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").size(), getCountStarResult());
-
-    String explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
-    jsonNode = postQuery(explainQuery);
-    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalProject"));
-    assertFalse(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalFilter"));
   }
 
   @Test
@@ -1257,30 +1282,26 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     // Query written this way with a CTE and limit will be planned such that the multi-stage group by executor will be
     // used for both leaf and final aggregation
-    String sqlQuery = "SET mseMaxInitialResultHolderCapacity = 1;\n"
-        + "WITH tmp AS ("
-        + "  SELECT *"
-        + "  FROM mytable"
-        + "  WHERE AirlineID > 20000"
-        + "  LIMIT 10000"
-        + ") "
-        + "SELECT AirlineID,"
-        + "  COUNT(*) FILTER ("
-        + "    WHERE Origin = 'garbage'"
-        + ") "
-        + "FROM tmp "
-        + "GROUP BY AirlineID";
-    JsonNode result = postQuery(sqlQuery);
-    assertNoError(result);
-    // Ensure that result set is not empty
-    assertTrue(result.get("numRowsResultSet").asInt() > 0);
+    String aggregates1 = "COUNT(*) FILTER (WHERE Origin = 'garbage')";
+    String aggregates2 = aggregates1 + ", COUNT(*)";
+    String queryTemplate = "SET mseMaxInitialResultHolderCapacity = 1;\n"
+        + "WITH tmp AS (SELECT * FROM mytable WHERE AirlineID > 20000 LIMIT 10000)\n"
+        + "SELECT AirlineID, %s FROM tmp GROUP BY AirlineID";
+    String query1 = String.format(queryTemplate, aggregates1);
+    String query2 = String.format(queryTemplate, aggregates2);
+    for (String query : new String[]{query1, query2}) {
+      JsonNode result = postQuery(query);
+      assertNoError(result);
+      // Ensure that result set is not empty
+      assertTrue(result.get("numRowsResultSet").asInt() > 0);
 
-    // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
-    JsonNode rows = result.get("resultTable").get("rows");
-    for (int i = 0; i < rows.size(); i++) {
-      assertEquals(rows.get(i).get(1).asInt(), 0);
-      // Ensure that the main filter was applied
-      assertTrue(rows.get(i).get(0).asInt() > 20000);
+      // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+      JsonNode rows = result.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        assertEquals(rows.get(i).get(1).asInt(), 0);
+        // Ensure that the main filter was applied
+        assertTrue(rows.get(i).get(0).asInt() > 20000);
+      }
     }
   }
 
@@ -1383,7 +1404,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed only as table prefix. Will
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1425,7 +1446,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
         null);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1433,7 +1454,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test
@@ -1441,7 +1462,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
         Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_VALIDATION_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
@@ -1452,7 +1473,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1591,12 +1612,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Iterator<JsonNode> exIterator = exceptionsJson.iterator();
     assertTrue(exIterator.hasNext(), "Expected a timeout exception but did not find one");
     ObjectNode exception = (ObjectNode) exIterator.next();
-    assertEquals(exception.get(ProcessingException._Fields.ERROR_CODE.getFieldName()).asInt(),
-        QueryException.BROKER_TIMEOUT_ERROR_CODE);
-    assertEquals(exception.get(ProcessingException._Fields.MESSAGE.getFieldName()).asText(),
-        QueryException.BROKER_TIMEOUT_ERROR.getMessage());
+    assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.BROKER_TIMEOUT.getId());
+    assertEquals(exception.get("message").asText(), QueryErrorCode.BROKER_TIMEOUT.getDefaultMessage());
   }
 
+  @Test
   public void testNumServersQueried() throws Exception {
     String query = "select * from mytable limit 10";
     JsonNode jsonNode = postQuery(query);
@@ -1604,6 +1624,81 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNotNull(numServersQueried);
     assertTrue(numServersQueried.isInt());
     assertTrue(numServersQueried.asInt() > 0);
+  }
+
+  @Test
+  public void testLookupJoin() throws Exception {
+
+    Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(lookupTableSchema);
+    TableConfig tableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
+    tableConfig.setTenantConfig(tenantConfig);
+    addTableConfig(tableConfig);
+    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
+
+    // Compare total rows in the primary table with number of rows in the result of the join with lookup table
+    String query = "select count(*) from " + getTableName();
+    JsonNode jsonNode = postQuery(query);
+    long totalRowsInTable = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    query = "select /*+ joinOptions(join_strategy='lookup') */ AirlineID, DayOfWeek, dayName from " + getTableName()
+        + " join daysOfWeek ON DayOfWeek = dayId where dayName in ('Monday', 'Tuesday', 'Wednesday')";
+    jsonNode = postQuery(query);
+    long result = jsonNode.get("resultTable").get("rows").size();
+    assertTrue(result > 0);
+    assertTrue(result < totalRowsInTable);
+
+    // Verify that LOOKUP_JOIN stage is present and HASH_JOIN stage is not present in the query plan
+    Set<String> stages = new HashSet<>();
+    JsonNode currentNode = jsonNode.get("stageStats").get("children");
+    while (currentNode != null) {
+      currentNode = currentNode.get(0);
+      stages.add(currentNode.get("type").asText());
+      currentNode = currentNode.get("children");
+    }
+    assertTrue(stages.contains("LOOKUP_JOIN"), "Could not find LOOKUP_JOIN stage in the query plan");
+    assertFalse(stages.contains("HASH_JOIN"), "HASH_JOIN stage should not be present in the query plan");
+
+    dropOfflineTable(tableConfig.getTableName());
+  }
+
+  public void testSearchLiteralFilter() throws Exception {
+    String sqlQuery =
+        "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
+            + "CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
+    JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + sqlQuery);
+    assertTrue(explainPlan.get("resultTable").get("rows").get(0).get(1).asText().contains("SEARCH"));
+
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(result.get("resultTable").get("rows").size(), 1);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asLong(), 1692057600000L);
+
+    sqlQuery =
+        "SELECT * FROM (SELECT CASE WHEN Carrier = 'garbage' THEN 'val1' ELSE 'val2' END as val FROM mytable) WHERE "
+            + "val in ('val1', 'val2') LIMIT 1";
+    explainPlan = postQuery("EXPLAIN PLAN FOR " + sqlQuery);
+    assertTrue(explainPlan.get("resultTable").get("rows").get(0).get(1).asText().contains("SEARCH"));
+
+    result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(result.get("resultTable").get("rows").size(), 1);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), "val2");
+  }
+
+  @Test
+  public void testPolymorphicScalarArrayFunctions() throws Exception {
+    String query = "select ARRAY_LENGTH(ARRAY[1,2,3]);";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 3);
+
+    query = "select ARRAY_LENGTH(SPLIT('abc,xyz', ','));";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 2);
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
@@ -1631,9 +1726,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result, expectedValue);
   }
 
-  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, int errorCode) {
+  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, QueryErrorCode errorCode) {
     long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(result, errorCode);
+    assertEquals(result, errorCode.getId());
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,

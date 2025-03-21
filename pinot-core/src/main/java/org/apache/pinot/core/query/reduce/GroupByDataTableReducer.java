@@ -39,7 +39,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -61,8 +60,8 @@ import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -120,7 +119,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
       } catch (TimeoutException e) {
         brokerResponse.getExceptions()
-            .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+            .add(new QueryProcessingException(QueryErrorCode.BROKER_TIMEOUT, e.getMessage()));
       }
     }
 
@@ -262,7 +261,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          Tracing.ThreadAccountantOps.setupWorker(taskId, new ThreadResourceUsageProvider(), parentContext);
+          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
           try {
             for (DataTable dataTable : reduceGroup) {
               boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();

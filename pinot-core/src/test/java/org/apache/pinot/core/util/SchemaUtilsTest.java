@@ -193,7 +193,6 @@ public class SchemaUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");

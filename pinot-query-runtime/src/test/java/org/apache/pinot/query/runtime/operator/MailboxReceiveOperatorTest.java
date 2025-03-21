@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -39,6 +38,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -110,7 +110,7 @@ public class MailboxReceiveOperatorTest {
         System.currentTimeMillis() + 100L)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+      assertTrue(block.getExceptions().containsKey(QueryErrorCode.EXECUTION_TIMEOUT.getId()));
     }
   }
 
@@ -146,7 +146,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(errorMessage));
     }
   }
 
@@ -201,7 +201,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(errorMessage));
     }
   }
 

@@ -60,7 +60,6 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -71,6 +70,7 @@ import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusRespons
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
@@ -99,6 +99,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -294,7 +295,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _resourceManager = _controllerStarter.getHelixResourceManager();
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     _executorService = Executors.newFixedThreadPool(10);
-    preChecker.init(_helixResourceManager, _executorService);
+    preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
         _resourceManager.getTableSizeReader());
   }
@@ -354,13 +355,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private void testQueryError(String query, int errorCode)
+  private void testQueryError(String query, QueryErrorCode errorCode)
       throws Exception {
     JsonNode response = postQuery(query);
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty(), "At least one exception was expected");
     JsonNode firstException = exceptions.get(0);
-    assertEquals(firstException.get("errorCode").asInt(), errorCode);
+    assertEquals(firstException.get("errorCode").asInt(), errorCode.getId());
   }
 
   @Test
@@ -403,11 +404,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           return false;
         }
         int errorCode = exceptions.get(0).get("errorCode").asInt();
-        if (errorCode == QueryException.BROKER_TIMEOUT_ERROR_CODE) {
+        if (errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()) {
           // Timed out on broker side
           return true;
         }
-        if (errorCode == QueryException.SERVER_NOT_RESPONDING_ERROR_CODE) {
+        if (errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()) {
           // Timed out on server side
           int numServersQueried = queryResponse.get("numServersQueried").asInt();
           int numServersResponded = queryResponse.get("numServersResponded").asInt();
@@ -693,7 +694,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION.getId());
   }
 
   @Test
@@ -704,7 +705,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty());
     int errorCode = exceptions.get(0).get("errorCode").asInt();
-    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
+    assertEquals(errorCode, QueryErrorCode.QUERY_CANCELLATION.getId());
   }
 
   @Test
@@ -720,7 +721,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -753,7 +754,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -786,7 +787,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonNode response = postQuery(SELECT_STAR_QUERY);
         JsonNode exceptions = response.get("exceptions");
         return !exceptions.isEmpty()
-            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
+            && exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.QUERY_CANCELLATION.getId();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -822,44 +823,71 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Enable pre-checks, nothing is set
     rebalanceConfig.setPreChecks(true);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Enable minimizeDataMovement
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, true, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
     tableConfig.getIndexingConfig().getBloomFilterColumns().add("Quarter");
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Undo tableConfig change
     tableConfig.getIndexingConfig().getBloomFilterColumns().remove("Quarter");
     updateTableConfig(tableConfig);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, false);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a schema change
     Schema schema = createSchema();
     schema.addField(new MetricFieldSpec("NewAddedIntMetric", DataType.INT, 1));
     updateSchema(schema);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, false, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Keep schema change and update table config to add minimizeDataMovement
-    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap());
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(true));
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP, true, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
+        "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN);
+
+    // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
+    tableConfig.setInstanceAssignmentConfigMap(createInstanceAssignmentConfigMap(false));
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
+        "minimizeDataMovement is not enabled but instance assignment is allowed",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
     rebalanceConfig.setReassignInstances(true);
     tableConfig.setInstanceAssignmentConfigMap(null);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE, false, true);
+    checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.DONE,
+        "Instance assignment not allowed, no need for minimizeDataMovement",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Disable dry-run
     rebalanceConfig.setDryRun(false);
@@ -874,20 +902,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   private void checkRebalancePreCheckStatus(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
-      boolean expectedMinimizeDataMovement, boolean expectedNeedsReloadStatus) {
+      String expectedMinimizeDataMovement, RebalancePreCheckerResult.PreCheckStatus expectedMinimizeDataMovementStatus,
+      String expectedNeedsReloadMessage, RebalancePreCheckerResult.PreCheckStatus expectedNeedsReloadStatus) {
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
-    Map<String, String> preChecksResult = rebalanceResult.getPreChecksResult();
+    Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 2);
+    assertEquals(preChecksResult.size(), 4);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
-        String.valueOf(expectedMinimizeDataMovement));
-    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS),
-        String.valueOf(expectedNeedsReloadStatus));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
+        expectedMinimizeDataMovementStatus);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
+        expectedMinimizeDataMovement);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
+        expectedNeedsReloadStatus);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
+        expectedNeedsReloadMessage);
+    // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
+    // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
+    // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
+    // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
   }
 
-  private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap() {
+  private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap(boolean minimizeDataMovement) {
     InstanceTagPoolConfig instanceTagPoolConfig =
         new InstanceTagPoolConfig("tag", false, 1, null);
     List<String> constraints = new ArrayList<>();
@@ -895,10 +938,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
     InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
         new InstanceReplicaGroupPartitionConfig(true, 1, 1,
-            1, 1, 1, true,
+            1, 1, 1, minimizeDataMovement,
             null);
     InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,
-        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, true);
+        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put("OFFLINE", instanceAssignmentConfig);
     return instanceAssignmentConfigMap;
@@ -1293,37 +1336,45 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT toBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId());
+      String errorMsg = exceptionNode.get("message").toString();
+      assertTrue(errorMsg.contains("tobase64 with 0 arguments"), errorMsg);
     }
 
     // invalid argument
     sqlQuery = "SELECT fromBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryValidationError"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId());
+      String errorMsg = exceptionNode.get("message").asText();
+      assertEquals(errorMsg, "Unsupported function: frombase64 with 0 arguments");
     }
 
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.SQL_PARSING.getId());
     }
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryErrorCode.QUERY_PLANNING);
     } else {
       response = postQuery(sqlQuery);
-      assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+      JsonNode exceptionNode = response.get("exceptions").get(0);
+      assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.SQL_PARSING.getId());
     }
 
     // string literal used in a filter
@@ -1693,7 +1744,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode queryResponse = postQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
     // NOTE: Broker timeout is 60s
     assertTrue(System.currentTimeMillis() - startTimeMs < 60_000L);
-    assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
+
+    JsonNode exceptionNode = queryResponse.get("exceptions").get(0);
+    assertEquals(exceptionNode.get("errorCode").asInt(), QueryErrorCode.QUERY_EXECUTION.getId());
   }
 
   @Test
@@ -2958,7 +3011,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     //test repeated columns in selection query with order by
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
+    testQueryError(query, QueryErrorCode.QUERY_PLANNING);
 
     //test repeated columns in agg query
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
@@ -2967,7 +3020,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     //test repeated columns in agg group by query
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
+    testQueryError(query, QueryErrorCode.QUERY_PLANNING);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -2996,7 +3049,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       JsonNode jsonNode = postQuery(pinotQuery);
       JsonNode exceptions = jsonNode.get("exceptions");
       assertFalse(exceptions.isEmpty());
-      assertEquals(exceptions.get(0).get("errorCode").asInt(), 710);
+      assertEquals(exceptions.get(0).get("errorCode").asInt(), QueryErrorCode.UNKNOWN_COLUMN.getId());
     }
     {
       //test same alias name with column name
@@ -3152,6 +3205,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
     String configPath = "/" + getHelixClusterName() + "/CONFIGS/PARTICIPANT/" + serverName;
     assertFalse(_propertyStore.exists(configPath, 0));
+  }
+
+  @Test
+  void testDual()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT 1");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
+  }
+
+  @Test
+  void testDualWithNotExistsTableSSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    JsonNode queryResponse = postQuery("SELECT 1 from notExistsTable");
+    Assert.assertTrue(queryResponse.get("exceptions").isEmpty());
+    Assert.assertEquals(queryResponse.get("numRowsResultSet").asInt(), 1);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3475,7 +3546,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
         + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
-        + "            LogicalTableScan(table=[[default, mytable]])\n");
+        + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: AggregateProjectMergeRule -> Time:*\n"
         + "Rule: Project -> Time:*\n"
@@ -3502,7 +3573,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject\\(.*\\)\n"
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
-            + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
+            + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
     assertEquals(response2Json.get("rows").get(0).get(2).asText(),
         "Rule Execution Times\n"
@@ -3825,6 +3896,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertTrue(connection.isClosed());
   }
 
+  @Test
+  public void testNonExistingTableQueryThroughJDBCClient()
+      throws Exception {
+    String query = "SELECT 1 from nonExistingTable";
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
+  }
+
   private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
       throws Exception {
     PinotDriver pinotDriver = new PinotDriver();
@@ -4119,9 +4203,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertNotNull(rebalanceResult.getPreChecksResult());
     assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(rebalanceResult.getPreChecksResult().containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
-    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS), "false");
-    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT),
-        "false");
+    assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
+        "No need to reload");
+    assertEquals(rebalanceResult.getPreChecksResult().get(
+            DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(rebalanceResult.getPreChecksResult().get(
+            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
+        "Instance assignment not allowed, no need for minimizeDataMovement");
+    assertEquals(rebalanceResult.getPreChecksResult().get(
+            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
   }
 
   private void checkRebalanceDryRunSummary(RebalanceResult rebalanceResult, RebalanceResult.Status expectedStatus,
