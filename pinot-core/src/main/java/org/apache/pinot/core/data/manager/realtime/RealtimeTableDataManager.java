@@ -104,7 +104,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
-  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, SemaphoreAccessCoordinator> _partitionGroupIdToSemaphoreCoordinatorMap =
+      new ConcurrentHashMap<>();
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
   private static final String STATS_FILE_NAME = "segment-stats.ser";
@@ -138,6 +139,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
+  private boolean _enforceConsumptionInOrder = false;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
@@ -218,6 +220,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
       _tableUpsertMetadataManager.init(_tableConfig, schema, this);
     }
+
+    _enforceConsumptionInOrder = enforceConsumptionInOrder();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
@@ -507,7 +511,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void doAddConsumingSegment(String segmentName)
       throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-    if (zkMetadata.getStatus() != Status.IN_PROGRESS) {
+    if ((zkMetadata.getStatus() != Status.IN_PROGRESS) && (!_enforceConsumptionInOrder)) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
       //       Helix, then we can rely on the following CONSUMING -> ONLINE state transition to add it.
@@ -539,7 +543,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
-    Semaphore semaphore = _partitionGroupIdToSemaphoreMap.computeIfAbsent(partitionGroupId, k -> new Semaphore(1));
+    SemaphoreAccessCoordinator semaphoreCoordinator = getSemaphoreAccessCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
@@ -548,9 +552,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
-    RealtimeSegmentDataManager realtimeSegmentDataManager =
-        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName, semaphore,
-            partitionUpsertMetadataManager, partitionDedupMetadataManager, _isTableReadyToConsumeData);
+    RealtimeSegmentDataManager realtimeSegmentDataManager;
+    try {
+      realtimeSegmentDataManager =
+          createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
+              semaphoreCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
+              _isTableReadyToConsumeData);
+    } catch (SegmentAlreadyConsumedException e) {
+      // Don't do anything since segment was already committed by another instance.
+      // Eventually this server should receive a CONSUMING -> ONLINE/OFFLINE helix state transition
+      return;
+    }
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
@@ -640,12 +652,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      Semaphore semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator,
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
-        partitionDedupMetadataManager, isTableReadyToConsumeData);
+        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, _serverMetrics,
+        partitionUpsertMetadataManager, partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
   /**
@@ -802,6 +815,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     registerSegment(segmentName, segmentDataManager);
   }
 
+  @Override
+  protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+    SegmentDataManager oldSegmentDataManager = super.registerSegment(segmentName, segmentDataManager);
+    if (_enforceConsumptionInOrder) {
+      // helix threads might be waiting for their respective previous segments to be loaded.
+      // they need to be notified here.
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      Preconditions.checkNotNull(llcSegmentName);
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator =
+          getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
+      semaphoreAccessCoordinator.trackSegment(llcSegmentName);
+    }
+    return oldSegmentDataManager;
+  }
+
   /**
    * Replaces the CONSUMING segment with a downloaded committed one.
    */
@@ -851,6 +879,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return Collections.emptyMap();
   }
 
+  @Nullable
+  public StreamIngestionConfig getStreamIngestionConfig() {
+    if (_tableConfig.getIngestionConfig() == null) {
+      return null;
+    }
+    return _tableConfig.getIngestionConfig().getStreamIngestionConfig();
+  }
+
   /**
    * Validate a schema against the table config for real-time record consumption.
    * Ideally, we should validate these things when schema is added or table is created, but either of these
@@ -884,5 +920,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     // 2. Validate the schema itself
     SchemaUtils.validate(schema);
+  }
+
+  private SemaphoreAccessCoordinator getSemaphoreAccessCoordinator(int partitionGroupId) {
+    return _partitionGroupIdToSemaphoreCoordinatorMap.computeIfAbsent(partitionGroupId,
+        k -> new SemaphoreAccessCoordinator(new Semaphore(1), _enforceConsumptionInOrder, this));
+  }
+
+  public BooleanSupplier getIsTableReadyToConsumeData() {
+    return _isTableReadyToConsumeData;
+  }
+
+  private boolean enforceConsumptionInOrder() {
+    StreamIngestionConfig streamIngestionConfig = getStreamIngestionConfig();
+    if (streamIngestionConfig == null) {
+      return false;
+    }
+    return streamIngestionConfig.isEnforceConsumptionInOrder() && (isDedupEnabled() || isPartialUpsertEnabled());
   }
 }

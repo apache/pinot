@@ -250,6 +250,13 @@ public class HelixHelper {
     return accessor.getProperty(builder.idealStates(resourceName));
   }
 
+  public static Map<String, Map<String, String>> getSegmentAssignment(String tableNameWithType,
+      HelixManager helixManager) {
+    IdealState idealState = getTableIdealState(helixManager, tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    return idealState.getRecord().getMapFields();
+  }
+
   public static ExternalView getExternalViewForResource(HelixAdmin admin, String clusterName, String resourceName) {
     return admin.getResourceExternalView(clusterName, resourceName);
   }

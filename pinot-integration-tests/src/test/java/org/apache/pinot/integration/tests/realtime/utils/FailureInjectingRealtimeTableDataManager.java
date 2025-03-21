@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SemaphoreAccessCoordinator;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -52,7 +53,8 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
   @Override
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      Semaphore semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      SemaphoreAccessCoordinator semaphoreAccessCoordinator,
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
 
@@ -61,6 +63,6 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       addFailureToCommits = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, addFailureToCommits);
+        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, _serverMetrics, addFailureToCommits);
   }
 }
