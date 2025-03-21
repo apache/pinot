@@ -105,7 +105,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryEnvironment.QueryPlannerResult planQuery(String sql) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    return _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+      return compiledQuery.planQuery(requestId);
+    }
   }
 
   /**
@@ -115,8 +117,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    QueryEnvironment.QueryPlannerResult queryPlannerResult = _queryEnvironment.planQuery(sql, sqlNodeAndOptions,
-        requestId);
+    QueryEnvironment.QueryPlannerResult queryPlannerResult;
+    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+      queryPlannerResult = compiledQuery.planQuery(requestId);
+    }
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));

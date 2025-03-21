@@ -644,13 +644,13 @@
         "description": "nested aggregation",
         "sql": "SELECT min(max(int_col)) FROM {tbl}",
         "comments": ".*Aggregate expressions cannot be nested.",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": ".*Aggregate expressions cannot be nested"
       },
       {
         "psql": "4.2.7",
         "description": "nested aggregation",
         "sql": "SELECT (SELECT max(min(int_col)) FROM {tbl}) from {tbl};",
-        "expectedException": "Error composing query plan for.*"
+        "expectedException": ".*Aggregate expressions cannot be nested"
       },
       {
         "psql": "4.2.7",

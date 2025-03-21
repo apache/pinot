@@ -26,7 +26,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -529,6 +528,16 @@ public abstract class ClusterTest extends ControllerTest {
         getExtraQueryProperties());
   }
 
+  public QueryAssert assertQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQuery(query));
+  }
+
+  public QueryAssert assertControllerQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQueryToController(query));
+  }
+
   protected Map<String, String> getExtraQueryProperties() {
     return Map.of();
   }
@@ -617,11 +626,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public void assertNoError(JsonNode response) {
-    JsonNode exceptionsJson = response.get("exceptions");
-    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
-    if (exIterator.hasNext()) {
-      Assert.fail("There is at least one exception: " + exIterator.next());
-    }
+    QueryAssert.assertThat(response)
+        .hasNoExceptions();
   }
 
   @DataProvider(name = "systemColumns")

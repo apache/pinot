@@ -18,21 +18,24 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Utility class that works with a timeout in milliseconds and provides methods to check remaining time and expiration.
  */
 public class Timer {
-  private final long _timeoutMillis;
-  private final long _startTime;
+  private final long _startNs;
+  private final long _deadlineNs;
+  private final ClockNs _clock;
 
-  /**
-   * Initializes the Timer with the specified timeout in milliseconds.
-   *
-   * @param timeoutMillis the timeout duration in milliseconds
-   */
-  public Timer(long timeoutMillis) {
-    _timeoutMillis = timeoutMillis;
-    _startTime = System.currentTimeMillis();
+  public Timer(Long timeout, TimeUnit timeUnit) {
+    this(System::nanoTime, timeout, timeUnit);
+  }
+
+  public Timer(ClockNs clock, Long timeout, TimeUnit timeUnit) {
+    _clock = clock;
+    _startNs = _clock.nanos();
+    _deadlineNs = timeUnit.toNanos(timeout) + _clock.nanos();
   }
 
   /**
@@ -40,10 +43,9 @@ public class Timer {
    *
    * @return the remaining time in milliseconds
    */
-  public long getRemainingTime() {
-    long elapsedTime = System.currentTimeMillis() - _startTime;
-    long remainingTime = _timeoutMillis - elapsedTime;
-    return Math.max(remainingTime, 0);
+  public long getRemainingTimeMs() {
+    long remainingNs = _deadlineNs - _clock.nanos();
+    return Math.max(remainingNs / 1_000_000, 0);
   }
 
   /**
@@ -52,6 +54,14 @@ public class Timer {
    * @return true if the timer has expired, false otherwise
    */
   public boolean hasExpired() {
-    return getRemainingTime() == 0;
+    return getRemainingTimeMs() == 0;
+  }
+
+  public long timeElapsed(TimeUnit timeUnit) {
+    return timeUnit.convert(_clock.nanos() - _startNs, TimeUnit.NANOSECONDS);
+  }
+
+  public interface ClockNs {
+    long nanos();
   }
 }

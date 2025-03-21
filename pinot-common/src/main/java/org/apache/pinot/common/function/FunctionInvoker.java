@@ -137,7 +137,8 @@ public class FunctionInvoker {
       return invokeDirectly(arguments);
     } catch (Exception e) {
       throw new IllegalStateException(
-          "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
+          "Caught exception while invoking method: " + _method.getName() + " with arguments: "
+              + Arrays.toString(arguments), e);
     }
   }
 
