@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -87,12 +88,9 @@ public class QueryLogger {
       queryLogBuilder.append(',');
     }
 
-    // update: stop logging the query itself here, as it will already be logged in the request handler
-    /*
+    // always log the query last - don't add this to the QueryLogEntry enum
     queryLogBuilder.append("query=")
         .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
-    */
-    queryLogBuilder.setLength(queryLogBuilder.length() - 1);
     _logger.info(queryLogBuilder.toString());
 
     if (_droppedLogRateLimiter.tryAcquire()) {
