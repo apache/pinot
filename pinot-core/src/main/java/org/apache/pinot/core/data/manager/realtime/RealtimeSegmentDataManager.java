@@ -1077,6 +1077,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
     // complete.
     if (_allowConsumptionDuringBuild) {
+      if (!_allowConsumptionDuringDownload) {
+        _segmentLogger.info("Releasing semaphore early before the build where forCommit:{}", forCommit);
+      }
       closeStreamConsumers();
     }
     // Do not allow building segment when table data manager is already shut down
