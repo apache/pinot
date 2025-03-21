@@ -334,6 +334,8 @@ public class ImplicitHybridTableTest {
         {"no_route_table_R"},
         {"no_route_table_O_OFFLINE"},
         {"no_route_table_R_REALTIME"},
+        {"hybrid_o_disabled_REALTIME"},
+        {"hybrid_r_disabled_OFFLINE"},
     };
     //@formatter:on
   }
@@ -370,6 +372,8 @@ public class ImplicitHybridTableTest {
     //@formatter:off
     return new Object[][] {
         {"hybrid_disabled"},
+        {"hybrid_disabled_OFFLINE"},
+        {"hybrid_disabled_REALTIME"},
         {"hybrid_o_disabled_OFFLINE"},
         {"hybrid_r_disabled_REALTIME"},
         {"o_disabled_OFFLINE"},
