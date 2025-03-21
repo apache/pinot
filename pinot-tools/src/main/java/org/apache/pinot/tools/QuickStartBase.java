@@ -39,6 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
@@ -284,7 +285,9 @@ public abstract class QuickStartBase {
 
   protected Map<String, Object> getConfigOverrides() {
     try {
-      return StringUtils.isEmpty(_configFilePath) ? ImmutableMap.of()
+      return StringUtils.isEmpty(_configFilePath) ? ImmutableMap.of(
+          // disable running the disk utilization check periodic task by default in QuickStart
+          ControllerConf.RESOURCE_UTILIZATION_CHECKER_FREQUENCY, "-1")
           : PinotConfigUtils.readConfigFromFile(_configFilePath);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
