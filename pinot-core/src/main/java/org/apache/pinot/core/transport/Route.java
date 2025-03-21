@@ -16,15 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.table;
+package org.apache.pinot.core.transport;
 
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 
 
 public interface Route {
-  PhysicalTableRoute getOfflineTableRoute();
-  PhysicalTableRoute getRealtimeTableRoute();
+  @Nullable
+  BrokerRequest getOfflineBrokerRequest();
+  @Nullable
+  BrokerRequest getRealtimeBrokerRequest();
+  @Nullable
+  Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
+  @Nullable
+  Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
+
   List<String> getUnavailableSegments();
   int getNumPrunedSegments();
+
+  Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  @Nullable
+  PhysicalTableRoute getOfflineTableRoute();
+  @Nullable
+  PhysicalTableRoute getRealtimeTableRoute();
+
   boolean isEmpty();
 }

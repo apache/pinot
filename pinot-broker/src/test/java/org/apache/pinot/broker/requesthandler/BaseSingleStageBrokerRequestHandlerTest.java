@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -37,6 +36,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.transport.Route;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -193,10 +193,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-              BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-              @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
+              BrokerRequest serverBrokerRequest, Route route, long timeoutMs,
               ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;

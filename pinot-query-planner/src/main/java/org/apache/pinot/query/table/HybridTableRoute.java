@@ -22,8 +22,16 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.transport.PhysicalTableRoute;
+import org.apache.pinot.core.transport.Route;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 
 
 public class HybridTableRoute implements Route {
@@ -68,6 +76,30 @@ public class HybridTableRoute implements Route {
     return _realtimeTableRoute;
   }
 
+  @Nullable
+  @Override
+  public BrokerRequest getOfflineBrokerRequest() {
+    return _offlineTableRoute != null ? _offlineTableRoute.getBrokerRequest() : null;
+  }
+
+  @Nullable
+  @Override
+  public BrokerRequest getRealtimeBrokerRequest() {
+    return _realtimeTableRoute != null ? _realtimeTableRoute.getBrokerRequest() : null;
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+    return _offlineTableRoute != null ? _offlineTableRoute.getRoutingTable() : null;
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+    return _realtimeTableRoute != null ? _realtimeTableRoute.getRoutingTable() : null;
+  }
+
   @Override
   public List<String> getUnavailableSegments() {
     List<String> unavailableSegments = Collections.emptyList();
@@ -99,6 +131,25 @@ public class HybridTableRoute implements Route {
       numPrunedSegments += _realtimeTableRoute.getNumPrunedSegments();
     }
     return numPrunedSegments;
+  }
+
+  @Override
+  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
+    if (_offlineTableRoute != null) {
+      requestMap = _offlineTableRoute.getRequestMap(requestId, brokerId, preferTls);
+    }
+    if (_realtimeTableRoute != null) {
+      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap =
+          _realtimeTableRoute.getRequestMap(requestId, brokerId, preferTls);
+      if (requestMap == null) {
+        requestMap = realtimeRequestMap;
+      } else {
+        requestMap.putAll(realtimeRequestMap);
+      }
+    }
+
+    return requestMap;
   }
 
   @Override

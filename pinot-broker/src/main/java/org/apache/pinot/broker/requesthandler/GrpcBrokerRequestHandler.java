@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -40,6 +39,8 @@ import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.transport.PhysicalTableRoute;
+import org.apache.pinot.core.transport.Route;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -86,25 +87,19 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
+      BrokerRequest serverBrokerRequest, Route route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Add servers queried/responded stats
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
+    assert !route.isEmpty();
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
-    if (offlineBrokerRequest != null) {
-      assert offlineRoutingTable != null;
-      sendRequest(requestId, TableType.OFFLINE, offlineBrokerRequest, offlineRoutingTable, responseMap,
-          requestContext.isSampledRequest());
+    for (PhysicalTableRoute tableRoute : List.of(route.getOfflineTableRoute(), route.getRealtimeTableRoute())) {
+      if (tableRoute != null) {
+        sendRequest(requestId, TableType.OFFLINE, tableRoute.getBrokerRequest(), tableRoute.getRoutingTable(),
+            responseMap, requestContext.isSampledRequest());
+      }
     }
-    if (realtimeBrokerRequest != null) {
-      assert realtimeRoutingTable != null;
-      sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
-          requestContext.isSampledRequest());
-    }
+
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
