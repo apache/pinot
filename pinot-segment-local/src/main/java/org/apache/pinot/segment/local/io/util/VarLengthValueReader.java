@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
+import com.dynatrace.hash4j.hashing.Hashing;
 import java.util.List;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -90,6 +92,11 @@ public class VarLengthValueReader implements ValueReader {
 
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return new String(buffer, 0, length, UTF_8);
+  }
+
+  private int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     // Read the offset of the byte array first and then read the actual byte array.
@@ -100,7 +107,7 @@ public class VarLengthValueReader implements ValueReader {
 
     assert numBytesPerValue >= length;
     _dataBuffer.copyTo(startOffset, buffer, 0, length);
-    return new String(buffer, 0, length, UTF_8);
+    return length;
   }
 
   public void recordOffsetRanges(int index, long baseOffset, List<ForwardIndexReader.ByteRange> rangeList) {
@@ -128,6 +135,12 @@ public class VarLengthValueReader implements ValueReader {
     byte[] value = new byte[length];
     _dataBuffer.copyTo(startOffset, value);
     return value;
+  }
+
+  @Override
+  public HashValue128 get128BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return Hashing.murmur3_128().hashBytesTo128Bits(buffer, 0, length);
   }
 
   @Override

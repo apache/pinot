@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -60,6 +61,11 @@ public interface ValueReader extends Closeable {
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
    */
   byte[] getBytes(int index, int numBytesPerValue);
+
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
+  HashValue128 get128BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer);
 
   /**
    * Returns the comparison result of the UTF-8 decoded values.

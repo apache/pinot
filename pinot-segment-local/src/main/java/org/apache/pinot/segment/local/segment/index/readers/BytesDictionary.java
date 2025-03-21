@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -103,5 +104,13 @@ public class BytesDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return getBytes(dictId);
+  }
+
+  @Override
+  public void read128BitsMurmur3HashValues(int[] dictIds, int length, HashValue128[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get128BitsMurmur3HashValue(dictIds[i], buffer);
+    }
   }
 }

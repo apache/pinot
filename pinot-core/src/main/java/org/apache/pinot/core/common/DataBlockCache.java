@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.common;
 
+import com.dynatrace.hash4j.hashing.HashValue128;
 import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -240,6 +241,13 @@ public class DataBlockCache {
       _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
     }
     return bytesValues;
+  }
+
+  public HashValue128[] get128BitsMurmur3HashValuesForSVColumn(String column) {
+    // TODO: This is not cached
+    HashValue128[] hashValues = new HashValue128[_length];
+    _dataFetcher.fetch128BitsMurmur3HashValues(column, _docIds, _length, hashValues);
+    return hashValues;
   }
 
   /**
