@@ -453,6 +453,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+    public static final String GRPC_SERVER_ENABLED = "pinot.broker.grpc.server.enabled";
+    public static final boolean DEFAULT_GRPC_SERVER_ENABLED = false;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -722,6 +724,18 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
+    }
+
+    public static class Grpc {
+      public static final String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
+      public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
+      public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
+      public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
+
+      public static final String BLOCK_ROW_SIZE = "blockRowSize";
+      public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
+      public static final String COMPRESSION = "compression";
+      public static final String DEFAULT_COMPRESSION = "ZSTD";
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";

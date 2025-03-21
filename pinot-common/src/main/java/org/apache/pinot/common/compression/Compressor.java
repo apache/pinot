@@ -16,45 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
-
-import java.util.List;
-
+package org.apache.pinot.common.compression;
 
 /**
- * A updatable cache of table name to list of eligible brokers.
- * Implementations should implement manual refreshing mechanism
+ * Compressor interface for bytes compress/decompress.
+ * Note that the compress method will also encode the size of original bytes as the first
  */
-public interface UpdatableBrokerCache {
-  /**
-   * Initializes the cache
-   * @throws Exception
-   */
-  void init()
+public interface Compressor {
+
+  byte[] compress(byte[] input)
       throws Exception;
 
-  /**
-   * Method to get one random broker for a given table
-   * @param tableName
-   * @return Broker address corresponding to the table
-   */
-  String getBroker(String... tableName);
-
-  /**
-   * Returns all the brokers currently in the cache
-   * @return List of all available brokers
-   */
-  List<String> getBrokers();
-
-  /**
-   * Manually trigger a cache refresh
-   * @throws Exception
-   */
-  void triggerBrokerCacheUpdate()
+  byte[] decompress(byte[] input)
       throws Exception;
+}
 
-  /**
-   * Closes the cache and release any resources
-   */
-  void close();
+class NoCompressor implements Compressor {
+  public static final Compressor INSTANCE = new NoCompressor();
+
+  @Override
+  public byte[] compress(byte[] input) {
+    return input;
+  }
+
+  @Override
+  public byte[] decompress(byte[] input) {
+    return input;
+  }
 }

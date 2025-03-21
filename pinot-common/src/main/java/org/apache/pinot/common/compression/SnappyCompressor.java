@@ -16,34 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.common.compression;
 
-public class InstanceInfo {
-  private final String _instanceName;
-  private final String _host;
-  private final Integer _port;
-  private final Integer _grpcPort;
+import org.xerial.snappy.Snappy;
 
-  public InstanceInfo(String instanceName, String host, Integer port, Integer grpcPort) {
-    _instanceName = instanceName;
-    _host = host;
-    _port = port;
-    _grpcPort = grpcPort;
+
+public class SnappyCompressor implements Compressor {
+  public static final SnappyCompressor INSTANCE = new SnappyCompressor();
+
+  @Override
+  public byte[] compress(byte[] input)
+      throws Exception {
+    return Snappy.compress(input);
   }
 
-  public String getInstanceName() {
-    return _instanceName;
-  }
-
-  public String getHost() {
-    return _host;
-  }
-
-  public Integer getPort() {
-    return _port;
-  }
-
-  public Integer getGrpcPort() {
-    return _grpcPort;
+  @Override
+  public byte[] decompress(byte[] input)
+      throws Exception {
+    return Snappy.uncompress(input);
   }
 }

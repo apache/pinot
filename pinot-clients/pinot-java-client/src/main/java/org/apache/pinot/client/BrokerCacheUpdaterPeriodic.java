@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Maintains broker cache this is updated periodically
  */
@@ -46,7 +47,8 @@ public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
         properties.getProperty(BROKER_UPDATE_FREQUENCY_MILLIS, DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS));
   }
 
-  public void init() throws Exception {
+  public void init()
+      throws Exception {
     _brokerCache.updateBrokerData();
 
     if (_brokerUpdateFreqInMillis > 0) {
@@ -73,11 +75,17 @@ public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
   }
 
   @Override
-  public void triggerBrokerCacheUpdate() throws Exception {
+  public void triggerBrokerCacheUpdate()
+      throws Exception {
     _brokerCache.updateBrokerData();
   }
 
   public void close() {
+    try {
+      _brokerCache.close();
+    } catch (Exception e) {
+      LOGGER.error("Cannot close Broker Cache", e);
+    }
     try {
       _scheduledExecutorService.shutdown();
     } catch (Exception e) {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.client.grpc;
 
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -32,29 +32,29 @@ import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
-public class PinotConnection extends AbstractBaseConnection {
-
-  protected static final String[] POSSIBLE_QUERY_OPTIONS = {
-    QueryOptionKey.ENABLE_NULL_HANDLING,
-    QueryOptionKey.USE_MULTISTAGE_ENGINE
-  };
-  private org.apache.pinot.client.Connection _session;
-  private boolean _closed;
-  private String _controllerURL;
-  private PinotControllerTransport _controllerTransport;
-  private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
-
+public class PinotGrpcConnection extends AbstractBaseConnection {
   public static final String BROKER_LIST = "brokers";
+  protected static final String[] POSSIBLE_QUERY_OPTIONS = {
+      QueryOptionKey.ENABLE_NULL_HANDLING,
+      QueryOptionKey.USE_MULTISTAGE_ENGINE,
+  };
 
-  PinotConnection(String controllerURL, PinotClientTransport transport, String tenant,
-      PinotControllerTransport controllerTransport) {
-    this(new Properties(), controllerURL, transport, tenant, controllerTransport);
-  }
+  protected static final String[] POSSIBLE_METADATA_MAP_OPTIONS = {
+      CommonConstants.Broker.Grpc.BLOCK_ROW_SIZE,
+      CommonConstants.Broker.Grpc.COMPRESSION,
+  };
+  private GrpcConnection _session;
+  private PinotControllerTransport _controllerTransport;
+  private boolean _closed;
+  private final String _controllerURL;
+  private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
+  private final Map<String, String> _metadataMap = new HashMap<>();
 
-  PinotConnection(Properties properties, String controllerURL, PinotClientTransport transport, String tenant,
+  public PinotGrpcConnection(Properties properties, String controllerURL, String tenant,
       PinotControllerTransport controllerTransport) {
     _closed = false;
     _controllerURL = controllerURL;
@@ -67,20 +67,25 @@ public class PinotConnection extends AbstractBaseConnection {
     if (properties.containsKey(BROKER_LIST)) {
       brokers = Arrays.asList(properties.getProperty(BROKER_LIST).split(";"));
     } else {
-      brokers = getBrokerList(controllerURL, tenant);
+      brokers = getBrokerGrpcList(controllerURL, tenant);
     }
-    _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
+    _session = new GrpcConnection(properties, brokers);
 
-    for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
+    for (String possibleQueryOption : POSSIBLE_QUERY_OPTIONS) {
       Object property = properties.getProperty(possibleQueryOption);
       if (property != null) {
         _queryOptions.put(possibleQueryOption, DriverUtils.parseOptionValue(property));
       }
     }
+    for (String possibleMetadataMapOption : POSSIBLE_METADATA_MAP_OPTIONS) {
+      Object property = properties.getProperty(possibleMetadataMapOption);
+      if (property != null) {
+        _metadataMap.put(possibleMetadataMapOption, property.toString());
+      }
+    }
   }
 
-
-  public org.apache.pinot.client.Connection getSession() {
+  public GrpcConnection getSession() {
     return _session;
   }
 
@@ -88,10 +93,14 @@ public class PinotConnection extends AbstractBaseConnection {
     return _queryOptions;
   }
 
-  private List<String> getBrokerList(String controllerURL, String tenant) {
+  public Map<String, String> getMetadataMap() {
+    return _metadataMap;
+  }
+
+  private List<String> getBrokerGrpcList(String controllerURL, String tenant) {
     ControllerTenantBrokerResponse controllerTenantBrokerResponse =
         _controllerTransport.getBrokersFromController(controllerURL, tenant);
-    return controllerTenantBrokerResponse.getBrokers();
+    return controllerTenantBrokerResponse.getBrokerGrpcConnections();
   }
 
   @Override
@@ -118,14 +127,14 @@ public class PinotConnection extends AbstractBaseConnection {
   public Statement createStatement()
       throws SQLException {
     validateState();
-    return new PinotStatement(this);
+    return new PinotGrpcStatement(this);
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql)
       throws SQLException {
     validateState();
-    return new PinotPreparedStatement(this, sql);
+    return new PinotGrpcPreparedStatement(this, sql);
   }
 
   @Override
@@ -137,6 +146,6 @@ public class PinotConnection extends AbstractBaseConnection {
   @Override
   public DatabaseMetaData getMetaData()
       throws SQLException {
-    return new PinotConnectionMetaData(this, _controllerURL, _controllerTransport);
+    return new PinotGrpcConnectionMetaData(this, _controllerURL, _controllerTransport);
   }
 }

@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.client.grpc;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -34,67 +36,57 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.client.PinotResultMetadata;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PinotResultSet extends AbstractBaseResultSet {
+public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public static final String NULL_STRING = "null";
-  private static final Logger LOG = LoggerFactory.getLogger(PinotResultSet.class);
-  private org.apache.pinot.client.ResultSet _resultSet;
-  private int _totalRows;
-  private int _currentRow;
+  private static final Logger LOG = LoggerFactory.getLogger(PinotGrpcResultSet.class);
+
+  private final Iterator<Broker.BrokerResponse> _brokerResponseIterator;
   private final int _totalColumns;
   private final Map<String, Integer> _columns = new HashMap<>();
   private final Map<Integer, String> _columnDataTypes = new HashMap<>();
+
+  private ArrayNode _currentRowBatch;
+  private int _currentBatchSize;
+
+  private int _currentBatchIndex = -1;
+  private int _currentRow = 0;
+
   private boolean _closed;
   private boolean _wasNull = false;
 
-  public PinotResultSet(org.apache.pinot.client.ResultSet resultSet) {
-    _resultSet = resultSet;
-    _totalRows = _resultSet.getRowCount();
-    _totalColumns = _resultSet.getColumnCount();
-    _currentRow = -1;
+  public PinotGrpcResultSet(Iterator<Broker.BrokerResponse> brokerResponseIterator)
+      throws IOException {
+    _brokerResponseIterator = brokerResponseIterator;
     _closed = false;
+    ObjectNode metadata = GrpcUtils.extractMetadataJson(_brokerResponseIterator.next());
+    DataSchema dataSchema = GrpcUtils.extractSchema(_brokerResponseIterator.next());
+    _totalColumns = dataSchema.size();
     for (int i = 0; i < _totalColumns; i++) {
-      _columns.put(_resultSet.getColumnName(i), i + 1);
-      _columnDataTypes.put(i + 1, _resultSet.getColumnDataType(i));
+      _columns.put(dataSchema.getColumnName(i), i + 1);
+      _columnDataTypes.put(i + 1, dataSchema.getColumnDataType(i).name());
     }
   }
 
-  public PinotResultSet() {
-    _totalRows = 0;
-    _currentRow = -1;
+  public PinotGrpcResultSet() {
+    _brokerResponseIterator = null;
+    _currentBatchSize = 0;
     _totalColumns = 0;
   }
 
-  public static PinotResultSet empty() {
-    return new PinotResultSet();
-  }
-
-  public static PinotResultSet fromJson(String jsonText) {
-    try {
-      JsonNode brokerResponse = JsonUtils.stringToJsonNode(jsonText);
-      ResultSet resultSet = new ResultTableResultSet(brokerResponse.get("resultTable"));
-      return new PinotResultSet(resultSet);
-    } catch (Exception e) {
-      LOG.error("Error encountered while creating result set from JSON", e);
-      return empty();
-    }
-  }
-
-  public static PinotResultSet fromResultTable(ResultSet resultSet) {
-    try {
-      return new PinotResultSet(resultSet);
-    } catch (Exception e) {
-      LOG.error("Error encountered while creating result set from Result Table", e);
-      return empty();
-    }
+  public static PinotGrpcResultSet empty() {
+    return new PinotGrpcResultSet();
   }
 
   protected void validateState()
@@ -117,39 +109,26 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public boolean absolute(int row)
       throws SQLException {
     validateState();
-
-    if (row >= 0 && row < _totalRows) {
-      _currentRow = row;
-      return true;
-    } else if (row < 0 && Math.abs(row) <= _totalRows) {
-      _currentRow = _totalRows + row;
-      return true;
-    }
-
-    return false;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public void afterLast()
       throws SQLException {
     validateState();
-
-    _currentRow = _totalRows;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public void beforeFirst()
       throws SQLException {
     validateState();
-
-    _currentRow = -1;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public void close()
       throws SQLException {
-    _resultSet = null;
-    _totalRows = 0;
     _currentRow = -1;
     _columns.clear();
     _closed = true;
@@ -176,9 +155,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public boolean first()
       throws SQLException {
     validateState();
-
-    _currentRow = 0;
-    return true;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
@@ -280,7 +257,6 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public int getRow()
       throws SQLException {
     validateState();
-
     return _currentRow;
   }
 
@@ -295,8 +271,7 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public String getString(int columnIndex)
       throws SQLException {
     validateColumn(columnIndex);
-
-    String val = _resultSet.getString(_currentRow, columnIndex - 1);
+    String val = _currentRowBatch.get(_currentBatchIndex).get(columnIndex - 1).asText();
     if (checkIsNull(val)) {
       return null;
     }
@@ -405,16 +380,14 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public boolean isAfterLast()
       throws SQLException {
     validateState();
-
-    return (_currentRow >= _totalRows);
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public boolean isBeforeFirst()
       throws SQLException {
     validateState();
-
-    return (_currentRow < 0);
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
@@ -427,25 +400,21 @@ public class PinotResultSet extends AbstractBaseResultSet {
   public boolean isFirst()
       throws SQLException {
     validateState();
-
-    return _currentRow == 0;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public boolean isLast()
       throws SQLException {
     validateState();
-
-    return _currentRow == _totalRows - 1;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public boolean last()
       throws SQLException {
     validateState();
-
-    _currentRow = _totalRows - 1;
-    return true;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
@@ -453,33 +422,40 @@ public class PinotResultSet extends AbstractBaseResultSet {
       throws SQLException {
     validateState();
 
+    if (_currentBatchIndex == _currentBatchSize - 1) {
+      if (_brokerResponseIterator.hasNext()) {
+        System.out.println("Try to fetch next batch of rows from broker response iterator.");
+        try {
+          _currentRowBatch = GrpcUtils.extractRowsJson(_brokerResponseIterator.next());
+          _currentBatchIndex = 0;
+          _currentBatchSize = _currentRowBatch.size();
+          _currentRow++;
+          return true;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        return false;
+      }
+    }
+
+    _currentBatchIndex++;
     _currentRow++;
-    boolean hasNext = _currentRow < _totalRows;
-    return hasNext;
+    return _currentBatchIndex < _currentBatchSize;
   }
 
   @Override
   public boolean previous()
       throws SQLException {
     validateState();
-
-    if (!isBeforeFirst()) {
-      _currentRow--;
-      return true;
-    }
-    return false;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override
   public boolean relative(int rows)
       throws SQLException {
     validateState();
-    int nextRow = _currentRow + rows;
-    if (nextRow >= 0 && nextRow < _totalRows) {
-      _currentRow = nextRow;
-      return true;
-    }
-    return false;
+    throw new SQLDataException("Absolute row number not supported");
   }
 
   @Override

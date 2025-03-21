@@ -66,6 +66,25 @@ public class ControllerTenantBrokerResponse {
     return brokerList;
   }
 
+  public List<String> getBrokerGrpcConnections() {
+    List<String> brokerList = new ArrayList<>();
+    for (JsonNode broker : _brokers) {
+      if (!broker.has("grpcPort")) {
+        continue;
+      }
+      String hostName = broker.get("host").textValue();
+      Integer grpcPort = broker.get("grpcPort").intValue();
+      String brokerIP = hostName;
+      if (hostName.contains("_")) {
+        String[] hostNamePart = hostName.split("_");
+        brokerIP = hostNamePart[hostNamePart.length - 1];
+      }
+      String brokerIPPort = String.format("%s:%d", brokerIP, grpcPort);
+      brokerList.add(brokerIPPort);
+    }
+    return brokerList;
+  }
+
   public static class ControllerTenantBrokerResponseFuture
       extends ControllerResponseFuture<ControllerTenantBrokerResponse> {
     public ControllerTenantBrokerResponseFuture(Future<Response> response, String url) {
