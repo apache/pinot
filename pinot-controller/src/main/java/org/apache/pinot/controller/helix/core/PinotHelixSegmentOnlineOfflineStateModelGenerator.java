@@ -40,17 +40,13 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
   public static final String DROPPED_STATE = "DROPPED";
   public static final String CONSUMING_STATE = "CONSUMING";
 
-  // Helix state transitions can be assigned a priority which is used by Helix
-  // to issue the order of state transitions. A lower priority value means a higher
-  // priority in Helix.
-  // Set all DROPPED related state transitions to have a higher priority.
-  // Handling DROPPED state transitions with a higher priority can help prevent
-  // servers from running into disk utilization problems.
-  public static final int DROPPED_STATE_TRANSITION_PRIORITY = 1;
-  // Set all state transitions to OFFLINE state to have higher priority than default but less
-  // than DROPPED. Processing OFFLINE transitions earlier can help reduce memory pressure on servers.
-  public static final int OFFLINE_STATE_TRANSITION_PRIORITY = 2;
-  public static final int DEFAULT_STATE_TRANSITION_PRIORITY = Integer.MAX_VALUE;
+  // Helix state can be assigned a priority which is used by Helix to issue the order of state transitions. The priority
+  // is applied to the desired state. A lower priority value means a higher priority in Helix.
+  // Set DROPPED state with the highest priority to help prevent servers from running into disk utilization problems.
+  public static final int DROPPED_STATE_PRIORITY = 1;
+  // Set OFFLINE state with higher priority than other state but less than DROPPED. Processing OFFLINE transitions
+  // earlier can help reduce memory pressure on servers.
+  public static final int OFFLINE_STATE_PRIORITY = 2;
 
   public static StateModelDefinition generatePinotStateModelDefinition() {
     StateModelDefinition.Builder builder = new StateModelDefinition.Builder(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
@@ -59,31 +55,22 @@ public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
 
     builder.addState(ONLINE_STATE);
     builder.addState(CONSUMING_STATE);
-    builder.addState(OFFLINE_STATE);
-    builder.addState(DROPPED_STATE);
+    builder.addState(OFFLINE_STATE, OFFLINE_STATE_PRIORITY);
+    builder.addState(DROPPED_STATE, DROPPED_STATE_PRIORITY);
 
     // Add transitions between the states.
-    builder.addTransition(OFFLINE_STATE, CONSUMING_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(OFFLINE_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(CONSUMING_STATE, ONLINE_STATE, DEFAULT_STATE_TRANSITION_PRIORITY);
-    // Set state transitions to OFFLINE to have higher priority to help reduce memory pressure on servers faster
-    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(ONLINE_STATE, OFFLINE_STATE, OFFLINE_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(OFFLINE_STATE, CONSUMING_STATE);
+    builder.addTransition(OFFLINE_STATE, ONLINE_STATE);
+    builder.addTransition(CONSUMING_STATE, ONLINE_STATE);
+    builder.addTransition(CONSUMING_STATE, OFFLINE_STATE);
+    builder.addTransition(ONLINE_STATE, OFFLINE_STATE);
     // Add explicit state transitions to DROPPED from each state to ensure that DROPPED can be processed in a single
     // state transition. Without adding explicit state transitions to DROPPED from ONLINE/CONSUMING, two state
     // transitions will be needed to fully drop a segment (CONSUMING/ONLINE -> OFFLINE, OFFLINE -> DROPPED)
-    builder.addTransition(OFFLINE_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(CONSUMING_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
-    builder.addTransition(ONLINE_STATE, DROPPED_STATE, DROPPED_STATE_TRANSITION_PRIORITY);
+    builder.addTransition(OFFLINE_STATE, DROPPED_STATE);
+    builder.addTransition(CONSUMING_STATE, DROPPED_STATE);
+    builder.addTransition(ONLINE_STATE, DROPPED_STATE);
 
-    // set constraints on states.
-    // static constraint
-    builder.dynamicUpperBound(ONLINE_STATE, "R");
-    // dynamic constraint, R means it should be derived based on the replication
-    // factor.
-    builder.dynamicUpperBound(CONSUMING_STATE, "R");
-
-    StateModelDefinition statemodelDefinition = builder.build();
-    return statemodelDefinition;
+    return builder.build();
   }
 }
