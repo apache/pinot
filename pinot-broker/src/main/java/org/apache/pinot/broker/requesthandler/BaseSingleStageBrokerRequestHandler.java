@@ -91,7 +91,7 @@ import org.apache.pinot.query.table.HybridTable;
 import org.apache.pinot.query.table.HybridTableRoute;
 import org.apache.pinot.query.table.ImplicitHybridTable;
 import org.apache.pinot.query.table.PhysicalTable;
-import org.apache.pinot.query.table.Route;
+import org.apache.pinot.core.transport.Route;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -592,7 +592,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
     }
 
-    if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
+    if (route.isEmpty()) {
       if (!errorMsgs.isEmpty()) {
         QueryProcessingException firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"
@@ -601,7 +601,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
         return BrokerResponseNative.fromBrokerErrors(errorMsgs);
       } else {
-        // When all segments have been pruned, we can just return an empty response.
+        // If no route is found, send an empty response
         return getEmptyBrokerOnlyResponse(pinotQuery, requestContext, tableName, requesterIdentity, schema, query,
             database);
       }
@@ -703,18 +703,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       onQueryStart(
           requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
       try {
-        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-            requestContext);
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, route, remainingTimeMs,
+            serverStats, requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
         onQueryFinish(requestId);
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-          offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-          requestContext);
+      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, route, remainingTimeMs,
+          serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -1952,10 +1950,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
+      BrokerRequest serverBrokerRequest, Route route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
