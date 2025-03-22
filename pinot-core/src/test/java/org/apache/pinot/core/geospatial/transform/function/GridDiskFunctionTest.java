@@ -35,8 +35,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class GridDiskFunctionTest extends BaseTransformFunctionTest {
+import static org.testng.Assert.assertEquals;
 
+public class GridDiskFunctionTest extends BaseTransformFunctionTest {
   @BeforeClass
   @Override
   public void setUp() throws Exception {
@@ -44,8 +45,7 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
   }
 
   @Test
-  public void testGridDisk()
-      throws IOException {
+  public void testGridDisk() throws IOException {
     H3Core h3Core = H3Core.newInstance();
     // Test point in San Francisco
     double lat = 37.7749;
@@ -54,6 +54,8 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
 
     // Test with k=1 (immediate neighbors)
     int k = 1;
+
+    // Create expected values
     List<Long> expectedDisk = h3Core.gridDisk(h3Index, k);
     long[][] expectedValues = new long[NUM_ROWS][];
     Arrays.fill(expectedValues, expectedDisk.stream().mapToLong(Long::longValue).toArray());
@@ -64,6 +66,7 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     TransformFunction transformFunction = TransformFunctionFactory.get(
         ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDisk",
             Arrays.asList(h3Context, kContext))), _dataSourceMap);
+
     Map<String, ColumnContext> columnContextMap = new HashMap<>();
     for (Map.Entry<String, DataSource> entry : _dataSourceMap.entrySet()) {
       columnContextMap.put(entry.getKey(), ColumnContext.fromDataSource(entry.getValue()));
@@ -71,7 +74,10 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     transformFunction.init(Arrays.asList(
         TransformFunctionFactory.get(h3Context, _dataSourceMap),
         TransformFunctionFactory.get(kContext, _dataSourceMap)), columnContextMap);
-    testTransformFunctionMV(transformFunction, expectedValues);
+
+    // Test the function
+    long[][] result = transformFunction.transformToLongValuesMV(_projectionBlock);
+    assertArrayEquals(result, expectedValues);
 
     // Test with k=0 (only the center)
     k = 0;
@@ -79,7 +85,6 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     expectedValues = new long[NUM_ROWS][];
     Arrays.fill(expectedValues, expectedDisk.stream().mapToLong(Long::longValue).toArray());
 
-    h3Context = ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index);
     kContext = ExpressionContext.forLiteral(FieldSpec.DataType.INT, k);
     transformFunction = TransformFunctionFactory.get(
         ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDisk",
@@ -87,7 +92,9 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     transformFunction.init(Arrays.asList(
         TransformFunctionFactory.get(h3Context, _dataSourceMap),
         TransformFunctionFactory.get(kContext, _dataSourceMap)), columnContextMap);
-    testTransformFunctionMV(transformFunction, expectedValues);
+
+    result = transformFunction.transformToLongValuesMV(_projectionBlock);
+    assertArrayEquals(result, expectedValues);
 
     // Test with k=2 (two rings of neighbors)
     k = 2;
@@ -95,7 +102,6 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     expectedValues = new long[NUM_ROWS][];
     Arrays.fill(expectedValues, expectedDisk.stream().mapToLong(Long::longValue).toArray());
 
-    h3Context = ExpressionContext.forLiteral(FieldSpec.DataType.LONG, h3Index);
     kContext = ExpressionContext.forLiteral(FieldSpec.DataType.INT, k);
     transformFunction = TransformFunctionFactory.get(
         ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "gridDisk",
@@ -103,6 +109,15 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
     transformFunction.init(Arrays.asList(
         TransformFunctionFactory.get(h3Context, _dataSourceMap),
         TransformFunctionFactory.get(kContext, _dataSourceMap)), columnContextMap);
-    testTransformFunctionMV(transformFunction, expectedValues);
+
+    result = transformFunction.transformToLongValuesMV(_projectionBlock);
+    assertArrayEquals(result, expectedValues);
+  }
+
+  private void assertArrayEquals(long[][] actual, long[][] expected) {
+    assertEquals(actual.length, expected.length);
+    for (int i = 0; i < actual.length; i++) {
+      assertEquals(actual[i], expected[i]);
+    }
   }
 }
