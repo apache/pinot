@@ -86,13 +86,15 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.query.table.HybridTable;
+import org.apache.pinot.query.table.ImplicitHybridTable;
+import org.apache.pinot.query.table.PhysicalTable;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -403,56 +405,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
 
     // Get the tables hit by the request
-    String offlineTableName = null;
-    String realtimeTableName = null;
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == TableType.OFFLINE) {
-      // Offline table
-      if (_routingManager.routingExists(tableName)) {
-        offlineTableName = tableName;
-      }
-    } else if (tableType == TableType.REALTIME) {
-      // Realtime table
-      if (_routingManager.routingExists(tableName)) {
-        realtimeTableName = tableName;
-      }
-    } else {
-      // Hybrid table (check both OFFLINE and REALTIME)
-      String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      if (_routingManager.routingExists(offlineTableNameToCheck)) {
-        offlineTableName = offlineTableNameToCheck;
-      }
-      String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      if (_routingManager.routingExists(realtimeTableNameToCheck)) {
-        realtimeTableName = realtimeTableNameToCheck;
-      }
+    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+
+    if (!hybridTable.isExists()) {
+      LOGGER.info("Table not found for request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
+      return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
 
-    TableConfig offlineTableConfig =
-        _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-    TableConfig realtimeTableConfig =
-        _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-
-    if (offlineTableName == null && realtimeTableName == null) {
-      // No table matches the request
-      if (realtimeTableConfig == null && offlineTableConfig == null) {
-        LOGGER.info("Table not found for request {}: {}", requestId, query);
-        requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
-        return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
-      }
+    if (!hybridTable.isRouteExists()) {
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
 
-    // Handle query rewrite that can be overridden by the table configs
-    if (offlineTableName == null) {
-      offlineTableConfig = null;
-    }
-    if (realtimeTableName == null) {
-      realtimeTableConfig = null;
-    }
+    String offlineTableName =
+        hybridTable.getOfflineTable() != null ? hybridTable.getOfflineTable().getTableNameWithType() : null;
+    String realtimeTableName =
+        hybridTable.getRealtimeTable() != null ? hybridTable.getRealtimeTable().getTableNameWithType() : null;
+    TableConfig offlineTableConfig =
+        hybridTable.getOfflineTable() != null ? hybridTable.getOfflineTable().getTableConfig() : null;
+    TableConfig realtimeTableConfig =
+        hybridTable.getRealtimeTable() != null ? hybridTable.getRealtimeTable().getTableConfig() : null;
+    TimeBoundaryInfo timeBoundaryInfo = hybridTable.getTimeBoundaryInfo();
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
@@ -477,19 +453,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Prepare OFFLINE and REALTIME requests
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
-    TimeBoundaryInfo timeBoundaryInfo = null;
-    if (offlineTableName != null && realtimeTableName != null) {
-      // Time boundary info might be null when there is no segment in the offline table, query real-time side only
-      timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
-      if (timeBoundaryInfo == null) {
-        LOGGER.debug("No time boundary info found for hybrid table: {}", rawTableName);
-        offlineTableName = null;
-      }
-    }
-    if (offlineTableName != null && realtimeTableName != null) {
+
+    if (hybridTable.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
+      assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
       handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
@@ -507,7 +476,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (offlineTableName != null) {
+    } else if (hybridTable.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
@@ -606,19 +575,23 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
-    if (offlineTableDisabled || realtimeTableDisabled) {
-      String errorMessage = null;
-      if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
-          && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
-          realtimeTableConfig == null && offlineTableDisabled)) {
-        requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
-        return BrokerResponseNative.TABLE_IS_DISABLED;
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
-        errorMessage = "Realtime table is disabled in hybrid table";
-      } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
-        errorMessage = "Offline table is disabled in hybrid table";
+    // If all tables in a hybrid are disabled then return an error.
+    // Note that if a query is for one of OFFLINE or REALTIME table and the other physical table is disabled,
+    // we still want to run the query. So this condition is false.
+    // Tested by the tables "hybrid_o_disabled_REALTIME" and "hybrid_r_disabled_OFFLINE" in ImplicitHybridTableTest
+    if (hybridTable.isDisabled()) {
+      requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
+      return BrokerResponseNative.TABLE_IS_DISABLED;
+    }
+
+    List<PhysicalTable> disabledTables = hybridTable.getDisabledTables();
+    if (disabledTables != null) {
+      for (PhysicalTable disabled : disabledTables) {
+        String errorMessage = String.format("%s Table %s is disabled", disabled.getTableType().name(),
+            disabled.getTableNameWithType());
+        LOGGER.info("{}: {}", errorMessage, query);
+        errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
       }
-      errorMsgs.add(new QueryProcessingException(QueryErrorCode.TABLE_IS_DISABLED, errorMessage));
     }
 
     int numUnavailableSegments = unavailableSegments.size();
