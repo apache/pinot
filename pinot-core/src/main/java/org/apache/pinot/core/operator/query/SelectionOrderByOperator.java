@@ -281,62 +281,64 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     for (String column : columns) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
-    TransformOperator transformOperator =
-        new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 
-    // Fill the non-order-by expression values
-    int numNonOrderByExpressions = nonOrderByExpressions.size();
-    blockValSets = new BlockValSet[numNonOrderByExpressions];
-    int rowBaseId = 0;
-    while ((valueBlock = transformOperator.nextBlock()) != null) {
-      for (int i = 0; i < numNonOrderByExpressions; i++) {
-        ExpressionContext expression = nonOrderByExpressions.get(i);
-        blockValSets[i] = valueBlock.getBlockValueSet(expression);
-      }
-      RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      int numDocsFetched = valueBlock.getNumDocs();
-      for (int i = 0; i < numDocsFetched; i++) {
-        blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
-      }
-      if (_nullHandlingEnabled) {
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+    try (ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows))) {
+      TransformOperator transformOperator =
+          new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
+
+      // Fill the non-order-by expression values
+      int numNonOrderByExpressions = nonOrderByExpressions.size();
+      blockValSets = new BlockValSet[numNonOrderByExpressions];
+      int rowBaseId = 0;
+      while ((valueBlock = transformOperator.nextBlock()) != null) {
         for (int i = 0; i < numNonOrderByExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          ExpressionContext expression = nonOrderByExpressions.get(i);
+          blockValSets[i] = valueBlock.getBlockValueSet(expression);
         }
+        RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
+        int numDocsFetched = valueBlock.getNumDocs();
         for (int i = 0; i < numDocsFetched; i++) {
-          Object[] values = rowList.get(rowBaseId + i);
-          for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
-            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
-              int valueColId = numOrderByExpressions + colId;
-              values[valueColId] = null;
+          blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
+        }
+        if (_nullHandlingEnabled) {
+          RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+          for (int i = 0; i < numNonOrderByExpressions; i++) {
+            nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          }
+          for (int i = 0; i < numDocsFetched; i++) {
+            Object[] values = rowList.get(rowBaseId + i);
+            for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
+              if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
+                int valueColId = numOrderByExpressions + colId;
+                values[valueColId] = null;
+              }
             }
           }
         }
+        _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
+        rowBaseId += numDocsFetched;
       }
-      _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
-      rowBaseId += numDocsFetched;
-    }
 
-    // Create the data schema
-    String[] columnNames = new String[numExpressions];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
-    for (int i = 0; i < numExpressions; i++) {
-      columnNames[i] = _expressions.get(i).toString();
-    }
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
-          _orderByColumnContexts[i].isSingleValue());
-    }
-    for (int i = 0; i < numNonOrderByExpressions; i++) {
-      ColumnContext columnContext = transformOperator.getResultColumnContext(nonOrderByExpressions.get(i));
-      columnDataTypes[numOrderByExpressions + i] =
-          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
-    }
-    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+      // Create the data schema
+      String[] columnNames = new String[numExpressions];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        columnNames[i] = _expressions.get(i).toString();
+      }
+      for (int i = 0; i < numOrderByExpressions; i++) {
+        columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(_orderByColumnContexts[i].getDataType(),
+            _orderByColumnContexts[i].isSingleValue());
+      }
+      for (int i = 0; i < numNonOrderByExpressions; i++) {
+        ColumnContext columnContext = transformOperator.getResultColumnContext(nonOrderByExpressions.get(i));
+        columnDataTypes[numOrderByExpressions + i] =
+            DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
+      }
+      DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+      return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
+    }
   }
 
   private List<Object[]> getSortedRows() {

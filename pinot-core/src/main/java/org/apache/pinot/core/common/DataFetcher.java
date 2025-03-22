@@ -19,8 +19,6 @@
 package org.apache.pinot.core.common;
 
 import com.google.common.base.Preconditions;
-import java.io.Closeable;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +43,7 @@ import org.apache.pinot.spi.utils.MapUtils;
  * and garbage collection.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DataFetcher {
+public class DataFetcher implements AutoCloseable {
   // Thread local (reusable) buffer for single-valued column dictionary Ids
   private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
@@ -307,7 +305,7 @@ public class DataFetcher {
    *
    * TODO: Type conversion for BOOLEAN and TIMESTAMP is not handled
    */
-  private class ColumnValueReader implements Closeable {
+  private class ColumnValueReader implements AutoCloseable {
     final ForwardIndexReader _reader;
     final Dictionary _dictionary;
     final DataType _storedType;
@@ -587,11 +585,20 @@ public class DataFetcher {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
       if (_readerContext != null) {
         _readerContext.close();
       }
+    }
+  }
+
+  /**
+   * Close the DataFetcher and release all resources (specifically, the ForwardIndexReaderContext off-heap buffers).
+   */
+  @Override
+  public void close() {
+    for (ColumnValueReader columnValueReader : _columnValueReaderMap.values()) {
+      columnValueReader.close();
     }
   }
 }

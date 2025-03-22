@@ -203,8 +203,7 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
       if (_dictVarsReaderContext != null) {
         _dictVarsReaderContext.close();
       }

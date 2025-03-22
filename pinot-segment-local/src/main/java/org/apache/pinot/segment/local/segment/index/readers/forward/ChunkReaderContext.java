@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +43,7 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   private int _chunkId;
 
   private List<ForwardIndexReader.ByteRange> _ranges;
+  private boolean _closed;
 
   public ChunkReaderContext(int maxChunkSize) {
     _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
@@ -52,11 +52,12 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.getCleaner().freeBuffer(_chunkBuffer);
+  public void close() {
+    if (_closed) {
+      return;
     }
+    _closed = true;
+    CleanerUtil.cleanQuietly(_chunkBuffer);
   }
 
   public ByteBuffer getChunkBuffer() {

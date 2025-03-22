@@ -38,8 +38,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
-  // TODO: Figure out a way to close the reader context
-  //       ChunkReaderContext should be closed explicitly to release the off-heap buffer
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
@@ -91,6 +89,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       _firstMismatch = batchSize;
       _cursor = 0;
       if (_firstMismatch == 0) {
+        close();
         return Constants.EOF;
       }
     }
@@ -108,6 +107,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
         return nextDocId;
       }
     }
+    close();
     return Constants.EOF;
   }
 
@@ -138,6 +138,7 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       }
       _numEntriesScanned += limit;
     }
+    close();
     return result.get();
   }
 
@@ -311,6 +312,13 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
+    }
+  }
+
+  @Override
+  public void close() {
+    if (_readerContext != null) {
+      _readerContext.close();
     }
   }
 }
