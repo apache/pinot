@@ -189,6 +189,12 @@
       </source>
       <destName>plugins/pinot-input-format/pinot-confluent-protobuf/pinot-confluent-protobuf-${project.version}-shaded.jar</destName>
     </file>
+    <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-confluent-json/target/pinot-confluent-json-${project.version}-shaded.jar
+      </source>
+      <destName>plugins/pinot-input-format/pinot-confluent-json/pinot-confluent-json-${project.version}-shaded.jar</destName>
+    </file>
     <!-- End Include Pinot Input Format Plugins-->
     <!-- Start Include Pinot Minion Tasks Plugins-->
     <file>
