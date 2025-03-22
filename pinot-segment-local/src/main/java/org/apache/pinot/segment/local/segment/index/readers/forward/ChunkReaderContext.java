@@ -43,6 +43,7 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
   private int _chunkId;
 
   private List<ForwardIndexReader.ByteRange> _ranges;
+  private boolean _closed;
 
   public ChunkReaderContext(int maxChunkSize) {
     _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);
@@ -52,6 +53,10 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
 
   @Override
   public void close() {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
     CleanerUtil.cleanQuietly(_chunkBuffer);
   }
 
