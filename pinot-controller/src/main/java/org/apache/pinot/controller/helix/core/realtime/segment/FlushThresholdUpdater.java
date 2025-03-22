@@ -18,21 +18,26 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
- * Interface for the flush threshold updating strategies
- * These implementations are responsible for updating the flush threshold (rows/time) for the given segment ZK metadata
+ * Interface for the flush threshold updating strategies.
  */
 public interface FlushThresholdUpdater {
 
   /**
-   * Updates the flush threshold for the given segment ZK metadata
+   * Invoked when a segment is committed.
+   */
+  default void onSegmentCommit(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
+      SegmentZKMetadata committingSegmentZKMetadata) {
+    // Do nothing by default
+  }
+
+  /**
+   * Updates the flush threshold for the new consuming segment.
    */
   void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
       int maxNumPartitionsPerInstance);
 }

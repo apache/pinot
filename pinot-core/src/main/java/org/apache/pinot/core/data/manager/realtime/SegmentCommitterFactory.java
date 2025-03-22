@@ -47,8 +47,7 @@ public class SegmentCommitterFactory {
     _logger = segmentLogger;
     _protocolHandler = protocolHandler;
     _tableConfig = tableConfig;
-    _streamConfig = new StreamConfig(_tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0));
+    _streamConfig = IngestionConfigUtils.getFirstStreamConfig(tableConfig);
     _indexLoadingConfig = indexLoadingConfig;
     _serverMetrics = serverMetrics;
   }

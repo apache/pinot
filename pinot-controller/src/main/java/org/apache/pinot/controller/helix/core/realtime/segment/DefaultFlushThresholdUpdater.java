@@ -19,14 +19,13 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
- * The default flush threshold updation strategy, which computes the flush threshold size of the segment
- * by dividing the flush threshold of the table by the max number of partitions consuming on an instance
+ * The default flush threshold updating strategy, which computes the flush threshold size of the segment by dividing the
+ * flush threshold of the table by the max number of partitions consuming on an instance.
  */
 public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
   private final int _tableFlushSize;
@@ -35,16 +34,15 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
     _tableFlushSize = tableFlushSize;
   }
 
-  @Override
-  public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
-      int maxNumPartitionsPerInstance) {
-    // Configure the segment size flush limit based on the maximum number of partitions allocated to an instance
-    newSegmentZKMetadata.setSizeThresholdToFlushSegment(_tableFlushSize / maxNumPartitionsPerInstance);
-  }
-
   @VisibleForTesting
   int getTableFlushSize() {
     return _tableFlushSize;
+  }
+
+  @Override
+  public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
+      int maxNumPartitionsPerInstance) {
+    // Configure the segment size flush limit based on the maximum number of partitions allocated to an instance
+    newSegmentZKMetadata.setSizeThresholdToFlushSegment(_tableFlushSize / maxNumPartitionsPerInstance);
   }
 }
