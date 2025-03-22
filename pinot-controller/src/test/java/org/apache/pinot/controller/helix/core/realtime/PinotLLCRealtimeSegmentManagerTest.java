@@ -1694,8 +1694,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfig =
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
               .setStreamConfigs(streamConfigs).build();
-      _streamConfigs = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).stream().map(
-          streamConfig -> new StreamConfig(_tableConfig.getTableName(), streamConfig)).collect(Collectors.toList());
+      _streamConfigs = IngestionConfigUtils.getStreamConfigs(_tableConfig);
     }
 
     void makeConsumingInstancePartitions() {

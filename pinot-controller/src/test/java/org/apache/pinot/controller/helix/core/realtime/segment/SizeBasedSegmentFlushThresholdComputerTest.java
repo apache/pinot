@@ -34,36 +34,33 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class SegmentFlushThresholdComputerTest {
+public class SizeBasedSegmentFlushThresholdComputerTest {
 
   @Test
   public void testUseAutoTuneInitialRowsIfFirstSegmentInPartition() {
     int autoTuneInitialRows = 1_000;
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushAutotuneInitialRows()).thenReturn(autoTuneInitialRows);
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
-
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, null, "newSegmentName");
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     assertEquals(threshold, autoTuneInitialRows);
   }
 
   @Test
   public void testUseLastSegmentSizeTimesRatioIfFirstSegmentInPartitionAndNewPartitionGroup() {
-    double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 20000L;
-    SegmentFlushThresholdComputer computer =
-        new SegmentFlushThresholdComputer(Clock.systemUTC(), segmentRowsToSizeRatio);
+    double segmentRowsToSizeRatio = 1.5;
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer(Clock.systemUTC());
+    computer.setSizeForLastSegment(segmentSizeBytes);
+    computer.setSegmentRowsToSizeRatio(segmentRowsToSizeRatio);
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
-
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, null, "newSegmentName");
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // segmentSize * 1.5
     // 20000 * 1.5
@@ -72,17 +69,16 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testUseLastSegmentSizeTimesRatioIfFirstSegmentInPartitionAndNewPartitionGroupMinimumSize10000Rows() {
-    double segmentRowsToSizeRatio = 1.5;
     long segmentSizeBytes = 2000L;
-    SegmentFlushThresholdComputer computer =
-        new SegmentFlushThresholdComputer(Clock.systemUTC(), segmentRowsToSizeRatio);
+    double segmentRowsToSizeRatio = 1.5;
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer(Clock.systemUTC());
+    computer.setSizeForLastSegment(segmentSizeBytes);
+    computer.setSegmentRowsToSizeRatio(segmentRowsToSizeRatio);
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(segmentSizeBytes);
 
-    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
-
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, null, "newSegmentName");
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     assertEquals(threshold, 10000);
   }
@@ -91,7 +87,7 @@ public class SegmentFlushThresholdComputerTest {
   public void testUseLastSegmentsThresholdIfSegmentSizeMissing() {
     long segmentSizeBytes = 0L;
     int segmentSizeThreshold = 5_000;
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdTimeMillis()).thenReturn(123L);
@@ -102,8 +98,8 @@ public class SegmentFlushThresholdComputerTest {
     SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(segmentSizeThreshold);
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "newSegmentName");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     assertEquals(threshold, segmentSizeThreshold);
   }
@@ -112,7 +108,7 @@ public class SegmentFlushThresholdComputerTest {
   public void testUseLastSegmentsThresholdIfSegmentIsCommittingDueToForceCommit() {
     long committingSegmentSizeBytes = 500_000L;
     int committingSegmentSizeThreshold = 25_000;
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(committingSegmentSizeBytes);
@@ -123,11 +119,10 @@ public class SegmentFlushThresholdComputerTest {
 
     StreamConfig streamConfig = mock(StreamConfig.class);
 
-    int newSegmentSizeThreshold =
-        computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-            "newSegmentName");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
-    assertEquals(newSegmentSizeThreshold, committingSegmentSizeThreshold);
+    assertEquals(threshold, committingSegmentSizeThreshold);
   }
 
   @Test
@@ -135,7 +130,7 @@ public class SegmentFlushThresholdComputerTest {
     long currentTime = 1640216032391L;
     Clock clock = Clock.fixed(java.time.Instant.ofEpochMilli(currentTime), ZoneId.of("UTC"));
 
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer(clock);
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
@@ -150,8 +145,8 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
         currentTime - MILLISECONDS.convert(1, TimeUnit.HOURS));
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // totalDocs * 1.1
     // 10000 * 1.1
@@ -163,7 +158,7 @@ public class SegmentFlushThresholdComputerTest {
     long currentTime = 1640216032391L;
     Clock clock = Clock.fixed(java.time.Instant.ofEpochMilli(currentTime), ZoneId.of("UTC"));
 
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer(clock);
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer(clock);
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
@@ -178,8 +173,8 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getCreationTime()).thenReturn(
         currentTime - MILLISECONDS.convert(2, TimeUnit.HOURS));
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // (totalDocs / 2) * 1.1
     // (30000 / 2) * 1.1
@@ -189,7 +184,7 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeTooSmall() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
@@ -201,8 +196,8 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // totalDocs / 2
     // 30000 / 2
@@ -211,7 +206,7 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeTooBig() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(500_0000L);
@@ -223,8 +218,8 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // totalDocs + (totalDocs / 2)
     // 30000 + (30000 / 2)
@@ -233,7 +228,7 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testSegmentSizeJustRight() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
@@ -245,8 +240,8 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(20_000);
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
     // (totalDocs / segmentSize) * flushThresholdSegmentSize
     // (30000 / 250000) * 300000
@@ -255,10 +250,12 @@ public class SegmentFlushThresholdComputerTest {
 
   @Test
   public void testNoRows() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    int autoTuneInitialRows = 1_000;
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
+    when(streamConfig.getFlushAutotuneInitialRows()).thenReturn(autoTuneInitialRows);
 
     CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
     when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(250_0000L);
@@ -267,17 +264,16 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(0L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(0);
 
-    int threshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+    int threshold = computer.computeThreshold(streamConfig, "newSegmentName");
 
-    // max((totalDocs / segmentSize) * flushThresholdSegmentSize, 10000)
-    // max(0, 10000)
-    assertEquals(threshold, 10_000);
+    // Should use initial rows
+    assertEquals(threshold, autoTuneInitialRows);
   }
 
   @Test
   public void testAdjustRowsToSizeRatio() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
 
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(300_0000L);
@@ -289,25 +285,23 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(30_000L, 50_000L);
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(60_000);
 
-    computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
 
     // (totalDocs / segmentSize)
     // (30000 / 200000)
-    assertEquals(computer.getLatestSegmentRowsToSizeRatio(), 0.15);
+    assertEquals(computer.getSegmentRowsToSizeRatio(), 0.15);
 
-    computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
-        "events3__0__0__20211222T1646Z");
+    computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
 
     // (0.1 * (totalDocs / segmentSize)) + (0.9 * lastRatio)
     // (0.1 * (50000 / 200000)) + (0.9 * 0.15)
     // (0.1 * 0.25) + (0.9 * 0.15)
-    assertEquals(computer.getLatestSegmentRowsToSizeRatio(), 0.16);
+    assertEquals(computer.getSegmentRowsToSizeRatio(), 0.16);
   }
 
   @Test(invocationCount = 1000)
   public void testSegmentFlushThresholdVariance() {
-    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
     int threshold = 90000;
     for (double var = 0; var <= 0.5; var += 0.05) {
       StreamConfig streamConfig = mock(StreamConfig.class);
@@ -322,8 +316,9 @@ public class SegmentFlushThresholdComputerTest {
       when(committingSegmentZKMetadata.getTotalDocs()).thenReturn(60_000L, 50_000L);
       when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(60_000);
 
-      int computedThreshold = computer.computeThreshold(streamConfig, committingSegmentDescriptor,
-          committingSegmentZKMetadata, "events3__0__0__20211222T1646Z");
+      computer.onSegmentCommit(committingSegmentDescriptor, committingSegmentZKMetadata);
+      int computedThreshold = computer.computeThreshold(streamConfig, "newSegmentName");
+
       assertTrue(computedThreshold >= (1.0 - var) * threshold && computedThreshold <= (1.0 + var) * threshold);
     }
   }
