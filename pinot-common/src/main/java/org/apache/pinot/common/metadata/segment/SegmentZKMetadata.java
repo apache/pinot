@@ -309,6 +309,7 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.Realtime.FLUSH_THRESHOLD_SIZE, flushThresholdSize);
   }
 
+  @Deprecated
   public String getTimeThresholdToFlushSegment() {
     // Check "null" for backward-compatibility
     String flushThresholdTime = _simpleFields.get(Segment.Realtime.FLUSH_THRESHOLD_TIME);
@@ -319,6 +320,7 @@ public class SegmentZKMetadata implements ZKMetadata {
     }
   }
 
+  @Deprecated
   public void setTimeThresholdToFlushSegment(String flushThresholdTime) {
     setValue(Segment.Realtime.FLUSH_THRESHOLD_TIME, flushThresholdTime);
   }
