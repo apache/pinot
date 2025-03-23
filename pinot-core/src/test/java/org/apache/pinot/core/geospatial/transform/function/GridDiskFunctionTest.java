@@ -75,7 +75,6 @@ public class GridDiskFunctionTest extends BaseTransformFunctionTest {
         TransformFunctionFactory.get(h3Context, _dataSourceMap),
         TransformFunctionFactory.get(kContext, _dataSourceMap)), columnContextMap);
 
-    // Test the function
     long[][] result = transformFunction.transformToLongValuesMV(_projectionBlock);
     assertArrayEquals(result, expectedValues);
 
