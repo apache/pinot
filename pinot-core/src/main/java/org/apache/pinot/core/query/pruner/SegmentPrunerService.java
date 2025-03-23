@@ -142,11 +142,12 @@ public class SegmentPrunerService {
     int invalid = 0;
     for (IndexSegment segment : segments) {
       if (!isEmptySegment(segment)) {
-        if (isInvalidSegment(segment, query)) {
-          invalid++;
-        } else {
-          segments.set(selected++, segment);
-        }
+//        if (isInvalidSegment(segment, query)) {
+//          invalid++;
+//        } else {
+//          segments.set(selected++, segment);
+//        }
+        segments.set(selected++, segment);;
       }
     }
     stats.setInvalidSegments(invalid);
