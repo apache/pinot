@@ -89,7 +89,7 @@ public class DirectOOMServerHandler extends ChannelInboundHandlerAdapter {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-    if (cause instanceof OutOfMemoryError && cause.getMessage().contains("direct buffer")) {
+    if (cause instanceof OutOfMemoryError && cause.getMessage().toLowerCase().contains("direct buffer")) {
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.DIRECT_MEMORY_OOM, 1L);
       // Only one thread should handle OOM
       if (OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
