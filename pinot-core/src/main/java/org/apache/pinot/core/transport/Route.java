@@ -26,44 +26,91 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 
 
+/**
+ * Interface representing a route for Pinot queries.
+ */
 public interface Route {
+
+  /**
+   * Gets the offline broker request.
+   *
+   * @return the offline broker request, or null if not available
+   */
   @Nullable
   BrokerRequest getOfflineBrokerRequest();
+
+  /**
+   * Gets the realtime broker request.
+   *
+   * @return the realtime broker request, or null if not available
+   */
   @Nullable
   BrokerRequest getRealtimeBrokerRequest();
+
+  /**
+   * Gets the offline routing table.
+   *
+   * @return the offline routing table, or null if not available
+   */
   @Nullable
   Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
+
+  /**
+   * Gets the realtime routing table.
+   *
+   * @return the realtime routing table, or null if not available
+   */
   @Nullable
   Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
 
+  /**
+   * Gets the list of unavailable segments.
+   *
+   * @return the list of unavailable segments
+   */
   List<String> getUnavailableSegments();
 
+  /**
+   * Gets the total number of pruned segments.
+   *
+   * @return the total number of pruned segments
+   */
   int getNumPrunedSegmentsTotal();
 
+  /**
+   * Checks if the route is empty.
+   *
+   * @return true if the route is empty, false otherwise
+   */
   boolean isEmpty();
 
+  /**
+   * Gets the offline request map.
+   *
+   * @param requestId the request ID
+   * @param brokerId the broker ID
+   * @param preferTls whether to prefer TLS
+   * @return the offline request map
+   */
   Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId, boolean preferTls);
 
+  /**
+   * Gets the realtime request map.
+   *
+   * @param requestId the request ID
+   * @param brokerId the broker ID
+   * @param preferTls whether to prefer TLS
+   * @return the realtime request map
+   */
   Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId, boolean preferTls);
 
-  default Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
-      boolean preferTls) {
-    Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
-    Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap =
-        getOfflineRequestMap(requestId, brokerId, preferTls);
-    Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap =
-        getRealtimeRequestMap(requestId, brokerId, preferTls);
-    if (offlineRequestMap != null) {
-      requestMap = offlineRequestMap;
-    }
-    if (realtimeRequestMap != null) {
-      if (requestMap == null) {
-        requestMap = realtimeRequestMap;
-      } else {
-        requestMap.putAll(realtimeRequestMap);
-      }
-    }
-
-    return requestMap;
-  }
+  /**
+   * Gets the combined request map.
+   *
+   * @param requestId the request ID
+   * @param brokerId the broker ID
+   * @param preferTls whether to prefer TLS
+   * @return the combined request map
+   */
+  Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
 }

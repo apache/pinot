@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -76,7 +75,7 @@ public class QueryRoutingTest {
   private QueryServer _queryServer;
   private QueryThreadContext.CloseableContext _closeableContext;
 
-  private static class TestRoute implements Route {
+  private static class TestRoute extends AbstractRoute {
     private final BrokerRequest _offlineBrokerRequest;
     private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
     private final BrokerRequest _realtimeBrokerRequest;
@@ -135,14 +134,8 @@ public class QueryRoutingTest {
     public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
         boolean preferTls) {
       if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
-        Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : _offlineRoutingTable.entrySet()) {
-          ServerRoutingInstance serverRoutingInstance =
-              entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-          InstanceRequest instanceRequest = getInstanceRequest(requestId, brokerId, _offlineBrokerRequest, entry.getValue());
-          requestMap.put(serverRoutingInstance, instanceRequest);
-        }
-        return requestMap;
+        return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId,
+            preferTls);
       }
       return null;
     }
@@ -151,36 +144,10 @@ public class QueryRoutingTest {
     public Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
         boolean preferTls) {
       if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
-        Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : _realtimeRoutingTable.entrySet()) {
-          ServerRoutingInstance serverRoutingInstance =
-              entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-          InstanceRequest instanceRequest = getInstanceRequest(requestId, brokerId, _realtimeBrokerRequest, entry.getValue());
-          requestMap.put(serverRoutingInstance, instanceRequest);
-        }
-        return requestMap;
+        return getRequestMapFromRoutingTable(_realtimeRoutingTable, _realtimeBrokerRequest, requestId, brokerId,
+            preferTls);
       }
       return null;
-    }
-
-    private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
-        ServerRouteInfo segments) {
-      InstanceRequest instanceRequest = new InstanceRequest();
-      instanceRequest.setRequestId(requestId);
-      instanceRequest.setQuery(brokerRequest);
-      Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-      if (queryOptions != null) {
-        instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
-      }
-      instanceRequest.setSearchSegments(segments.getSegments());
-      instanceRequest.setBrokerId(brokerId);
-      if (CollectionUtils.isNotEmpty(segments.getOptionalSegments())) {
-        // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
-        // compatible, as there are places like in multi-stage query engine where this field is not set today when
-        // creating the InstanceRequest.
-        instanceRequest.setOptionalSegments(segments.getOptionalSegments());
-      }
-      return instanceRequest;
     }
   }
 

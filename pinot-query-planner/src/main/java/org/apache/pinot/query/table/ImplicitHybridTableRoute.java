@@ -20,7 +20,6 @@ package org.apache.pinot.query.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -29,22 +28,24 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.transport.Route;
+import org.apache.pinot.core.transport.AbstractRoute;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-public class ImplicitHybridTableRoute implements Route {
-  private final PhysicalTableRoute _offlineTableRoute;
-  private final PhysicalTableRoute _realtimeTableRoute;
+public class ImplicitHybridTableRoute extends AbstractRoute {
+  private final BrokerRequest _offlineBrokerRequest;
+  private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
+  private final BrokerRequest _realtimeBrokerRequest;
+  private final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegmentsTotal;
 
   public static ImplicitHybridTableRoute from(HybridTable hybridTable, RoutingManager routingManager,
       BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest, long requestId) {
-    PhysicalTableRoute offlineTableRoute = null;
-    PhysicalTableRoute realtimeTableRoute = null;
+    Map<ServerInstance, ServerRouteInfo> offlineTableRoute = null;
+    Map<ServerInstance, ServerRouteInfo> realtimeTableRoute = null;
+
     int numPrunedSegmentsTotal = 0;
     List<String> unavailableSegments = new ArrayList<>();
 
@@ -62,10 +63,13 @@ public class ImplicitHybridTableRoute implements Route {
         Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
-          offlineTableRoute = new PhysicalTableRoute(serverInstanceToSegmentsMap, physicalTable.getTableNameWithType(),
-              offlineBrokerRequest);
+          offlineTableRoute = serverInstanceToSegmentsMap;
+        } else {
+          offlineBrokerRequest = null;
         }
         numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
+      } else {
+        offlineBrokerRequest = null;
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -82,38 +86,27 @@ public class ImplicitHybridTableRoute implements Route {
         Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
-          realtimeTableRoute = new PhysicalTableRoute(serverInstanceToSegmentsMap, physicalTable.getTableNameWithType(),
-              realtimeBrokerRequest);
+          realtimeTableRoute = serverInstanceToSegmentsMap;
+        } else {
+          realtimeBrokerRequest = null;
         }
         numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
+      } else {
+        realtimeBrokerRequest = null;
       }
     }
 
-    return new ImplicitHybridTableRoute(offlineTableRoute, realtimeTableRoute, unavailableSegments, numPrunedSegmentsTotal);
+    return new ImplicitHybridTableRoute(offlineBrokerRequest, offlineTableRoute, realtimeBrokerRequest, realtimeTableRoute, unavailableSegments, numPrunedSegmentsTotal);
   }
 
-  public static ImplicitHybridTableRoute from(String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
-    PhysicalTableRoute offlineTableRoute = null;
-    if (offlineBrokerRequest != null && offlineRoutingTable != null) {
-      offlineTableRoute = new PhysicalTableRoute(offlineRoutingTable, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName), offlineBrokerRequest);
-    }
-
-    PhysicalTableRoute realtimeTableRoute = null;
-    if (realtimeBrokerRequest != null && realtimeRoutingTable != null) {
-      realtimeTableRoute = new PhysicalTableRoute(realtimeRoutingTable, TableNameBuilder.REALTIME.tableNameWithType(rawTableName), realtimeBrokerRequest);
-    }
-
-    return new ImplicitHybridTableRoute(offlineTableRoute, realtimeTableRoute, Collections.emptyList(), 0);
-  }
-
-  private ImplicitHybridTableRoute(PhysicalTableRoute offlineTableRoute, PhysicalTableRoute realtimeTableRoute,
-      List<String> unavailableSegments, int numPrunedSegmentsTotal) {
-    _offlineTableRoute = offlineTableRoute;
-    _realtimeTableRoute = realtimeTableRoute;
+  private ImplicitHybridTableRoute(BrokerRequest offlineBrokerRequest,
+      Map<ServerInstance, ServerRouteInfo> offlineRoutingTable, BrokerRequest realtimeBrokerRequest,
+      Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, List<String> unavailableSegments,
+      int numPrunedSegmentsTotal) {
+    _offlineBrokerRequest = offlineBrokerRequest;
+    _offlineRoutingTable = offlineRoutingTable;
+    _realtimeBrokerRequest = realtimeBrokerRequest;
+    _realtimeRoutingTable = realtimeRoutingTable;
     _unavailableSegments = unavailableSegments;
     _numPrunedSegmentsTotal = numPrunedSegmentsTotal;
   }
@@ -121,25 +114,25 @@ public class ImplicitHybridTableRoute implements Route {
   @Nullable
   @Override
   public BrokerRequest getOfflineBrokerRequest() {
-    return _offlineTableRoute != null ? _offlineTableRoute.getBrokerRequest() : null;
+    return _offlineBrokerRequest;
   }
 
   @Nullable
   @Override
   public BrokerRequest getRealtimeBrokerRequest() {
-    return _realtimeTableRoute != null ? _realtimeTableRoute.getBrokerRequest() : null;
+    return _realtimeBrokerRequest;
   }
 
   @Nullable
   @Override
   public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
-    return _offlineTableRoute != null ? _offlineTableRoute.getRoutingTable() : null;
+    return _offlineRoutingTable;
   }
 
   @Nullable
   @Override
   public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
-    return _realtimeTableRoute != null ? _realtimeTableRoute.getRoutingTable() : null;
+    return _realtimeRoutingTable;
   }
 
   @Override
@@ -154,20 +147,28 @@ public class ImplicitHybridTableRoute implements Route {
 
   @Override
   public boolean isEmpty() {
-    return _offlineTableRoute == null && _realtimeTableRoute == null;
+    return _offlineRoutingTable == null && _realtimeRoutingTable == null;
   }
 
   @Nullable
   @Override
   public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
       boolean preferTls) {
-    return _offlineTableRoute != null ? _offlineTableRoute.getRequestMap(requestId, brokerId, preferTls) : null;
+    if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
+      return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId,
+          preferTls);
+    }
+    return null;
   }
 
   @Nullable
   @Override
   public Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
       boolean preferTls) {
-    return _realtimeTableRoute != null ? _realtimeTableRoute.getRequestMap(requestId, brokerId, preferTls) : null;
+    if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
+      return getRequestMapFromRoutingTable(_realtimeRoutingTable, _realtimeBrokerRequest, requestId, brokerId,
+          preferTls);
+    }
+    return null;
   }
 }
