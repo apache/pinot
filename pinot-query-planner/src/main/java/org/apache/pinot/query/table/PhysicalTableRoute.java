@@ -16,52 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.query.table;
 
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class PhysicalTableRoute {
   private final Map<ServerInstance, ServerRouteInfo> _routingTable;
-  private final List<String> _unavailableSegments;
-  private final int _numPrunedSegments;
   private final String _tableName;
   private final BrokerRequest _brokerRequest;
 
-  public static PhysicalTableRoute from(String tableName, RoutingManager routingManager, BrokerRequest brokerRequest,
-      long requestId) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    Preconditions.checkNotNull(tableType);
-    RoutingTable routingTable = null;
-    if (!routingManager.isTableDisabled(tableName)) {
-      routingTable = routingManager.getRoutingTable(brokerRequest, requestId);
-    }
-    if (routingTable == null) {
-      return null;
-    }
-    return new PhysicalTableRoute(routingTable.getServerInstanceToSegmentsMap(), tableName, brokerRequest,
-        routingTable.getUnavailableSegments(), routingTable.getNumPrunedSegments());
-  }
-
-  private PhysicalTableRoute(Map<ServerInstance, ServerRouteInfo> routingTable, String tableName,
-      BrokerRequest brokerRequest, List<String> unavailableSegments, int numPrunedSegments) {
+  public PhysicalTableRoute(Map<ServerInstance, ServerRouteInfo> routingTable, String tableName,
+      BrokerRequest brokerRequest) {
     _routingTable = routingTable;
     _tableName = tableName;
-    _unavailableSegments = unavailableSegments;
-    _numPrunedSegments = numPrunedSegments;
     _brokerRequest = brokerRequest;
   }
 
@@ -71,14 +49,6 @@ public class PhysicalTableRoute {
 
   public String getTableName() {
     return _tableName;
-  }
-
-  public List<String> getUnavailableSegments() {
-    return _unavailableSegments;
-  }
-
-  public int getNumPrunedSegments() {
-    return _numPrunedSegments;
   }
 
   public BrokerRequest getBrokerRequest() {

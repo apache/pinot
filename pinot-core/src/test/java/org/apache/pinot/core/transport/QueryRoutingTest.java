@@ -22,12 +22,16 @@ import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -50,11 +54,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class QueryRoutingTest {
@@ -75,6 +75,114 @@ public class QueryRoutingTest {
   int _requestCount;
   private QueryServer _queryServer;
   private QueryThreadContext.CloseableContext _closeableContext;
+
+  private static class TestRoute implements Route {
+    private final BrokerRequest _offlineBrokerRequest;
+    private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
+    private final BrokerRequest _realtimeBrokerRequest;
+    private final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+
+    public TestRoute(@Nullable BrokerRequest offlineBrokerRequest,
+        @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+        @Nullable BrokerRequest realtimeBrokerRequest,
+        @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+      _offlineBrokerRequest = offlineBrokerRequest;
+      _offlineRoutingTable = offlineRoutingTable;
+      _realtimeBrokerRequest = realtimeBrokerRequest;
+      _realtimeRoutingTable = realtimeRoutingTable;
+    }
+
+    @Nullable
+    @Override
+    public BrokerRequest getOfflineBrokerRequest() {
+      return _offlineBrokerRequest;
+    }
+
+    @Nullable
+    @Override
+    public BrokerRequest getRealtimeBrokerRequest() {
+      return _realtimeBrokerRequest;
+    }
+
+    @Nullable
+    @Override
+    public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+      return _offlineRoutingTable;
+    }
+
+    @Nullable
+    @Override
+    public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+      return _realtimeRoutingTable;
+    }
+
+    @Override
+    public List<String> getUnavailableSegments() {
+      return List.of();
+    }
+
+    @Override
+    public int getNumPrunedSegmentsTotal() {
+      return 0;
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return _offlineBrokerRequest == null && _realtimeBrokerRequest == null;
+    }
+
+    @Override
+    public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
+        boolean preferTls) {
+      if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
+        Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
+        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : _offlineRoutingTable.entrySet()) {
+          ServerRoutingInstance serverRoutingInstance =
+              entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
+          InstanceRequest instanceRequest = getInstanceRequest(requestId, brokerId, _offlineBrokerRequest, entry.getValue());
+          requestMap.put(serverRoutingInstance, instanceRequest);
+        }
+        return requestMap;
+      }
+      return null;
+    }
+
+    @Override
+    public Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
+        boolean preferTls) {
+      if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
+        Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
+        for (Map.Entry<ServerInstance, ServerRouteInfo> entry : _realtimeRoutingTable.entrySet()) {
+          ServerRoutingInstance serverRoutingInstance =
+              entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
+          InstanceRequest instanceRequest = getInstanceRequest(requestId, brokerId, _realtimeBrokerRequest, entry.getValue());
+          requestMap.put(serverRoutingInstance, instanceRequest);
+        }
+        return requestMap;
+      }
+      return null;
+    }
+
+    private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
+        ServerRouteInfo segments) {
+      InstanceRequest instanceRequest = new InstanceRequest();
+      instanceRequest.setRequestId(requestId);
+      instanceRequest.setQuery(brokerRequest);
+      Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+      if (queryOptions != null) {
+        instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
+      }
+      instanceRequest.setSearchSegments(segments.getSegments());
+      instanceRequest.setBrokerId(brokerId);
+      if (CollectionUtils.isNotEmpty(segments.getOptionalSegments())) {
+        // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
+        // compatible, as there are places like in multi-stage query engine where this field is not set today when
+        // creating the InstanceRequest.
+        instanceRequest.setOptionalSegments(segments.getOptionalSegments());
+      }
+      return instanceRequest;
+    }
+  }
 
   @BeforeClass
   public void setUp() {
@@ -149,7 +257,7 @@ public class QueryRoutingTest {
 
     // OFFLINE only
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 600_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 600_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -163,7 +271,7 @@ public class QueryRoutingTest {
 
     // REALTIME only
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", null, null, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(null, null, BROKER_REQUEST, ROUTING_TABLE), 1_000L);
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(REALTIME_SERVER_ROUTING_INSTANCE));
@@ -176,7 +284,7 @@ public class QueryRoutingTest {
 
     // Hybrid
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE),
             1_000L);
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
@@ -205,7 +313,7 @@ public class QueryRoutingTest {
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -237,7 +345,7 @@ public class QueryRoutingTest {
     // Send a query with ServerSide exception and check if the latency is set to timeout value.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -277,7 +385,7 @@ public class QueryRoutingTest {
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
 
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -316,7 +424,7 @@ public class QueryRoutingTest {
     //server-side exception is seen.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -353,7 +461,7 @@ public class QueryRoutingTest {
     // Send a valid query and get latency
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -387,7 +495,7 @@ public class QueryRoutingTest {
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
+        _queryRouter.submitQuery(requestId + 1, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), 1_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
     assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -421,7 +529,7 @@ public class QueryRoutingTest {
 
     long startTimeMs = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+        _queryRouter.submitQuery(requestId + 1, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), timeoutMs);
 
     // Shut down the server before getting the response
     _queryServer.shutDown();
@@ -447,7 +555,7 @@ public class QueryRoutingTest {
       // Submit query after server is down
       startTimeMs = System.currentTimeMillis();
       asyncQueryResponse =
-          _queryRouter.submitQuery(requestId + 1, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, timeoutMs);
+          _queryRouter.submitQuery(requestId + 1, "testTable", new TestRoute(BROKER_REQUEST, ROUTING_TABLE, null, null), timeoutMs);
       response = asyncQueryResponse.getFinalResponses();
       assertEquals(response.size(), 1);
       assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
@@ -505,7 +613,7 @@ public class QueryRoutingTest {
         CalciteSqlCompiler.compileToBrokerRequest("SET skipUnavailableServers=true; SELECT * FROM testTable");
     long startTime = System.currentTimeMillis();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(brokerRequest, routingTable, null, null), 10_000L);
     Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(serverRoutingInstance1));
@@ -529,7 +637,7 @@ public class QueryRoutingTest {
     brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable");
     startTime = System.currentTimeMillis();
     asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 10_000L);
+        _queryRouter.submitQuery(requestId, "testTable", new TestRoute(brokerRequest, routingTable, null, null), 10_000L);
     response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 2);
     assertTrue(response.containsKey(serverRoutingInstance1));

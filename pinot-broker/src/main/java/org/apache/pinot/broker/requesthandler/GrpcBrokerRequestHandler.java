@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.transport.PhysicalTableRoute;
 import org.apache.pinot.core.transport.Route;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -92,14 +91,22 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       throws Exception {
     // TODO: Add servers queried/responded stats
     assert !route.isEmpty();
-    Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
-    for (PhysicalTableRoute tableRoute : List.of(route.getOfflineTableRoute(), route.getRealtimeTableRoute())) {
-      if (tableRoute != null) {
-        sendRequest(requestId, TableType.OFFLINE, tableRoute.getBrokerRequest(), tableRoute.getRoutingTable(),
-            responseMap, requestContext.isSampledRequest());
-      }
-    }
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = route.getRealtimeRoutingTable();
 
+    Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
+    if (offlineBrokerRequest != null) {
+      assert offlineRoutingTable != null;
+      sendRequest(requestId, TableType.OFFLINE, offlineBrokerRequest, offlineRoutingTable, responseMap,
+          requestContext.isSampledRequest());
+    }
+    if (realtimeBrokerRequest != null) {
+      assert realtimeRoutingTable != null;
+      sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
+          requestContext.isSampledRequest());
+    }
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
