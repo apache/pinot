@@ -59,7 +59,8 @@ public interface AccessControl extends FineGrainedAccessControl {
   }
 
   /**
-   * Fine-grained access control on parsed broker request. May check table, column, permissions, etc.
+   * Fine-grained access control on parsed broker request. May check column, permissions, etc.
+   * NOTE: Table Permissions are checked by authorize(RequesterIdentity, Set<String> tables)
    * The default implementation is kept to have backward compatibility with the existing implementations
    * @param requesterIdentity requester identity
    * @param brokerRequest broker request (incl query)
@@ -74,7 +75,9 @@ public interface AccessControl extends FineGrainedAccessControl {
   }
 
   /**
-   * Verify access control on parsed broker request. May check table, column, permissions, etc.
+   * Verify access control on parsed broker request.
+   * May fine-grained details about the request such column, permissions, etc.
+   * NOTE: Table Permissions are checked by authorize(RequesterIdentity, Set<String> tables)
    * The default implementation returns a {@link BasicAuthorizationResultImpl} with the result of the hasAccess() of
    * the implementation
    *

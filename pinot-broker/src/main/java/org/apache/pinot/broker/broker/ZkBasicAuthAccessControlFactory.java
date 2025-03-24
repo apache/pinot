@@ -20,7 +20,6 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -91,13 +90,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-          .isSetTableName()) {
-        // no table restrictions? accept
-        return TableAuthorizationResult.success();
-      }
-
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return TableAuthorizationResult.success();
     }
 
     @Override

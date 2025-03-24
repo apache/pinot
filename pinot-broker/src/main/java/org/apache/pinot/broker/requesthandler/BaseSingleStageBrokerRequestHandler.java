@@ -376,8 +376,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
 
+    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
+
     AuthorizationResult authorizationResult =
-        hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
+        hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders, accessControl, brokerRequest);
     if (!authorizationResult.hasAccess()) {
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
@@ -398,7 +400,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
     }
 
-    BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
 
@@ -921,7 +922,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         if (tableName != null) {
           // First check if table permissions are in place to not leak schema information.
           AuthorizationResult authorizationResult =
-              hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
+              hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders, accessControl);
           if (!authorizationResult.hasAccess()) {
             throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
           }

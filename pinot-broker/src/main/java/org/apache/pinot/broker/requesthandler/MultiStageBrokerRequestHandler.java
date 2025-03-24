@@ -215,7 +215,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           Set<String> tableNames = queryPlanResult.getTableNames();
           Map<String, String> extraFields = queryPlanResult.getExtraFields();
           TableAuthorizationResult tableAuthorizationResult =
-              hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
+              hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders, accessControl);
           if (!tableAuthorizationResult.hasAccess()) {
             String failureMessage = tableAuthorizationResult.getFailureMessage();
             if (StringUtils.isNotBlank(failureMessage)) {
@@ -250,7 +250,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (resolvedTables != null && !resolvedTables.isEmpty()) {
           // validate table access to prevent schema leak via error messages
           TableAuthorizationResult tableAuthorizationResult =
-              hasTableAccess(requesterIdentity, resolvedTables, requestContext, httpHeaders);
+              hasTableAccess(requesterIdentity, resolvedTables, requestContext, httpHeaders, accessControl);
           if (!tableAuthorizationResult.hasAccess()) {
             throwTableAccessError(tableAuthorizationResult);
           }
@@ -290,7 +290,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate table access.
     TableAuthorizationResult tableAuthorizationResult =
-        hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
+        hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders, accessControl);
     if (!tableAuthorizationResult.hasAccess()) {
       throwTableAccessError(tableAuthorizationResult);
     }
