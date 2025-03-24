@@ -38,7 +38,6 @@
       "stream.kafka.clusterGroup": "aggregate-tracking",
       "stream.kafka.consumer.factory.class.name": "com.linkedin.pinot.v2.server.LiPinotKafkaConsumerFactory",
       "stream.kafka.consumer.prop.auto.offset.reset": "largest",
-      "stream.kafka.consumer.type": "simple",
       "stream.kafka.decoder.class.name": "com.linkedin.pinot.v2.server.LiKafkaDecoder",
       "stream.kafka.topic.name": "UserGeneratedContentGestureCountEvent",
       "streamType": "kafka"

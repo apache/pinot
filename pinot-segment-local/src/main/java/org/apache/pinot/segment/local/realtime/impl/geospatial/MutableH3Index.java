@@ -76,7 +76,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();
     // TODO: support multiple resolutions
-    long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
+    long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     _bitmaps.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap()).add(_nextDocId);
   }
 

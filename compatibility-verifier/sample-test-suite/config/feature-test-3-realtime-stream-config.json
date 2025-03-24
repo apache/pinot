@@ -1,6 +1,5 @@
 {
   "streamType": "kafka",
-  "stream.kafka.consumer.type": "simple",
   "topicName": "PinotRealtimeFeatureTest3Event",
   "partitionColumn": "longDimSV1",
   "numPartitions": "3",

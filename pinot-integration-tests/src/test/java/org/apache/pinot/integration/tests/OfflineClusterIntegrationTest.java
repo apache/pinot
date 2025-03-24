@@ -295,7 +295,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _resourceManager = _controllerStarter.getHelixResourceManager();
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     _executorService = Executors.newFixedThreadPool(10);
-    preChecker.init(_helixResourceManager, _executorService);
+    preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
         _resourceManager.getTableSizeReader());
   }
@@ -907,9 +907,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(rebalanceResult.getStatus(), expectedStatus);
     Map<String, RebalancePreCheckerResult> preChecksResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preChecksResult);
-    assertEquals(preChecksResult.size(), 2);
+    assertEquals(preChecksResult.size(), 4);
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
+    assertTrue(preChecksResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),
         expectedMinimizeDataMovementStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
@@ -918,6 +920,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         expectedNeedsReloadStatus);
     assertEquals(preChecksResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getMessage(),
         expectedNeedsReloadMessage);
+    // As the disk utilization check periodic task was disabled in the test controller (ControllerConf
+    // .RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY was set to 30000s, see org.apache.pinot.controller.helix
+    // .ControllerTest.getDefaultControllerConfiguration), server's disk util should be unavailable on all servers if
+    // not explicitly set via org.apache.pinot.controller.validation.ResourceUtilizationInfo.setDiskUsageInfo
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preChecksResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.WARN);
   }
 
   private Map<String, InstanceAssignmentConfig> createInstanceAssignmentConfigMap(boolean minimizeDataMovement) {
@@ -4199,7 +4209,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(rebalanceResult.getPreChecksResult().get(
-        DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
+            DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         "Instance assignment not allowed, no need for minimizeDataMovement");
     assertEquals(rebalanceResult.getPreChecksResult().get(
             DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getPreCheckStatus(),

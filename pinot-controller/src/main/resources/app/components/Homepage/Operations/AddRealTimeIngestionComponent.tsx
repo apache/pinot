@@ -87,7 +87,6 @@ export default function AddRealTimeIngestionComponent({
             "streamType": "kafka",
             "stream.kafka.topic.name": "",
             "stream.kafka.broker.list": "",
-            "stream.kafka.consumer.type": "lowlevel",
             "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
             "stream.kafka.consumer.factory.class.name":"org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
             "stream.kafka.decoder.class.name":"org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",

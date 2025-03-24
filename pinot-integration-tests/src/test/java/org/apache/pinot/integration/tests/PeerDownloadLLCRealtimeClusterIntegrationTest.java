@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -38,12 +37,10 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,14 +220,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
             instanceState.getValue()));
       }
     }
-  }
-
-  @Test(expectedExceptions = IOException.class)
-  public void testAddHLCTableShouldFail()
-      throws IOException {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
-        .setStreamConfigs(Collections.singletonMap("stream.kafka.consumer.type", "HIGHLEVEL")).build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString());
   }
 
   // MockPinotFS is a localPinotFS whose root directory is configured as _basePath;

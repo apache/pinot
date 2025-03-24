@@ -194,7 +194,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // The number of segments in deepstore that do not have corresponding metadata in ZooKeeper.
   // These segments are untracked and should be considered for deletion based on retention policies.
-  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false);
+  UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
+
+  // Metric used to track errors during the periodic table retention management
+  RETENTION_MANAGER_ERROR("retentionManagerError", false);
 
   private final String _gaugeName;
   private final String _unit;
