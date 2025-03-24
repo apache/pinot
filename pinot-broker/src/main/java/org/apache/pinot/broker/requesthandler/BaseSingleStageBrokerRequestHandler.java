@@ -545,12 +545,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Route route =
         ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
 
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable =
-        route.getOfflineTableRoute() != null ? route.getOfflineTableRoute().getRoutingTable() : null;
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable =
-        route.getRealtimeTableRoute() != null ? route.getRealtimeTableRoute().getRoutingTable() : null;
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = route.getRealtimeRoutingTable();
     List<String> unavailableSegments = route.getUnavailableSegments();
-    int numPrunedSegmentsTotal = route.getNumPrunedSegments();
+    int numPrunedSegmentsTotal = route.getNumPrunedSegmentsTotal();
 
     List<QueryProcessingException> errorMsgs = new ArrayList<>();
 

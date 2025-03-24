@@ -69,7 +69,7 @@ public class ImplicitHybridTableRoute implements Route {
       }
     }
     if (realtimeBrokerRequest != null) {
-      PhysicalTable physicalTable = hybridTable.getOfflineTable();
+      PhysicalTable physicalTable = hybridTable.getRealtimeTable();
       Preconditions.checkNotNull(physicalTable);
 
       // NOTE: Routing table might be null if table is just removed
