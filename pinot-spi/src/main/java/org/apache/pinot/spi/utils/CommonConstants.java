@@ -875,8 +875,6 @@ public class CommonConstants {
     public static final String MULTISTAGE_EXECUTOR = "multistage.executor";
     public static final String MULTISTAGE_EXECUTOR_CONFIG_PREFIX =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MULTISTAGE_EXECUTOR;
-    public static final String TYPE = "type";
-    public static final String CONFIG_OF_MULTISTAGE_EXECUTOR_TYPE = MULTISTAGE_EXECUTOR_CONFIG_PREFIX + "." + TYPE;
     public static final String DEFAULT_MULTISTAGE_EXECUTOR_TYPE = "cached";
     @Deprecated
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
