@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -49,18 +50,25 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private final Object2ObjectOpenHashMap<String, AbstractColumnStatisticsCollector> _keyStats =
       new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
+  private final Map<String, Integer> _keyFrequencies = new Object2ObjectOpenHashMap<>(INITIAL_HASH_SET_SIZE);
   private String[] _sortedValues;
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private boolean _sealed = false;
+  private ComplexFieldSpec _colFieldSpec;
 
   public MapColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
     _sorted = false;
+    _colFieldSpec = (ComplexFieldSpec) statsCollectorConfig.getFieldSpecForColumn(column);
   }
 
   public AbstractColumnStatisticsCollector getKeyStatistics(String key) {
     return _keyStats.get(key);
+  }
+
+  public Map<String, Integer> getAllKeyFrequencies() {
+    return _keyFrequencies;
   }
 
   @Override
@@ -77,6 +85,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       for (Map.Entry<String, Object> mapValueEntry : mapValue.entrySet()) {
         String key = mapValueEntry.getKey();
         Object value = mapValueEntry.getValue();
+        _keyFrequencies.merge(key, 1, Integer::sum);
         AbstractColumnStatisticsCollector keyStats = _keyStats.get(key);
         if (keyStats == null) {
           keyStats = createKeyStatsCollector(key, value);
@@ -140,6 +149,13 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void seal() {
     if (!_sealed) {
+      //All the keys which have appeared less than total docs insert default null Value in unique values
+      FieldSpec valueFieldSpec = _colFieldSpec.getChildFieldSpec("value");
+      for (Map.Entry<String, Integer> entry : _keyFrequencies.entrySet()) {
+        if (entry.getValue() < _totalNumberOfEntries) {
+          _keyStats.get(entry.getKey()).collect(valueFieldSpec.getDefaultNullValue());
+        }
+      }
       _sortedValues = _keyStats.keySet().toArray(new String[0]);
       Arrays.sort(_sortedValues);
 
