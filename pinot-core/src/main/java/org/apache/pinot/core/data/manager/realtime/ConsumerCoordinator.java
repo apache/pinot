@@ -254,4 +254,9 @@ public class ConsumerCoordinator {
   AtomicBoolean getIsFirstTransitionProcessed() {
     return _isFirstTransitionProcessed;
   }
+
+  @VisibleForTesting
+  int getMaxSegmentSeqNumLoaded() {
+    return _maxSegmentSeqNumLoaded;
+  }
 }
