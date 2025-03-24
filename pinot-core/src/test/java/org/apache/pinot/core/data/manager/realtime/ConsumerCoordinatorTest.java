@@ -67,26 +67,27 @@ public class ConsumerCoordinatorTest {
   }
 
   private static class FakeConsumerCoordinator extends ConsumerCoordinator {
+    private final Map<String, Map<String, String>> _segmentAssignmentMap;
+
     public FakeConsumerCoordinator(boolean enforceConsumptionInOrder,
         RealtimeTableDataManager realtimeTableDataManager) {
       super(enforceConsumptionInOrder, realtimeTableDataManager);
-    }
-
-    @Override
-    public Map<String, Map<String, String>> getSegmentAssignment() {
       Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
         put("server_1", "ONLINE");
         put("server_3", "ONLINE");
       }};
-      return new HashMap<>() {{
+      _segmentAssignmentMap = new HashMap<>() {{
         put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__111__20250304T0035Z", serverSegmentStatusMap);
-        put("tableTest_REALTIME__1__131__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__90__20250304T0035Z", serverSegmentStatusMap);
       }};
+    }
+
+    @Override
+    public Map<String, Map<String, String>> getSegmentAssignment() {
+      return _segmentAssignmentMap;
     }
   }
 
@@ -231,6 +232,50 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.release();
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), -1);
+    realtimeTableDataManager.registerSegment(getSegmentName(101), mockedRealtimeSegmentDataManager);
+
+    // 3. test that segment 103 will be blocked.
+    Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
+      put("server_1", "ONLINE");
+      put("server_3", "ONLINE");
+    }};
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(103), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
+
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(103));
+    thread1.start();
+
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
+
+    // 3. test that segment 102 will acquire semaphore.
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(102));
+    thread2.start();
+
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
+
+    // 4. registering seg 102 should unblock seg 103
+    realtimeTableDataManager.registerSegment(getSegmentName(102), mockedRealtimeSegmentDataManager);
+
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+
+    // 5. releasing semaphore should let seg 103 acquire it
+    consumerCoordinator.getSemaphore().release();
+
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), -1);
   }
 
   @Test
