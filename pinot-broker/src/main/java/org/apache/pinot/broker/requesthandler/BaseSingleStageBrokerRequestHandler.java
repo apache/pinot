@@ -88,7 +88,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.query.table.HybridTable;
-import org.apache.pinot.query.table.HybridTableRoute;
+import org.apache.pinot.query.table.ImplicitHybridTableRoute;
 import org.apache.pinot.query.table.ImplicitHybridTable;
 import org.apache.pinot.query.table.PhysicalTable;
 import org.apache.pinot.core.transport.Route;
@@ -543,7 +543,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
     Route route =
-        HybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
 
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable =
         route.getOfflineTableRoute() != null ? route.getOfflineTableRoute().getRoutingTable() : null;

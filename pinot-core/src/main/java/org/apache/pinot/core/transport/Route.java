@@ -37,14 +37,33 @@ public interface Route {
   Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
 
   List<String> getUnavailableSegments();
-  int getNumPrunedSegments();
 
-  Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
-
-  @Nullable
-  PhysicalTableRoute getOfflineTableRoute();
-  @Nullable
-  PhysicalTableRoute getRealtimeTableRoute();
+  int getNumPrunedSegmentsTotal();
 
   boolean isEmpty();
+
+  Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  default Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
+      boolean preferTls) {
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
+    Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap =
+        getOfflineRequestMap(requestId, brokerId, preferTls);
+    Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap =
+        getRealtimeRequestMap(requestId, brokerId, preferTls);
+    if (offlineRequestMap != null) {
+      requestMap = offlineRequestMap;
+    }
+    if (realtimeRequestMap != null) {
+      if (requestMap == null) {
+        requestMap = realtimeRequestMap;
+      } else {
+        requestMap.putAll(realtimeRequestMap);
+      }
+    }
+
+    return requestMap;
+  }
 }
