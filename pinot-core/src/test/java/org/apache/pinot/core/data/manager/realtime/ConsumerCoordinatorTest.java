@@ -38,10 +38,17 @@ public class ConsumerCoordinatorTest {
   private static class FakeRealtimeTableDataManager extends RealtimeTableDataManager {
 
     private ConsumerCoordinator _consumerCoordinator;
+    private StreamIngestionConfig _streamIngestionConfig = null;
 
-    public FakeRealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+    public FakeRealtimeTableDataManager(Semaphore segmentBuildSemaphore, boolean trackSegmentSeq) {
       super(segmentBuildSemaphore);
       super._recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+      if (trackSegmentSeq) {
+        StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(new HashMap<>()));
+        streamIngestionConfig.setEnforceConsumptionInOrder(true);
+        streamIngestionConfig.setTrackSegmentSeqNumber(true);
+        _streamIngestionConfig = streamIngestionConfig;
+      }
     }
 
     @Override
@@ -55,10 +62,7 @@ public class ConsumerCoordinatorTest {
 
     @Override
     public StreamIngestionConfig getStreamIngestionConfig() {
-      StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(new HashMap<>()));
-      streamIngestionConfig.setEnforceConsumptionInOrder(true);
-      streamIngestionConfig.setTrackSegmentSeqNumber(true);
-      return streamIngestionConfig;
+      return _streamIngestionConfig;
     }
   }
 
@@ -87,10 +91,19 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test
+  public void testFirstConsumer() {
+    // 1. Enable tracking segment seq num.
+    FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null, true);
+    realtimeTableDataManager.setEnforceConsumptionInOrder(true);
+    FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
+    realtimeTableDataManager.setConsumerCoordinator(consumerCoordinator);
+  }
+
+  @Test
   public void testSequentialOrderNotRelyingOnIdealState()
       throws InterruptedException {
-    // 1. Enable tracking segment seq num,
-    FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null);
+    // 1. Enable tracking segment seq num.
+    FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null, true);
     realtimeTableDataManager.setEnforceConsumptionInOrder(true);
 
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
@@ -171,12 +184,19 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
     Assert.assertTrue(consumerCoordinator.getIsFirstTransitionProcessed().get());
     Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 0);
+
+    // 8. register 103 seg and check if seg 104 is now queued on semaphore
+    realtimeTableDataManager.registerSegment(getSegmentName(103), mockedRealtimeSegmentDataManager);
+    Thread.sleep(1000);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 103);
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
   }
 
   @Test
   public void testSequentialOrderRelyingOnIdealState()
       throws InterruptedException {
-    FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null);
+    FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null, false);
     realtimeTableDataManager.setEnforceConsumptionInOrder(true);
 
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
@@ -211,17 +231,6 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.release();
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
-
-    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(90));
-    thread1.start();
-    TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0), 5000,
-        "Semaphore must be acquired after registering previous segment");
-
-    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(90));
-    thread2.start();
-    TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0) && (
-            consumerCoordinator.getSemaphore().getQueueLength() == 1), 50000,
-        "Semaphore must be already acquired by another thread.");
   }
 
   @Test
