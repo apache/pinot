@@ -543,7 +543,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
     Route route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+            requestId);
 
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = route.getRealtimeRoutingTable();
