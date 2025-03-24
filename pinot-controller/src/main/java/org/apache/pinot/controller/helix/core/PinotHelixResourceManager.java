@@ -245,13 +245,12 @@ public class PinotHelixResourceManager {
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
   private final ExecutorService _executorService;
-  private final HttpClientConnectionManager _connectionManager;
+  private HttpClientConnectionManager _connectionManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService, @Nullable HttpClientConnectionManager connectionManager,
-      double diskUtilizationThreshold) {
+      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -274,20 +273,9 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _connectionManager = connectionManager;
     _executorService = executorService;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
-  }
-
-  public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService,
-      @Nullable HttpClientConnectionManager connectionManager) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
-        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
-        connectionManager, controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -295,7 +283,7 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService, null,
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
         controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
@@ -304,7 +292,7 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null, null,
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
         controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
@@ -1968,6 +1956,10 @@ public class PinotHelixResourceManager {
 
   public void registerTableSizeReader(TableSizeReader tableSizeReader) {
     _tableSizeReader = tableSizeReader;
+  }
+
+  public void registerConnectionManager(HttpClientConnectionManager connectionManager) {
+    _connectionManager = connectionManager;
   }
 
   private void assignInstances(TableConfig tableConfig, boolean override) {
