@@ -182,18 +182,8 @@ public class ConsumerCoordinatorTest {
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
     realtimeTableDataManager.setConsumerCoordinator(consumerCoordinator);
 
-    String segmentName = "tableTest_REALTIME__1__101__20250304T0035Z";
-    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-    Assert.assertNotNull(llcSegmentName);
-
     // 1. test that acquire blocks when prev segment is not loaded.
-    Thread thread = new Thread(() -> {
-      try {
-        consumerCoordinator.acquire(llcSegmentName);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    Thread thread = getNewThread(consumerCoordinator, getLLCSegment(101));
     thread.start();
 
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
@@ -203,16 +193,14 @@ public class ConsumerCoordinatorTest {
     Assert.assertNotNull(realtimeTableDataManager);
 
     // prev segment has seq 91, so registering seq 90 won't do anything.
-    realtimeTableDataManager.registerSegment("tableTest_REALTIME__1__90__20250304T0035Z",
-        mockedRealtimeSegmentDataManager);
+    realtimeTableDataManager.registerSegment(getSegmentName(90), mockedRealtimeSegmentDataManager);
 
     Thread.sleep(2000);
 
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
 
     // 2. test that registering prev segment will unblock thread.
-    realtimeTableDataManager.registerSegment("tableTest_REALTIME__1__91__20250304T0035Z",
-        mockedRealtimeSegmentDataManager);
+    realtimeTableDataManager.registerSegment(getSegmentName(91), mockedRealtimeSegmentDataManager);
 
     TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0), 5000,
         "Semaphore must be acquired after registering previous segment");
@@ -224,24 +212,12 @@ public class ConsumerCoordinatorTest {
     Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
     Assert.assertFalse(consumerCoordinator.getSemaphore().hasQueuedThreads());
 
-    Thread thread1 = new Thread(() -> {
-      try {
-        consumerCoordinator.acquire(llcSegmentName);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(90));
     thread1.start();
     TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0), 5000,
         "Semaphore must be acquired after registering previous segment");
 
-    Thread thread2 = new Thread(() -> {
-      try {
-        consumerCoordinator.acquire(llcSegmentName);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(90));
     thread2.start();
     TestUtils.waitForCondition(aVoid -> (consumerCoordinator.getSemaphore().availablePermits() == 0) && (
             consumerCoordinator.getSemaphore().getQueueLength() == 1), 50000,
