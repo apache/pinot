@@ -96,7 +96,8 @@ public class ImplicitHybridTableRoute extends AbstractRoute {
       }
     }
 
-    return new ImplicitHybridTableRoute(offlineBrokerRequest, offlineTableRoute, realtimeBrokerRequest, realtimeTableRoute, unavailableSegments, numPrunedSegmentsTotal);
+    return new ImplicitHybridTableRoute(offlineBrokerRequest, offlineTableRoute, realtimeBrokerRequest,
+        realtimeTableRoute, unavailableSegments, numPrunedSegmentsTotal);
   }
 
   private ImplicitHybridTableRoute(BrokerRequest offlineBrokerRequest,
@@ -155,8 +156,7 @@ public class ImplicitHybridTableRoute extends AbstractRoute {
   public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
       boolean preferTls) {
     if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
-      return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId,
-          preferTls);
+      return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId, preferTls);
     }
     return null;
   }
