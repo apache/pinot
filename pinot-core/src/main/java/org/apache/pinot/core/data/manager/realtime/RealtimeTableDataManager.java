@@ -104,7 +104,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
-  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToSemaphoreCoordinatorMap =
+  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
       new ConcurrentHashMap<>();
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
@@ -543,7 +543,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
-    ConsumerCoordinator semaphoreCoordinator = getSemaphoreAccessCoordinator(partitionGroupId);
+    ConsumerCoordinator consumerCoordinator = getSemaphoreAccessCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
@@ -554,7 +554,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             : null;
     RealtimeSegmentDataManager realtimeSegmentDataManager =
         createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
-            semaphoreCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
+            consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
             _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
@@ -882,7 +882,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @VisibleForTesting
   ConsumerCoordinator getSemaphoreAccessCoordinator(int partitionGroupId) {
-    return _partitionGroupIdToSemaphoreCoordinatorMap.computeIfAbsent(partitionGroupId,
+    return _partitionGroupIdToConsumerCoordinatorMap.computeIfAbsent(partitionGroupId,
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
   }
 
