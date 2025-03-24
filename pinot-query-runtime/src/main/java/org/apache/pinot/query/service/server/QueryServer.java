@@ -237,7 +237,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submitTimeSeries(Worker.TimeSeriesQueryRequest request,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
-    try (QueryThreadContext.CloseableContext closeable = QueryThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext queryTlClosable = QueryThreadContext.open();
+        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
       // TODO: populate the thread context with TSE information
       QueryThreadContext.setQueryEngine("tse");
       _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), request.getMetadataMap(), responseObserver);
