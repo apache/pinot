@@ -23,7 +23,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.core.data.manager.realtime.SemaphoreAccessCoordinator;
+import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -46,7 +46,7 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
   public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata,
       TableConfig tableConfig, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
       IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      SemaphoreAccessCoordinator semaphoreAccessCoordinator, ServerMetrics serverMetrics,
+      ConsumerCoordinator semaphoreAccessCoordinator, ServerMetrics serverMetrics,
       boolean failCommit) throws AttemptsExceededException, RetriableOperationException {
     // Pass through to the real parent constructor
     super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,

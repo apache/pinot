@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
@@ -37,22 +38,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SemaphoreAccessCoordinator {
+public class ConsumerCoordinator {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SemaphoreAccessCoordinator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
 
   private final Semaphore _semaphore;
   private final boolean _enforceConsumptionInOrder;
   private final Condition _condition;
   private final Lock _lock;
   private int _maxSegmentSeqNumLoaded = -1;
-  private boolean _relyOnIdealState = false;
+  private boolean _relyOnIdealState = true;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _isFirstTransitionProcessed;
 
-  public SemaphoreAccessCoordinator(Semaphore semaphore, boolean enforceConsumptionInOrder,
-      RealtimeTableDataManager realtimeTableDataManager) {
-    _semaphore = semaphore;
+  public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
+    _semaphore = new Semaphore(1);
     _lock = new ReentrantLock();
     _condition = _lock.newCondition();
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
@@ -63,13 +63,13 @@ public class SemaphoreAccessCoordinator {
       trackSegmentSeqNumber = streamIngestionConfig.isTrackSegmentSeqNumber();
     }
     // if trackSegmentSeqNumber is false, server relies on ideal state to fetch previous segment to a segment.
-    if (!trackSegmentSeqNumber) {
-      _relyOnIdealState = true;
+    if (trackSegmentSeqNumber) {
+      _relyOnIdealState = false;
     }
     _isFirstTransitionProcessed = new AtomicBoolean(false);
   }
 
-  public void acquire(LLCSegmentName llcSegmentName)
+  void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException {
 
     String segmentName = llcSegmentName.getSegmentName();
@@ -91,15 +91,16 @@ public class SemaphoreAccessCoordinator {
     }
   }
 
-  public void release() {
+  void release() {
     _semaphore.release();
   }
 
-  public Semaphore getSemaphore() {
+  @VisibleForTesting
+  Semaphore getSemaphore() {
     return _semaphore;
   }
 
-  public void trackSegment(LLCSegmentName llcSegmentName) {
+  void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
       if (!_relyOnIdealState) {
@@ -169,8 +170,9 @@ public class SemaphoreAccessCoordinator {
     }
   }
 
+  @VisibleForTesting
   @Nullable
-  private String getPreviousSegment(LLCSegmentName currSegment) {
+  String getPreviousSegment(LLCSegmentName currSegment) {
     // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
     // created before current segment
     int maxSequenceNumBelowCurrentSegment = -1;
@@ -178,9 +180,7 @@ public class SemaphoreAccessCoordinator {
     int currPartitionGroupId = currSegment.getPartitionGroupId();
     int currSequenceNum = currSegment.getSequenceNumber();
 
-    Map<String, Map<String, String>> segmentAssignment =
-        HelixHelper.getSegmentAssignment(_realtimeTableDataManager.getTableName(),
-            _realtimeTableDataManager.getHelixManager());
+    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
 
     if (segmentAssignment == null) {
       return null;
@@ -220,6 +220,12 @@ public class SemaphoreAccessCoordinator {
     return previousSegment;
   }
 
+  @VisibleForTesting
+  Map<String, Map<String, String>> getSegmentAssignment() {
+    return HelixHelper.getSegmentAssignment(_realtimeTableDataManager.getTableName(),
+        _realtimeTableDataManager.getHelixManager());
+  }
+
   private boolean isSegmentInProgress(String segmentName) {
     SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(segmentName);
 
@@ -237,5 +243,15 @@ public class SemaphoreAccessCoordinator {
     }
 
     return true;
+  }
+
+  @VisibleForTesting
+  Lock getLock() {
+    return _lock;
+  }
+
+  @VisibleForTesting
+  AtomicBoolean getIsFirstTransitionProcessed() {
+    return _isFirstTransitionProcessed;
   }
 }

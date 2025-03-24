@@ -92,7 +92,7 @@ public class RealtimeSegmentDataManagerTest {
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
 
-  private final Map<Integer, SemaphoreAccessCoordinator> _partitionGroupIdToSemaphoreAccessCoordinatorMap =
+  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToSemaphoreAccessCoordinatorMap =
       new ConcurrentHashMap<>();
 
   private static TableConfig createTableConfig()
@@ -150,7 +150,7 @@ public class RealtimeSegmentDataManagerTest {
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreAccessCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
-        new SemaphoreAccessCoordinator(new Semaphore(1), false, tableDataManager));
+        new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
@@ -919,7 +919,7 @@ public class RealtimeSegmentDataManagerTest {
     private boolean _downloadAndReplaceCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
-    public Map<Integer, SemaphoreAccessCoordinator> _semaphoreAccessCoordinatorMap;
+    public Map<Integer, ConsumerCoordinator> _semaphoreAccessCoordinatorMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
@@ -936,7 +936,7 @@ public class RealtimeSegmentDataManagerTest {
 
     public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
-        LLCSegmentName llcSegmentName, Map<Integer, SemaphoreAccessCoordinator> semaphoreAccessCoordinatorMap,
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> semaphoreAccessCoordinatorMap,
         ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,

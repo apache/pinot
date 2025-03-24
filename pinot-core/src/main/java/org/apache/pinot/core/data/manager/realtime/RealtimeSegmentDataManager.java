@@ -243,7 +243,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
-  private final SemaphoreAccessCoordinator _partitionGroupSemaphoreAccessCoordinator;
+  private final ConsumerCoordinator _partitionGroupSemaphoreAccessCoordinator;
   // A boolean flag to check whether the current thread has acquired the semaphore.
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
   // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
@@ -1515,7 +1515,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public RealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
       RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
-      Schema schema, LLCSegmentName llcSegmentName, SemaphoreAccessCoordinator partitionGroupSemaphoreAccessCoordinator,
+      Schema schema, LLCSegmentName llcSegmentName, ConsumerCoordinator partitionGroupSemaphoreAccessCoordinator,
       ServerMetrics serverMetrics, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
