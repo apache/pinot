@@ -73,7 +73,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
   //boolean Check if dataDir is avaiable on boot?
-  public static final String SKIP_DATA_DIR_VALIDATION_ON_BOOT = "controller.skip_data_dir_validation_on_boot";
+  public static final String CONTINUE_WITHOUT_DEEP_STORE = "controller.startup.continueWithoutDeepStore";
 
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
@@ -542,9 +542,7 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
   }
 
-  public boolean skipDataDirValidationOnBoot() {
-    return getProperty(SKIP_DATA_DIR_VALIDATION_ON_BOOT, false);
-  }
+  public boolean continueWithoutDeepStore() { return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false); }
 
   public String generateVipUrl() {
     return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerVipPort();
