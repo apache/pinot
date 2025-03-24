@@ -144,9 +144,6 @@ public class QueryServer {
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
               ch.pipeline().addLast(_instanceRequestHandler);
-              ch.closeFuture().addListener(future -> {
-                _allChannels.remove(ch);
-              });
             }
           }).bind(_port).sync().channel();
     } catch (Exception e) {
