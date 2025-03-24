@@ -87,28 +87,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
     @Override
     public AuthorizationResult authorize(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-      Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
-
-      if (!principalOpt.isPresent()) {
-        throw new NotAuthorizedException("Basic");
-      }
-
-      BasicAuthPrincipal principal = principalOpt.get();
-      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-          .isSetTableName()) {
-        // no table restrictions? accept
-        return TableAuthorizationResult.success();
-      }
-
-      Set<String> failedTables = new HashSet<>();
-
-      if (!principal.hasTable(brokerRequest.getQuerySource().getTableName())) {
-        failedTables.add(brokerRequest.getQuerySource().getTableName());
-      }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables);
+      return TableAuthorizationResult.success();
     }
 
     @Override

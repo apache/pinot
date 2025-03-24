@@ -48,6 +48,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
@@ -351,10 +352,35 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Validates whether the requester has access to all the tables.
    */
   protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
-      RequestContext requestContext, HttpHeaders httpHeaders) {
+      RequestContext requestContext, HttpHeaders httpHeaders, AccessControl accessControl) {
     final long startTimeNs = System.nanoTime();
-    AccessControl accessControl = _accessControlFactory.create();
 
+    TableAuthorizationResult tableAuthorizationResult =
+        checkTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders, accessControl);
+
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return tableAuthorizationResult;
+  }
+
+  protected AuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+      RequestContext requestContext, HttpHeaders httpHeaders, AccessControl accessControl,
+      @Nullable BrokerRequest request) {
+    final long startTimeNs = System.nanoTime();
+
+    AuthorizationResult authorizationResult =
+        checkTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders, accessControl);
+    if (!authorizationResult.hasAccess() || request == null) {
+      return authorizationResult;
+    }
+    authorizationResult = accessControl.authorize(requesterIdentity, request);
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return authorizationResult;
+  }
+
+  private TableAuthorizationResult checkTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
+      RequestContext requestContext, HttpHeaders httpHeaders, AccessControl accessControl) {
     TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
 
     Set<String> failedTables = tableNames.stream()
@@ -374,9 +400,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
     }
-
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
-
     return tableAuthorizationResult;
   }
 
