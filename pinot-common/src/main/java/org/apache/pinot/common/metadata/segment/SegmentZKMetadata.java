@@ -309,6 +309,7 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.Realtime.FLUSH_THRESHOLD_SIZE, flushThresholdSize);
   }
 
+  // Deprecated because the time threshold is directly read from table config on the server side
   @Deprecated
   public String getTimeThresholdToFlushSegment() {
     // Check "null" for backward-compatibility
@@ -320,6 +321,7 @@ public class SegmentZKMetadata implements ZKMetadata {
     }
   }
 
+  // Deprecated because the time threshold is directly read from table config on the server side
   @Deprecated
   public void setTimeThresholdToFlushSegment(String flushThresholdTime) {
     setValue(Segment.Realtime.FLUSH_THRESHOLD_TIME, flushThresholdTime);
