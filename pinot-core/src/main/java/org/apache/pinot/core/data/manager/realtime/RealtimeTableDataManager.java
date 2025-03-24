@@ -552,17 +552,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
-    RealtimeSegmentDataManager realtimeSegmentDataManager;
-    try {
-      realtimeSegmentDataManager =
-          createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
-              semaphoreCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
-              _isTableReadyToConsumeData);
-    } catch (SegmentAlreadyConsumedException e) {
-      // Don't do anything since segment was already committed by another instance.
-      // Eventually this server should receive a CONSUMING -> ONLINE/OFFLINE helix state transition
-      return;
-    }
+    RealtimeSegmentDataManager realtimeSegmentDataManager =
+        createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
+            semaphoreCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
+            _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
     if (partitionUpsertMetadataManager != null) {
       partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);

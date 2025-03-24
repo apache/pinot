@@ -28,7 +28,6 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -72,8 +71,6 @@ public class ConsumerCoordinator {
   void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException {
 
-    String segmentName = llcSegmentName.getSegmentName();
-
     if (_enforceConsumptionInOrder) {
       waitForPrevSegment(llcSegmentName);
     }
@@ -82,12 +79,6 @@ public class ConsumerCoordinator {
     while (!_semaphore.tryAcquire(5, TimeUnit.MINUTES)) {
       LOGGER.warn("Failed to acquire partitionGroup consumer semaphore in: {} ms. Retrying.",
           System.currentTimeMillis() - startTimeMs);
-
-      // if segment is marked online/offline by any instance, just return the current offline -> consuming
-      // transition.
-      if (!_enforceConsumptionInOrder && !isSegmentInProgress(segmentName)) {
-        throw new SegmentAlreadyConsumedException("segment: " + segmentName + " status must be in progress");
-      }
     }
   }
 
@@ -224,25 +215,6 @@ public class ConsumerCoordinator {
   Map<String, Map<String, String>> getSegmentAssignment() {
     return HelixHelper.getSegmentAssignment(_realtimeTableDataManager.getTableName(),
         _realtimeTableDataManager.getHelixManager());
-  }
-
-  private boolean isSegmentInProgress(String segmentName) {
-    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(segmentName);
-
-    if (segmentZKMetadata == null) {
-      LOGGER.error("segmentZKMetadata does not exists for segment: {}", segmentName);
-      throw new RuntimeException("segmentZKMetadata does not exists.");
-    }
-
-    if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
-      // it's certain at this point that there is a pending consuming -> online/offline transition message.
-      // hence return from here and handle pending message instead.
-      LOGGER.warn("segment: {} status must be {}. Skipping creation of RealtimeSegmentDataManager", segmentName,
-          CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-      return false;
-    }
-
-    return true;
   }
 
   @VisibleForTesting
