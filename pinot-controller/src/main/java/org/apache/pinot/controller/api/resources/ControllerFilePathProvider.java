@@ -66,13 +66,14 @@ public class ControllerFilePathProvider {
     try {
       _dataDirURI = URIUtils.getUri(dataDir);
       LOGGER.info("Data directory: {}", _dataDirURI);
-
-      PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
-      if (pinotFS.exists(_dataDirURI)) {
-        Preconditions
-            .checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory", _dataDirURI);
-      } else {
-        Preconditions.checkState(pinotFS.mkdir(_dataDirURI), "Failed to create data directory: %s", _dataDirURI);
+      if (controllerConf.skipDataDirValidationOnBoot()) {
+        PinotFS pinotFS = PinotFSFactory.create(_dataDirURI.getScheme());
+        if (pinotFS.exists(_dataDirURI)) {
+          Preconditions
+                  .checkState(pinotFS.isDirectory(_dataDirURI), "Data directory: %s must be a directory", _dataDirURI);
+        } else {
+          Preconditions.checkState(pinotFS.mkdir(_dataDirURI), "Failed to create data directory: %s", _dataDirURI);
+        }
       }
 
       String localTempDirPath = controllerConf.getLocalTempDir();

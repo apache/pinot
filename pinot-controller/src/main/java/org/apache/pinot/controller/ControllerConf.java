@@ -72,6 +72,10 @@ public class ControllerConf extends PinotConfiguration {
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
+  //boolean Check if dataDir is avaiable on boot?
+  public static final String SKIP_DATA_DIR_VALIDATION_ON_BOOT = "controller.skip_data_dir_validation_on_boot";
+
+
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
   public static final String DEFAULT_TABLE_CONFIG_TUNER_PACKAGES = "org.apache.pinot";
@@ -526,6 +530,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isUpdateSegmentStateModel() {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
+  }
+
+  public boolean skipDataDirValidationOnBoot() {
+    return getProperty(SKIP_DATA_DIR_VALIDATION_ON_BOOT, false);
   }
 
   public String generateVipUrl() {
