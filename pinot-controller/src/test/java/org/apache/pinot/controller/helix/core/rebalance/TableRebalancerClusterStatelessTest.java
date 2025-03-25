@@ -1186,8 +1186,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
-    assertTrue(tenantInfoMap.containsKey(
-        TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE)));
+    assertTrue(tenantInfoMap.containsKey(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE));
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
@@ -1203,16 +1202,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumServerParticipants(), 0);
-    assertEquals(tenantInfoMap.get(
-                TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
-            .getNumSegmentsToDownload(),
+    assertEquals(
+        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumSegmentsToDownload(),
         0);
-    assertEquals(tenantInfoMap.get(
-            TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
-        .getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
-    assertEquals(tenantInfoMap.get(
-            TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
-        .getNumServerParticipants(), 6);
+    assertEquals(
+        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumSegmentsUnchanged(),
+        numSegments * NUM_REPLICAS);
+    assertEquals(
+        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumServerParticipants(),
+        6);
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
