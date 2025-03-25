@@ -169,7 +169,22 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
    * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
    */
-  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
+
+  /// Number of tasks started by the MSE query runner
+  MULTI_STAGE_RUNNER_STARTED_TASKS("tasks", true),
+  /// Number of stats completed by the MSE query runner
+  MULTI_STAGE_RUNNER_COMPLETED_TASKS("tasks", true),
+  /// Number of tasks started by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
+  /// Number of tasks completed by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+
+  // predownload metrics
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
+  PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
+  PREDOWNLOAD_FAILED("predownloadFailed", true);
 
   private final String _meterName;
   private final String _unit;

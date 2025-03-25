@@ -36,7 +36,7 @@ import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -46,18 +46,30 @@ import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class DataBlockBuilder {
-
   private DataBlockBuilder() {
   }
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema)
       throws IOException {
-    return buildFromRows(rows, dataSchema, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+    return buildFromRows(rows, dataSchema, null, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  }
+
+  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions)
+      throws IOException {
+    return buildFromRows(rows, dataSchema, aggFunctions, PagedPinotOutputStream.HeapPageAllocator.createSmall());
   }
 
   public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema,
       PagedPinotOutputStream.PageAllocator allocator)
+      throws IOException {
+    return buildFromRows(rows, dataSchema, null, allocator);
+  }
+
+  public static RowDataBlock buildFromRows(List<Object[]> rows, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions, PagedPinotOutputStream.PageAllocator allocator)
       throws IOException {
     int numRows = rows.size();
 
@@ -74,8 +86,7 @@ public class DataBlockBuilder {
     int nullFixedBytes = numColumns * Integer.BYTES * 2;
     int rowSizeInBytes = calculateBytesPerRow(dataSchema);
     int fixedBytesRequired = rowSizeInBytes * numRows + nullFixedBytes;
-    ByteBuffer fixedSize = ByteBuffer.allocate(fixedBytesRequired)
-        .order(ByteOrder.BIG_ENDIAN);
+    ByteBuffer fixedSize = ByteBuffer.allocate(fixedBytesRequired).order(ByteOrder.BIG_ENDIAN);
 
     PagedPinotOutputStream varSize = new PagedPinotOutputStream(allocator);
     Object2IntOpenHashMap<String> dictionary = new Object2IntOpenHashMap<>();
@@ -84,15 +95,36 @@ public class DataBlockBuilder {
       Object[] row = rows.get(rowId);
       for (int colId = 0; colId < numColumns; colId++) {
         Object value = row[colId];
+        ColumnDataType storedType = storedTypes[colId];
+
+        if (storedType == ColumnDataType.OBJECT) {
+          // Custom intermediate result for aggregation function
+          assert aggFunctions != null;
+          if (value == null) {
+            setNull(fixedSize, varSize);
+          } else {
+            // NOTE: The first (numColumns - numAggFunctions) columns are key columns
+            int numAggFunctions = aggFunctions.length;
+            AggregationFunction aggFunction = aggFunctions[colId + numAggFunctions - numColumns];
+            setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
+          }
+          continue;
+        }
+
         if (value == null) {
-          nullBitmaps[colId].add(rowId);
-          value = nullPlaceholders[colId];
+          if (storedType == ColumnDataType.UNKNOWN) {
+            setNull(fixedSize, varSize);
+            continue;
+          } else {
+            nullBitmaps[colId].add(rowId);
+            value = nullPlaceholders[colId];
+          }
         }
 
         // NOTE:
         // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
         // rows conform to the data schema. This can help catch the unexpected data type issues early.
-        switch (storedTypes[colId]) {
+        switch (storedType) {
           // Single-value column
           case INT:
             fixedSize.putInt((int) value);
@@ -135,26 +167,20 @@ public class DataBlockBuilder {
           case STRING_ARRAY:
             setColumn(fixedSize, varSize, (String[]) value, dictionary);
             break;
-
-          // Special intermediate result for aggregation function
-          case OBJECT:
-            setColumn(fixedSize, varSize, value);
-            break;
-
           // Null
           case UNKNOWN:
-            setColumn(fixedSize, varSize, (Object) null);
+            setNull(fixedSize, varSize);
             break;
 
           default:
-            throw new IllegalStateException("Unsupported stored type: " + storedTypes[colId] + " for column: "
-                + dataSchema.getColumnName(colId));
+            throw new IllegalStateException(
+                "Unsupported stored type: " + storedType + " for column: " + dataSchema.getColumnName(colId));
         }
       }
     }
 
-    CompoundDataBuffer.Builder varBufferBuilder = new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, true)
-        .addPagedOutputStream(varSize);
+    CompoundDataBuffer.Builder varBufferBuilder =
+        new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, true).addPagedOutputStream(varSize);
 
     // Write null bitmaps after writing data.
     setNullRowIds(nullBitmaps, fixedSize, varBufferBuilder);
@@ -163,11 +189,23 @@ public class DataBlockBuilder {
 
   public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
       throws IOException {
-    return buildFromColumns(columns, dataSchema, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+    return buildFromColumns(columns, dataSchema, null, PagedPinotOutputStream.HeapPageAllocator.createSmall());
+  }
+
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions)
+      throws IOException {
+    return buildFromColumns(columns, dataSchema, aggFunctions, PagedPinotOutputStream.HeapPageAllocator.createSmall());
   }
 
   public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema,
       PagedPinotOutputStream.PageAllocator allocator)
+      throws IOException {
+    return buildFromColumns(columns, dataSchema, null, allocator);
+  }
+
+  public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema,
+      @Nullable AggregationFunction[] aggFunctions, PagedPinotOutputStream.PageAllocator allocator)
       throws IOException {
     int numRows = columns.isEmpty() ? 0 : columns.get(0).length;
 
@@ -189,7 +227,13 @@ public class DataBlockBuilder {
       for (int colId = 0; colId < numColumns; colId++) {
         RoaringBitmap nullBitmap = new RoaringBitmap();
         nullBitmaps[colId] = nullBitmap;
-        serializeColumnData(columns, dataSchema, colId, fixedSize, varSize, nullBitmap, dictionary);
+        AggregationFunction aggFunction = null;
+        if (aggFunctions != null) {
+          // NOTE: The first (numColumns - numAggFunctions) columns are key columns
+          int numAggFunctions = aggFunctions.length;
+          aggFunction = aggFunctions[colId + numAggFunctions - numColumns];
+        }
+        serializeColumnData(columns, dataSchema, colId, fixedSize, varSize, nullBitmap, dictionary, aggFunction);
       }
       varBufferBuilder.addPagedOutputStream(varSize);
     }
@@ -200,7 +244,7 @@ public class DataBlockBuilder {
 
   private static void serializeColumnData(List<Object[]> columns, DataSchema dataSchema, int colId,
       ByteBuffer fixedSize, PagedPinotOutputStream varSize, RoaringBitmap nullBitmap,
-      Object2IntOpenHashMap<String> dictionary)
+      Object2IntOpenHashMap<String> dictionary, @Nullable AggregationFunction aggFunction)
       throws IOException {
     ColumnDataType storedType = dataSchema.getColumnDataType(colId).getStoredType();
     int numRows = columns.get(colId).length;
@@ -385,24 +429,29 @@ public class DataBlockBuilder {
         }
         break;
       }
-
-      // Special intermediate result for aggregation function
+      // Custom intermediate result for aggregation function
       case OBJECT: {
+        assert aggFunction != null;
         for (int rowId = 0; rowId < numRows; rowId++) {
-          setColumn(fixedSize, varSize, column[rowId]);
+          Object value = column[rowId];
+          if (value == null) {
+            setNull(fixedSize, varSize);
+          } else {
+            setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
+          }
         }
         break;
       }
       // Null
       case UNKNOWN:
         for (int rowId = 0; rowId < numRows; rowId++) {
-          setColumn(fixedSize, varSize, (Object) null);
+          setNull(fixedSize, varSize);
         }
         break;
 
       default:
-        throw new IllegalStateException("Unsupported stored type: " + storedType + " for column: "
-            + dataSchema.getColumnName(colId));
+        throw new IllegalStateException(
+            "Unsupported stored type: " + storedType + " for column: " + dataSchema.getColumnName(colId));
     }
   }
 
@@ -444,11 +493,9 @@ public class DataBlockBuilder {
   private static void setNullRowIds(RoaringBitmap[] nullVectors, ByteBuffer fixedSize,
       CompoundDataBuffer.Builder varBufferBuilder)
       throws IOException {
-    int varBufSize = Arrays.stream(nullVectors)
-        .mapToInt(bitmap -> bitmap == null ? 0 : bitmap.serializedSizeInBytes())
-        .sum();
-    ByteBuffer variableSize = ByteBuffer.allocate(varBufSize)
-        .order(ByteOrder.BIG_ENDIAN);
+    int varBufSize =
+        Arrays.stream(nullVectors).mapToInt(bitmap -> bitmap == null ? 0 : bitmap.serializedSizeInBytes()).sum();
+    ByteBuffer variableSize = ByteBuffer.allocate(varBufSize).order(ByteOrder.BIG_ENDIAN);
 
     long varWrittenBytes = varBufferBuilder.getWrittenBytes();
     Preconditions.checkArgument(varWrittenBytes < Integer.MAX_VALUE,
@@ -474,8 +521,8 @@ public class DataBlockBuilder {
 
   private static ColumnarDataBlock buildColumnarBlock(int numRows, DataSchema dataSchema, String[] dictionary,
       ByteBuffer fixedSize, CompoundDataBuffer.Builder varBufferBuilder) {
-    return new ColumnarDataBlock(numRows, dataSchema, dictionary,
-        PinotByteBuffer.wrap(fixedSize), varBufferBuilder.build());
+    return new ColumnarDataBlock(numRows, dataSchema, dictionary, PinotByteBuffer.wrap(fixedSize),
+        varBufferBuilder.build());
   }
 
   private static String[] getReverseDictionary(Object2IntOpenHashMap<String> dictionary) {
@@ -509,22 +556,6 @@ public class DataBlockBuilder {
     byte[] bytes = MapUtils.serializeMap(value);
     fixedSize.putInt(bytes.length);
     varSize.write(bytes);
-  }
-
-  // TODO: Move ser/de into AggregationFunction interface
-  private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, @Nullable Object value)
-      throws IOException {
-    writeVarOffsetInFixed(fixedSize, varSize);
-    if (value == null) {
-      fixedSize.putInt(0);
-      varSize.writeInt(CustomObject.NULL_TYPE_VALUE);
-    } else {
-      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
-      byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-      fixedSize.putInt(bytes.length);
-      varSize.writeInt(objectTypeValue);
-      varSize.write(bytes);
-    }
   }
 
   private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, int[] values)
@@ -572,5 +603,23 @@ public class DataBlockBuilder {
       int dictId = dictionary.computeIfAbsent(value, k -> dictionary.size());
       varSize.writeInt(dictId);
     }
+  }
+
+  private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize,
+      AggregationFunction.SerializedIntermediateResult value)
+      throws IOException {
+    writeVarOffsetInFixed(fixedSize, varSize);
+    int type = value.getType();
+    byte[] bytes = value.getBytes();
+    fixedSize.putInt(bytes.length);
+    varSize.writeInt(type);
+    varSize.write(bytes);
+  }
+
+  private static void setNull(ByteBuffer fixedSize, PagedPinotOutputStream varSize)
+      throws IOException {
+    writeVarOffsetInFixed(fixedSize, varSize);
+    fixedSize.putInt(0);
+    varSize.writeInt(CustomObject.NULL_TYPE_VALUE);
   }
 }

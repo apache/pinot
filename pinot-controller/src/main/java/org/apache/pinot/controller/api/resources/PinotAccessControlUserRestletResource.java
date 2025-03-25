@@ -149,8 +149,8 @@ public class PinotAccessControlUserRestletResource {
         }
         try {
             _pinotHelixResourceManager.addUser(userConfig);
-            return new SuccessResponse(String.format("User %s has been successfully added!",
-                userConfig.getUserName() + '_' + userConfig.getComponentType()));
+            return new SuccessResponse("User " + userConfig.getUserName() + '_' + userConfig.getComponentType()
+                + " has been successfully added!");
         } catch (Exception e) {
             if (e instanceof UserAlreadyExistsException) {
                 throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -214,9 +214,8 @@ public class PinotAccessControlUserRestletResource {
             }
             String usernameWithComponentTypeFromUserConfig = userConfig.getUsernameWithComponent();
             if (!usernameWithComponentType.equals(usernameWithComponentTypeFromUserConfig)) {
-                throw new ControllerApplicationException(LOGGER,
-                    String.format("Request user %s does not match %s in the Request body",
-                        usernameWithComponentType, usernameWithComponentTypeFromUserConfig),
+                throw new ControllerApplicationException(LOGGER, "Request user " + usernameWithComponentType
+                    + " does not match " + usernameWithComponentTypeFromUserConfig + " in the Request body",
                     Response.Status.BAD_REQUEST);
             }
             if (!_pinotHelixResourceManager.hasUser(username, componentTypeStr)) {

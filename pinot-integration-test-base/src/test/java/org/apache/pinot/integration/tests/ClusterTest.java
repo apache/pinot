@@ -26,7 +26,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -72,6 +71,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -448,8 +448,8 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
-                URIUtils.encode(segmentTarFile.getName()))),
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+                + URIUtils.encode(segmentTarFile.getName())),
         new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
             FileUploadDownloadClient.FileUploadType.METADATA.toString()));
     // Add table name and table type as request parameters
@@ -513,7 +513,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  public JsonNode postQuery(String query)
+  public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
@@ -522,10 +522,20 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query, Map<String, String> headers)
+  protected JsonNode postQuery(@Language("sql") String query, Map<String, String> headers)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
         getExtraQueryProperties());
+  }
+
+  public QueryAssert assertQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQuery(query));
+  }
+
+  public QueryAssert assertControllerQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQueryToController(query));
   }
 
   protected Map<String, String> getExtraQueryProperties() {
@@ -535,7 +545,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query or /query/sql)
    */
-  public static JsonNode postQuery(String query, String brokerQueryApiUrl, Map<String, String> headers,
+  public static JsonNode postQuery(@Language("sql") String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -551,7 +561,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryWithOptions(String query, String queryOptions)
+  protected JsonNode postQueryWithOptions(@Language("sql") String query, String queryOptions)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         Map.of("queryOptions", queryOptions));
@@ -560,7 +570,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public JsonNode postQueryToController(String query)
+  public JsonNode postQueryToController(@Language("sql") String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
   }
@@ -616,11 +626,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public void assertNoError(JsonNode response) {
-    JsonNode exceptionsJson = response.get("exceptions");
-    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
-    if (exIterator.hasNext()) {
-      Assert.fail("There is at least one exception: " + exIterator.next());
-    }
+    QueryAssert.assertThat(response)
+        .hasNoExceptions();
   }
 
   @DataProvider(name = "systemColumns")

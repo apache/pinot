@@ -97,14 +97,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
-  // Maintains a map of partitionGroup
-  // Ids to semaphores.
+
+  // Maintains a map of partition id to semaphore.
+  // We use semaphore of 1 permit instead of lock because the semaphore is shared across multiple threads, and it can be
+  // released by a different thread than the one that acquired it. There is no out-of-box Lock implementation that
+  // allows releasing the lock from a different thread.
   // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
   // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host)
   // consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
   private static final String STATS_FILE_NAME = "segment-stats.ser";
@@ -465,22 +469,22 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
-    } else {
-      if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-        _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
-        ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
-        onConsumingToOnline(segmentName);
-      } else {
-        // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
-        // call completes.
-        // The server should replace the segment only after the CRC is set by COMMIT_END_METADATA and the segment is
-        // marked DONE.
-        // This ensures the segment's download URL is available before discarding the locally built copy, preventing
-        // data loss if COMMIT_END_METADATA fails.
-        if (zkMetadata.getStatus() == Status.DONE) {
-          replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
-        }
-      }
+      return;
+    }
+    if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+      _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
+      ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
+      onConsumingToOnline(segmentName);
+      return;
+    }
+    // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
+    // call completes.
+    // The server should replace the segment only after the CRC is set by COMMIT_END_METADATA and the segment is
+    // marked DONE.
+    // This ensures the segment's download URL is available before discarding the locally built copy, preventing
+    // data loss if COMMIT_END_METADATA fails.
+    if (zkMetadata.getStatus() == Status.DONE) {
+      replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }
   }
 

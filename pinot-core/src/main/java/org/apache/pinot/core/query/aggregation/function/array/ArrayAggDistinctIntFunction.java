@@ -19,15 +19,18 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpenHashSet> {
+public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntSet> {
   public ArrayAggDistinctIntFunction(ExpressionContext expression, FieldSpec.DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
@@ -38,14 +41,15 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpen
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     int[] value = blockValSet.getIntValuesSV();
-    IntOpenHashSet valueArray = new IntOpenHashSet(length);
+    IntOpenHashSet valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntOpenHashSet(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
+        valueSet.add(value[i]);
       }
     });
-    aggregationResultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
@@ -56,5 +60,16 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpen
       resultHolder.setValueForKey(groupKey, valueSet);
     }
     valueSet.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(IntSet intSet) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
+        ObjectSerDeUtils.INT_SET_SER_DE.serialize(intSet));
+  }
+
+  @Override
+  public IntSet deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.INT_SET_SER_DE.deserialize(customObject.getBuffer());
   }
 }

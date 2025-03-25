@@ -19,8 +19,9 @@
 package org.apache.pinot.query.runtime;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.ArrayList;
+import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -28,16 +29,16 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class MultiStageStatsTreeBuilder {
-  private final List<PlanNode> _planNodes;
+  private final Map<Integer, PlanNode> _planNodes;
   private final List<? extends MultiStageQueryStats.StageStats> _queryStats;
-  private final List<DispatchablePlanFragment> _planFragments;
+  private final Map<Integer, DispatchablePlanFragment> _planFragments;
 
-  public MultiStageStatsTreeBuilder(List<DispatchablePlanFragment> planFragments,
+  public MultiStageStatsTreeBuilder(Map<Integer, DispatchablePlanFragment> planFragments,
       List<? extends MultiStageQueryStats.StageStats> queryStats) {
     _planFragments = planFragments;
-    _planNodes = new ArrayList<>(planFragments.size());
-    for (DispatchablePlanFragment stagePlan : planFragments) {
-      _planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
+    _planNodes = Maps.newHashMapWithExpectedSize(planFragments.size());
+    for (Map.Entry<Integer, DispatchablePlanFragment> entry : planFragments.entrySet()) {
+      _planNodes.put(entry.getKey(), entry.getValue().getPlanFragment().getFragmentRoot());
     }
     _queryStats = queryStats;
   }

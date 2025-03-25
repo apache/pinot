@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -137,8 +138,7 @@ public class ClusterIntegrationTestUtils {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
-            Assert.fail(
-                String.format("Unsupported UNION Avro field: %s with underlying types: %s", fieldName, typesInUnion));
+            Assert.fail("Unsupported UNION Avro field: " + fieldName + " with underlying types: " + typesInUnion);
             break;
           case ARRAY:
             Schema.Type type = field.schema().getElementType().getType();
@@ -150,21 +150,21 @@ public class ClusterIntegrationTestUtils {
             if (isSingleValueAvroFieldType(fieldType)) {
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, fieldType, false));
             } else {
-              Assert.fail(String.format("Unsupported Avro field: %s with underlying types: %s", fieldName, fieldType));
+              Assert.fail("Unsupported Avro field: " + fieldName + " with underlying types: " + fieldType);
             }
             break;
         }
       }
 
-      h2Connection.prepareCall(String.format("DROP TABLE IF EXISTS %s", tableName)).execute();
+      h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
       String columnsStr = StringUtil.join(",", h2FieldNameAndTypes.toArray(new String[0]));
-      h2Connection.prepareCall(String.format("CREATE TABLE %s (%s)", tableName, columnsStr)).execute();
+      h2Connection.prepareCall("CREATE TABLE " + tableName + " (" + columnsStr + ")").execute();
     }
 
     // Insert Avro records into H2 table
     String params = "?" + StringUtils.repeat(",?", h2FieldNameAndTypes.size() - 1);
     PreparedStatement h2Statement =
-        h2Connection.prepareStatement(String.format("INSERT INTO %s VALUES (%s)", tableName, params));
+        h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
     for (File avroFile : avroFiles) {
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
         for (GenericRecord record : reader) {
@@ -215,7 +215,7 @@ public class ClusterIntegrationTestUtils {
       Assert.assertTrue(isSingleValueAvroFieldType(type1));
       return type1;
     }
-    Assert.fail(String.format("Unsupported UNION Avro field with underlying types: %s, %s", type1, type2));
+    Assert.fail("Unsupported UNION Avro field with underlying types: " + type1 + ", " + type2);
     return null;
   }
 
@@ -269,12 +269,12 @@ public class ClusterIntegrationTestUtils {
     }
     // if column is array data type, add Array with size.
     if (arrayType) {
-      h2FieldType = String.format("%s  ARRAY[%d]", h2FieldType, MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE);
+      h2FieldType = h2FieldType + "  ARRAY[" + MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE + "]";
     }
     if (nullable) {
-      return String.format("`%s` %s", fieldName, h2FieldType);
+      return "`" + fieldName + "` " + h2FieldType;
     } else {
-      return String.format("`%s` %s not null", fieldName, h2FieldType);
+      return "`" + fieldName + "` " + h2FieldType + " not null";
     }
   }
 
@@ -342,8 +342,15 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
       throws Exception {
+    buildSegmentFromFile(avroFile, tableConfig, schema, segmentNamePostfix, segmentDir, tarDir, FileFormat.AVRO);
+  }
+
+  public static void buildSegmentFromFile(File file, TableConfig tableConfig, org.apache.pinot.spi.data.Schema schema,
+      String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setFormat(fileFormat);
+    segmentGeneratorConfig.setInputFilePath(file.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
@@ -1006,16 +1013,15 @@ public class ClusterIntegrationTestUtils {
         String actualOrderByValue = actualOrderByValueBuilder.toString();
         // Check actual value in expected values set, skip comparison if query response is truncated by limit
         if ((!isLimitSet || limit > h2NumRows) && !expectedValues.contains(actualValue)) {
-          throw new RuntimeException(String.format(
-              "Selection result differ in Pinot from H2: Pinot row: [ %s ] not found in H2 result set: [%s].",
-              actualValue, expectedValues));
+          throw new RuntimeException("Selection result differ in Pinot from H2: Pinot row: [ " + actualValue
+              + " ] not found in H2 result set: [" + expectedValues + "].");
         }
         if (!orderByColumns.isEmpty()) {
           // Check actual group value is the same as expected group value in the same order.
           if (!expectedOrderByValues.get(rowIndex).equals(actualOrderByValue)) {
-            throw new RuntimeException(String.format(
-                "Selection Order by result at row index: %d in Pinot: [ %s ] is different than result in H2: [ %s ].",
-                rowIndex, actualOrderByValue, expectedOrderByValues.get(rowIndex)));
+            throw new RuntimeException("Selection Order by result at row index: " + rowIndex + " in Pinot: [ "
+                + actualOrderByValue + " ] is different than result in H2: [ " + expectedOrderByValues.get(rowIndex)
+                + " ].");
           }
         }
       }

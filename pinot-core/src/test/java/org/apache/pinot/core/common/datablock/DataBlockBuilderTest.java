@@ -21,56 +21,56 @@ package org.apache.pinot.core.common.datablock;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.IntFunction;
-import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
-import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
+@SuppressWarnings("rawtypes")
 public class DataBlockBuilderTest {
 
   @DataProvider(name = "columnDataTypes")
-  DataSchema.ColumnDataType[] columnDataTypes() {
-    return Arrays.stream(DataSchema.ColumnDataType.values())
-        .map(DataSchema.ColumnDataType::getStoredType)
-        .distinct()
-        .toArray(DataSchema.ColumnDataType[]::new);
+  ColumnDataType[] columnDataTypes() {
+    return EnumSet.complementOf(EnumSet.of(ColumnDataType.BYTES_ARRAY)).toArray(new ColumnDataType[0]);
   }
 
   @Test(dataProvider = "columnDataTypes")
-  void testRowBlock(DataSchema.ColumnDataType type)
+  void testRowBlock(ColumnDataType type)
       throws IOException {
     int numRows = 100;
     List<Object[]> rows = generateRows(type, numRows);
-
-    DataSchema dataSchema = new DataSchema(new String[]{"column"}, new DataSchema.ColumnDataType[]{type});
-
-    DataBlock rowDataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-
+    DataSchema dataSchema = new DataSchema(new String[]{"column"}, new ColumnDataType[]{type});
+    AggregationFunction[] aggFunctions = null;
+    if (type == ColumnDataType.OBJECT) {
+      aggFunctions = new AggregationFunction[]{mock(AggregationFunction.class)};
+    }
+    DataBlock rowDataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema, aggFunctions);
     assertEquals(rowDataBlock.getNumberOfRows(), numRows);
     checkEquals(type, rowDataBlock, i -> rows.get(i)[0]);
   }
 
-  private List<Object[]> generateRows(DataSchema.ColumnDataType type, int numRows) {
+  private List<Object[]> generateRows(ColumnDataType type, int numRows) {
     List<Object[]> result = new ArrayList<>();
     Random r = new Random(42);
-    switch (type) {
+    switch (type.getStoredType()) {
       case INT:
         for (int i = 0; i < numRows; i++) {
           result.add(new Object[]{r.nextInt()});
@@ -104,11 +104,6 @@ public class DataBlockBuilderTest {
       case BIG_DECIMAL:
         for (int i = 0; i < numRows; i++) {
           result.add(new Object[]{BigDecimal.valueOf(r.nextInt())});
-        }
-        break;
-      case OBJECT:
-        for (int i = 0; i < numRows; i++) {
-          result.add(new Object[]{r.nextLong()}); // longs are valid object types
         }
         break;
       case MAP:
@@ -145,9 +140,12 @@ public class DataBlockBuilderTest {
           result.add(new Object[]{new String[]{String.valueOf(r.nextInt()), String.valueOf(r.nextInt())}});
         }
         break;
-      case BYTES_ARRAY:
+      case OBJECT:
       case UNKNOWN:
-        throw new SkipException(type + " not supported yet");
+        for (int i = 0; i < numRows; i++) {
+          result.add(new Object[1]);
+        }
+        break;
       default:
         throw new IllegalStateException("Unsupported data type: " + type);
     }
@@ -158,23 +156,25 @@ public class DataBlockBuilderTest {
   }
 
   @Test(dataProvider = "columnDataTypes")
-  void testColumnBlock(DataSchema.ColumnDataType type)
+  void testColumnBlock(ColumnDataType type)
       throws IOException {
     int numRows = 100;
     Object[] column = generateColumns(type, numRows);
-
-    DataSchema dataSchema = new DataSchema(new String[]{"column"}, new DataSchema.ColumnDataType[]{type});
-
-    DataBlock rowDataBlock = DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema);
-
+    DataSchema dataSchema = new DataSchema(new String[]{"column"}, new ColumnDataType[]{type});
+    AggregationFunction[] aggFunctions = null;
+    if (type == ColumnDataType.OBJECT) {
+      aggFunctions = new AggregationFunction[]{mock(AggregationFunction.class)};
+    }
+    DataBlock rowDataBlock =
+        DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema, aggFunctions);
     assertEquals(rowDataBlock.getNumberOfRows(), numRows);
     checkEquals(type, rowDataBlock, i -> column[i]);
   }
 
-  Object[] generateColumns(DataSchema.ColumnDataType type, int numRows) {
+  Object[] generateColumns(ColumnDataType type, int numRows) {
     Object[] result = new Object[numRows];
     Random r = new Random(42);
-    switch (type) {
+    switch (type.getStoredType()) {
       case INT:
         for (int i = 0; i < numRows; i++) {
           result[i] = r.nextInt();
@@ -218,11 +218,6 @@ public class DataBlockBuilderTest {
           result[i] = BigDecimal.valueOf(r.nextInt());
         }
         break;
-      case OBJECT:
-        for (int i = 0; i < numRows; i++) {
-          result[i] = r.nextLong(); // longs are valid object types
-        }
-        break;
       case INT_ARRAY:
         for (int i = 0; i < numRows; i++) {
           result[i] = new int[]{r.nextInt(), r.nextInt()};
@@ -248,9 +243,9 @@ public class DataBlockBuilderTest {
           result[i] = new String[]{String.valueOf(r.nextInt()), String.valueOf(r.nextInt())};
         }
         break;
-      case BYTES_ARRAY:
+      case OBJECT:
       case UNKNOWN:
-        throw new SkipException(type + " not supported yet");
+        break;
       default:
         throw new IllegalStateException("Unsupported data type: " + type);
     }
@@ -260,9 +255,9 @@ public class DataBlockBuilderTest {
     return result;
   }
 
-  private void checkEquals(DataSchema.ColumnDataType type, DataBlock block, IntFunction<Object> rowToData) {
+  private void checkEquals(ColumnDataType type, DataBlock block, IntFunction<Object> rowToData) {
     int numRows = block.getNumberOfRows();
-    switch (type) {
+    switch (type.getStoredType()) {
       case INT:
         for (int i = 0; i < numRows; i++) {
           Object expected = rowToData.apply(i);
@@ -319,16 +314,6 @@ public class DataBlockBuilderTest {
           }
         }
         break;
-      case OBJECT:
-        for (int i = 0; i < numRows; i++) {
-          Object expected = rowToData.apply(i);
-          if (expected != null) {
-            CustomObject customObject = block.getCustomObject(i, 0);
-            Long l = ObjectSerDeUtils.deserialize(customObject);
-            assertEquals(l, expected, "Failure on row " + i);
-          }
-        }
-        break;
       case MAP:
         for (int i = 0; i < numRows; i++) {
           Object expected = rowToData.apply(i);
@@ -377,13 +362,16 @@ public class DataBlockBuilderTest {
           }
         }
         break;
-      case BYTES_ARRAY:
+      case OBJECT:
       case UNKNOWN:
-        throw new SkipException(type + " not supported yet");
+        for (int i = 0; i < numRows; i++) {
+          assertNull(block.getCustomObject(i, 0));
+        }
+        break;
       default:
         throw new IllegalStateException("Unsupported data type: " + type);
     }
-    if (type != DataSchema.ColumnDataType.OBJECT) {
+    if (type != ColumnDataType.OBJECT && type != ColumnDataType.UNKNOWN) {
       RoaringBitmap nullRowIds = block.getNullRowIds(0);
 
       BitSet actualBitSet = new BitSet(numRows);

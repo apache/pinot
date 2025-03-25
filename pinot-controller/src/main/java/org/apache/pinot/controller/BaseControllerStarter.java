@@ -111,6 +111,7 @@ import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceM
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
@@ -125,6 +126,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -135,10 +137,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -387,7 +386,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public void start() {
+  public void start()
+      throws Exception {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -411,6 +411,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         LOGGER.error("Invalid mode: {}", _controllerMode);
         break;
     }
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(
+        _config.getProperty(CommonConstants.Groovy.GROOVY_INGESTION_STATIC_ANALYZER_CONFIG,
+            _config.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
@@ -584,26 +589,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);
-    List<String> existingHlcTables = new ArrayList<>();
-    _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
-      TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
-      if (tableConfig != null) {
-        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-        try {
-          for (Map<String, String> streamConfigMap : streamConfigMaps) {
-            StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-                streamConfigMap);
-          }
-        } catch (Exception e) {
-          existingHlcTables.add(rt);
-        }
-      }
-    });
-    if (existingHlcTables.size() > 0) {
-      LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
-          + "following HLC tables before proceeding: {}\n", existingHlcTables);
-      throw new RuntimeException("Unable to start controller due to existing HLC tables!");
-    }
 
     // One time job to fix schema name in all tables
     // This method can be removed after the next major release.
@@ -876,8 +861,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager,
             _resourceUtilizationManager);
     periodicTasks.add(_taskManager);
-    _retentionManager =
-        new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
+    _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        brokerServiceHelper);
     periodicTasks.add(_retentionManager);
     _offlineSegmentIntervalChecker =
         new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,

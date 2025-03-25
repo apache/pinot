@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.floats.AbstractFloatCollection;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.floats.FloatCollection;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public abstract class BaseArrayAggFloatFunction<I extends AbstractFloatCollection>
+public abstract class BaseArrayAggFloatFunction<I extends FloatCollection>
     extends BaseArrayAggFunction<I, FloatArrayList> {
   public BaseArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, FieldSpec.DataType.FLOAT, nullHandlingEnabled);
@@ -77,10 +77,10 @@ public abstract class BaseArrayAggFloatFunction<I extends AbstractFloatCollectio
   }
 
   @Override
-  public FloatArrayList extractFinalResult(I floatArrayList) {
-    if (floatArrayList == null) {
+  public FloatArrayList extractFinalResult(I floats) {
+    if (floats == null) {
       return new FloatArrayList();
     }
-    return new FloatArrayList(floatArrayList);
+    return new FloatArrayList(floats);
   }
 }

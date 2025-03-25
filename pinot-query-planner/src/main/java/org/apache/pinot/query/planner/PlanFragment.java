@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
@@ -37,9 +38,16 @@ public class PlanFragment {
   public PlanFragment(int fragmentId, PlanNode fragmentRoot, List<PlanFragment> children) {
     _fragmentId = fragmentId;
     _fragmentRoot = fragmentRoot;
+    Preconditions.checkArgument(fragmentRoot.getStageId() == fragmentId,
+        "Fragment root stageId: %s does not match fragmentId: %s", fragmentRoot.getStageId(), fragmentId);
     _children = children;
   }
 
+  /**
+   * Returns the fragment id
+   *
+   * <p>Fragment id is the stage id of the fragment root.
+   */
   public int getFragmentId() {
     return _fragmentId;
   }

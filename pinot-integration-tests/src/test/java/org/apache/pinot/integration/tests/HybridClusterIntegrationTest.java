@@ -343,6 +343,35 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testExplainDropResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String resultTag = "resultTable";
+    String query = String.format("EXPLAIN PLAN FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    JsonNode jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+    query = String.format("EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+
+    query = String.format("EXPLAIN IMPLEMENTATION PLAN FOR SELECT * FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+
+    query = String.format("EXPLAIN PLAN FOR SELECT 1 + 1 FROM %s limit 10", getTableName());
+
+    // dropResults=true - resultTable must be in the response (it is a query plan)
+    jsonNode = postQueryWithOptions(query, "dropResults=true");
+    Assert.assertTrue(jsonNode.has(resultTag));
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -364,13 +393,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testGeneratedQueries(true, useMultiStageQueryEngine);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryExceptions(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    super.testQueryExceptions();
   }
 
   @Test

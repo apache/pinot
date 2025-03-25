@@ -34,7 +34,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.spi.config.table.TableType;
@@ -497,39 +496,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
     }
-  }
-
-  /**
-   * Test invalid queries which should cause query exceptions.
-   *
-   * @throws Exception
-   */
-  public void testQueryExceptions()
-      throws Exception {
-    testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
-
-    // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
-    testQueryException("SELECT COUNT(*) FROM potato",
-        useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
-
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable",
-        useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_VALIDATION_ERROR_CODE);
-
-    // ArrTime expects a numeric type
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
-
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
-  }
-
-  private void testQueryException(String query, int errorCode)
-      throws Exception {
-    JsonNode jsonObject = postQuery(query);
-    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
   }
 
   /**

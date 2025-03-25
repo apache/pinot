@@ -287,7 +287,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
 
-    List<DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageList();
+    Map<Integer, DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageMap();
 
     MultiStageStatsTreeBuilder multiStageStatsTreeBuilder =
         new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats());

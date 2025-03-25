@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -34,6 +35,8 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 public class ServerGrpcRequestBuilder {
   private long _requestId;
+  @Nullable
+  private String _cid;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
   private boolean _enableStreaming;
@@ -44,6 +47,11 @@ public class ServerGrpcRequestBuilder {
 
   public ServerGrpcRequestBuilder setRequestId(long requestId) {
     _requestId = requestId;
+    return this;
+  }
+
+  public ServerGrpcRequestBuilder setCid(String cid) {
+    _cid = Preconditions.checkNotNull(cid);
     return this;
   }
 
@@ -85,6 +93,8 @@ public class ServerGrpcRequestBuilder {
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put(Request.MetadataKeys.REQUEST_ID, Long.toString(_requestId));
+    String cid = _cid != null ? _cid : Long.toString(_requestId);
+    metadata.put(Request.MetadataKeys.CORRELATION_ID, cid);
     metadata.put(Request.MetadataKeys.BROKER_ID, _brokerId);
     metadata.put(Request.MetadataKeys.ENABLE_TRACE, Boolean.toString(_enableTrace));
     metadata.put(Request.MetadataKeys.ENABLE_STREAMING, Boolean.toString(_enableStreaming));
