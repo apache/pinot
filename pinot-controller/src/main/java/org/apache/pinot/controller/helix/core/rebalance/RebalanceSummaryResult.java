@@ -171,6 +171,7 @@ public class RebalanceSummaryResult {
   }
 
   public static class TenantInfo {
+    public static final String TENANT_NOT_TAGGED_WITH_TABLE = "OUTDATED_SERVERS";
     private final String _tenantName;
     private int _numSegmentsUnchanged;
     private int _numSegmentsToDownload;
@@ -189,7 +190,7 @@ public class RebalanceSummaryResult {
       _numServerParticipants = numServerParticipants;
     }
 
-    public TenantInfo(String tenantName, List<String> usedAsTier) {
+    public TenantInfo(String tenantName) {
       this(tenantName, 0, 0, 0);
     }
 

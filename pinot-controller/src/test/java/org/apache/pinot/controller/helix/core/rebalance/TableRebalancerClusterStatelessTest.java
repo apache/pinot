@@ -1164,6 +1164,56 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     assertEquals(numSegmentsOnServer0, numSegments / 2);
 
+    _helixResourceManager.deleteOfflineServerTenantFor("replicaAssignment" + TIER_A_NAME);
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setReassignInstances(false);
+
+    // if rebalance with reassignInstances=false, servers assigned would not have relevant tags
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
+    assertNotNull(rebalanceSummaryResult);
+    assertNotNull(rebalanceSummaryResult.getServerInfo());
+    assertNotNull(rebalanceSummaryResult.getSegmentInfo());
+    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
+    assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
+    assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
+    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
+    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 3);
+    tenantInfoMap = rebalanceSummaryResult.getTenantsInfo()
+        .stream()
+        .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
+    assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
+    assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
+    assertTrue(tenantInfoMap.containsKey(
+        TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE)));
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
+        .getNumSegmentsToDownload(), 0);
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
+            .getNumSegmentsUnchanged(),
+        0);
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
+            .getNumServerParticipants(),
+        0);
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
+            .getNumSegmentsToDownload(),
+        0);
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
+        .getNumSegmentsUnchanged(), 0);
+    assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
+        .getNumServerParticipants(), 0);
+    assertEquals(tenantInfoMap.get(
+                TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
+            .getNumSegmentsToDownload(),
+        0);
+    assertEquals(tenantInfoMap.get(
+            TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
+        .getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(tenantInfoMap.get(
+            TagNameUtils.getOfflineTagForTenant(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE))
+        .getNumServerParticipants(), 6);
+
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
   }
 

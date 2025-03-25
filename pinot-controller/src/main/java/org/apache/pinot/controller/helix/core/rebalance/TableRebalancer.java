@@ -669,12 +669,12 @@ public class TableRebalancer {
       String serverTenantNameWithType =
           TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       tenantInfoMap.put(serverTenantNameWithType,
-          new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType, null));
+          new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType));
     }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {
         String tierTenantNameWithType = tierConfig.getServerTag();
-        tenantInfoMap.put(tierTenantNameWithType, new RebalanceSummaryResult.TenantInfo(tierTenantNameWithType, null));
+        tenantInfoMap.put(tierTenantNameWithType, new RebalanceSummaryResult.TenantInfo(tierTenantNameWithType));
       });
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
@@ -715,24 +715,26 @@ public class TableRebalancer {
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
           instanceToTagsMap.getOrDefault(server, null)));
       List<String> serverTags = getServerTag(server);
-      // Since this is a server in the target assignment, it should contain at least one tag of the tenant or tier
-      // server tag. Note that if the server is tagged with multiple tenant or tier tags that are used in the table
-      // config, we will count it multiple times, i.e. the total segment count would not add up to the actual total.
-      if (serverTags.isEmpty()) {
-        LOGGER.warn(
-            "Server: {} was assigned to table: {} but does not have any tags. Race condition might happen during the "
-                + "instance assignment. This could make the tenantInfo in rebalance summary inconsistent.",
-            server, tableNameWithType);
-        continue;
+      Set<String> relevantTenants = new HashSet<>(serverTags);
+      relevantTenants.retainAll(tenantInfoMap.keySet());
+      // The segments remain unchanged or need to download will be accounted to every tenant associated with this
+      // server instance
+      if (relevantTenants.isEmpty()) {
+        LOGGER.warn("Server: {} was assigned to table: {} but does not have any relevant tags", server,
+            tableNameWithType);
+
+        RebalanceSummaryResult.TenantInfo tenantInfo =
+            tenantInfoMap.computeIfAbsent(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE,
+                RebalanceSummaryResult.TenantInfo::new);
+        tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+        tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
+        tenantInfo.increaseNumServerParticipants(1);
       }
-      for (Map.Entry<String, RebalanceSummaryResult.TenantInfo> tenantInfoEntry : tenantInfoMap.entrySet()) {
-        String tenantNameWithType = tenantInfoEntry.getKey();
-        RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoEntry.getValue();
-        if (serverTags.contains(tenantNameWithType)) {
-          tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
-          tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
-          tenantInfo.increaseNumServerParticipants(1);
-        }
+      for (String tenantNameWithType : relevantTenants) {
+        RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoMap.get(tenantNameWithType);
+        tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+        tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
+        tenantInfo.increaseNumServerParticipants(1);
       }
     }
 
