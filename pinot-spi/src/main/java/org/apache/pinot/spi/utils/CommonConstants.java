@@ -1285,6 +1285,7 @@ public class CommonConstants {
       public static final String END_OFFSET = "segment.realtime.endOffset";
       public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
       public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+      @Deprecated
       public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
 
       // Deprecated, but kept for backward-compatibility of reading old segments' ZK metadata

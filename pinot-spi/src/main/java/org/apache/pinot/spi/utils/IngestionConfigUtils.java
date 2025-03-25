@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -105,6 +106,37 @@ public final class IngestionConfigUtils {
       return List.of(indexingConfig.getStreamConfigs());
     }
     throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
+  }
+
+  public static List<StreamConfig> getStreamConfigs(TableConfig tableConfig) {
+    return getStreamConfigMaps(tableConfig).stream()
+        .map(streamConfigMap -> new StreamConfig(tableConfig.getTableName(), streamConfigMap))
+        .collect(Collectors.toList());
+  }
+
+  // TODO: Revisit the callers of this method. We should use the stream config for a given partition, instead of the
+  //       first one.
+  public static Map<String, String> getFirstStreamConfigMap(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      List<Map<String, String>> streamConfigMaps =
+          tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
+      Preconditions.checkState(!streamConfigMaps.isEmpty(), "Table must have at least 1 stream");
+      return streamConfigMaps.get(0);
+    }
+    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null) {
+      return tableConfig.getIndexingConfig().getStreamConfigs();
+    }
+    throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
+  }
+
+  // TODO: Revisit the callers of this method. We should use the stream config for a given partition, instead of the
+  //       first one.
+  public static StreamConfig getFirstStreamConfig(TableConfig tableConfig) {
+    return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
   /**
