@@ -702,6 +702,11 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
   }
 
+  public void dropOfflineTable(String tableName, String retentionPeriod)
+      throws IOException {
+    getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName), retentionPeriod);
+  }
+
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));

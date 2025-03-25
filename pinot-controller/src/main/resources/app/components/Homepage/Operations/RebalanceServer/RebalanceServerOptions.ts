@@ -109,7 +109,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": -1,
         "type": "INTEGER",
         "label": "Min Available Replicas",
-        "description": "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas allowed to be unavailable if value is negative. Should not be 0 unless for downtime=true",
+        "description": "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance if value is positive, or 'numReplicas + value' replicas to keep alive if value is negative (e.g. if -1, replicas to keep alive = 'numReplicas + (-1)'). Should not be 0 unless for downtime=true",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
