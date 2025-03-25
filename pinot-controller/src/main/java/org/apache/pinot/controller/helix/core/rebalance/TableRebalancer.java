@@ -877,6 +877,11 @@ public class TableRebalancer {
     return new ConsumingSegmentInfoReader(_executorService, _connectionManager, _pinotHelixResourceManager);
   }
 
+  /**
+   * Fetches the consuming segment info for the table and calculates the number of bytes to catch up for each consuming
+   * segment. Returns a map from segment name to the number of bytes to catch up for that consuming segment. Return
+   * null if failed to obtain info for any consuming segment.
+   */
   private Map<String, Integer> getConsumingSegmentsBytesToCatchUp(String tableNameWithType) {
     ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
     if (consumingSegmentInfoReader == null) {
@@ -897,20 +902,25 @@ public class TableRebalancer {
                 segmentName);
         if (segmentZKMetadata == null) {
           LOGGER.warn("Cannot find SegmentZKMetadata for segment: {} in table: {}", segmentName, tableNameWithType);
-          continue;
+          return null;
         }
         if (consumingSegmentInfoList != null) {
           String startOffset = segmentZKMetadata.getStartOffset();
           if (startOffset == null) {
             LOGGER.warn("Start offset is null for segment: {} in table: {}", segmentName, tableNameWithType);
-            continue;
+            return null;
           }
-          Integer bytesToCatchUp = null;
           if (!consumingSegmentInfoList.isEmpty()) {
-            bytesToCatchUp = consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
+            // this value should be the same regardless of which server the consuming segment info is from, use the
+            // first in the list here
+            int bytesToCatchUp = consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
                 .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
+            segmentToBytesToCatchUp.put(segmentName, bytesToCatchUp);
+          } else {
+            LOGGER.warn("No available consuming segment info from any server. Segment: {} in table: {}", segmentName,
+                tableNameWithType);
+            return null;
           }
-          segmentToBytesToCatchUp.put(segmentName, bytesToCatchUp);
         }
       }
     } catch (InvalidConfigException e) {
