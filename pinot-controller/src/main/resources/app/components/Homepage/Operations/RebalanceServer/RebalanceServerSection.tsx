@@ -23,13 +23,14 @@ import Link from "@material-ui/core/Link";
 type RebalanceServerConfigurationSectionProps = {
     sectionTitle: string;
     children: ReactNode;
+    maxHeight?: number;
     showSectionByDefault?: boolean;
     canHideSection?: boolean;
     additionalSectionTitle?: ReactNode;
 }
 
 export const RebalanceServerSection = (
-    { sectionTitle, additionalSectionTitle, children, showSectionByDefault = true, canHideSection = false }: RebalanceServerConfigurationSectionProps
+    { sectionTitle, additionalSectionTitle, children, showSectionByDefault = true, canHideSection = false, maxHeight }: RebalanceServerConfigurationSectionProps
 ) => {
     const [showSection, setShowSection] = useState<boolean>(showSectionByDefault);
     const showHideSectionRef = useRef(null);
@@ -51,13 +52,13 @@ export const RebalanceServerSection = (
     }, [showSection, showHideSectionRef]);
 
     return (
-        <Box marginBottom={2}>
-            <Box display='flex' flexDirection='row' alignItems='center' marginBottom={2}>
+        <Box marginBottom={showSection ? 2 : 0}>
+            <Box display='flex' flexDirection='row' alignItems='center' marginBottom={showSection ? 2 : 0}>
                 <div ref={showHideSectionRef} />
                 <Typography variant='body1' style={{ fontWeight: 'bold', marginRight: 10 }}>
                     {sectionTitle}
                 </Typography>
-                {additionalSectionTitle}
+                {additionalSectionTitle && <Box marginRight={1}>{additionalSectionTitle}</Box>}
                 {canHideSection && (
                     <Link style={{ cursor: 'pointer' }} onClick={() => setShowSection(visible => !visible)}>
                         { showSection ? "Hide" : "Show" }
