@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util.trace;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -27,15 +28,19 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Locale;
 import jdk.jfr.Configuration;
 import jdk.jfr.Recording;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ContinuousJfrStarter {
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(ContinuousJfrStarter.class);
   /// Key that controls whether to enable continuous JFR recording.
   public static final String ENABLED = "enabled";
   /// Default value for the enabled key.
@@ -69,6 +74,13 @@ public class ContinuousJfrStarter {
   /// The default value is the current working directory.
   /// The filename will be 'recording-<timestamp>.jfr'.
   public static final String DIRECTORY = "directory";
+  /// Key that controls the maximum number of dumps to keep.
+  ///
+  /// If set, the directory will be cleaned up to keep only the most recent dumps.
+  ///
+  /// This is a Pinot feature, not a JFR feature and defaults to 10.
+  public static final String MAX_DUMPS = "maxDumps";
+  public static final int DEFAULT_MAX_DUMPS = 10;
 
   /// Key that controls whether to buffer the recording to disk.
   /// If false, the recording will only be kept in memory.
@@ -145,6 +157,14 @@ public class ContinuousJfrStarter {
       } catch (IOException e) {
         throw new UncheckedIOException("Failed to create new recording file", e);
       }
+
+      int maxDumps = subset.getProperty(MAX_DUMPS, DEFAULT_MAX_DUMPS);
+      if (maxDumps > 0) {
+        Thread cleanupThread = new Thread(() -> cleanUpDumps(directory, maxDumps));
+        cleanupThread.setName("JFR-Dump-Cleanup");
+        cleanupThread.setDaemon(true);
+        cleanupThread.start();
+      }
     }
 
     try {
@@ -160,5 +180,19 @@ public class ContinuousJfrStarter {
     }
     recording.start();
     _started = true;
+  }
+
+  private static void cleanUpDumps(Path directory, int maxDumps) {
+    File[] files = directory.toFile().listFiles();
+    if (files == null) {
+      return;
+    }
+    Arrays.sort(files, Comparator.comparing(File::getName).reversed());
+    for (int i = maxDumps; i < files.length; i++) {
+      boolean delete = files[i].delete();
+      if (!delete) {
+        LOGGER.warn("Failed to delete file: {}", files[i]);
+      }
+    }
   }
 }
