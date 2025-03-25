@@ -853,7 +853,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     try {
       long startTime = System.currentTimeMillis();
       while (!_snapshotLock.writeLock().tryLock(5, TimeUnit.MINUTES)) {
-        _logger.warn("Unable to acquire snapshotLock.writeLock in: {}. Retrying.", System.currentTimeMillis() - startTime);
+        _logger.warn("Unable to acquire snapshotLock.writeLock in: {} ms. Retrying.",
+            System.currentTimeMillis() - startTime);
       }
       try {
         _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_WRITE_LOCK_TIME_MS,
@@ -861,9 +862,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
         startTime = System.currentTimeMillis();
         doTakeSnapshot();
-        long duration = System.currentTimeMillis() - startTime;
-        _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
-            TimeUnit.MILLISECONDS);
+        _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS,
+            System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot", e);
       } finally {
