@@ -1,10 +1,8 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -83,7 +81,8 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
   }
 
   @Test
-  public void testConsumingSegmentSummary() throws Exception {
+  public void testConsumingSegmentSummary()
+      throws Exception {
     String response = sendPostRequest(
         getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
     RebalanceResult result = JsonUtils.stringToObject(response, RebalanceResult.class);
@@ -94,7 +93,8 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
     Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
     Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(), 0);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(), 1);
+    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(),
+        1);
 
     startServer();
     response = sendPostRequest(
@@ -107,18 +107,27 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
     Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(), 57801);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(), 2);
-    Assert.assertTrue(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().values().stream().allMatch(x -> x == 57801 || x == 0));
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().values().stream().reduce(0, Integer::sum), 57801);
+    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(),
+        2);
+    Assert.assertTrue(segmentInfo.getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .allMatch(x -> x == 57801 || x == 0));
+    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary()
+        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .reduce(0, Integer::sum), 57801);
 
     stopServer();
     response = sendPostRequest(
         getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    RebalanceResult result_no_info = JsonUtils.stringToObject(response, RebalanceResult.class);
-    Assert.assertNotNull(result_no_info);
-    Assert.assertNotNull(result_no_info.getRebalanceSummaryResult());
-    Assert.assertNotNull(result_no_info.getRebalanceSummaryResult().getSegmentInfo());
-    segmentInfo = result_no_info.getRebalanceSummaryResult().getSegmentInfo();
+    RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);
+    Assert.assertNotNull(resultNoInfo);
+    Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());
+    Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult().getSegmentInfo());
+    segmentInfo = resultNoInfo.getRebalanceSummaryResult().getSegmentInfo();
     Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
     Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertNull(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp());
