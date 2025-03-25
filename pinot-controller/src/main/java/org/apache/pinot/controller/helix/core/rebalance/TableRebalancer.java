@@ -741,13 +741,13 @@ public class TableRebalancer {
     RebalanceSummaryResult.RebalanceChangeInfo numSegmentsAcrossAllReplicas
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumberSegmentsTotal, newNumberSegmentsTotal);
 
-    int totalSegmentsToBeAddedd = newNumberSegmentsTotal - segmentsNotMoved;
+    int totalSegmentsToBeAdded = newNumberSegmentsTotal - segmentsNotMoved;
 
     long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableSubTypeSizeDetails);
     long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
-        : ((long) totalSegmentsToBeAddedd) * averageSegmentSizeInBytes;
+        : ((long) totalSegmentsToBeAdded) * averageSegmentSizeInBytes;
 
     // Set some of the sets to null if they are empty to ensure they don't show up in the result
     RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(
@@ -755,7 +755,7 @@ public class TableRebalancer {
         serversGettingNewSegments, serverSegmentChangeInfoMap);
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
-    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeAddedd,
+    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeAdded,
         totalSegmentsToBeDeleted, maxSegmentsAddedToServer, averageSegmentSizeInBytes,
         totalEstimatedDataToBeMovedInBytes, replicationFactor, numSegmentsInSingleReplica,
         numSegmentsAcrossAllReplicas);
