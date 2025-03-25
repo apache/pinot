@@ -46,7 +46,7 @@ public class WorkerQueryServer {
     QueryRunner queryRunner = new QueryRunner();
     queryRunner.init(_configuration, instanceDataManager, helixManager, serverMetrics, tlsConfig,
         sendStats::getSendStats);
-    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig);
+    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig, serverMetrics, configuration);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {

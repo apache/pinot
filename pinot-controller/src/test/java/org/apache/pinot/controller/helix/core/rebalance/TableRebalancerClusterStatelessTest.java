@@ -23,17 +23,21 @@ import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -71,7 +75,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   public void setUp()
       throws Exception {
     startZk();
-    startController();
+    Map<String, Object> config = getDefaultControllerConfiguration();
+    // Disable resource util check in test so that each test can set the ResourceUtilizationInfo manually
+    config.put(ControllerConf.RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY, 30_000);
+    startController(config);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
   }
 
@@ -88,15 +95,22 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   public void testRebalance()
       throws Exception {
     int numServers = 3;
+    // Mock disk usage
+    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
+
     for (int i = 0; i < numServers; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo1 =
+          new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo1);
     }
 
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
-    preChecker.init(_helixResourceManager, executorService);
-    TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
+    preChecker.init(_helixResourceManager, executorService, 1);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -164,8 +178,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Add 3 more servers
     int numServersToAdd = 3;
     for (int i = 0; i < numServersToAdd; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + (numServers + i), true);
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo =
+          new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo);
     }
+
+    ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
     // Rebalance in dry-run summary mode with added servers
     rebalanceConfig = new RebalanceConfig();
@@ -215,13 +235,16 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
     rebalanceConfig.setPreChecks(true);
+
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertEquals(preCheckResult.size(), 2);
+    assertEquals(preCheckResult.size(), 4);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
@@ -232,6 +255,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT).getMessage(),
         "Instance assignment not allowed, no need for minimizeDataMovement");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
+            .getMessage()
+            .startsWith("Within threshold"));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+            .getMessage()
+            .startsWith("Within threshold"));
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -525,6 +560,111 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     for (int i = 0; i < numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
+    executorService.shutdown();
+  }
+
+  @Test
+  public void testRebalancePreCheckerDiskUtil()
+      throws Exception {
+    int numServers = 3;
+    // Mock disk usage
+    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo1 =
+          new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo1);
+    }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, executorService, 0.5);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
+
+    // Add 3 more servers
+    int numServersToAdd = 3;
+    for (int i = 0; i < numServersToAdd; i++) {
+      String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + (numServers + i);
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo =
+          new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo);
+    }
+
+    ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
+
+    // Rebalance in dry-run mode
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
+            .getMessage()
+            .startsWith("Within threshold"));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertTrue(
+        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+            .getMessage()
+            .startsWith("Within threshold"));
+
+    for (int i = 0; i < numServers + numServersToAdd; i++) {
+      String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
+      DiskUsageInfo diskUsageInfo =
+          new DiskUsageInfo(instanceId, "", 1000L, 755L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo);
+    }
+
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    preCheckResult = rebalanceResult.getPreChecksResult();
+    assertNotNull(preCheckResult);
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.ERROR);
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.ERROR);
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance("preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i);
+    }
+    for (int i = 0; i < numServersToAdd; i++) {
+      stopAndDropFakeInstance("preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + (numServers + i));
     }
     executorService.shutdown();
   }

@@ -39,7 +39,8 @@ public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     long[] value = blockValSet.getLongValuesSV();
-    LongArrayList valueArray = new LongArrayList(length);
+    LongArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {

@@ -66,7 +66,7 @@ public class QueryFunctionInvoker {
     try {
       return _functionInvoker.invokeDirectly(arguments);
     } catch (InvocationTargetException e) {
-      throw QueryErrorCode.QUERY_EXECUTION.asException(e);
+      throw QueryErrorCode.QUERY_EXECUTION.asException(e.getTargetException());
     } catch (IllegalAccessException e) {
       throw QueryErrorCode.INTERNAL.asException(e);
     }
