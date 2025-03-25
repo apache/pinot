@@ -405,19 +405,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       RebalanceContext rebalanceContext, Trigger trigger, TableRebalanceProgressStats rebalanceProgressStats) {
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
+    Map<String, Set<String>> targetInstanceToOfflineSegmentsMap = new HashMap<>();
     Set<String> newSegmentsNotExistingBefore = new HashSet<>();
 
     Set<String> segmentsToMonitor = rebalanceContext.getSegmentsToMonitor();
-    for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
-      String segmentName = entrySet.getKey();
-      for (String instanceName : entrySet.getValue().keySet()) {
-        if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
-          continue;
-        }
-        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
-      }
-    }
-
     int totalNewSegmentsNotMonitored = 0;
     int totalSegmentsTarget = 0;
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
@@ -425,7 +416,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       if (!rebalanceContext.getUniqueSegmentList().contains(segmentName)) {
         newSegmentsNotExistingBefore.add(segmentName);
       }
-      for (String instanceName : entrySet.getValue().keySet()) {
+      for (Map.Entry<String, String> entry : entrySet.getValue().entrySet()) {
+        String instanceName = entry.getKey();
+        String instanceState = entry.getValue();
         if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
           if (newSegmentsNotExistingBefore.contains(segmentName)) {
             // Don't track newly added segments unless they're on the monitor list
@@ -434,8 +427,28 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           continue;
         }
+        if (instanceState.equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
+          // Skip tracking segments that are in OFFLINE state in the target assignment
+          targetInstanceToOfflineSegmentsMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+          continue;
+        }
         totalSegmentsTarget += 1;
         newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+      }
+    }
+
+    for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
+      String segmentName = entrySet.getKey();
+      for (String instanceName : entrySet.getValue().keySet()) {
+        if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
+          continue;
+        }
+        if (targetInstanceToOfflineSegmentsMap.containsKey(instanceName)
+            && targetInstanceToOfflineSegmentsMap.get(instanceName).contains(segmentName)) {
+          // Skip tracking segments that are in OFFLINE state in the target assignment
+          continue;
+        }
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
       }
     }
 
