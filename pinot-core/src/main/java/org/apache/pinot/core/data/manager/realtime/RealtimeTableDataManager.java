@@ -97,8 +97,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
-  // Maintains a map of partitionGroup
-  // Ids to semaphores.
+
+  // Maintains a map of partition id to semaphore.
+  // We use semaphore of 1 permit instead of lock because the semaphore is shared across multiple threads, and it can be
+  // released by a different thread than the one that acquired it. There is no out-of-box Lock implementation that
+  // allows releasing the lock from a different thread.
   // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
   // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host)
   // consuming from the same stream partition can lead to bugs.

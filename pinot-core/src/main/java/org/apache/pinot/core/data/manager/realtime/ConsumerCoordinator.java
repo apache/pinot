@@ -38,6 +38,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The ConsumerCoordinator coordinates the offline->consuming helix transitions.
+ */
 public class ConsumerCoordinator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);

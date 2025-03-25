@@ -92,12 +92,75 @@ public class ConsumerCoordinatorTest {
   }
 
   @Test
-  public void testFirstConsumer() {
+  public void testFirstConsumer()
+      throws InterruptedException {
     // 1. Enable tracking segment seq num.
     FakeRealtimeTableDataManager realtimeTableDataManager = new FakeRealtimeTableDataManager(null, true);
     realtimeTableDataManager.setEnforceConsumptionInOrder(true);
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
     realtimeTableDataManager.setConsumerCoordinator(consumerCoordinator);
+    RealtimeSegmentDataManager mockedRealtimeSegmentDataManager = getMockedRealtimeSegmentDataManager();
+    Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
+      put("server_1", "ONLINE");
+      put("server_3", "ONLINE");
+    }};
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(102), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(104), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(106), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(107), serverSegmentStatusMap);
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(109), serverSegmentStatusMap);
+
+    // 2. create multiple helix transitions in this order: 106, 109, 104, 107
+    Thread thread1 = getNewThread(consumerCoordinator, getLLCSegment(106));
+    Thread thread2 = getNewThread(consumerCoordinator, getLLCSegment(109));
+    Thread thread3 = getNewThread(consumerCoordinator, getLLCSegment(104));
+    Thread thread4 = getNewThread(consumerCoordinator, getLLCSegment(107));
+
+    thread1.start();
+
+    Thread.sleep(1000);
+
+    // 3. load segment 100, 101, 102
+    realtimeTableDataManager.registerSegment(getSegmentName(100), mockedRealtimeSegmentDataManager);
+    realtimeTableDataManager.registerSegment(getSegmentName(101), mockedRealtimeSegmentDataManager);
+    realtimeTableDataManager.registerSegment(getSegmentName(102), mockedRealtimeSegmentDataManager);
+    Thread.sleep(1000);
+
+    // 4. check all of the above threads wait
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 1);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertFalse(consumerCoordinator.getIsFirstTransitionProcessed().get());
+
+    thread2.start();
+    thread3.start();
+    thread4.start();
+
+    Thread.sleep(1000);
+
+    // 5. check that first thread acquiring semaphore is of segment 104
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 102);
+    Assert.assertTrue(consumerCoordinator.getIsFirstTransitionProcessed().get());
+
+    realtimeTableDataManager.registerSegment(getSegmentName(104), mockedRealtimeSegmentDataManager);
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 104);
+    Assert.assertTrue(consumerCoordinator.getIsFirstTransitionProcessed().get());
+    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
+
+    // 6. check the next threads acquiring semaphore is 106
+    consumerCoordinator.getSemaphore().release();
+    realtimeTableDataManager.registerSegment(getSegmentName(106), mockedRealtimeSegmentDataManager);
+
+    Thread.sleep(1000);
+
+    Assert.assertEquals(consumerCoordinator.getSemaphore().availablePermits(), 0);
+    Assert.assertEquals(consumerCoordinator.getMaxSegmentSeqNumLoaded(), 106);
+    Assert.assertTrue(consumerCoordinator.getIsFirstTransitionProcessed().get());
+    Assert.assertEquals(consumerCoordinator.getSemaphore().getQueueLength(), 1);
   }
 
   @Test
@@ -319,7 +382,7 @@ public class ConsumerCoordinatorTest {
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
-    });
+    }, String.valueOf(llcSegmentName.getSequenceNumber()));
   }
 
   private RealtimeSegmentDataManager getMockedRealtimeSegmentDataManager() {

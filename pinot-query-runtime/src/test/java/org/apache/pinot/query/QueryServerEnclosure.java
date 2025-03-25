@@ -78,8 +78,8 @@ public class QueryServerEnclosure {
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     HelixManager helixManager = mockHelixManager(factory.buildSchemaMap());
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, helixManager, mockServiceMetrics(),
-        null);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, helixManager, ServerMetrics.get(),
+        null, () -> true);
   }
 
   private HelixManager mockHelixManager(Map<String, Schema> schemaMap) {
@@ -99,10 +99,6 @@ public class QueryServerEnclosure {
     HelixManager helixManager = mock(HelixManager.class);
     when(helixManager.getHelixPropertyStore()).thenReturn(zkHelixPropertyStore);
     return helixManager;
-  }
-
-  private ServerMetrics mockServiceMetrics() {
-    return mock(ServerMetrics.class);
   }
 
   public int getPort() {

@@ -56,6 +56,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
+  EXTERNALVIEW_ZNODE_SIZE("externalview", false),
+  EXTERNALVIEW_ZNODE_BYTE_SIZE("externalview", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),

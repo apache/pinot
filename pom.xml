@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.5</aws.sdk.version>
+    <aws.sdk.version>2.31.6</aws.sdk.version>
     <azure.sdk.version>1.2.32</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
@@ -232,7 +232,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.56.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.57.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.37.0</google.errorprone.version>
@@ -280,6 +280,7 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
+    <assertj.version>3.27.2</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
@@ -582,6 +583,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-confluent-protobuf</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-confluent-json</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -989,11 +995,6 @@
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
         <version>2.4</version>
-      </dependency>
-      <dependency>
-        <groupId>org.xerial.larray</groupId>
-        <artifactId>larray-mmap</artifactId>
-        <version>0.4.1</version>
       </dependency>
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
@@ -1694,6 +1695,11 @@
         <artifactId>kafka-protobuf-serializer</artifactId>
         <version>${confluent.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.confluent</groupId>
+        <artifactId>kafka-json-schema-serializer</artifactId>
+        <version>${confluent.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.apache.pulsar</groupId>
@@ -2037,6 +2043,12 @@
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest_${scala.compat.version}</artifactId>
         <version>${scalatest.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
         <scope>test</scope>
       </dependency>
     </dependencies>
