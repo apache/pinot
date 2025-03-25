@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -90,7 +89,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,7 +135,7 @@ public final class TableConfigUtils {
   /**
    * @see TableConfigUtils#validate(TableConfig, Schema, String)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema) {
+  public static void validate(TableConfig tableConfig, Schema schema) {
     validate(tableConfig, schema, null);
   }
 
@@ -152,17 +150,14 @@ public final class TableConfigUtils {
    *
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
-  public static void validate(TableConfig tableConfig, @Nullable Schema schema, @Nullable String typesToSkip) {
+  public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+    Preconditions.checkArgument(schema != null, "Schema should not be null");
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      Preconditions.checkState(schema != null, "Schema should not be null for REALTIME table");
-    }
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
-      validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
       validateIngestionConfig(tableConfig, schema);
 
@@ -205,7 +200,7 @@ public final class TableConfigUtils {
    * @param tableConfig Table config to validate
    * @return true if the table config is using instance pool and replica group configuration, false otherwise
    */
-  static boolean isTableUsingInstancePoolAndReplicaGroup(@Nonnull TableConfig tableConfig) {
+  static boolean isTableUsingInstancePoolAndReplicaGroup(TableConfig tableConfig) {
     boolean status = true;
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {
@@ -250,19 +245,6 @@ public final class TableConfigUtils {
     }
     if (StringUtils.containsWhitespace(tableName)) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
-    }
-  }
-
-  /**
-   * Validates the table name with the following rule:
-   * - Schema name should either be null or match the raw table name
-   */
-  private static void validateTableSchemaConfig(TableConfig tableConfig) {
-    // Ensure that table is not created if schema is not present
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    String schemaName = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaName != null && !schemaName.equals(rawTableName)) {
-      throw new IllegalStateException("Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
 
@@ -314,7 +296,7 @@ public final class TableConfigUtils {
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
    */
-  private static void validateValidationConfig(TableConfig tableConfig, @Nullable Schema schema) {
+  private static void validateValidationConfig(TableConfig tableConfig, Schema schema) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String timeColumnName = validationConfig.getTimeColumnName();
     if (tableConfig.getTableType() == TableType.REALTIME) {
@@ -322,7 +304,7 @@ public final class TableConfigUtils {
       Preconditions.checkState(timeColumnName != null, "'timeColumnName' cannot be null in REALTIME table config");
     }
     // timeColumnName can be null in OFFLINE table
-    if (timeColumnName != null && !timeColumnName.isEmpty() && schema != null) {
+    if (timeColumnName != null) {
       Preconditions.checkState(schema.getSpecForTimeColumn(timeColumnName) != null,
           "Cannot find valid fieldSpec for timeColumn: %s from the table config: %s, in the schema: %s", timeColumnName,
           tableConfig.getTableName(), schema.getSchemaName());
@@ -330,8 +312,8 @@ public final class TableConfigUtils {
     if (tableConfig.isDimTable()) {
       Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
           "Dimension table must be of OFFLINE table type.");
-      Preconditions.checkState(schema != null, "Dimension table must have an associated schema");
-      Preconditions.checkState(!schema.getPrimaryKeyColumns().isEmpty(), "Dimension table must have primary key[s]");
+      Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
+          "Dimension table must have primary key[s]");
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
@@ -360,7 +342,7 @@ public final class TableConfigUtils {
    * 6. ingestion type for dimension tables
    */
   @VisibleForTesting
-  public static void validateIngestionConfig(TableConfig tableConfig, @Nullable Schema schema) {
+  public static void validateIngestionConfig(TableConfig tableConfig, Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
 
     if (ingestionConfig != null) {
@@ -395,7 +377,7 @@ public final class TableConfigUtils {
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
-        Preconditions.checkState(streamConfigMaps.size() > 0, "Must have at least 1 stream in REALTIME table");
+        Preconditions.checkState(!streamConfigMaps.isEmpty(), "Must have at least 1 stream in REALTIME table");
         // TODO: for multiple stream configs, validate them
       }
 
@@ -431,14 +413,11 @@ public final class TableConfigUtils {
                 "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
           }
 
-          FieldSpec fieldSpec = null;
-          if (schema != null) {
-            fieldSpec = schema.getFieldSpecFor(columnName);
-            Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
-                + "' of the aggregation function must be present in the schema");
-            Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
-                "The destination column '" + columnName + "' of the aggregation function must be a metric column");
-          }
+          FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+          Preconditions.checkState(fieldSpec != null,
+              "The destination column '" + columnName + "' of the aggregation function must be present in the schema");
+          Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
+              "The destination column '" + columnName + "' of the aggregation function must be a metric column");
 
           if (!aggregationColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate aggregation config found for column '" + columnName + "'");
@@ -471,11 +450,9 @@ public final class TableConfigUtils {
               Preconditions.checkState(StringUtils.isNumeric(literal),
                   "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
             }
-            if (fieldSpec != null) {
-              DataType dataType = fieldSpec.getDataType();
-              Preconditions.checkState(dataType == DataType.BYTES,
-                  "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
-            }
+            DataType dataType = fieldSpec.getDataType();
+            Preconditions.checkState(dataType == DataType.BYTES, "Result type for DISTINCT_COUNT_HLL must be BYTES: %s",
+                aggregationConfig);
           } else if (functionType == DISTINCTCOUNTHLLPLUS) {
             Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
                 "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
@@ -525,10 +502,8 @@ public final class TableConfigUtils {
 
           aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
-        if (schema != null) {
-          Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
-              "all metric columns must be aggregated");
-        }
+        Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
+            "all metric columns must be aggregated");
 
         // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
         // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
@@ -565,13 +540,10 @@ public final class TableConfigUtils {
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
           }
-          if (schema != null) {
-            Preconditions.checkState(
-                schema.getFieldSpecFor(columnName) != null || aggregationSourceColumns.contains(columnName),
-                "The destination column '" + columnName
-                    + "' of the transform function must be present in the schema or as a source column for "
-                    + "aggregations");
-          }
+          Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName),
+              "The destination column '" + columnName
+                  + "' of the transform function must be present in the schema or as a source column for "
+                  + "aggregations");
           FunctionEvaluator expressionEvaluator;
           if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
@@ -595,7 +567,7 @@ public final class TableConfigUtils {
 
       // Complex configs
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
-      if (complexTypeConfig != null && schema != null) {
+      if (complexTypeConfig != null) {
         Map<String, String> prefixesToRename = complexTypeConfig.getPrefixesToRename();
         if (MapUtils.isNotEmpty(prefixesToRename)) {
           Set<String> fieldNames = schema.getColumnNames();
@@ -611,7 +583,7 @@ public final class TableConfigUtils {
 
       SchemaConformingTransformerConfig schemaConformingTransformerConfig =
           ingestionConfig.getSchemaConformingTransformerConfig();
-      if (null != schemaConformingTransformerConfig && null != schema) {
+      if (schemaConformingTransformerConfig != null) {
         SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
       }
     }
@@ -983,10 +955,7 @@ public final class TableConfigUtils {
    * Also ensures proper dependency between index types (eg: Inverted Index columns
    * cannot be present in no-dictionary columns).
    */
-  private static void validateIndexingConfig(IndexingConfig indexingConfig, @Nullable Schema schema) {
-    if (schema == null) {
-      return;
-    }
+  private static void validateIndexingConfig(IndexingConfig indexingConfig, Schema schema) {
     ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
     Set<String> noDictionaryColumnsSet = new HashSet<>();
 
@@ -1189,7 +1158,7 @@ public final class TableConfigUtils {
    * Additional checks for TEXT and FST index types
    * Validates index compatibility for forward index disabled columns
    */
-  private static void validateFieldConfigList(TableConfig tableConfig, @Nullable Schema schema) {
+  private static void validateFieldConfigList(TableConfig tableConfig, Schema schema) {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TableType tableType = tableConfig.getTableType();
@@ -1200,6 +1169,9 @@ public final class TableConfigUtils {
 
     for (FieldConfig fieldConfig : fieldConfigList) {
       String columnName = fieldConfig.getName();
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(fieldSpec != null,
+          "Column: %s defined in field config list must be a valid column defined in the schema", columnName);
       EncodingType encodingType = fieldConfig.getEncodingType();
       Preconditions.checkArgument(encodingType != null, "Encoding type must be specified for column: %s", columnName);
       CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
@@ -1211,10 +1183,8 @@ public final class TableConfigUtils {
               "Compression codec: %s is not applicable to raw index",
               compressionCodec);
           if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
-              || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4)
-              && schema != null) {
-            Preconditions.checkArgument(
-                schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,
+              || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4)) {
+            Preconditions.checkArgument(fieldSpec.getDataType().getStoredType() == DataType.STRING,
                 "CLP compression codec can only be applied to string columns");
           }
           break;
@@ -1231,13 +1201,6 @@ public final class TableConfigUtils {
         default:
           break;
       }
-
-      if (schema == null) {
-        return;
-      }
-      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      Preconditions.checkState(fieldSpec != null,
-          "Column: %s defined in field config list must be a valid column defined in the schema", columnName);
 
       // Validate the forward index disabled compatibility with other indexes if enabled for this column
       validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
@@ -1493,7 +1456,7 @@ public final class TableConfigUtils {
     return false;
   }
 
-  private static boolean isRoutingStrategyAllowedForUpsert(@Nonnull RoutingConfig routingConfig) {
+  private static boolean isRoutingStrategyAllowedForUpsert(RoutingConfig routingConfig) {
     String instanceSelectorType = routingConfig.getInstanceSelectorType();
     return UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES.stream().anyMatch(x -> x.equalsIgnoreCase(instanceSelectorType));
   }
