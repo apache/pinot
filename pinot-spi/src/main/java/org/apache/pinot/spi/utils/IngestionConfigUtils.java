@@ -114,6 +114,8 @@ public final class IngestionConfigUtils {
         .collect(Collectors.toList());
   }
 
+  // TODO: Revisit the callers of this method. We should use the stream config for a given partition, instead of the
+  //       first one.
   public static Map<String, String> getFirstStreamConfigMap(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
@@ -131,6 +133,8 @@ public final class IngestionConfigUtils {
     throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
   }
 
+  // TODO: Revisit the callers of this method. We should use the stream config for a given partition, instead of the
+  //       first one.
   public static StreamConfig getFirstStreamConfig(TableConfig tableConfig) {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }

@@ -1178,8 +1178,8 @@ public class PinotLLCRealtimeSegmentManager {
       boolean offsetsHaveToChange = offsetCriteria != null;
       if (isTableEnabled && !isTablePaused) {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-            offsetsHaveToChange ? Collections.emptyList()
-                // offsets from metadata are not valid anymore; fetch for all partitions
+            offsetsHaveToChange
+                ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
                 : getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
         // FIXME: Right now, we assume topics are sharing same offset criteria
         OffsetCriteria originalOffsetCriteria = streamConfigs.get(0).getOffsetCriteria();
