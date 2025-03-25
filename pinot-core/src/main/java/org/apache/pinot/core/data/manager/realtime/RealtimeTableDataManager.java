@@ -97,14 +97,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
-  // Maintains a map of partitionGroup
-  // Ids to semaphores.
+
+  // Maintains a map of partition id to semaphore.
+  // We use semaphore of 1 permit instead of lock because the semaphore is shared across multiple threads, and it can be
+  // released by a different thread than the one that acquired it. There is no out-of-box Lock implementation that
+  // allows releasing the lock from a different thread.
   // The semaphore ensures that exactly one PartitionConsumer instance consumes from any stream partition.
   // In some streams, it's possible that having multiple consumers (with the same consumer name on the same host)
   // consuming from the same stream partition can lead to bugs.
   // The semaphores will stay in the hash map even if the consuming partitions move to a different host.
   // We expect that there will be a small number of semaphores, but that may be ok.
   private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+
   // The old name of the stats file used to be stats.ser which we changed when we moved all packages
   // from com.linkedin to org.apache because of not being able to deserialize the old files using the newer classes
   private static final String STATS_FILE_NAME = "segment-stats.ser";

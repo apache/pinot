@@ -41,14 +41,15 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongS
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     long[] value = blockValSet.getLongValuesSV();
-    LongOpenHashSet valueArray = new LongOpenHashSet(length);
+    LongOpenHashSet valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new LongOpenHashSet(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        valueArray.add(value[i]);
+        valueSet.add(value[i]);
       }
     });
-    aggregationResultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
