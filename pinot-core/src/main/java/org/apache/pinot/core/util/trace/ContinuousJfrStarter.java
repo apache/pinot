@@ -149,9 +149,8 @@ public class ContinuousJfrStarter {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         String filename = "recording-" + timestamp + ".jfr";
         Path recordingPath = directory.resolve(filename);
-        boolean newFile = recordingPath.toFile().createNewFile();
-        if (!newFile) {
-          throw new RuntimeException("Failed to create new file: " + recordingPath);
+        if (!recordingPath.toFile().canWrite()) {
+          throw new RuntimeException("Cannot write: " + recordingPath);
         }
         recording.setDestination(recordingPath);
       } catch (IOException e) {
