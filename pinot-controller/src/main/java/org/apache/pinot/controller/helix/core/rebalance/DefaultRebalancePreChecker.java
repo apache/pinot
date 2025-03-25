@@ -309,36 +309,31 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
     List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
-    int numReplicas = Integer.MAX_VALUE;
-    for (String segment : segmentsToMove) {
-      numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
-    }
-
-    if (rebalanceConfig.isDowntime() && !segmentsToMove.isEmpty() && numReplicas > 1) {
-      pass = false;
-      message.append("Number of replicas (")
-          .append(numReplicas)
-          .append(") is greater than 1, downtime is not recommended.\n");
-    }
-    if (rebalanceConfig.getMinAvailableReplicas() >= 0) {
-      // For non-negative value, use it as min available replicas
-      if (rebalanceConfig.getMinAvailableReplicas() >= numReplicas) {
+    if (rebalanceConfig.isDowntime()) {
+      int numReplicas = Integer.MAX_VALUE;
+      for (String segment : segmentsToMove) {
+        numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
+      }
+      if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
-        message.append("The number of replicas (")
+        message.append("Number of replicas (")
             .append(numReplicas)
-            .append(") is less than minAvailableReplicas. The rebalance would fail.\n");
+            .append(") is greater than 1, downtime is not recommended.\n");
       }
     }
+
     if (!rebalanceConfig.isIncludeConsuming() && tableConfig.getTableType() == TableType.REALTIME) {
       pass = false;
       message.append("includeConsuming is disabled for a realtime table.\n");
     }
     if (rebalanceConfig.isBootstrap()) {
       pass = false;
-      message.append("bootstrap is enabled, only enable it if you know what you are doing\n");
+      message.append(
+          "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended\n");
     }
 
-    return pass ? RebalancePreCheckerResult.pass("") : RebalancePreCheckerResult.warn(message.toString());
+    return pass ? RebalancePreCheckerResult.pass("No rebalance parameters need to double check")
+        : RebalancePreCheckerResult.warn(message.toString());
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {

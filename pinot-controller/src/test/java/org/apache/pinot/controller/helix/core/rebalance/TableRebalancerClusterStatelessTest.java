@@ -272,7 +272,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
             .startsWith("Within threshold"));
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(), "");
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
+        "No rebalance parameters need to double check");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -729,7 +730,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
         "bestEfforts is enabled, only enable it if you know what you are doing\n"
-            + "bootstrap is enabled, only enable it if you know what you are doing\n");
+            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
+            + "intended\n");
 
     // trigger downtime warning
     TableConfig newTableConfig =
@@ -751,9 +753,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckerResult.getMessage(),
-        "");
-
+    assertEquals(preCheckerResult.getMessage(), "No rebalance parameters need to double check");
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
