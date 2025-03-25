@@ -160,24 +160,8 @@ public final class TableConfigUtils {
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
       validateIngestionConfig(tableConfig, schema);
-
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-        if (streamConfigMaps.size() > 1) {
-          Preconditions.checkArgument(!tableConfig.isUpsertEnabled(),
-              "Multiple stream configs are not supported for upsert tables");
-        }
-        // TODO: validate stream configs in the map are identical in most fields
-        StreamConfig streamConfig;
-        for (Map<String, String> streamConfigMap : streamConfigMaps) {
-          try {
-            // Validate that StreamConfig can be created
-            streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
-          } catch (Exception e) {
-            throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
-          }
-          validateStreamConfig(streamConfig);
-        }
+        validateStreamConfigMaps(tableConfig);
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -592,6 +576,52 @@ public final class TableConfigUtils {
   public static void validateIngestionAggregation(AggregationFunctionType functionType) {
     Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
         "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
+  }
+
+  private static void validateStreamConfigMaps(TableConfig tableConfig) {
+    List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+    int numStreamConfigs = streamConfigMaps.size();
+    List<StreamConfig> streamConfigs = new ArrayList<>(numStreamConfigs);
+    for (Map<String, String> streamConfigMap : streamConfigMaps) {
+      StreamConfig streamConfig;
+      try {
+        // Validate that StreamConfig can be created
+        streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+      } catch (Exception e) {
+        throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+      }
+      validateStreamConfig(streamConfig);
+      streamConfigs.add(streamConfig);
+    }
+    if (numStreamConfigs > 1) {
+      Preconditions.checkState(!tableConfig.isUpsertEnabled(),
+          "Multiple stream configs are not supported for upsert table");
+
+      // Apply the following checks if there are multiple streamConfigs:
+      // 1. Check if all streamConfigs have the same stream type.
+      // 2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is
+      // predefining the values before fetching stream partition info from stream. At the construction time, we don't
+      // know the value extracted from a streamConfig would be applied to which segment.
+      // TODO: Remove these limitations
+      StreamConfig firstStreamConfig = streamConfigs.get(0);
+      String streamType = firstStreamConfig.getType();
+      int flushThresholdRows = firstStreamConfig.getFlushThresholdRows();
+      long flushThresholdTimeMillis = firstStreamConfig.getFlushThresholdTimeMillis();
+      double flushThresholdVarianceFraction = firstStreamConfig.getFlushThresholdVarianceFraction();
+      long flushThresholdSegmentSizeBytes = firstStreamConfig.getFlushThresholdSegmentSizeBytes();
+      int flushThresholdSegmentRows = firstStreamConfig.getFlushThresholdSegmentRows();
+      for (int i = 1; i < numStreamConfigs; i++) {
+        StreamConfig streamConfig = streamConfigs.get(i);
+        Preconditions.checkState(streamConfig.getType().equals(streamType),
+            "All streamConfigs must have the same stream type");
+        Preconditions.checkState(streamConfig.getFlushThresholdRows() == flushThresholdRows
+                && streamConfig.getFlushThresholdTimeMillis() == flushThresholdTimeMillis
+                && streamConfig.getFlushThresholdVarianceFraction() == flushThresholdVarianceFraction
+                && streamConfig.getFlushThresholdSegmentSizeBytes() == flushThresholdSegmentSizeBytes
+                && streamConfig.getFlushThresholdSegmentRows() == flushThresholdSegmentRows,
+            "Segment flush parameters must be consistent across all streamConfigs");
+      }
+    }
   }
 
   @VisibleForTesting
