@@ -815,10 +815,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // helix threads might be waiting for their respective previous segments to be loaded.
       // they need to be notified here.
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      Preconditions.checkNotNull(llcSegmentName);
-      ConsumerCoordinator semaphoreAccessCoordinator =
-          getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
-      semaphoreAccessCoordinator.trackSegment(llcSegmentName);
+      if (llcSegmentName != null) {
+        ConsumerCoordinator semaphoreAccessCoordinator =
+            getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
+        semaphoreAccessCoordinator.trackSegment(llcSegmentName);
+      }
     }
     return oldSegmentDataManager;
   }

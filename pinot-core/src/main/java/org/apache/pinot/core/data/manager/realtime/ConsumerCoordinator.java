@@ -28,6 +28,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -49,6 +50,7 @@ public class ConsumerCoordinator {
   private boolean _relyOnIdealState = true;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _isFirstTransitionProcessed;
+  private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5);
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _semaphore = new Semaphore(1);
@@ -76,7 +78,7 @@ public class ConsumerCoordinator {
     }
 
     long startTimeMs = System.currentTimeMillis();
-    while (!_semaphore.tryAcquire(5, TimeUnit.MINUTES)) {
+    while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
       LOGGER.warn("Failed to acquire partitionGroup consumer semaphore in: {} ms. Retrying.",
           System.currentTimeMillis() - startTimeMs);
     }
@@ -125,7 +127,7 @@ public class ConsumerCoordinator {
         while (segmentDataManager == null) {
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
-          while (!_condition.await(5, TimeUnit.MINUTES)) {
+          while (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waiting on previous segment: {} since: {} ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
           }
@@ -150,7 +152,7 @@ public class ConsumerCoordinator {
     try {
       while (_maxSegmentSeqNumLoaded < prevSeqNum) {
         // it means all segments until _maxSegmentSeqNumLoaded is not loaded in the server. Wait until it's loaded.
-        while (!_condition.await(5, TimeUnit.MINUTES)) {
+        while (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
           LOGGER.warn("Semaphore access denied to segment: {}."
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
               prevSeqNum, System.currentTimeMillis() - startTimeMs);
@@ -170,12 +172,7 @@ public class ConsumerCoordinator {
     String previousSegment = null;
     int currPartitionGroupId = currSegment.getPartitionGroupId();
     int currSequenceNum = currSegment.getSequenceNumber();
-
     Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
-
-    if (segmentAssignment == null) {
-      return null;
-    }
 
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
@@ -189,7 +186,10 @@ public class ConsumerCoordinator {
       }
 
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      Preconditions.checkNotNull(llcSegmentName);
+      if (llcSegmentName == null) {
+        // can't compare with this segment, hence skip.
+        continue;
+      }
 
       if (llcSegmentName.getPartitionGroupId() != currPartitionGroupId) {
         // ignore segments of different partitions.
@@ -213,8 +213,11 @@ public class ConsumerCoordinator {
 
   @VisibleForTesting
   Map<String, Map<String, String>> getSegmentAssignment() {
-    return HelixHelper.getSegmentAssignment(_realtimeTableDataManager.getTableName(),
-        _realtimeTableDataManager.getHelixManager());
+    IdealState idealState = HelixHelper.getTableIdealState(_realtimeTableDataManager.getHelixManager(),
+        _realtimeTableDataManager.getTableName());
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s",
+        _realtimeTableDataManager.getTableName());
+    return idealState.getRecord().getMapFields();
   }
 
   @VisibleForTesting
