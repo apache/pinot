@@ -139,9 +139,15 @@ public class ControllerRequestClient {
 
   public void deleteTable(String tableNameWithType)
       throws IOException {
+    deleteTable(tableNameWithType, null);
+  }
+
+  public void deleteTable(String tableNameWithType, String retentionPeriod)
+      throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forTableDelete(tableNameWithType)),
+          _httpClient.sendDeleteRequest(
+              new URI(_controllerRequestURLBuilder.forTableDelete(tableNameWithType, retentionPeriod)),
               _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);

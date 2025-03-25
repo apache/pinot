@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.Hash;
@@ -48,7 +47,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -176,16 +174,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   protected void doShutdown() {
     releaseAndRemoveAllSegments();
     closeDimensionTable(_dimensionTable.get());
+    INSTANCES.remove(_tableNameWithType);
   }
 
-  /* This method is necessary for testing because shutdown doesn't release
-   * _dimensionTable and DimensionTableDataManager instance is always kept in INSTANCES,
-   * point to a possibly big eagerly-loaded data structure.
-   */
-  @VisibleForTesting
-  public void releaseDimensionTable() {
-    closeDimensionTable(_dimensionTable.getAndSet(null));
-  }
 
   private void closeDimensionTable(DimensionTable dimensionTable) {
     try {
@@ -251,7 +242,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
                 return null;
               }
 
-              //TODO: consider inlining primary keys and values tables to reduce memory overhead
               Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
               Object[] values = recordReader.getRecordValues(i, valIndexes);
 
@@ -259,7 +249,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               if (_errorOnDuplicatePrimaryKey && previousValue != null) {
                 throw new IllegalStateException(
                     "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
-                        + "primary key already exist for: " + toString(primaryKey));
+                        + "primary key already exist for: " + Arrays.toString(primaryKey));
               }
             }
           } catch (Exception e) {
@@ -273,14 +263,6 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       for (SegmentDataManager segmentManager : segmentDataManagers) {
         releaseSegment(segmentManager);
       }
-    }
-  }
-
-  private static String toString(Object[] primaryKey) {
-    try {
-      return JsonUtils.objectToPrettyString(primaryKey);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
     }
   }
 

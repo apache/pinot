@@ -196,7 +196,6 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
   @TearDown(Level.Iteration)
   public void tearDown() {
     _tableDataManager.shutDown();
-    _tableDataManager.releaseDimensionTable();
 
     for (IndexSegment indexSegment : _indexSegments) {
       indexSegment.destroy();
