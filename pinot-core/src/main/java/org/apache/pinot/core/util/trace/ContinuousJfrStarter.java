@@ -81,6 +81,7 @@ public class ContinuousJfrStarter {
   /// If set, the directory will be cleaned up to keep only the most recent dumps.
   ///
   /// This is a Pinot feature, not a JFR feature and defaults to 10.
+  /// If negative, no file will be removed.
   public static final String MAX_DUMPS = "maxDumps";
   public static final int DEFAULT_MAX_DUMPS = 10;
 
@@ -186,6 +187,10 @@ public class ContinuousJfrStarter {
   }
 
   private static void cleanUpDumps(Path directory, int maxDumps) {
+    if (maxDumps < 0) {
+      LOGGER.debug("maxDumps is negative, no cleanup will be performed");
+      return;
+    }
     File[] files = directory.toFile().listFiles();
     if (files == null) {
       return;
