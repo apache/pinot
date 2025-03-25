@@ -55,6 +55,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
       "Total time taken to delete expired upsert primary keys based on metadataTTL or deletedKeysTTL"),
   GRPC_QUERY_EXECUTION_MS("milliseconds", false, "Total execution time of a successful query over gRPC"),
   UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot"),
+  UPSERT_SNAPSHOT_WRITE_LOCK_TIME_MS("milliseconds", false,
+      "Total time taken to acquire write lock before taking upsert table snapshot"),
 
   DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired dedup primary keys based on metadataTTL or deletedKeysTTL"),
