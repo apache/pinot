@@ -173,6 +173,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
+  enum ParallelSegmentConsumptionPolicy {
+    ALLOW_ALWAYS,               // Allow consumption of next segment during both build and download of the previous
+    ALLOW_DURING_BUILD_ONLY,    // Allow consumption of next segment during build but not download of the previous
+    ALLOW_DURING_DOWNLOAD_ONLY, // Allow consumption of next segment during download but not build of the previous
+    DISALLOW_ALWAYS             // Don't allow consumption of next segment during either build or download of the
+  }
+
+  @VisibleForTesting
   public class SegmentBuildDescriptor {
     final File _segmentTarFile;
     final Map<String, File> _metadataFileMap;
@@ -329,9 +337,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
-  private final boolean _allowConsumptionDuringBuild;
-  private final boolean _allowConsumptionDuringDownload;
   private boolean _trackFilteredMessageOffsets = false;
+  private final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -1073,14 +1080,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
-    if (_allowConsumptionDuringBuild) {
-      if (!_allowConsumptionDuringDownload) {
-        _segmentLogger.info("Releasing partitionGroupConsumerSemaphore early before segment build, forCommit:{}",
-            forCommit);
-      }
+    if ((_parallelSegmentConsumptionPolicy == ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS) || (
+        _parallelSegmentConsumptionPolicy == ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY)) {
       closeStreamConsumers();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1284,6 +1285,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
+      _segmentLogger.info("Releasing the _partitionGroupConsumerSemaphore");
       _partitionGroupConsumerSemaphore.release();
     }
   }
@@ -1463,10 +1465,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    // for partial upsert and dedup tables, do not release _partitionGroupConsumerSemaphore proactively and rely on
-    // offload() to release the semaphore. This ensures new consuming segment is not consuming until the segment
-    // replacement is complete.
-    if (_allowConsumptionDuringDownload) {
+    if ((_parallelSegmentConsumptionPolicy == ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS) || (
+        _parallelSegmentConsumptionPolicy == ParallelSegmentConsumptionPolicy.ALLOW_DURING_DOWNLOAD_ONLY)) {
       closeStreamConsumers();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
@@ -1718,8 +1718,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
       _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
           llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringBuild = isConsumptionAllowedDuringBuild();
-      _allowConsumptionDuringDownload = isConsumptionAllowedDuringDownload();
+      _parallelSegmentConsumptionPolicy = getParallelConsumptionPolicy();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1753,16 +1752,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  // Consumption while building the segment is not allowed for the following tables:
-  // 1. Partial Upserts
-  // For the above table types, Before the next consumer starts consumption, Snapshot is captured which
-  // might be invalid if immutable segment is not persisted.
-  private boolean isConsumptionAllowedDuringBuild() {
-    return (!_realtimeTableDataManager.isPartialUpsertEnabled() || _tableConfig.getUpsertConfig()
-        .isAllowPartialUpsertConsumptionDuringCommit());
-  }
-
-  // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
+  // Consumption while downloading and replacing consuming segment is not allowed for the following tables:
   // 1. Partial Upserts
   // 2. Dedup Tables
   // For the above table types, we would be looking into the metadata information when inserting a new record,
@@ -1770,10 +1760,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
   // upsert tables. If tables are dedup/partial upsert enabled check for table and server config properties to see if
   // consumption is allowed
-  private boolean isConsumptionAllowedDuringDownload() {
-    return (!_realtimeTableDataManager.isDedupEnabled() || _tableConfig.getDedupConfig()
-        .isAllowDedupConsumptionDuringCommit()) && (!_realtimeTableDataManager.isPartialUpsertEnabled()
-        || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
+  @VisibleForTesting
+  ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
+    if (_realtimeTableDataManager.isDedupEnabled() && _tableConfig.getDedupConfig()
+        .isAllowDedupConsumptionDuringCommit()) {
+      // if dedup is enabled
+      return ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY;
+    }
+    if (_realtimeTableDataManager.isPartialUpsertEnabled() && _tableConfig.getUpsertConfig()
+        .isAllowPartialUpsertConsumptionDuringCommit()) {
+      // if partial upserts is enabled
+      return ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY;
+    }
+    return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
