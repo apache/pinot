@@ -76,7 +76,7 @@ public class TableMetadataReader {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
     Set<String> serverInstanceSet = new HashSet<>(serverInstances);
-    return getReloadCheckResponsesForServerSet(tableNameWithType, timeoutMs, serverInstanceSet);
+    return getServerSetReloadCheckResponses(tableNameWithType, timeoutMs, serverInstanceSet);
   }
 
   /**
@@ -84,15 +84,15 @@ public class TableMetadataReader {
    * server list may not match the currently tagged server list)
    * @return response containing a) number of failed responses, b) reload responses returned
    */
-  public TableReloadJsonResponse getServerCheckSegmentsReloadMetadataForServerSet(String tableNameWithType,
+  public TableReloadJsonResponse getServerSetCheckSegmentsReloadMetadata(String tableNameWithType,
       int timeoutMs, Set<String> serverSet)
       throws InvalidConfigException, IOException {
-    ServerSegmentMetadataReader.TableReloadResponse segmentsMetadataResponse = getReloadCheckResponsesForServerSet(
+    ServerSegmentMetadataReader.TableReloadResponse segmentsMetadataResponse = getServerSetReloadCheckResponses(
         tableNameWithType, timeoutMs, serverSet);
     return processSegmentMetadataReloadResponse(segmentsMetadataResponse);
   }
 
-  public ServerSegmentMetadataReader.TableReloadResponse getReloadCheckResponsesForServerSet(String tableNameWithType,
+  public ServerSegmentMetadataReader.TableReloadResponse getServerSetReloadCheckResponses(String tableNameWithType,
       int timeoutMs, Set<String> serverInstanceSet) throws InvalidConfigException {
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
     ServerSegmentMetadataReader serverSegmentMetadataReader =

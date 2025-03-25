@@ -126,8 +126,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       // exception for servers that don't contain segments for the given table
       Set<String> serverInstanceSet = getCurrentlyAssignedServerSet(currentAssignment);
       TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
-          metadataReader.getServerCheckSegmentsReloadMetadataForServerSet(tableNameWithType, 30_000,
-              serverInstanceSet);
+          metadataReader.getServerSetCheckSegmentsReloadMetadata(tableNameWithType, 30_000, serverInstanceSet);
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
