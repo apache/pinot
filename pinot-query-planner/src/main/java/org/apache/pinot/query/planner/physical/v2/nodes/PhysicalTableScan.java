@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.query.planner.physical.v2.nodes;
 
 import com.google.common.base.Preconditions;
@@ -37,7 +55,8 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
 
   @Override
   public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
-    return new PhysicalTableScan(getCluster(), traitSet, getHints(), getTable(), _nodeId, _pinotDataDistribution, _tableScanMetadata);
+    return new PhysicalTableScan(getCluster(), traitSet, getHints(), getTable(), _nodeId, _pinotDataDistribution,
+        _tableScanMetadata);
   }
 
   @Override
@@ -74,7 +93,8 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
 
   @Override
   public PRelNode copy(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
-    Preconditions.checkState(newInputs.isEmpty(), "No inputs expected for PhysicalTableScan. Found: %s", newInputs.size());
+    Preconditions.checkState(newInputs.isEmpty(), "No inputs expected for PhysicalTableScan. Found: %s",
+        newInputs.size());
     return new PhysicalTableScan(getCluster(), getTraitSet(), getHints(), getTable(), newNodeId,
         newDistribution, _tableScanMetadata);
   }
