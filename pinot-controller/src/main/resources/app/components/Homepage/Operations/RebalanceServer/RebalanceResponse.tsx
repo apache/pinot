@@ -3,18 +3,27 @@ import React from 'react';
 import {Grid, Paper} from "@material-ui/core";
 import CustomCodemirror from "../../../CustomCodemirror";
 import {
-    RebalanceServerInstanceAssignmentResponse
-} from "./RebalanceServerResponses/RebalanceServerInstanceAssignmentResponse";
-import {
-    RebalanceServerSegmentAssignmentResponse
-} from "./RebalanceServerResponses/RebalanceServerSegmentAssignmentResponse";
+    RebalanceServerSectionResponse
+} from "./RebalanceServerResponses/RebalanceServerSectionResponse";
 import {RebalanceServerPreChecksResponse} from "./RebalanceServerResponses/RebalanceServerPreChecksResponse";
 import {RebalanceServerResponseLabelValue} from "./RebalanceServerResponses/RebalanceServerResponseLabelValue";
 import {
     RebalanceServerRebalanceSummaryResponse
 } from "./RebalanceServerResponses/RebalanceServerRebalanceSummaryResponse";
+import {RebalanceServerResponseCard} from "./RebalanceServerResponses/RebalanceServerResponseCard";
 
 export const RebalanceResponse = ({ response }) => {
+    const responseSectionsToShow = [
+        {
+            name: 'Segment Assignment',
+            key: 'segmentAssignment'
+        },
+        {
+            name: 'Instance Assignment',
+            key: 'instanceAssignment'
+        }
+    ];
+
     return (
         <Grid container spacing={2}>
             <Grid item xs={12}>
@@ -30,19 +39,24 @@ export const RebalanceResponse = ({ response }) => {
             </Grid>
             { response.preChecksResult && <RebalanceServerPreChecksResponse response={response} /> }
             { response.rebalanceSummaryResult && <RebalanceServerRebalanceSummaryResponse response={response} /> }
-            { response.instanceAssignment && <RebalanceServerInstanceAssignmentResponse response={response} /> }
-            { response.segmentAssignment && <RebalanceServerSegmentAssignmentResponse response={response} /> }
+            {
+                responseSectionsToShow.map((section) => {
+                    if (Object.keys(response).includes(section.key)) {
+                        return <RebalanceServerSectionResponse sectionTitle={section.name} sectionData={response[section.key]} />
+                    }
+                })
+            }
 
             {/* To be kept at the last, RAW JSON Preview */}
             <Grid item xs={12}>
-                <Paper variant='outlined' style={{ padding: 20 }}>
+                <RebalanceServerResponseCard>
                     <RebalanceServerSection sectionTitle={"Raw JSON"} canHideSection showSectionByDefault={false}>
                         <CustomCodemirror
                             data={response}
                             isEditable={false}
                         />
                     </RebalanceServerSection>
-                </Paper>
+                </RebalanceServerResponseCard>
             </Grid>
         </Grid>
     );
