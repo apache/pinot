@@ -20,7 +20,7 @@
 {{- if .Values.broker.ingress.v1beta1.enabled }}
 {{- $ingressPath := .Values.broker.ingress.v1beta1.path }}
 {{- $serviceName := include "pinot.broker.fullname" . }}
-{{- $servicePort := .Values.broker.service.port }}
+{{- $servicePort := .Values.broker.ingress.v1.port | default .Values.broker.service.port }}
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
