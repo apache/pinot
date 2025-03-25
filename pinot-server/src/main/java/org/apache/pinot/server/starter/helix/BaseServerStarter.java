@@ -78,6 +78,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
@@ -255,6 +256,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+
+    ContinuousJfrStarter.init(_serverConf);
   }
 
   /**

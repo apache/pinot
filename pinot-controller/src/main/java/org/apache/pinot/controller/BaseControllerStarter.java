@@ -126,6 +126,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -271,6 +272,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
+
+    ContinuousJfrStarter.init(_config);
   }
 
   // If thread pool size is not configured executor will use cached thread pool

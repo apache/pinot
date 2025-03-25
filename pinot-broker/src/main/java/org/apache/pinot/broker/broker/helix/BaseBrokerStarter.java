@@ -79,6 +79,7 @@ import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -193,6 +194,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+
+    ContinuousJfrStarter.init(_brokerConf);
   }
 
   private void setupHelixSystemProperties() {
