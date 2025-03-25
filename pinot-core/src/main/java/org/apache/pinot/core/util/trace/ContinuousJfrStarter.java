@@ -25,7 +25,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -72,7 +74,7 @@ public class ContinuousJfrStarter {
   /// Key that controls the directory to store the recordings when dumped on exit.
   ///
   /// The default value is the current working directory.
-  /// The filename will be 'recording-<timestamp>.jfr'.
+  /// The filename will be 'recording-<timestamp>.jfr', where timestamp is in UTC and format is 'yyyy-MM-dd_HH-mm-ss'.
   public static final String DIRECTORY = "directory";
   /// Key that controls the maximum number of dumps to keep.
   ///
@@ -130,7 +132,6 @@ public class ContinuousJfrStarter {
       return;
     }
 
-    Path directory = Path.of(subset.getProperty(DIRECTORY, Paths.get(".").toString()));
 
     Recording recording;
     String jfrConfName = subset.getProperty(CONFIGURATION, DEFAULT_CONFIGURATION);
@@ -146,23 +147,26 @@ public class ContinuousJfrStarter {
     recording.setDumpOnExit(dumpOnExit);
     if (dumpOnExit) {
       try {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+        Path directory = Path.of(subset.getProperty(DIRECTORY, Paths.get(".").toString()));
+        if (!directory.toFile().canWrite()) {
+          throw new RuntimeException("Cannot write: " + directory);
+        }
+
+        String timestamp = ZonedDateTime.ofInstant(Instant.now(), ZoneOffset.UTC)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         String filename = "recording-" + timestamp + ".jfr";
         Path recordingPath = directory.resolve(filename);
-        if (!recordingPath.toFile().canWrite()) {
-          throw new RuntimeException("Cannot write: " + recordingPath);
-        }
         recording.setDestination(recordingPath);
+
+        int maxDumps = subset.getProperty(MAX_DUMPS, DEFAULT_MAX_DUMPS);
+        if (maxDumps > 0) {
+          Thread cleanupThread = new Thread(() -> cleanUpDumps(directory, maxDumps));
+          cleanupThread.setName("JFR-Dump-Cleanup");
+          cleanupThread.setDaemon(true);
+          cleanupThread.start();
+        }
       } catch (IOException e) {
         throw new UncheckedIOException("Failed to create new recording file", e);
-      }
-
-      int maxDumps = subset.getProperty(MAX_DUMPS, DEFAULT_MAX_DUMPS);
-      if (maxDumps > 0) {
-        Thread cleanupThread = new Thread(() -> cleanUpDumps(directory, maxDumps));
-        cleanupThread.setName("JFR-Dump-Cleanup");
-        cleanupThread.setDaemon(true);
-        cleanupThread.start();
       }
     }
 
