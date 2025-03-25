@@ -248,16 +248,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
-    String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
-    List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
-    long segmentNamesBytesSize = 0;
-    if (segmentNames != null) {
-      for (String segmentName : segmentNames) {
-        segmentNamesBytesSize += segmentName.getBytes().length;
+    if (propertyStore != null) {
+      String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
+      List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
+      long segmentNamesBytesSize = 0;
+      if (segmentNames != null) {
+        for (String segmentName : segmentNames) {
+          segmentNamesBytesSize += segmentName.getBytes().length;
+        }
       }
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
+          segmentNamesBytesSize);
     }
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
-        segmentNamesBytesSize);
 
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
