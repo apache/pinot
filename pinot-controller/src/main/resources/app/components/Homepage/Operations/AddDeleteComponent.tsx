@@ -56,7 +56,7 @@ type Props = {
   streamConfigsObj: Object
 };
 
-const compulsoryKeys = ["stream.kafka.broker.list","stream.kafka.topic.name","stream.kafka.consumer.type","stream.kafka.decoder.class.name"];
+const compulsoryKeys = ["stream.kafka.broker.list","stream.kafka.topic.name","stream.kafka.decoder.class.name"];
 
 export default function AddDeleteComponent({
     changeHandler,

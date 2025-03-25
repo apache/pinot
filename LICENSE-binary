@@ -295,11 +295,6 @@ commons-io:commons-io:2.16.1
 commons-pool:commons-pool:1.6
 info.picocli:picocli:4.7.6
 io.airlift:aircompressor:0.27
-io.circe:circe-core_2.12:0.14.10
-io.circe:circe-generic_2.12:0.14.10
-io.circe:circe-jawn_2.12:0.14.10
-io.circe:circe-numbers_2.12:0.14.10
-io.circe:circe-parser_2.12:0.14.10
 io.confluent:common-utils:7.7.0
 io.confluent:kafka-avro-serializer:7.7.0
 io.confluent:kafka-protobuf-provider:7.7.0

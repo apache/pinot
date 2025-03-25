@@ -25,12 +25,15 @@ import org.slf4j.LoggerFactory;
 
 
 public enum QueryErrorCode {
+  /// Request in JSON format is incorrect. For example, doesn't contain the expected 'sql' field.
   JSON_PARSING(100, "JsonParsingError"),
+  /// Error detected at parsing time. For example, syntax error.
   SQL_PARSING(150, "SQLParsingError"),
   SQL_RUNTIME(160, "SQLRuntimeError"),
   ACCESS_DENIED(180, "AccessDenied"),
   TABLE_DOES_NOT_EXIST(190, "TableDoesNotExistError"),
   TABLE_IS_DISABLED(191, "TableIsDisabledError"),
+  /// Error at query execution time. For example, String column cast to int when contains a non-integer value.
   QUERY_EXECUTION(200, "QueryExecutionError"),
   SERVER_SHUTTING_DOWN(210, "ServerShuttingDown"),
   SERVER_OUT_OF_CAPACITY(211, "ServerOutOfCapacity"),
@@ -49,8 +52,10 @@ public enum QueryErrorCode {
   INTERNAL(450, "InternalError"),
   MERGE_RESPONSE(500, "MergeResponseError"),
   QUERY_CANCELLATION(503, "QueryCancellationError"),
+  /// Error detected at validation time. For example, type mismatch.
   QUERY_VALIDATION(700, "QueryValidationError"),
   UNKNOWN_COLUMN(710, "UnknownColumnError"),
+  ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError"),
   UNKNOWN(1000, "UnknownError");
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);

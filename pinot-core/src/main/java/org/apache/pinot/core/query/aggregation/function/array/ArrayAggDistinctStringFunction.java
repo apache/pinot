@@ -40,9 +40,11 @@ public class ArrayAggDistinctStringFunction extends BaseArrayAggStringFunction<O
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] value = blockValSet.getStringValuesSV();
-    ObjectOpenHashSet<String> valueArray = new ObjectOpenHashSet<>(length);
-    forEachNotNull(length, blockValSet, (from, to) -> valueArray.addAll(Arrays.asList(value).subList(from, to)));
-    aggregationResultHolder.setValue(valueArray);
+    ObjectOpenHashSet<String> valueSet =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult()
+            : new ObjectOpenHashSet<>(length);
+    forEachNotNull(length, blockValSet, (from, to) -> valueSet.addAll(Arrays.asList(value).subList(from, to)));
+    aggregationResultHolder.setValue(valueSet);
   }
 
   @Override
