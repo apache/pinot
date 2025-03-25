@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,9 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThr
    */
   public SegmentAllIndexPreprocessThrottler(int maxPreprocessConcurrency,
       int maxPreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
-    super(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries, LOGGER);
+    super(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries,
+        ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT,
+        LOGGER);
   }
 
   @Override

@@ -19,11 +19,14 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -34,6 +37,15 @@ import static org.mockito.Mockito.spy;
 
 public class SegmentOperationsThrottlerTest {
 
+  private final List<String> THRESHOLD_GAUGES =
+      Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
+          ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
+          ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD.getGaugeName());
+  private final List<String> COUNT_GAUGES =
+      Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT.getGaugeName(),
+          ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT.getGaugeName(),
+          ServerGauge.SEGMENT_DOWNLOAD_COUNT.getGaugeName());
+
   @Test
   public void testBasicAcquireRelease()
       throws Exception {
@@ -42,17 +54,36 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(4, 8, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(4, 8, true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.availablePermits(), 4);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, 4);
+      Assert.assertEquals(countGaugeValue, 0);
 
       operationsThrottler.acquire();
       Assert.assertEquals(operationsThrottler.availablePermits(), 3);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
 
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, 4);
+      Assert.assertEquals(countGaugeValue, 1);
+
       operationsThrottler.release();
       Assert.assertEquals(operationsThrottler.availablePermits(), 4);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, 4);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -65,18 +96,37 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(totalPermits, totalPermits * 2, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(totalPermits, totalPermits * 2, true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
 
-      for (int i = 0; i < totalPermits; i++) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, totalPermits);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < totalPermits; j++) {
         operationsThrottler.acquire();
-        Assert.assertEquals(operationsThrottler.availablePermits(), totalPermits - i - 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), totalPermits - j - 1);
         Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, totalPermits);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
-      for (int i = 0; i < totalPermits; i++) {
+      for (int j = 0; j < totalPermits; j++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(), i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), j + 1);
         Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, totalPermits);
+        Assert.assertEquals(countGaugeValue, totalPermits - j - 1);
       }
     }
   }
@@ -126,7 +176,11 @@ public class SegmentOperationsThrottlerTest {
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM), Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       int defaultPermits = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM)
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
@@ -134,10 +188,21 @@ public class SegmentOperationsThrottlerTest {
               : Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits);
-      for (int i = 0; i < 100; i++) {
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermits);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < 100; j++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermits);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits - i - 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits - j - 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, defaultPermits);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
     }
   }
@@ -153,9 +218,18 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Change the value of cluster config for max segment operation parallelism to be a negative value
       // If config is <= 0, this is an invalid configuration change. Do nothing other than log a warning
@@ -169,6 +243,11 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -184,11 +263,25 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      for (int i = 0; i < initialPermits; i++) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), 0);
@@ -204,14 +297,29 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+      Assert.assertEquals(countGaugeValue, initialPermits);
+
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
-      for (int i = 0; i < initialPermits; i++) {
+      for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+        Assert.assertEquals(countGaugeValue, initialPermits + j + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
       Assert.assertEquals(operationsThrottler.availablePermits(), 0);
-      for (int i = 0; i < (initialPermits * 2); i++) {
+      for (int j = 0; j < (initialPermits * 2); j++) {
         operationsThrottler.release();
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+        Assert.assertEquals(countGaugeValue, (initialPermits * 2) - j - 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits * 2);
@@ -230,16 +338,30 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      for (int i = 0; i < initialPermits; i++) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), 0);
 
-      // Increase the value of cluster config for max segment operation parallelism
+      // Decrease the value of cluster config for max segment operation parallelism
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
               ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
@@ -249,10 +371,20 @@ public class SegmentOperationsThrottlerTest {
           String.valueOf(initialPermits / 2));
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits / 2);
-
       Assert.assertEquals(operationsThrottler.availablePermits(), -(initialPermits / 2));
-      for (int i = 0; i < 4; i++) {
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits / 2);
+      Assert.assertEquals(countGaugeValue, initialPermits);
+
+      for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.release();
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits / 2);
+        Assert.assertEquals(countGaugeValue, initialPermits - j - 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits / 2);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits / 2);
@@ -270,7 +402,11 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
@@ -282,10 +418,20 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
 
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+      Assert.assertEquals(countGaugeValue, 0);
+
       // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -301,7 +447,11 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
@@ -315,21 +465,41 @@ public class SegmentOperationsThrottlerTest {
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
-      for (int i = 0; i < numPermitsToTake; i++) {
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
 
-      // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
+      // Once the server is ready to serve queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
-      Assert.assertEquals(operationsThrottler.availablePermits(),
-          initialPermits - numPermitsToTake);
+      Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - numPermitsToTake);
 
-      for (int i = 0; i < numPermitsToTake; i++) {
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, numPermitsToTake);
+
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + j + 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits);
+        Assert.assertEquals(countGaugeValue, numPermitsToTake - j - 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -348,7 +518,11 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES) - 5, false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
@@ -362,10 +536,21 @@ public class SegmentOperationsThrottlerTest {
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - 5);
-      for (int i = 0; i < numPermitsToTake; i++) {
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery - 5);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1 - 5);
+        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1 - 5);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery - 5);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
 
       // Double the permits for before serving queries config
@@ -381,23 +566,42 @@ public class SegmentOperationsThrottlerTest {
       // We increased permits but took some before the increase
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - numPermitsToTake);
 
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+      Assert.assertEquals(countGaugeValue, numPermitsToTake);
+
       // Take more permits
-      for (int i = 0; i < numPermitsToTake; i++) {
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
         Assert.assertEquals(operationsThrottler.availablePermits(),
-            defaultPermitsBeforeQuery - numPermitsToTake - i - 1);
+            defaultPermitsBeforeQuery - numPermitsToTake - j - 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+        Assert.assertEquals(countGaugeValue, numPermitsToTake + j + 1);
       }
 
       // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
-      Assert.assertEquals(operationsThrottler.availablePermits(),
-          initialPermits - (numPermitsToTake * 2));
+      Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - (numPermitsToTake * 2));
 
-      for (int i = 0; i < numPermitsToTake * 2; i++) {
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, numPermitsToTake * 2);
+
+      for (int j = 0; j < numPermitsToTake * 2; j++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake * 2) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake * 2) + j + 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits);
+        Assert.assertEquals(countGaugeValue, (numPermitsToTake * 2) - j - 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -416,7 +620,11 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, Integer.parseInt(
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES), false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
           : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
@@ -430,10 +638,21 @@ public class SegmentOperationsThrottlerTest {
       // preprocessing more segments is acceptable and cannot affect the query performance
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
-      for (int i = 0; i < numPermitsToTake; i++) {
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+      Assert.assertEquals(countGaugeValue, 0);
+
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.acquire();
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
-        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - i - 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
+        Assert.assertEquals(countGaugeValue, j + 1);
       }
 
       // Half the permits for before serving queries config
@@ -450,14 +669,29 @@ public class SegmentOperationsThrottlerTest {
       // We doubled permits but took all of the previous ones
       Assert.assertEquals(operationsThrottler.availablePermits(), newDefaultPermits - numPermitsToTake);
 
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, newDefaultPermits);
+      Assert.assertEquals(countGaugeValue, numPermitsToTake);
+
       // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
       operationsThrottler.startServingQueries();
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - numPermitsToTake);
 
-      for (int i = 0; i < numPermitsToTake; i++) {
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, numPermitsToTake);
+
+      for (int j = 0; j < numPermitsToTake; j++) {
         operationsThrottler.release();
-        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + i + 1);
+        Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + j + 1);
+
+        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        Assert.assertEquals(thresholdGaugeValue, initialPermits);
+        Assert.assertEquals(countGaugeValue, numPermitsToTake - j - 1);
       }
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -471,7 +705,6 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentAllIndexPreprocessThrottler(1, 2, true));
     segmentOperationsThrottlerList.add(new SegmentStarTreePreprocessThrottler(1, 2, true));
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(1, 2, true));
-
 
     for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
       BaseSegmentOperationsThrottler spy = spy(operationsThrottler);
@@ -497,13 +730,27 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Add some random configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -518,8 +765,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Create a set of valid keys and pass clusterConfigs as null, the config should reset to the default
       Set<String> keys = new HashSet<>();
@@ -529,12 +785,18 @@ public class SegmentOperationsThrottlerTest {
               ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
               : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
       operationsThrottler.onChange(keys, null);
-      Assert.assertEquals(operationsThrottler.totalPermits(),
-          Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
-                  : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM));
+
+      int newTotalPermits = Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
+          ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM
+          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
+              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM
+              : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+      Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, newTotalPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -549,8 +811,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Create a set of valid keys and pass clusterConfigs as null, the config should reset to the default
       Set<String> keys = new HashSet<>();
@@ -565,12 +836,18 @@ public class SegmentOperationsThrottlerTest {
               ? CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
               : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
       operationsThrottler.onChange(keys, null);
-      Assert.assertEquals(operationsThrottler.totalPermits(),
-          Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
-              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-              : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
-                  ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
-                  : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES));
+
+      int newTotalPermits = Integer.parseInt(operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
+          ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
+          : operationsThrottler instanceof SegmentStarTreePreprocessThrottler
+              ? CommonConstants.Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES
+              : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
+      Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, newTotalPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -585,8 +862,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Add some random configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
@@ -598,6 +884,11 @@ public class SegmentOperationsThrottlerTest {
               : CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, "42");
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -612,8 +903,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         true));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Add random and relevant configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
@@ -633,6 +933,11 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       // Since isServingQueries = false, new total should match CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -647,8 +952,17 @@ public class SegmentOperationsThrottlerTest {
     segmentOperationsThrottlerList.add(new SegmentDownloadThrottler(initialPermits, initialPermits * 2,
         false));
 
-    for (BaseSegmentOperationsThrottler operationsThrottler : segmentOperationsThrottlerList) {
+    for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
+      BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
+      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
+      String countGaugeName = COUNT_GAUGES.get(i);
+
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
+
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+      Assert.assertEquals(countGaugeValue, 0);
 
       // Add random and relevant configs and call 'onChange'
       Map<String, String> updatedClusterConfigs = new HashMap<>();
@@ -668,6 +982,11 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       // Since isServingQueries = false, new total should match higher threshold of before serving queries
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 4);
+
+      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 4);
+      Assert.assertEquals(countGaugeValue, 0);
     }
   }
 
@@ -688,6 +1007,16 @@ public class SegmentOperationsThrottlerTest {
         initialPermits);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits);
 
+    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits);
+    }
+
+    for (String countGaugeName : COUNT_GAUGES) {
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(countGaugeValue, 0);
+    }
+
     // Add random and relevant configs and call 'onChange'
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put("random.config.key", "random.config.value");
@@ -703,6 +1032,16 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
+
+    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+    }
+
+    for (String countGaugeName : COUNT_GAUGES) {
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(countGaugeValue, 0);
+    }
   }
 
   @Test
@@ -722,6 +1061,16 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
+
+    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
+    }
+
+    for (String countGaugeName : COUNT_GAUGES) {
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(countGaugeValue, 0);
+    }
 
     // Add random and relevant configs and call 'onChange'
     Map<String, String> updatedClusterConfigs = new HashMap<>();
@@ -746,5 +1095,15 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentStarTreePreprocessThrottler().totalPermits(),
         initialPermits * 4);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 4);
+
+    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Assert.assertEquals(thresholdGaugeValue, initialPermits * 4);
+    }
+
+    for (String countGaugeName : COUNT_GAUGES) {
+      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Assert.assertEquals(countGaugeValue, 0);
+    }
   }
 }

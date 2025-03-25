@@ -53,6 +53,19 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
   STREAM_DATA_LOSS("streamDataLoss", false),
 
+  // Segment operation throttle metrics - threshold is the upper limit of the throttle and is set whenever the
+  // throttle configs are modified
+  SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD("segmentTableDownloadThrottleThreshold", false),
+  SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD("segmentDownloadThrottleThreshold", true),
+  SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD("segmentAllPreprocessThrottleThreshold", true),
+  SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD("segmentStartreePreprocessDownloadThreshold", true),
+  // Segment operation metrics - count is the current number of segments undergoing the given operation.
+  // Incremented when the semaphore is acquired and decremented when the semaphore is released
+  SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),
+  SEGMENT_DOWNLOAD_COUNT("segmentDownloadCount", true),
+  SEGMENT_ALL_PREPROCESS_COUNT("segmentAllPreprocessCount", true),
+  SEGMENT_STARTREE_PREPROCESS_COUNT("segmentStartreePreprocessCount", true),
+
   /**
    * The size of the small cache.
    * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
