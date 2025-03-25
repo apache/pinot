@@ -54,7 +54,10 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -67,6 +70,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -113,6 +117,15 @@ public class RealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
     when(tableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+    if (tableConfig.isDedupEnabled()) {
+      Mockito.when(tableDataManager.isDedupEnabled()).thenReturn(true);
+    }
+    if (tableConfig.isUpsertEnabled()) {
+      Mockito.when(tableDataManager.isUpsertEnabled()).thenReturn(true);
+      if (tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+        Mockito.when(tableDataManager.isPartialUpsertEnabled()).thenReturn(true);
+      }
+    }
     return tableDataManager;
   }
 
@@ -884,6 +897,55 @@ public class RealtimeSegmentDataManagerTest {
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getSegmentMetadata().getTotalDocs(),
           FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    }
+  }
+
+  @Test
+  public void testParallelSegmentConsumptionPolicy()
+      throws Exception {
+    // no partial upsert or dedup enabled.
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager()) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          RealtimeSegmentDataManager.ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+
+    // no partial upsert or dedup enabled.
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(true, new TimeSupplier(),
+        null, null, null)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          RealtimeSegmentDataManager.ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+
+    // enable dedup
+    TableConfig tableConfig = createTableConfig();
+    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE);
+    dedupConfig.setAllowDedupConsumptionDuringCommit(true);
+    tableConfig.setDedupConfig(dedupConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          RealtimeSegmentDataManager.ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+    }
+
+    // enable partial upsert
+    tableConfig = createTableConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(true);
+    tableConfig.setUpsertConfig(upsertConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          RealtimeSegmentDataManager.ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+    }
+
+    // enable full upsert
+    tableConfig = createTableConfig();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    tableConfig.setUpsertConfig(upsertConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          RealtimeSegmentDataManager.ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
   }
 

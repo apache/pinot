@@ -1723,6 +1723,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
+      _segmentLogger.info("Releasing the _partitionGroupConsumerSemaphore");
       _partitionGroupConsumerSemaphore.release();
       _acquiredConsumerSemaphore.set(false);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
