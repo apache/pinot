@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.executor;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -33,6 +34,9 @@ public class MetricsExecutor extends DecoratorExecutorService {
 
   public MetricsExecutor(ExecutorService executorService, PinotMeter startedTasks, PinotMeter completedTasks) {
     super(executorService);
+    // These tests are added to fail fast in case null meters are sent, which is normal in tests when using mocks.
+    Preconditions.checkNotNull(startedTasks, "Started tasks meter should not be null");
+    Preconditions.checkNotNull(completedTasks, "Completed tasks meter should not be null");
     _startedTasks = startedTasks;
     _completedTasks = completedTasks;
   }
