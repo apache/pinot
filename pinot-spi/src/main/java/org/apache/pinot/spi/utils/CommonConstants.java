@@ -1489,7 +1489,7 @@ public class CommonConstants {
     /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
-    public static final String DEFAULT_SEND_STATS_MODE = "safe";
+    public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
 
     public enum JoinOverFlowMode {
       THROW, BREAK

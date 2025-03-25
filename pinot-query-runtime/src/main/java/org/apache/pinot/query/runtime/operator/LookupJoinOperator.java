@@ -187,8 +187,11 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockSemi(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
+    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+
     for (Object[] leftRow : container) {
-      if (_rightTable.containsKey(getKey(leftRow))) {
+      fillKey(leftRow, key);
+      if (_rightTable.containsKey(key)) {
         rows.add(leftRow);
       }
     }
@@ -198,8 +201,11 @@ public class LookupJoinOperator extends MultiStageOperator {
   private List<Object[]> buildJoinedDataBlockAnti(MseBlock.Data leftBlock) {
     List<Object[]> container = leftBlock.asRowHeap().getRows();
     List<Object[]> rows = new ArrayList<>(container.size());
+    PrimaryKey key = new PrimaryKey(new Object[_leftKeyIds.length]);
+
     for (Object[] leftRow : container) {
-      if (!_rightTable.containsKey(getKey(leftRow))) {
+      fillKey(leftRow, key);
+      if (!_rightTable.containsKey(key)) {
         rows.add(leftRow);
       }
     }
@@ -212,6 +218,13 @@ public class LookupJoinOperator extends MultiStageOperator {
       values[i] = row[_leftKeyIds[i]];
     }
     return new PrimaryKey(values);
+  }
+
+  private void fillKey(Object[] row, PrimaryKey key) {
+    Object[] values = key.getValues();
+    for (int i = 0; i < _leftKeyIds.length; i++) {
+      values[i] = row[_leftKeyIds[i]];
+    }
   }
 
   private Object[] joinRow(Object[] leftRow, @Nullable Object[] rightRow) {
