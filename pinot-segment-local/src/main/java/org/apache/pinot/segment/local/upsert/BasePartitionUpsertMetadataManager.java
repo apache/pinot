@@ -860,7 +860,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
 
         startTime = System.currentTimeMillis();
-
         doTakeSnapshot();
         _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS,
             System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
