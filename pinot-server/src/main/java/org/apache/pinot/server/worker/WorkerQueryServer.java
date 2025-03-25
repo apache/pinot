@@ -43,7 +43,7 @@ public class WorkerQueryServer {
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
     queryRunner.init(_configuration, instanceDataManager, helixManager, serverMetrics, tlsConfig);
-    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig);
+    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig, serverMetrics, configuration);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {
