@@ -53,6 +53,7 @@ public class ExternalViewReader {
   public static final String REALTIME_SUFFIX = "_REALTIME";
   public static final String OFFLINE_SUFFIX = "_OFFLINE";
   public static final String KEY_PINOT_TLS_PORT = "PINOT_TLS_PORT";
+  public static final String KEY_PINOT_GRPC_PORT = "grpcPort";
   public static final String KEY_SIMPLE_FIELDS = "simpleFields";
   public static final String KEY_HELIX_HOST = "HELIX_HOST";
   public static final String KEY_HELIX_PORT = "HELIX_PORT";
@@ -61,12 +62,21 @@ public class ExternalViewReader {
 
   @VisibleForTesting
   boolean _preferTlsPort;
-  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
-    _preferTlsPort = preferTlsPort;
-    _zkClient = zkClient;
-  }
+
+  boolean _useGrpcPort;
+
   public ExternalViewReader(ZkClient zkClient) {
     this(zkClient, false);
+  }
+
+  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
+    this(zkClient, preferTlsPort, false);
+  }
+
+  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort, boolean useGrpcPort) {
+    _preferTlsPort = preferTlsPort;
+    _zkClient = zkClient;
+    _useGrpcPort = useGrpcPort;
   }
 
   public List<String> getLiveBrokers() {
@@ -108,6 +118,7 @@ public class ExternalViewReader {
           if (simpleFields != null) {
             JsonNode hostNameNode = simpleFields.get(KEY_HELIX_HOST);
             JsonNode tlsPortNode = simpleFields.get(KEY_PINOT_TLS_PORT);
+            JsonNode grpcPortNode = simpleFields.get(KEY_PINOT_GRPC_PORT);
             JsonNode helixPortNode = simpleFields.get(KEY_HELIX_PORT);
             String[] splitItems = brokerName.split("_");
             if (splitItems.length < 3) {
@@ -116,6 +127,10 @@ public class ExternalViewReader {
             String hostName = splitItems[1];
             if (hostNameNode != null && !Strings.isNullOrEmpty(hostNameNode.asText())) {
               hostName = hostNameNode.asText();
+            }
+
+            if (grpcPortNode != null && !Strings.isNullOrEmpty(grpcPortNode.asText()) && _useGrpcPort) {
+              return hostName + ":" + grpcPortNode.asText();
             }
             if (tlsPortNode != null && !Strings.isNullOrEmpty(tlsPortNode.asText()) && _preferTlsPort) {
               return hostName + ":" + tlsPortNode.asText();

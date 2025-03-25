@@ -4455,7 +4455,7 @@ public class PinotHelixResourceManager {
         if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
           InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
           hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-              Integer.parseInt(instanceConfig.getPort())));
+              Integer.parseInt(instanceConfig.getPort()), Integer.parseInt(HelixHelper.getGrpcPort(instanceConfig))));
         }
       }
       if (!hosts.isEmpty()) {

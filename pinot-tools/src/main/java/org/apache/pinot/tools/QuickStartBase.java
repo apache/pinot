@@ -292,7 +292,7 @@ public abstract class QuickStartBase {
   }
 
   protected Map<String, String> getClusterConfigOverrides() {
-    return Map.of();
+    return Map.of("pinot.broker.grpc.port", "8010");
   }
 
   protected String[] getDefaultBatchTableDirectories() {
