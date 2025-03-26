@@ -826,7 +826,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Enable minimizeDataMovement
@@ -835,7 +835,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "No need to reload", RebalancePreCheckerResult.PreCheckStatus.PASS,
-        "No rebalance parameters need to double check",
+        "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Override minimizeDataMovement
@@ -844,7 +844,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled in table config but it's overridden with disabled",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Use default minimizeDataMovement and disable it in table config
@@ -854,7 +854,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is not enabled but instance assignment is allowed",
         RebalancePreCheckerResult.PreCheckStatus.WARN, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo minimizeDataMovement, update the table config to add a column to bloom filter
@@ -866,7 +866,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Undo tableConfig change
@@ -876,7 +876,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "No need to reload",
-        RebalancePreCheckerResult.PreCheckStatus.PASS, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.PASS, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a schema change
@@ -887,7 +887,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add minimizeDataMovement
@@ -896,7 +896,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled", RebalancePreCheckerResult.PreCheckStatus.PASS,
         "Reload needed prior to running rebalance", RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "No rebalance parameters need to double check",
+        "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Keep schema change and update table config to add instance config map with minimizeDataMovement = false
@@ -905,7 +905,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     checkRebalancePreCheckStatus(rebalanceResult, RebalanceResult.Status.NO_OP,
         "minimizeDataMovement is enabled",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
-        RebalancePreCheckerResult.PreCheckStatus.WARN, "No rebalance parameters need to double check",
+        RebalancePreCheckerResult.PreCheckStatus.WARN, "All rebalance parameters look good\n",
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
@@ -918,7 +918,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "No rebalance parameters need to double check", RebalancePreCheckerResult.PreCheckStatus.PASS);
+        "All rebalance parameters look good\n", RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Disable dry-run
     rebalanceConfig.setDryRun(false);

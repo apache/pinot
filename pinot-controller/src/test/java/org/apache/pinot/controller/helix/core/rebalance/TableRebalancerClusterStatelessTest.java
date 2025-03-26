@@ -273,7 +273,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
-        "No rebalance parameters need to double check");
+        "All rebalance parameters look good\n");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -747,13 +747,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getMessage(),
         "Number of replicas (3) is greater than 1, downtime is not recommended.\n");
 
+    // no downtime warning with 1 replica
+    newTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(1).build();
+
+    rebalanceConfig.setDowntime(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good\n");
+
     // test pass
     rebalanceConfig.setDowntime(false);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckerResult.getMessage(), "No rebalance parameters need to double check");
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good\n");
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 

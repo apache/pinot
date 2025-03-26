@@ -332,7 +332,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended\n");
     }
 
-    return pass ? RebalancePreCheckerResult.pass("No rebalance parameters need to double check")
+    return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good\n")
         : RebalancePreCheckerResult.warn(message.toString());
   }
 
