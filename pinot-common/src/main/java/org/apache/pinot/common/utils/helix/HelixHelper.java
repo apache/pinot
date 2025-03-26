@@ -611,6 +611,15 @@ public class HelixHelper {
   }
 
   /**
+   * Return the grpcPort for a given Pinot instance config
+   * @param instanceConfig the instance config to fetch
+   * @return the grpc port, -1 if not found
+   */
+  public static String getGrpcPort(InstanceConfig instanceConfig) {
+    return instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.GRPC_PORT_KEY, "-1");
+  }
+
+  /**
    * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
    * {@code false} otherwise.
    * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.

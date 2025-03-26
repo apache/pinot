@@ -158,6 +158,14 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   }
 
   @Override
+  protected String getBrokerGrpcEndpoint() {
+    if (_sharedClusterTestSuite != this) {
+      return _sharedClusterTestSuite.getBrokerGrpcEndpoint();
+    }
+    return super.getBrokerGrpcEndpoint();
+  }
+
+  @Override
   public int getControllerPort() {
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getControllerPort();

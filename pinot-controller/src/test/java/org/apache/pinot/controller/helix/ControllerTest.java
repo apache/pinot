@@ -121,6 +121,7 @@ public class ControllerTest {
 
   protected int _nextControllerPort = 20000;
   protected int _nextBrokerPort = _nextControllerPort + 1000;
+  protected int _nextBrokerGrpcPort = _nextBrokerPort + 500;
   protected int _nextServerPort = _nextBrokerPort + 1000;
   protected int _nextMinionPort = _nextServerPort + 1000;
 
@@ -662,6 +663,11 @@ public class ControllerTest {
   public void updateSchema(Schema schema)
       throws IOException {
     getControllerRequestClient().updateSchema(schema);
+  }
+
+  public void forceUpdateSchema(Schema schema)
+      throws IOException {
+    getControllerRequestClient().forceUpdateSchema(schema);
   }
 
   public Schema getSchema(String schemaName) {
