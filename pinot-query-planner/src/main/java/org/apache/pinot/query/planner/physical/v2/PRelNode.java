@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.TableScan;
 
 
 /**
@@ -29,25 +30,52 @@ import org.apache.calcite.rel.RelNode;
  * at the same time still relying on the plan tree/dag formed by RelNodes.
  */
 public interface PRelNode {
+  /**
+   * Node ID for this plan node in the query plan. During copy, this ID may be preserved or changed. Calcite RelNode
+   * also has its own integer IDs, but those are generated via a statically incrementing counter. This Node ID is
+   * supposed to make debugging easier.
+   */
   int getNodeId();
 
+  /**
+   * Returns a typed reference to the inputs of this node. You can also use {@link RelNode#getInputs()} to get the
+   * RelNode inputs corresponding to this node.
+   */
   List<PRelNode> getPRelInputs();
 
+  /**
+   * Same as {@link #getPRelInputs()} but allows returning a specific input.
+   */
   default PRelNode getPRelInput(int index) {
     return getPRelInputs().get(index);
   }
 
+  /**
+   * Returns a typed reference to the corresponding RelNode.
+   */
   RelNode unwrap();
 
+  /**
+   * Distribution of the data. This may be null, because this is assigned after the PRelNode tree is created.
+   */
   @Nullable
   PinotDataDistribution getPinotDataDistribution();
 
+  /**
+   * Same as {@link #getPinotDataDistribution()} but throws an exception if the distribution is null.
+   */
   default PinotDataDistribution getPinotDataDistributionOrThrow() {
     return Objects.requireNonNull(getPinotDataDistribution(), "Pinot Data Distribution is missing from PRelNode");
   }
 
+  /**
+   * Whether this node is part of the leaf stage.
+   */
   boolean isLeafStage();
 
+  /**
+   * Only set for {@link TableScan} nodes. Returns metadata computed during segment assignment for the leaf stage.
+   */
   @Nullable
   default TableScanMetadata getTableScanMetadata() {
     return null;

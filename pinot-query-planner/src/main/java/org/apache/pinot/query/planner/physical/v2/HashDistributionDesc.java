@@ -62,6 +62,11 @@ public class HashDistributionDesc {
     return _numPartitions;
   }
 
+  /**
+   * Returns all possible hash distribution descriptors for the given mapping of key indexes to the new key indexes.
+   * TODO: Need confirmation on whether there's any valid case where the List&lt;Integer&gt; will have more than a
+   *   single element. If there are no such cases, we could simply use a Partial Mapping from Calcite.
+   */
   @Nullable
   public Set<HashDistributionDesc> apply(Map<Integer, List<Integer>> mapping) {
     for (Integer currentKeyIndex : _keyIndexes) {

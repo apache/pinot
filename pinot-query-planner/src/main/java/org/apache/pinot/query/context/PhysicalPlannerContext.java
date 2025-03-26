@@ -39,9 +39,11 @@ public class PhysicalPlannerContext {
     }
   };
   /**
-   * This is hacky. We should have a centralized place to get this. This map currently is populated during table scan
-   * worker assignment because we interact with RoutingManager there and get QueryServerInstance objects. However, for
-   * worker assignment we only want to look at instanceId to keep testing simple.
+   * This is hacky. When assigning workers to the leaf-stage we cache the instanceId to QueryServerInstance values.
+   * This way we can continue to use instance IDs throughout planning and convert them back to QueryServerInstance
+   * while working with the Dispatchable Plan.
+   * TODO: We should not use this map and instead have a centralized place for instanceId to QueryServerInstance
+   *   mapping.
    */
   private final Map<String, QueryServerInstance> _instanceIdToQueryServerInstance = new HashMap<>();
   @Nullable

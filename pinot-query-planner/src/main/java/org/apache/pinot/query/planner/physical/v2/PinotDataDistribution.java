@@ -30,6 +30,11 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 
 
+/**
+ * Describes how the data will be distributed across a distributed set of output streams for a given Plan Node.
+ * They integer based keys, such as those in {@link HashDistributionDesc} are based on the output Row Type of the
+ * corresponding plan node.
+ */
 public class PinotDataDistribution {
   /**
    * Denotes the type of distribution: broadcast, singleton, etc.
@@ -39,9 +44,10 @@ public class PinotDataDistribution {
    * In the format: "index@instanceId".
    * <p>
    *   <b>TODO:</b> An alternative is to store workers separately. One reason workers are needed is because
-   *     Exchange is often required because the workers for RelNode with multiple inputs may be different. With
-   *     that kind of a design, we can just store the number of streams here and store workers separately and use
-   *     them later on.
+   *     Exchange is often required because the workers for RelNode with multiple inputs may be different.
+   *     If we store workers separately, then we can just store the number of streams here. But that means then that
+   *     we have to handle Exchanges for scenarios where workers are different in sender/receiver separately from
+   *     Exchanges added due to the other reason.
    * </p>
    */
   private final List<String> _workers;
@@ -96,6 +102,8 @@ public class PinotDataDistribution {
 
   /**
    * Given a distribution constraint, return whether this physical distribution meets the constraint or not.
+   * E.g. say the distribution constraint is Broadcast. That means each stream in the output of this Plan Node should
+   * contain all the records. This method will return true if that is already the case.
    */
   public boolean satisfies(@Nullable RelDistribution distributionConstraint) {
     if (distributionConstraint == null) {
@@ -105,8 +113,7 @@ public class PinotDataDistribution {
     if (constraintType == RelDistribution.Type.ANY) {
       return true;
     } else if (constraintType == RelDistribution.Type.BROADCAST_DISTRIBUTED) {
-      // TODO: We could do better when the input node is only on a single worker.
-      return _type == RelDistribution.Type.BROADCAST_DISTRIBUTED;
+      return _type == RelDistribution.Type.BROADCAST_DISTRIBUTED || _workers.size() == 1;
     } else if (constraintType == RelDistribution.Type.SINGLETON) {
       return _type == RelDistribution.Type.SINGLETON;
     } else if (constraintType == RelDistribution.Type.RANDOM_DISTRIBUTED) {
