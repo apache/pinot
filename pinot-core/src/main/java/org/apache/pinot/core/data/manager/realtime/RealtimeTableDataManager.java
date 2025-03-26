@@ -817,8 +817,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // they need to be notified here.
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
-        ConsumerCoordinator consumerCoordinator =
-            getConsumerCoordinator(llcSegmentName.getPartitionGroupId());
+        ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(llcSegmentName.getPartitionGroupId());
         consumerCoordinator.trackSegment(llcSegmentName);
       }
     }
