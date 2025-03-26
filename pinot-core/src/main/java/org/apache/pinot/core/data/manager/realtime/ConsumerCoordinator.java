@@ -52,7 +52,7 @@ public class ConsumerCoordinator {
   private final Condition _condition;
   private final Lock _lock;
   private final ServerMetrics _serverMetrics;
-  private volatile int _maxSegmentSeqNumLoaded = -1;
+  private volatile int _maxSegmentSeqNumRegistered = -1;
   private final boolean _alwaysRelyOnIdealState;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _isFirstTransitionProcessed;
@@ -66,8 +66,8 @@ public class ConsumerCoordinator {
     _realtimeTableDataManager = realtimeTableDataManager;
     StreamIngestionConfig streamIngestionConfig = realtimeTableDataManager.getStreamIngestionConfig();
     if (streamIngestionConfig != null) {
-      // if trackSegmentSeqNumber is false, server relies on ideal state to fetch previous segment to a segment for all
-      // helix transitions.
+      // if isUseIdealStateToCalculatePreviousSegment is true, server relies on ideal state to fetch previous segment
+      // to a segment for all helix transitions.
       _alwaysRelyOnIdealState = streamIngestionConfig.isUseIdealStateToCalculatePreviousSegment();
     } else {
       _alwaysRelyOnIdealState = false;
@@ -109,7 +109,7 @@ public class ConsumerCoordinator {
     _lock.lock();
     try {
       if (!_alwaysRelyOnIdealState) {
-        _maxSegmentSeqNumLoaded = Math.max(_maxSegmentSeqNumLoaded, llcSegmentName.getSequenceNumber());
+        _maxSegmentSeqNumRegistered = Math.max(_maxSegmentSeqNumRegistered, llcSegmentName.getSequenceNumber());
       }
       // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
       _condition.signalAll();
@@ -133,7 +133,7 @@ public class ConsumerCoordinator {
       return;
     }
 
-    // rely on _maxSegmentSeqNumLoaded watermark for previous segment.
+    // rely on _maxSegmentSeqNumRegistered watermark for previous segment.
     if (awaitForPreviousSegmentSequenceNumber(currSegment, WAIT_INTERVAL_MS)) {
       return;
     }
@@ -198,8 +198,8 @@ public class ConsumerCoordinator {
     int prevSeqNum = currSegment.getSequenceNumber() - 1;
     _lock.lock();
     try {
-      while (_maxSegmentSeqNumLoaded < prevSeqNum) {
-        // it means all segments until _maxSegmentSeqNumLoaded is not loaded in the server. Wait until it's loaded.
+      while (_maxSegmentSeqNumRegistered < prevSeqNum) {
+        // it means all segments until _maxSegmentSeqNumRegistered is not loaded in the server. Wait until it's loaded.
         if (!_condition.await(timeoutMs, TimeUnit.MILLISECONDS)) {
           LOGGER.warn("Semaphore access denied to segment: {}."
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
@@ -209,7 +209,7 @@ public class ConsumerCoordinator {
         }
       }
 
-      return (_maxSegmentSeqNumLoaded >= prevSeqNum);
+      return (_maxSegmentSeqNumRegistered >= prevSeqNum);
     } finally {
       _lock.unlock();
     }
@@ -284,6 +284,6 @@ public class ConsumerCoordinator {
 
   @VisibleForTesting
   int getMaxSegmentSeqNumLoaded() {
-    return _maxSegmentSeqNumLoaded;
+    return _maxSegmentSeqNumRegistered;
   }
 }
