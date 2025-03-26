@@ -46,17 +46,18 @@ import org.slf4j.LoggerFactory;
 public class ConsumerCoordinator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
+  private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
 
   private final Semaphore _semaphore;
   private final boolean _enforceConsumptionInOrder;
   private final Condition _condition;
   private final Lock _lock;
   private final ServerMetrics _serverMetrics;
-  private volatile int _maxSegmentSeqNumRegistered = -1;
   private final boolean _alwaysRelyOnIdealState;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _firstTransitionProcessed;
-  private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
+
+  private volatile int _maxSegmentSeqNumRegistered = -1;
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _semaphore = new Semaphore(1);
@@ -72,11 +73,11 @@ public class ConsumerCoordinator {
     } else {
       _alwaysRelyOnIdealState = false;
     }
-    _isFirstTransitionProcessed = new AtomicBoolean(false);
+    _firstTransitionProcessed = new AtomicBoolean(false);
     _serverMetrics = ServerMetrics.get();
   }
 
-  void acquire(LLCSegmentName llcSegmentName)
+  public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException {
     long startTimeMs;
 
@@ -86,7 +87,7 @@ public class ConsumerCoordinator {
       waitForPrevSegment(llcSegmentName);
 
       _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-          ServerTimer.PREV_SEGMENT_WAIT_DURATION_MS, System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+          ServerTimer.PREV_SEGMENT_WAIT_TIME_MS, System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
     }
 
     startTimeMs = System.currentTimeMillis();
@@ -96,7 +97,7 @@ public class ConsumerCoordinator {
     }
   }
 
-  void release() {
+  public void release() {
     _semaphore.release();
   }
 
@@ -105,7 +106,7 @@ public class ConsumerCoordinator {
     return _semaphore;
   }
 
-  void trackSegment(LLCSegmentName llcSegmentName) {
+  public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
       if (!_alwaysRelyOnIdealState) {
@@ -121,7 +122,7 @@ public class ConsumerCoordinator {
   private void waitForPrevSegment(LLCSegmentName currSegment)
       throws InterruptedException {
 
-    if (_alwaysRelyOnIdealState || !_isFirstTransitionProcessed.get()) {
+    if (_alwaysRelyOnIdealState || !_firstTransitionProcessed.get()) {
       // if _alwaysRelyOnIdealState or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
       acquireSegmentRelyingOnIdealState(currSegment);
@@ -129,7 +130,7 @@ public class ConsumerCoordinator {
       // the first transition will always be prone to error, consider edge case where segment previous to current
       // helix transition's segment was deleted and this server came alive after successful deletion. the prev
       // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
-      _isFirstTransitionProcessed.compareAndSet(false, true);
+      _firstTransitionProcessed.set(true);
       return;
     }
 
@@ -145,7 +146,7 @@ public class ConsumerCoordinator {
 
   private void acquireSegmentRelyingOnIdealState(LLCSegmentName currSegment)
       throws InterruptedException {
-    LLCSegmentName previousLLCSegmentName = getPreviousSegment(currSegment);
+    LLCSegmentName previousLLCSegmentName = getPreviousSegmentFromIdealState(currSegment);
     if (previousLLCSegmentName == null) {
       // previous segment can only be null if either all the previous segments are deleted or this is the starting
       // sequence segment of the partition Group.
@@ -166,7 +167,7 @@ public class ConsumerCoordinator {
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
             // changed in ideal state.
-            previousLLCSegmentName = getPreviousSegment(currSegment);
+            previousLLCSegmentName = getPreviousSegmentFromIdealState(currSegment);
             if (previousLLCSegmentName == null) {
               return;
             }
@@ -270,7 +271,7 @@ public class ConsumerCoordinator {
     LOGGER.info("Fetched previous segment: {} to current segment: {} in: {} ms.", prevSegmentName,
         currSegment.getSegmentName(), duration);
     _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_DURATION_MS, duration, TimeUnit.MILLISECONDS);
+        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS, duration, TimeUnit.MILLISECONDS);
 
     return previousSegment;
   }
@@ -290,8 +291,8 @@ public class ConsumerCoordinator {
   }
 
   @VisibleForTesting
-  AtomicBoolean getIsFirstTransitionProcessed() {
-    return _isFirstTransitionProcessed;
+  AtomicBoolean getFirstTransitionProcessed() {
+    return _firstTransitionProcessed;
   }
 
   // this should not be used outside of tests.

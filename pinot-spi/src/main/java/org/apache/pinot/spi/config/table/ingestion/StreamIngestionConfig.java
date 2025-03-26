@@ -46,8 +46,8 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Enforce consumption of segments in order of segment creation by the controller")
   private boolean _enforceConsumptionInOrder = false;
 
-  @JsonPropertyDescription("If enabled, Server always relies on ideal state to get previous segment. Else server uses"
-      + " _maxSegmentSeqNumRegistered as watermark to determine previous segment.")
+  @JsonPropertyDescription("If enabled, Server always relies on ideal state to get previous segment. If disabled, "
+      + "server uses sequence id - 1 for previous segment")
   private boolean _useIdealStateToCalculatePreviousSegment = false;
 
   @JsonCreator
