@@ -164,6 +164,7 @@ public class ConsumerCoordinator {
 
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
     try {
+      startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
         while (segmentDataManager == null) {
