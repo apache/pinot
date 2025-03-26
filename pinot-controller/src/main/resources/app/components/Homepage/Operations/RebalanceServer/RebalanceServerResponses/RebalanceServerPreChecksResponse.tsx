@@ -2,10 +2,21 @@ import {Grid, Typography} from "@material-ui/core";
 import {RebalanceServerSection} from "../RebalanceServerSection";
 import Alert from "@material-ui/lab/Alert";
 import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
-import {Cancel, CheckCircle} from "@material-ui/icons";
+import {Cancel, CheckCircle, Warning} from "@material-ui/icons";
 import React from "react";
 import {RebalanceServerResponseLabelValue} from "./RebalanceServerResponseLabelValue";
 import {RebalanceServerResponseCard} from "./RebalanceServerResponseCard";
+
+const PreCheckStatusIcon = ({ preCheckStatus } : { preCheckStatus: "PASS" | "WARN" | "ERROR" }) => {
+    switch (preCheckStatus) {
+        case "PASS":
+            return <CheckCircle style={{ marginRight: 10, marginTop: 5 }} fontSize='small' htmlColor='green' />;
+        case "ERROR":
+            return <Cancel style={{ marginRight: 10, marginTop: 5 }} fontSize='small' color='error' />;
+        case "WARN":
+            return <Warning style={{ marginRight: 10, marginTop: 5 }} fontSize='small' htmlColor='orange' />;
+    }
+}
 
 export const RebalanceServerPreChecksResponse = ({ response }) => {
     const numberOfPreChecksPassing = Object.keys(response.preChecksResult ?? {})
@@ -30,8 +41,8 @@ export const RebalanceServerPreChecksResponse = ({ response }) => {
                     </Alert>
                     <Grid container spacing={2}>
                         { Object.keys(response.preChecksResult).map((preCheckResult, index) => (
-                            <Grid item xs={12} style={{ display: 'flex', alignItems: 'flex-start' }} spacing={2}>
-                                {response.preChecksResult[preCheckResult].preCheckStatus === "PASS" ? <CheckCircle style={{ marginRight: 10, marginTop: 5 }} fontSize='small' htmlColor='green' /> : <Cancel style={{ marginRight: 10, marginTop: 5 }} fontSize='small' color='error' />}
+                            <Grid item xs={12} key={preCheckResult} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                                <PreCheckStatusIcon preCheckStatus={response.preChecksResult[preCheckResult].preCheckStatus} />
                                 <RebalanceServerResponseLabelValue label={preCheckResult} value={response.preChecksResult[preCheckResult].message} />
                             </Grid>)
                         )}

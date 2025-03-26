@@ -24,7 +24,7 @@ export const RebalanceServerRebalanceSummaryResponse = ({ response }) => {
                     {
                         responseSectionsToShow.map((section) => {
                             if (Object.keys(response.rebalanceSummaryResult).includes(section.key)) {
-                                return <RebalanceServerSectionResponse sectionTitle={section.name} sectionData={response.rebalanceSummaryResult[section.key]} />
+                                return <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response.rebalanceSummaryResult[section.key]} />
                             }
                         })
                     }

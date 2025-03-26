@@ -21,11 +21,15 @@ export const RebalanceResponse = ({ response }) => {
         {
             name: 'Instance Assignment',
             key: 'instanceAssignment'
+        },
+        {
+            name: 'Tier Instance Assignment',
+            key: 'tierInstanceAssignment'
         }
     ];
 
     return (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} key='rebalance-response'>
             <Grid item xs={12}>
                 <Paper variant='outlined' style={{ padding: 10 }}>
                     <RebalanceServerSection sectionTitle={"Job Summary"}>
@@ -42,7 +46,7 @@ export const RebalanceResponse = ({ response }) => {
             {
                 responseSectionsToShow.map((section) => {
                     if (Object.keys(response).includes(section.key)) {
-                        return <RebalanceServerSectionResponse sectionTitle={section.name} sectionData={response[section.key]} />
+                        return <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response[section.key]} />
                     }
                 })
             }
