@@ -292,8 +292,10 @@ public class TableConfigSerDeTest {
       ingestionConfig.setBatchIngestionConfig(
           new BatchIngestionConfig(Collections.singletonList(Collections.singletonMap("batchType", "s3")), "APPEND",
               "HOURLY"));
-      StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka")));
-      streamIngestionConfig.setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
+      StreamIngestionConfig streamIngestionConfig =
+          new StreamIngestionConfig(Collections.singletonList(Collections.singletonMap("streamType", "kafka")));
+      streamIngestionConfig.setParallelSegmentConsumptionPolicy(
+          ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY);
       ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
       ingestionConfig.setFilterConfig(new FilterConfig("filterFunc(foo)"));
       ingestionConfig.setTransformConfigs(

@@ -905,7 +905,8 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     // no partial upsert or dedup enabled.
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager()) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
 
     // enable dedup
@@ -915,12 +916,14 @@ public class RealtimeSegmentDataManagerTest {
     tableConfig.setDedupConfig(dedupConfig);
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
         null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
     dedupConfig.setAllowDedupConsumptionDuringCommit(false);
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
         null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
     }
 
     // enable partial upsert
@@ -930,12 +933,14 @@ public class RealtimeSegmentDataManagerTest {
     tableConfig.setUpsertConfig(upsertConfig);
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
         null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
     upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(false);
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
         null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
     }
 
     // enable full upsert
@@ -944,7 +949,8 @@ public class RealtimeSegmentDataManagerTest {
     tableConfig.setUpsertConfig(upsertConfig);
     try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
         null, null, tableConfig)) {
-      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(), ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
     }
   }
 
