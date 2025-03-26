@@ -205,7 +205,7 @@ public class ConsumerCoordinator {
                   + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
               prevSeqNum, System.currentTimeMillis() - startTimeMs);
           // waited until the timeout. Rely on ideal state now.
-          return false;
+          return (_maxSegmentSeqNumRegistered >= prevSeqNum);
         }
       }
 
