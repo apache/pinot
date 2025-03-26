@@ -63,10 +63,10 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   SECONDARY_Q_WAIT_TIME_MS("milliseconds", false,
       "Time spent waiting in the secondary queue when BinaryWorkloadScheduler is used."),
 
-  PREV_SEGMENT_FETCH_IDEAL_STATE_DURATION_MS("milliseconds", false,
+  PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS("milliseconds", false,
       "Time spent while fetching previous segment from ideal state for any segment."),
 
-  PREV_SEGMENT_WAIT_DURATION_MS("milliseconds", false,
+  PREV_SEGMENT_WAIT_TIME_MS("milliseconds", false,
       "Time spent while waiting on previous segment to be registered."),
 
   // Multi-stage
