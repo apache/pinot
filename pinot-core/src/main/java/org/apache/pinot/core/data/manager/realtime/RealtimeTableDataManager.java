@@ -931,6 +931,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (streamIngestionConfig == null) {
       return false;
     }
-    return streamIngestionConfig.isEnforceConsumptionInOrder() && (isDedupEnabled() || isPartialUpsertEnabled());
+    return streamIngestionConfig.isEnforceConsumptionInOrder();
   }
 }
