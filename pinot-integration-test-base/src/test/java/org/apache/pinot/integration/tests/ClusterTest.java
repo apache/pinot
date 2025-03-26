@@ -26,9 +26,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +49,8 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.grpc.GrpcConnection;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
@@ -72,6 +74,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -99,6 +102,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected final List<BaseBrokerStarter> _brokerStarters = new ArrayList<>();
   protected final List<Integer> _brokerPorts = new ArrayList<>();
   protected String _brokerBaseApiUrl;
+  protected String _brokerGrpcEndpoint;
 
   protected final List<BaseServerStarter> _serverStarters = new ArrayList<>();
   protected int _serverGrpcPort;
@@ -124,6 +128,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  protected String getBrokerGrpcEndpoint() {
+    return _brokerGrpcEndpoint;
   }
 
   public String getMinionBaseApiUrl() {
@@ -174,6 +182,13 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+
+    int brokerGrpcPort = NetUtils.findOpenPort(_nextBrokerGrpcPort);
+    brokerConf.setProperty(Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
+    if (_brokerGrpcEndpoint == null) {
+      _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
+    }
+    _nextBrokerGrpcPort = brokerGrpcPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -330,6 +345,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters.clear();
     _brokerPorts.clear();
     _brokerBaseApiUrl = null;
+    _brokerGrpcEndpoint = null;
   }
 
   protected void stopServer() {
@@ -510,11 +526,23 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.stringToJsonNode(sendGetRequest(getBrokerBaseApiUrl() + "/" + uri));
   }
 
+  public JsonNode queryGrpcEndpoint(String query, Map<String, String> metadataMap)
+      throws IOException {
+    GrpcConnection grpcConnection =
+        ConnectionFactory.fromHostListGrpc(new Properties(), List.of(getBrokerGrpcEndpoint()));
+    return grpcConnection.getJsonResponse(query, metadataMap);
+  }
+
   /**
-   * Queries the broker's sql query endpoint (/query/sql)
+   * Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
    */
-  public JsonNode postQuery(String query)
+  public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
+    if (System.currentTimeMillis() % 2 == 0) {
+      return queryGrpcEndpoint(query,
+          Map.of(Broker.Request.QUERY_OPTIONS,
+              Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=" + useMultiStageQueryEngine()));
+    }
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
   }
@@ -522,10 +550,20 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query, Map<String, String> headers)
+  protected JsonNode postQuery(@Language("sql") String query, Map<String, String> headers)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
         getExtraQueryProperties());
+  }
+
+  public QueryAssert assertQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQuery(query));
+  }
+
+  public QueryAssert assertControllerQuery(@Language("sql") String query)
+      throws Exception {
+    return QueryAssert.assertThat(postQueryToController(query));
   }
 
   protected Map<String, String> getExtraQueryProperties() {
@@ -535,7 +573,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query or /query/sql)
    */
-  public static JsonNode postQuery(String query, String brokerQueryApiUrl, Map<String, String> headers,
+  public static JsonNode postQuery(@Language("sql") String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -551,7 +589,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryWithOptions(String query, String queryOptions)
+  protected JsonNode postQueryWithOptions(@Language("sql") String query, String queryOptions)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         Map.of("queryOptions", queryOptions));
@@ -560,13 +598,13 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public JsonNode postQueryToController(String query)
+  public JsonNode postQueryToController(@Language("sql") String query)
       throws Exception {
     return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
   }
 
   public JsonNode cancelQuery(String clientQueryId)
-    throws Exception {
+      throws Exception {
     URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
     Object o = _httpClient.sendDeleteRequest(cancelURI);
     return null; // TODO
@@ -616,11 +654,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public void assertNoError(JsonNode response) {
-    JsonNode exceptionsJson = response.get("exceptions");
-    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
-    if (exIterator.hasNext()) {
-      Assert.fail("There is at least one exception: " + exIterator.next());
-    }
+    QueryAssert.assertThat(response)
+        .hasNoExceptions();
   }
 
   @DataProvider(name = "systemColumns")

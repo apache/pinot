@@ -175,6 +175,15 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
 
+  /// Number of tasks started by the MSE query runner
+  MULTI_STAGE_RUNNER_STARTED_TASKS("tasks", true),
+  /// Number of stats completed by the MSE query runner
+  MULTI_STAGE_RUNNER_COMPLETED_TASKS("tasks", true),
+  /// Number of tasks started by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
+  /// Number of tasks completed by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+
   // predownload metrics
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),

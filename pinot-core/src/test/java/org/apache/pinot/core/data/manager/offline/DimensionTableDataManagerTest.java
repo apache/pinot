@@ -65,6 +65,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -129,21 +130,28 @@ public class DimensionTableDataManagerTest {
   }
 
   private Schema getSchema() {
-    return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
+    return new Schema.SchemaBuilder()
+        .setSchemaName("dimBaseballTeams")
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .build();
   }
 
   private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
     DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
-        .setDimensionTableConfig(dimensionTableConfig).build();
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("dimBaseballTeams")
+        .setDimensionTableConfig(dimensionTableConfig)
+        .build();
   }
 
   private Schema getSchemaWithExtraColumn() {
     return new Schema.SchemaBuilder().setSchemaName("dimBaseballTeams")
-        .addSingleValueDimension("teamID", DataType.STRING).addSingleValueDimension("teamName", DataType.STRING)
-        .addSingleValueDimension("teamCity", DataType.STRING).setPrimaryKeyColumns(Collections.singletonList("teamID"))
+        .addSingleValueDimension("teamID", DataType.STRING)
+        .addSingleValueDimension("teamName", DataType.STRING)
+        .addSingleValueDimension("teamCity", DataType.STRING)
+        .setPrimaryKeyColumns(Collections.singletonList("teamID"))
         .build();
   }
 
@@ -348,6 +356,31 @@ public class DimensionTableDataManagerTest {
     // confirm table is cleaned up
     assertFalse(tableDataManager.containsKey(key));
     assertNull(tableDataManager.lookupRow(key));
+  }
+
+  @DataProvider(name = "options")
+  private Object[] getOptions() {
+    return new Boolean[]{true, false};
+  }
+
+  @Test(dataProvider = "options")
+  public void testDeleteTableRemovesManagerFromMemory(boolean disablePreload)
+      throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        SchemaUtils.toZNRecord(getSchema()));
+    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(getTableConfig(disablePreload, false)));
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+
+    tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig,
+        SEGMENT_OPERATIONS_THROTTLER));
+
+    tableDataManager.shutDown();
+
+    Assert.assertNull(DimensionTableDataManager.getInstanceByTableName(tableDataManager.getTableName()));
   }
 
   @Test

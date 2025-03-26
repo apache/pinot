@@ -22,11 +22,13 @@ public class InstanceInfo {
   private final String _instanceName;
   private final String _host;
   private final Integer _port;
+  private final Integer _grpcPort;
 
-  public InstanceInfo(String instanceName, String host, Integer port) {
+  public InstanceInfo(String instanceName, String host, Integer port, Integer grpcPort) {
     _instanceName = instanceName;
     _host = host;
     _port = port;
+    _grpcPort = grpcPort;
   }
 
   public String getInstanceName() {
@@ -39,5 +41,9 @@ public class InstanceInfo {
 
   public Integer getPort() {
     return _port;
+  }
+
+  public Integer getGrpcPort() {
+    return _grpcPort;
   }
 }

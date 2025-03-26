@@ -105,6 +105,17 @@ public class ControllerRequestClient {
     }
   }
 
+  public void forceUpdateSchema(Schema schema)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forSchemaUpdate(schema.getSchemaName()) + "?force=true";
+    try {
+      HttpClient.wrapAndThrowHttpException(
+          _httpClient.sendMultipartPutRequest(url, schema.toSingleLineJsonString(), _headers));
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void deleteSchema(String schemaName)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaDelete(schemaName);
@@ -139,9 +150,15 @@ public class ControllerRequestClient {
 
   public void deleteTable(String tableNameWithType)
       throws IOException {
+    deleteTable(tableNameWithType, null);
+  }
+
+  public void deleteTable(String tableNameWithType, String retentionPeriod)
+      throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendDeleteRequest(new URI(_controllerRequestURLBuilder.forTableDelete(tableNameWithType)),
+          _httpClient.sendDeleteRequest(
+              new URI(_controllerRequestURLBuilder.forTableDelete(tableNameWithType, retentionPeriod)),
               _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);

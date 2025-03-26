@@ -25,6 +25,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
+import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -37,13 +38,15 @@ public class WorkerQueryServer {
   private final QueryServer _queryWorkerService;
 
   public WorkerQueryServer(PinotConfiguration configuration, InstanceDataManager instanceDataManager,
-      HelixManager helixManager, ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig) {
+      HelixManager helixManager, ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig,
+      SendStatsPredicate sendStats) {
     _configuration = toWorkerQueryConfig(configuration);
     _queryServicePort = _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(_configuration, instanceDataManager, helixManager, serverMetrics, tlsConfig);
-    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig);
+    queryRunner.init(_configuration, instanceDataManager, helixManager, serverMetrics, tlsConfig,
+        sendStats::getSendStats);
+    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig, serverMetrics, configuration);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {
