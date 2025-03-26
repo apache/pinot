@@ -424,7 +424,6 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
 
     if (_currentBatchIndex == _currentBatchSize - 1) {
       if (_brokerResponseIterator.hasNext()) {
-        System.out.println("Try to fetch next batch of rows from broker response iterator.");
         try {
           _currentRowBatch = GrpcUtils.extractRowsJson(_brokerResponseIterator.next());
           _currentBatchIndex = 0;
