@@ -55,7 +55,7 @@ public class ConsumerCoordinator {
   private volatile int _maxSegmentSeqNumRegistered = -1;
   private final boolean _alwaysRelyOnIdealState;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final AtomicBoolean _isFirstTransitionProcessed;
+  private final AtomicBoolean _firstTransitionProcessed;
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
