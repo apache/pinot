@@ -216,7 +216,7 @@ public class ConsumerCoordinator {
 
   @VisibleForTesting
   @Nullable
-  LLCSegmentName getPreviousSegment(LLCSegmentName currSegment) {
+  LLCSegmentName getPreviousSegmentFromIdealState(LLCSegmentName currSegment) {
     long startTimeMs = System.currentTimeMillis();
     // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
     // created before current segment
