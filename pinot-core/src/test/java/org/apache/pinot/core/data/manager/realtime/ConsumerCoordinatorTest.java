@@ -80,6 +80,8 @@ public class ConsumerCoordinatorTest {
       }};
       _segmentAssignmentMap = new HashMap<>() {{
         put("tableTest_REALTIME__1__101__20250304T0035Z", serverSegmentStatusMap);
+        put("tableTest_REALTIME__2__101__20250304T0035Z", serverSegmentStatusMap);
+        put("tableTest_REALTIME__2__100__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__1__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__14__20250304T0035Z", serverSegmentStatusMap);
         put("tableTest_REALTIME__1__91__20250304T0035Z", serverSegmentStatusMap);

@@ -283,6 +283,7 @@ public class ConsumerCoordinator {
     return _isFirstTransitionProcessed;
   }
 
+  // this should not be used outside of tests.
   @VisibleForTesting
   int getMaxSegmentSeqNumLoaded() {
     return _maxSegmentSeqNumRegistered;
