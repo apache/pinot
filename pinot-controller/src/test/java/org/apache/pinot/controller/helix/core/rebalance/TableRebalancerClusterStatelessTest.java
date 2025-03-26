@@ -1645,16 +1645,16 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+    RebalanceSummaryResult.ConsumingSegmentSummary consumingSegmentSummary =
+        summaryResult.getSegmentInfo().getConsumingSegmentSummary();
+    assertNotNull(consumingSegmentSummary);
+    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         0);
-    assertEquals(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertEquals(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
-    assertTrue(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertTrue(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
@@ -1664,16 +1664,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+    consumingSegmentSummary = summaryResult.getSegmentInfo().getConsumingSegmentSummary();
+    assertNotNull(consumingSegmentSummary);
+    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         0);
-    assertEquals(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertEquals(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
-    assertTrue(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertTrue(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
@@ -1691,17 +1690,16 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    assertNotNull(summaryResult.getSegmentInfo().getConsumingSegmentSummary());
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(),
+    consumingSegmentSummary = summaryResult.getSegmentInfo().getConsumingSegmentSummary();
+    assertNotNull(consumingSegmentSummary);
+    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
-    assertEquals(summaryResult.getSegmentInfo().getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(),
+    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         mockOffsetBig);
-    assertEquals(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertEquals(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
-    assertTrue(summaryResult.getSegmentInfo()
-        .getConsumingSegmentSummary()
+    assertTrue(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
