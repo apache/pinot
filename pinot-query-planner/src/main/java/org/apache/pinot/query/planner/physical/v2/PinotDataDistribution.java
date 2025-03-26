@@ -22,12 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.util.mapping.Mappings;
 
 
 /**
@@ -125,8 +125,19 @@ public class PinotDataDistribution {
     if (_type != RelDistribution.Type.HASH_DISTRIBUTED) {
       return false;
     }
-    HashDistributionDesc hashDistributionDesc = satisfiesHashDistributionConstraint(distributionConstraint);
-    return hashDistributionDesc != null;
+    return satisfiesHashDistributionDesc(distributionConstraint.getKeys()) != null;
+  }
+
+  /**
+   * Returns a Hash Distribution Desc
+   */
+  @Nullable
+  public HashDistributionDesc satisfiesHashDistributionDesc(List<Integer> keys) {
+    Preconditions.checkNotNull(_hashDistributionDesc, "null hashDistributionDesc in satisfies");
+    // Return any hash distribution descriptor that matches the given constraint *exactly*.
+    // TODO: Add support for partial check here. e.g. (GROUP BY 1, 2, 3, 4 > GROUP BY 2, 4), does not require
+    //   re-partitioning.
+    return _hashDistributionDesc.stream().filter(x -> x.getKeys().equals(keys)).findFirst().orElse(null);
   }
 
   public boolean satisfies(@Nullable RelCollation relCollation) {
@@ -139,16 +150,16 @@ public class PinotDataDistribution {
     return _collation.satisfies(relCollation);
   }
 
-  public PinotDataDistribution apply(@Nullable Map<Integer, List<Integer>> mapping) {
-    if (mapping == null) {
+  public PinotDataDistribution apply(@Nullable Mappings.TargetMapping targetMapping) {
+    if (targetMapping == null) {
       return new PinotDataDistribution(RelDistribution.Type.ANY, _workers, _workerHash, null, null);
     }
     Set<HashDistributionDesc> newHashDesc = new HashSet<>();
     if (_hashDistributionDesc != null) {
       for (HashDistributionDesc desc : _hashDistributionDesc) {
-        Set<HashDistributionDesc> newDescs = desc.apply(mapping);
+        HashDistributionDesc newDescs = desc.apply(targetMapping);
         if (newDescs != null) {
-          newHashDesc.addAll(newDescs);
+          newHashDesc.add(newDescs);
         }
       }
     }
@@ -159,15 +170,6 @@ public class PinotDataDistribution {
     // TODO: Preserve collation too.
     RelCollation newCollation = RelCollations.EMPTY;
     return new PinotDataDistribution(newType, _workers, _workerHash, newHashDesc, newCollation);
-  }
-
-  @Nullable
-  public HashDistributionDesc satisfiesHashDistributionConstraint(RelDistribution hashConstraint) {
-    Preconditions.checkNotNull(_hashDistributionDesc, "Found hashDistributionDesc null in satisfies");
-    // TODO: once we switch away from RelDistribution, we can also support partial constraints.
-    // Return any hash distribution descriptor that matches the given constraint.
-    return _hashDistributionDesc.stream().filter(x -> x.getKeyIndexes().equals(hashConstraint.getKeys())).findFirst()
-        .orElse(null);
   }
 
   private void validate() {
