@@ -1748,7 +1748,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
-  // Consumption while downloading and replacing consuming segment is not allowed for the following tables:
   // 1. Partial Upserts
   // 2. Dedup Tables
   // For the above table types, we would be looking into the metadata information when inserting a new record,
