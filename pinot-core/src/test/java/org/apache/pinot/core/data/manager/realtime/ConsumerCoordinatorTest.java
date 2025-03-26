@@ -66,6 +66,11 @@ public class ConsumerCoordinatorTest {
     public StreamIngestionConfig getStreamIngestionConfig() {
       return _streamIngestionConfig;
     }
+
+    @Override
+    public String getServerInstance() {
+      return "server_1";
+    }
   }
 
   private static class FakeConsumerCoordinator extends ConsumerCoordinator {
@@ -433,6 +438,7 @@ public class ConsumerCoordinatorTest {
   public void testPreviousSegment() {
     RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
     Mockito.when(realtimeTableDataManager.getTableName()).thenReturn("tableTest_REALTIME");
+    Mockito.when(realtimeTableDataManager.getServerInstance()).thenReturn("server_1");
 
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
 
@@ -442,6 +448,14 @@ public class ConsumerCoordinatorTest {
     LLCSegmentName previousSegment = consumerCoordinator.getPreviousSegment(llcSegmentName);
     Assert.assertNotNull(previousSegment);
     Assert.assertEquals(previousSegment.getSegmentName(), "tableTest_REALTIME__1__91__20250304T0035Z");
+
+    consumerCoordinator.getSegmentAssignment().clear();
+    Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
+      put("server_3", "ONLINE");
+    }};
+    consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
+    previousSegment = consumerCoordinator.getPreviousSegment(llcSegmentName);
+    Assert.assertNull(previousSegment);
   }
 
   private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {

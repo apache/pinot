@@ -145,9 +145,6 @@ public class ConsumerCoordinator {
 
   private void acquireSegmentRelyingOnIdealState(LLCSegmentName currSegment)
       throws InterruptedException {
-    long startTimeMs = System.currentTimeMillis();
-
-    // this can be slow. And should not happen within lock.
     LLCSegmentName previousLLCSegmentName = getPreviousSegment(currSegment);
     if (previousLLCSegmentName == null) {
       // previous segment can only be null if either all the previous segments are deleted or this is the starting
@@ -156,15 +153,9 @@ public class ConsumerCoordinator {
     }
     String previousSegment = previousLLCSegmentName.getSegmentName();
 
-    long duration = System.currentTimeMillis() - startTimeMs;
-    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {} ms.", previousSegment,
-        currSegment.getSegmentName(), duration);
-    _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_DURATION_MS, duration, TimeUnit.MILLISECONDS);
-
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
     try {
-      startTimeMs = System.currentTimeMillis();
+      long startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
         while (segmentDataManager == null) {
@@ -173,6 +164,13 @@ public class ConsumerCoordinator {
           while (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waiting on previous segment: {} since: {} ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
+            // waited until timeout, fetch previous segment again from ideal state as previous segment might be
+            // changed in ideal state.
+            previousLLCSegmentName = getPreviousSegment(currSegment);
+            if (previousLLCSegmentName == null) {
+              return;
+            }
+            previousSegment = previousLLCSegmentName.getSegmentName();
           }
           segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
         }
@@ -219,6 +217,7 @@ public class ConsumerCoordinator {
   @VisibleForTesting
   @Nullable
   LLCSegmentName getPreviousSegment(LLCSegmentName currSegment) {
+    long startTimeMs = System.currentTimeMillis();
     // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
     // created before current segment
     int maxSequenceNumBelowCurrentSegment = -1;
@@ -226,14 +225,16 @@ public class ConsumerCoordinator {
     int currPartitionGroupId = currSegment.getPartitionGroupId();
     int currSequenceNum = currSegment.getSequenceNumber();
     Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
+    String currentServerInstanceId = _realtimeTableDataManager.getServerInstance();
 
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
+      String state = instanceStateMap.get(currentServerInstanceId);
 
-      if (!instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)) {
+      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
         // if server is looking for previous segment to current transition's segment, it means the previous segment
-        // has to be online in any instance. If all previous segments are not online, we just allow the current helix
+        // has to be online in the instance. If all previous segments are not online, we just allow the current helix
         // transition to go ahead.
         continue;
       }
@@ -260,6 +261,16 @@ public class ConsumerCoordinator {
         previousSegment = llcSegmentName;
       }
     }
+
+    long duration = System.currentTimeMillis() - startTimeMs;
+    String prevSegmentName = null;
+    if (previousSegment != null) {
+      prevSegmentName = previousSegment.getSegmentName();
+    }
+    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {} ms.", prevSegmentName,
+        currSegment.getSegmentName(), duration);
+    _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
+        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_DURATION_MS, duration, TimeUnit.MILLISECONDS);
 
     return previousSegment;
   }
