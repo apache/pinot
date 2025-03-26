@@ -44,6 +44,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,9 +124,16 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       List<String> segments = routingEntry.getValue().getSegments();
       // TODO: enable throttling on per host bases.
       try {
+        String cid = QueryThreadContext.getCid() == null ? QueryThreadContext.getCid() : Long.toString(requestId);
         Iterator<Server.ServerResponse> streamingResponse = _streamingQueryClient.submit(serverInstance,
-            new ServerGrpcRequestBuilder().setRequestId(requestId).setBrokerId(_brokerId).setEnableTrace(trace)
-                .setEnableStreaming(true).setBrokerRequest(brokerRequest).setSegments(segments).build());
+            new ServerGrpcRequestBuilder()
+                .setRequestId(requestId)
+                .setCid(cid)
+                .setBrokerId(_brokerId)
+                .setEnableTrace(trace)
+                .setEnableStreaming(true)
+                .setBrokerRequest(brokerRequest)
+                .setSegments(segments).build());
         responseMap.put(serverInstance.toServerRoutingInstance(tableType, ServerInstance.RoutingType.GRPC),
             streamingResponse);
       } catch (Exception e) {

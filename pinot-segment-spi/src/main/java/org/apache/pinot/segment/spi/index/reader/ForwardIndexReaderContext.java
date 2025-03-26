@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
-
-
 /**
  * Interface for the context of the forward index reader.
  * <p>The forward index reader itself is always stateless because it needs to be accessed by multiple threads. The
  * context can be passed when reading the values from the forward index reader so that reader can store some states
  * inside the context in order to accelerate the following reads.
  */
-public interface ForwardIndexReaderContext extends Closeable {
+public interface ForwardIndexReaderContext extends AutoCloseable {
+
+  @Override
+  void close();
 }

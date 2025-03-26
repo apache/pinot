@@ -91,7 +91,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail for null timeColumnName and null schema in REALTIME table");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -101,7 +101,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail for null schema in REALTIME table");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -149,12 +149,22 @@ public class TableConfigUtilsTest {
     // OFFLINE table
     // null timeColumnName and schema - allowed in OFFLINE
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    TableConfigUtils.validate(tableConfig, null);
+    try {
+      TableConfigUtils.validate(tableConfig, null);
+      Assert.fail("Should fail for null timeColumnName and null schema in OFFLINE table");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
 
     // null schema only - allowed in OFFLINE
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
-    TableConfigUtils.validate(tableConfig, null);
+    try {
+      TableConfigUtils.validate(tableConfig, null);
+      Assert.fail("Should fail for null schema in OFFLINE table");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
 
     // null timeColumnName only - allowed in OFFLINE
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
@@ -172,7 +182,7 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // non-null schema nd timeColumnName, but timeColumnName not present as a time spec in schema
+    // non-null schema and timeColumnName, but timeColumnName not present as a time spec in schema
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(TIME_COLUMN, FieldSpec.DataType.STRING).build();
     tableConfig =
@@ -183,11 +193,6 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
-
-    // empty timeColumnName - valid
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName("").build();
-    TableConfigUtils.validate(tableConfig, schema);
 
     // valid
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -217,7 +222,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, null);
       Assert.fail("Should fail with a Dimension table without a schema");
-    } catch (IllegalStateException e) {
+    } catch (IllegalArgumentException e) {
       // expected
     }
 
@@ -327,7 +332,7 @@ public class TableConfigUtilsTest {
     // invalid transform config since Groovy is disabled
     try {
       TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema, null);
+      TableConfigUtils.validate(tableConfig, schema);
       // Reset to false
       TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in transform config");
@@ -363,7 +368,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
       TableConfigUtils.setDisableGroovy(true);
-      TableConfigUtils.validate(tableConfig, schema, null);
+      TableConfigUtils.validate(tableConfig, schema);
       // Reset to false
       TableConfigUtils.setDisableGroovy(false);
       Assert.fail("Should fail when Groovy functions disabled but found in filter config");
@@ -677,23 +682,27 @@ public class TableConfigUtilsTest {
 
   @Test
   public void ingestionStreamConfigsTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addDateTime("timeColumn", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
     Map<String, String> streamConfigs = getStreamConfigs();
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs)));
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig)
+        .build();
 
     // Multiple stream configs are allowed
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigs)));
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // validate the proto decoder
     streamConfigs = getKafkaStreamConfigs();
@@ -759,6 +768,8 @@ public class TableConfigUtilsTest {
 
   @Test
   public void ingestionBatchConfigsTest() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
+
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
@@ -773,11 +784,14 @@ public class TableConfigUtilsTest {
         new BatchIngestionConfig(Arrays.asList(batchConfigMap, batchConfigMap), null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
   }
 
   @Test
   public void ingestionConfigForDimensionTableTest() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(List.of("pk")).build();
+
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.INPUT_DIR_URI, "s3://foo");
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, "gs://bar");
@@ -792,12 +806,12 @@ public class TableConfigUtilsTest {
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "REFRESH", null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true)
         .setIngestionConfig(ingestionConfig).build();
-    TableConfigUtils.validateIngestionConfig(tableConfig, null);
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // dimension tables should have batch ingestion config
     ingestionConfig.setBatchIngestionConfig(null);
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should fail for Dimension table without batch ingestion config");
     } catch (IllegalStateException e) {
       // expected
@@ -807,7 +821,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", null));
     try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should fail for Dimension table with ingestion type APPEND (should be REFRESH)");
     } catch (IllegalStateException e) {
       // expected
@@ -1848,7 +1862,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
         .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(stringTypeDelCol);
@@ -1971,7 +1984,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.BOOLEAN).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDropOutOfOrderRecord(dropOutOfOrderRecord);
@@ -1992,7 +2004,6 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setOutOfOrderRecordColumn(outOfOrderRecordColumn);
@@ -2094,7 +2105,6 @@ public class TableConfigUtilsTest {
             .setPrimaryKeyColumns(Lists.newArrayList("myCol1")).build();
 
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.IGNORE);
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -2191,7 +2201,6 @@ public class TableConfigUtilsTest {
    */
   private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
     Map<String, String> streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
     partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.IGNORE);
@@ -2447,7 +2456,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
@@ -2457,7 +2465,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getKafkaStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
@@ -2469,7 +2476,6 @@ public class TableConfigUtilsTest {
   private Map<String, String> getPulsarStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "pulsar");
-    streamConfigs.put("stream.pulsar.consumer.type", "lowlevel");
     streamConfigs.put("stream.pulsar.topic.name", "test");
     streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
     streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");

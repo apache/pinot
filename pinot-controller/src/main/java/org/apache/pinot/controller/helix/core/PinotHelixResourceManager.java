@@ -247,7 +247,7 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
       boolean enableTieredSegmentAssignment, LineageManager lineageManager, RebalancePreChecker rebalancePreChecker,
-      @Nullable ExecutorService executorService) {
+      @Nullable ExecutorService executorService, double diskUtilizationThreshold) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -271,7 +271,7 @@ public class PinotHelixResourceManager {
     }
     _lineageManager = lineageManager;
     _rebalancePreChecker = rebalancePreChecker;
-    _rebalancePreChecker.init(this, executorService);
+    _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf, @Nullable ExecutorService executorService) {
@@ -279,7 +279,8 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService);
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), executorService,
+        controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -287,7 +288,8 @@ public class PinotHelixResourceManager {
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
         LineageManagerFactory.create(controllerConf),
-        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null);
+        RebalancePreCheckerFactory.create(controllerConf.getRebalancePreCheckerClass()), null,
+        controllerConf.getRebalanceDiskUtilizationThreshold());
   }
 
   /**
@@ -460,8 +462,8 @@ public class PinotHelixResourceManager {
   }
 
 /**
-   * Instance related APIs
-   */
+ * Instance related APIs
+ */
 
   /**
    * Get all instance Ids.
@@ -1628,21 +1630,10 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
   }
 
-  /**
-   * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
-   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE,
-   * this method can return null.
-   */
+  @Deprecated
   @Nullable
   public Schema getSchemaForTableConfig(TableConfig tableConfig) {
-    Schema schema = getSchema(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
-    if (schema == null) {
-      String schemaName = tableConfig.getValidationConfig().getSchemaName();
-      if (schemaName != null) {
-        schema = getSchema(schemaName);
-      }
-    }
-    return schema;
+    return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
   public List<String> getSchemaNames() {
@@ -2291,7 +2282,6 @@ public class PinotHelixResourceManager {
     }
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
-
 
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
       Set<String> consumingSegmentsCommitted)
@@ -4465,7 +4455,7 @@ public class PinotHelixResourceManager {
         if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
           InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
           hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-              Integer.parseInt(instanceConfig.getPort())));
+              Integer.parseInt(instanceConfig.getPort()), Integer.parseInt(HelixHelper.getGrpcPort(instanceConfig))));
         }
       }
       if (!hosts.isEmpty()) {

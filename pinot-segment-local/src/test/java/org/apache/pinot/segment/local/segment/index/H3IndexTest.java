@@ -99,7 +99,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           onHeapCreator.add(point);
           offHeapCreator.add(point);
           mutableH3Index.add(GeometrySerializer.serialize(point), -1, docId++);
-          long h3Id = H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+          long h3Id = H3Utils.H3_CORE.latLngToCell(latitude, longitude, resolution);
           expectedCardinalities.merge(h3Id, 1, Integer::sum);
         }
         onHeapCreator.seal();

@@ -59,6 +59,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
           index = 0;
         }
       } else {
+        closeIterators();
         return Constants.EOF;
       }
     }
@@ -70,5 +71,11 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
   public int advance(int targetDocId) {
     _nextDocId = targetDocId;
     return next();
+  }
+
+  private void closeIterators() {
+    for (BlockDocIdIterator it : _docIdIterators) {
+      it.close();
+    }
   }
 }

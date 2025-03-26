@@ -39,7 +39,8 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc);
 
   /**
-   * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids.
+   * Applies AND operation to the given bitmap of document ids, returns a bitmap of the matching document ids. This
+   * method is expected to be called only once, as resources are released after the first call.
    */
   default MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     if (docIds.isEmpty()) {
@@ -57,7 +58,6 @@ public interface ScanBasedDocIdIterator extends BlockDocIdIterator {
   /**
    * Returns the estimated (effective) cardinality of the underlying data source
    */
-
   default float getEstimatedCardinality(boolean isAndDocIdSet) {
     //default N/A behavior so that it always get picked in the end
     return isAndDocIdSet ? Float.NEGATIVE_INFINITY : Float.POSITIVE_INFINITY;

@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.core.routing;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 public class TimeBoundaryInfo {
   private final String _timeColumn;
   private final String _timeValue;
 
-  public TimeBoundaryInfo(String timeColumn, String timeValue) {
+  @JsonCreator
+  public TimeBoundaryInfo(@JsonProperty("timeColumn") String timeColumn, @JsonProperty("timeValue") String timeValue) {
     _timeColumn = timeColumn;
     _timeValue = timeValue;
   }

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -98,4 +99,7 @@ public interface BrokerRequestHandler {
       HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception;
+
+  /// Returns the request ID for the given client query ID.
+  OptionalLong getRequestIdByClientId(String clientQueryId);
 }

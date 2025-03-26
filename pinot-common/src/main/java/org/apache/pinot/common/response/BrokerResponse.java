@@ -19,6 +19,7 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
@@ -34,7 +35,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Interface for broker response.
  */
 public interface BrokerResponse {
-
   /**
    * Convert the broker response to JSON String.
    */
@@ -49,6 +49,16 @@ public interface BrokerResponse {
   default void toOutputStream(OutputStream outputStream)
       throws IOException {
     JsonUtils.objectToOutputStream(this, outputStream);
+  }
+
+  /**
+   * Convert the broker response metadata to JSON String.
+   */
+  default String toMetadataJsonString()
+      throws IOException {
+    ObjectNode objectNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
+    objectNode.remove("resultTable");
+    return JsonUtils.objectToString(objectNode);
   }
 
   /**
