@@ -132,7 +132,11 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
           Object[] values = blockValueFetcher.getRow(docId);
           for (int colId = 0; colId < numExpressions; colId++) {
             if (_nullBitmaps[colId] != null && _nullBitmaps[colId].contains(docId)) {
-              values[colId] = null;
+              if (values[colId] instanceof Double) {
+                values[colId] = Double.NEGATIVE_INFINITY;
+              } else {
+                values[colId] = null;
+              }
             }
           }
           _rows.add(values);
