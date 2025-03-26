@@ -144,8 +144,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
     _logger = LoggerFactory.getLogger(StatelessRealtimeSegmentWriter.class.getName() + "_" + _segmentName);
 
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(_tableConfig).get(0);
-    _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMap);
+    _streamConfig = IngestionConfigUtils.getFirstStreamConfig(_tableConfig);
 
     StreamPartitionMsgOffsetFactory offsetFactory =
         StreamConsumerFactoryProvider.create(_streamConfig).createStreamMsgOffsetFactory();

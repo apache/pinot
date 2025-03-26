@@ -727,6 +727,18 @@ public class CommonConstants {
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
 
+    public static class Grpc {
+      public static final String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
+      public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
+      public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
+      public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
+
+      public static final String BLOCK_ROW_SIZE = "blockRowSize";
+      public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
+      public static final String COMPRESSION = "compression";
+      public static final String DEFAULT_COMPRESSION = "ZSTD";
+    }
+
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
 
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
@@ -1285,6 +1297,7 @@ public class CommonConstants {
       public static final String END_OFFSET = "segment.realtime.endOffset";
       public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
       public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+      @Deprecated
       public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
 
       // Deprecated, but kept for backward-compatibility of reading old segments' ZK metadata

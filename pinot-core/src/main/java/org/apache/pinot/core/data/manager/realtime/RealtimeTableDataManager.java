@@ -626,7 +626,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private long getDownloadTimeoutMs(TableConfig tableConfig) {
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(tableConfig);
     String timeoutSeconds = streamConfigMap.get(StreamConfigProperties.PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS);
     if (timeoutSeconds != null) {
       return TimeUnit.SECONDS.toMillis(Integer.parseInt(timeoutSeconds));
