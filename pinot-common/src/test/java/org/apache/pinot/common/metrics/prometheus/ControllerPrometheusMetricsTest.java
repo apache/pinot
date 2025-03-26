@@ -75,13 +75,13 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
       if (controllerTimer == ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS) {
         _controllerMetrics.addTimedTableValue(String.format("%s.%s", TABLE_NAME_WITH_TYPE, "DONE"),
             ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, 100_000, TimeUnit.MILLISECONDS);
-        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.JOBSTATUS_TABLE_NAME_WITH_TYPE,
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.JOBSTATUS_TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
       } else if (controllerTimer == ControllerTimer.CRON_SCHEDULER_JOB_EXECUTION_TIME_MS) {
         _controllerMetrics.addTimedTableValue(String.format("%s.%s", TABLE_NAME_WITH_TYPE,
                 ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT),
             ControllerTimer.CRON_SCHEDULER_JOB_EXECUTION_TIME_MS, 100_000, TimeUnit.MILLISECONDS);
-        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TASKTYPE_TABLE_NAME_WITH_TYPE,
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TASKTYPE_TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
       } else {
         _controllerMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);

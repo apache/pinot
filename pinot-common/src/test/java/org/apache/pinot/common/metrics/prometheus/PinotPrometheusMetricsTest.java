@@ -330,12 +330,12 @@ public abstract class PinotPrometheusMetricsTest {
             ExportedLabelValues.TABLETYPE_REALTIME, ExportedLabelKeys.TASKTYPE,
             ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
 
-    public static final List<String> JOBSTATUS_TABLE_NAME_WITH_TYPE =
-        List.of(STATUS, ExportedLabelValues.DONE, TABLE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME);
+    public static final List<String> JOBSTATUS_TABLENAME_TABLETYPE =
+        List.of(STATUS, ExportedLabelValues.DONE, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME);
 
-    public static final List<String> TASKTYPE_TABLE_NAME_WITH_TYPE =
-        List.of(TASKTYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TABLE,
-            ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME);
+    public static final List<String> TASKTYPE_TABLENAME_TABLETYPE =
+        List.of(TASKTYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TABLE, ExportedLabelValues.TABLENAME,
+            TABLETYPE, TABLETYPE_REALTIME);
   }
 
   public static class ExportedLabelKeys {
