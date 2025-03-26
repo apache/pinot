@@ -108,10 +108,11 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
     RebalanceSummaryResult.SegmentInfo segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
-    Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 0);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(), 0);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(),
+    RebalanceSummaryResult.ConsumingSegmentSummary consumingSegmentSummary = segmentInfo.getConsumingSegmentSummary();
+    Assert.assertNotNull(consumingSegmentSummary);
+    Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    Assert.assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(), 0);
+    Assert.assertEquals(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer().size(),
         1);
 
     startServer();
@@ -122,17 +123,18 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
     segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
-    Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 1);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp(), 57801);
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer().size(),
+    consumingSegmentSummary = segmentInfo.getConsumingSegmentSummary();
+    Assert.assertNotNull(consumingSegmentSummary);
+    Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 1);
+    Assert.assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(), 57801);
+    Assert.assertEquals(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer().size(),
         2);
-    Assert.assertTrue(segmentInfo.getConsumingSegmentSummary()
+    Assert.assertTrue(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .allMatch(x -> x == 57801 || x == 0));
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary()
+    Assert.assertEquals(consumingSegmentSummary
         .getBytesConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
@@ -146,9 +148,10 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult().getSegmentInfo());
     segmentInfo = resultNoInfo.getRebalanceSummaryResult().getSegmentInfo();
-    Assert.assertNotNull(segmentInfo.getConsumingSegmentSummary());
-    Assert.assertEquals(segmentInfo.getConsumingSegmentSummary().getNumConsumingSegmentsToBeMoved(), 1);
-    Assert.assertNull(segmentInfo.getConsumingSegmentSummary().getMaxBytesConsumingSegmentsToCatchUp());
-    Assert.assertNull(segmentInfo.getConsumingSegmentSummary().getBytesConsumingSegmentsToCatchUpPerServer());
+    consumingSegmentSummary = segmentInfo.getConsumingSegmentSummary();
+    Assert.assertNotNull(consumingSegmentSummary);
+    Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 1);
+    Assert.assertNull(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp());
+    Assert.assertNull(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer());
   }
 }
