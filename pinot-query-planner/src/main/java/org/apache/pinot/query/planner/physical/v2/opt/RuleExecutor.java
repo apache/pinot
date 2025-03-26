@@ -31,13 +31,8 @@ import org.apache.pinot.query.planner.physical.v2.PRelNode;
  * An abstract executor for a single physical optimization rule. Implementations can define their own order of how
  * a tree of {@link PRelNode} should be processed.
  */
-public abstract class RuleExecutor {
+public abstract class RuleExecutor implements PRelNodeTransformer {
   protected final Deque<PRelNode> _parents = new ArrayDeque<>();
-
-  /**
-   * Processes the subtree rooted at currentNode.
-   */
-  public abstract PRelNode execute(PRelNode currentNode);
 
   /**
    * Calls {@link #execute(PRelNode)} for a sub-list of inputs of the current node. This ensures that the Deque to
