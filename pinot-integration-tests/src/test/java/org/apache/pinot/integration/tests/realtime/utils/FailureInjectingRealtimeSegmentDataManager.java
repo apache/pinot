@@ -43,16 +43,15 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
   /**
    * Creates a manager that will forcibly fail the commit segment step.
    */
-  public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata,
-      TableConfig tableConfig, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      ConsumerCoordinator consumerCoordinator, ServerMetrics serverMetrics,
-      boolean failCommit) throws AttemptsExceededException, RetriableOperationException {
+  public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+      RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
+      Schema schema, LLCSegmentName llcSegmentName, ConsumerCoordinator consumerCoordinator,
+      ServerMetrics serverMetrics, boolean failCommit)
+      throws AttemptsExceededException, RetriableOperationException {
     // Pass through to the real parent constructor
-    super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
-        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, serverMetrics,
-        null /* no PartitionUpsertMetadataManager */, null /* no PartitionDedupMetadataManager */,
-        () -> true /* isReadyToConsumeData always true for tests */);
+    super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, indexLoadingConfig, schema,
+        llcSegmentName, consumerCoordinator, serverMetrics, null /* no PartitionUpsertMetadataManager */,
+        null /* no PartitionDedupMetadataManager */, () -> true /* isReadyToConsumeData always true for tests */);
 
     _failCommit = failCommit;
   }
