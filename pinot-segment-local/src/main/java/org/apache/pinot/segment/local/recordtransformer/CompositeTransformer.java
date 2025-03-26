@@ -41,6 +41,30 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
 public class CompositeTransformer implements RecordTransformer {
   private final List<RecordTransformer> _transformers;
 
+  // todo: return a list
+  public static RecordTransformer getDefaultPreEnrichers(TableConfig tableConfig, Schema schema) {
+    List<RecordTransformer> recordEnrichers = new ArrayList<>();
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+      if (enrichmentConfigs != null) {
+        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+          try {
+            if (enrichmentConfig.isPreEnricher()) {
+              addIfNotNoOp(recordEnrichers, RecordEnricherRegistry.createRecordEnricher(enrichmentConfig));
+              // todo: support multiple. don't exit at first match
+              return recordEnrichers.get(0);
+            }
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(),
+                e);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * Returns a record transformer that performs null value handling, time/expression/data-type transformation and record
    * sanitization.

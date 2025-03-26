@@ -39,6 +39,8 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
  * It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
  */
 public class TransformPipeline {
+  // TODO: should we operate on RecordEnricher here instead?
+  private final RecordTransformer _preRecordEnricher;
   private final RecordTransformer _recordTransformer;
   private final ComplexTypeTransformer _complexTypeTransformer;
 
@@ -49,6 +51,7 @@ public class TransformPipeline {
    */
   public TransformPipeline(RecordTransformer recordTransformer,
       @Nullable ComplexTypeTransformer complexTypeTransformer) {
+    _preRecordEnricher = null; // todo: handle this constructor
     _recordTransformer = recordTransformer;
     _complexTypeTransformer = complexTypeTransformer;
   }
@@ -59,6 +62,9 @@ public class TransformPipeline {
    * @param schema the table schema
    */
   public TransformPipeline(TableConfig tableConfig, Schema schema) {
+    // Create pre enricher
+    _preRecordEnricher = CompositeTransformer.getDefaultPreEnrichers(tableConfig, schema);
+
     // Create record transformer
     _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
@@ -92,6 +98,11 @@ public class TransformPipeline {
   public void processRow(GenericRow decodedRow, Result reusedResult)
       throws Exception {
     reusedResult.reset();
+
+    if (_preRecordEnricher != null) {
+      decodedRow = _preRecordEnricher.transform(decodedRow);
+    }
+
     if (_complexTypeTransformer != null) {
       // TODO: consolidate complex type transformer into composite type transformer
       decodedRow = _complexTypeTransformer.transform(decodedRow);
