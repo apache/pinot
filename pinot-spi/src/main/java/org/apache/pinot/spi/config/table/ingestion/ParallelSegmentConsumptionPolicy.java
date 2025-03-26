@@ -22,8 +22,26 @@ package org.apache.pinot.spi.config.table.ingestion;
  * Policy to determine the behaviour of parallel consumption for Realtime Ingestion.
  */
 public enum ParallelSegmentConsumptionPolicy {
-  ALLOW_ALWAYS,               // Allow consumption of next segment during both build and download of the previous
-  ALLOW_DURING_BUILD_ONLY,    // Allow consumption of next segment during build but not download of the previous
-  ALLOW_DURING_DOWNLOAD_ONLY, // Allow consumption of next segment during download but not build of the previous
-  DISALLOW_ALWAYS             // Don't allow consumption of next segment during either build or download of the
+  ALLOW_ALWAYS(true, true),
+  ALLOW_DURING_BUILD_ONLY(true, false),
+  ALLOW_DURING_DOWNLOAD_ONLY(false, true),
+  DISALLOW_ALWAYS(false, false);
+
+  /// Whether the consumption of next segment is allowed during build of the previous segment.
+  private final boolean _allowedDuringBuild;
+  /// Whether the consumption of next segment is allowed during download of the previous segment.
+  private final boolean _allowedDuringDownload;
+
+  ParallelSegmentConsumptionPolicy(boolean allowedDuringBuild, boolean allowedDuringDownload) {
+    _allowedDuringBuild = allowedDuringBuild;
+    _allowedDuringDownload = allowedDuringDownload;
+  }
+
+  public boolean isAllowedDuringBuild() {
+    return _allowedDuringBuild;
+  }
+
+  public boolean isAllowedDuringDownload() {
+    return _allowedDuringDownload;
+  }
 }
