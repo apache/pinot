@@ -813,6 +813,7 @@ public class TableRebalancer {
         String server = entry.getKey();
         entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Collections.emptySet()));
       }
+      // turn the map into server -> consuming segments added
       newServersToConsumingSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
@@ -928,12 +929,16 @@ public class TableRebalancer {
 
   /**
    * Fetches the consuming segment info for the table and calculates the number of offsets to catch up for each
-   * consuming
-   * segment. Returns a map from segment name to the number of offsets to catch up for that consuming segment. Return
-   * null if failed to obtain info for any consuming segment.
+   * consuming segment. consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata.
+   * Returns a map from segment name to the number of offsets to catch up for that consuming
+   * segment. Return null if failed to obtain info for any consuming segment.
    */
   private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(String tableNameWithType,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
+    if (consumingSegmentZKMetadata.isEmpty()) {
+      LOGGER.info("No consuming segments being moved for table: {}", tableNameWithType);
+      return new HashMap<>();
+    }
     ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
     if (consumingSegmentInfoReader == null) {
       LOGGER.warn("ConsumingSegmentInfoReader is null, cannot calculate consuming segments info for table: {}",
@@ -975,6 +980,7 @@ public class TableRebalancer {
       LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);
       return null;
     }
+    LOGGER.info("Successfully fetched consuming segments info for table: {}", tableNameWithType);
     return segmentToOffsetsToCatchUp;
   }
 
