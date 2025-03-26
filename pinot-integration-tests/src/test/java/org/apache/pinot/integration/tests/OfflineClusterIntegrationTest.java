@@ -909,8 +909,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         RebalancePreCheckerResult.PreCheckStatus.PASS);
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
+    // Trigger rebalance config warning
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
     rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setBestEfforts(true);
+    rebalanceConfig.setBootstrap(true);
     rebalanceConfig.setMinAvailableReplicas(-1);
     tableConfig.setInstanceAssignmentConfigMap(null);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -918,9 +921,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Instance assignment not allowed, no need for minimizeDataMovement",
         RebalancePreCheckerResult.PreCheckStatus.PASS, "Reload needed prior to running rebalance",
         RebalancePreCheckerResult.PreCheckStatus.WARN,
-        "All rebalance parameters look good\n", RebalancePreCheckerResult.PreCheckStatus.PASS);
+        "bestEfforts is enabled, only enable it if you know what you are doing\n"
+            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
+            + "intended\n", RebalancePreCheckerResult.PreCheckStatus.WARN);
 
     // Disable dry-run
+    rebalanceConfig.setBootstrap(false);
+    rebalanceConfig.setBestEfforts(false);
     rebalanceConfig.setDryRun(false);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertNull(rebalanceResult.getPreChecksResult());
