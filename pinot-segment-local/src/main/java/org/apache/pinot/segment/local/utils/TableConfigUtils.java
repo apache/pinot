@@ -1000,24 +1000,8 @@ public final class TableConfigUtils {
     if (indexingConfig.getBloomFilterColumns() != null) {
       bloomFilterColumns.addAll(indexingConfig.getBloomFilterColumns());
     }
-    // Bloom index semantic validation
-    // Bloom filter cannot be defined on boolean columns
-    if (indexingConfig.getBloomFilterColumns() != null) {
-      for (String bloomIndexCol : indexingConfig.getBloomFilterColumns()) {
-        Preconditions.checkState(
-            schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN,
-            "Cannot create a bloom filter on boolean column " + bloomIndexCol);
-      }
-    }
     if (indexingConfig.getBloomFilterConfigs() != null) {
       bloomFilterColumns.addAll(indexingConfig.getBloomFilterConfigs().keySet());
-    }
-    if (indexingConfig.getBloomFilterConfigs() != null) {
-      for (String bloomIndexCol: indexingConfig.getBloomFilterConfigs().keySet()) {
-        Preconditions.checkState(
-            schema.getFieldSpecFor(bloomIndexCol).getDataType() != FieldSpec.DataType.BOOLEAN,
-            "Cannot create a bloom filter on boolean column " + bloomIndexCol);
-      }
     }
     for (String bloomFilterColumn : bloomFilterColumns) {
       columnNameToConfigMap.put(bloomFilterColumn, "Bloom Filter Config");
@@ -1109,6 +1093,11 @@ public final class TableConfigUtils {
                     + varLenDictCol);
         }
       }
+    }
+
+    for (String bloomFilterColumn : bloomFilterColumns) {
+      Preconditions.checkState(schema.getFieldSpecFor(bloomFilterColumn).getDataType() != FieldSpec.DataType.BOOLEAN,
+          "Cannot create bloom filter on BOOLEAN column: " + bloomFilterColumn);
     }
 
     for (String jsonIndexColumn : jsonIndexColumns) {
