@@ -54,7 +54,7 @@ public class ConsumerCoordinatorTest {
     }
 
     @Override
-    ConsumerCoordinator getSemaphoreAccessCoordinator(int partitionId) {
+    ConsumerCoordinator getConsumerCoordinator(int partitionId) {
       return _consumerCoordinator;
     }
 

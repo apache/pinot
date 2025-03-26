@@ -547,7 +547,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Generates only one semaphore for every partition
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     int partitionGroupId = llcSegmentName.getPartitionGroupId();
-    ConsumerCoordinator consumerCoordinator = getSemaphoreAccessCoordinator(partitionGroupId);
+    ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(partitionGroupId);
 
     // Create the segment data manager and register it
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
@@ -646,12 +646,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      ConsumerCoordinator semaphoreAccessCoordinator,
+      ConsumerCoordinator consumerCoordinator,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
     return new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, _serverMetrics,
+        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics,
         partitionUpsertMetadataManager, partitionDedupMetadataManager, isTableReadyToConsumeData);
   }
 
@@ -817,9 +817,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // they need to be notified here.
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
-        ConsumerCoordinator semaphoreAccessCoordinator =
-            getSemaphoreAccessCoordinator(llcSegmentName.getPartitionGroupId());
-        semaphoreAccessCoordinator.trackSegment(llcSegmentName);
+        ConsumerCoordinator consumerCoordinator =
+            getConsumerCoordinator(llcSegmentName.getPartitionGroupId());
+        consumerCoordinator.trackSegment(llcSegmentName);
       }
     }
     return oldSegmentDataManager;
@@ -883,7 +883,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @VisibleForTesting
-  ConsumerCoordinator getSemaphoreAccessCoordinator(int partitionGroupId) {
+  ConsumerCoordinator getConsumerCoordinator(int partitionGroupId) {
     return _partitionGroupIdToConsumerCoordinatorMap.computeIfAbsent(partitionGroupId,
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
   }

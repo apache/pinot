@@ -53,7 +53,7 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
   @Override
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      ConsumerCoordinator semaphoreAccessCoordinator,
+      ConsumerCoordinator consumerCoordinator,
       PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
@@ -63,6 +63,6 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       addFailureToCommits = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphoreAccessCoordinator, _serverMetrics, addFailureToCommits);
+        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, addFailureToCommits);
   }
 }
