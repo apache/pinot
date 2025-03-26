@@ -181,6 +181,21 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
         BlockingSegmentCompletionFSMState.ABORTED);
   }
 
+  /**
+   * The method is used to decide whether we should reduce segment size and reset when server reports
+   * cannot build segment due to non-recoverable error.
+   * In most of cases, when such request is sent, the error should be deterministic. However, due to possible data lost,
+   * replicas may not hold exact same data and some of them might be able to build the segment.
+   * If the FSM _state indicates that one replica starts to commit, it means immutable segment can be
+   * created successfully, returns true.
+   *
+   * @return boolean
+   */
+  public boolean isImmutableSegmentCreated() {
+    return _state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || _state.equals(
+        BlockingSegmentCompletionFSMState.COMMITTING) || _state.equals(BlockingSegmentCompletionFSMState.COMMITTED);
+  }
+
   /*
    * We just heard from a server that it has reached completion stage, and is reporting the offset
    * that the server is at. Since multiple servers can come in at the same time for this segment,

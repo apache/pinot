@@ -248,6 +248,19 @@ public class SegmentCompletionManager {
     return response;
   }
 
+  public SegmentCompletionProtocol.Response reduceSegmentSizeAndReset(
+      SegmentCompletionProtocol.Request.Params reqParams) {
+    String segmentName = reqParams.getSegmentName();
+    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
+    if (fsm != null && fsm.isImmutableSegmentCreated()) {
+      // In this case, other replica already starts committing the segment. It is a false alert.
+      LOGGER.warn("Segment {} cannot build is a false alert", segmentName);
+      return SegmentCompletionProtocol.RESP_DISCARD;
+    }
+    _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    return SegmentCompletionProtocol.RESP_PROCESSED;
+  }
+
   /**
    * This method is to be called when a server reports that it has stopped consuming a real-time segment.
    *

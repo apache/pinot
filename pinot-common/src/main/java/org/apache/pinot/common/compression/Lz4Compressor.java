@@ -42,7 +42,6 @@ public class Lz4Compressor implements Compressor {
     ByteBuffer buffer = ByteBuffer.allocate(4 + maxCompressedLength);
     buffer.putInt(input.length); // Store original length
     int compressedSize = _compressor.compress(input, 0, input.length, buffer.array(), 4, maxCompressedLength);
-    System.out.println("original size = " + input.length + ", compressed size = " + compressedSize);
     // Return only the valid portion of the array
     return Arrays.copyOfRange(buffer.array(), 0, 4 + compressedSize);
   }
