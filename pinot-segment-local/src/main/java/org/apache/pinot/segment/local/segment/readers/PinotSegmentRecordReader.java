@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,11 @@ public class PinotSegmentRecordReader implements RecordReader {
   private IndexSegment _indexSegment;
   private boolean _destroySegmentOnClose;
   private int _numDocs;
+
+  // These two collection allow for more efficient value reading - via indexes
+  private ArrayList<String> _columnNames;
+  private ArrayList<PinotSegmentColumnReader> _columnReaders;
+
   private Map<String, PinotSegmentColumnReader> _columnReaderMap;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
@@ -157,15 +163,23 @@ public class PinotSegmentRecordReader implements RecordReader {
 
     if (_numDocs > 0) {
       _columnReaderMap = new HashMap<>();
+      _columnReaders = new ArrayList<>();
+      _columnNames = new ArrayList<>();
       Set<String> columnsInSegment = _indexSegment.getPhysicalColumnNames();
       if (CollectionUtils.isEmpty(fieldsToRead)) {
         for (String column : columnsInSegment) {
-          _columnReaderMap.put(column, new PinotSegmentColumnReader(indexSegment, column));
+          PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
+          _columnReaderMap.put(column, reader);
+          _columnNames.add(column);
+          _columnReaders.add(reader);
         }
       } else {
         for (String column : fieldsToRead) {
           if (columnsInSegment.contains(column)) {
-            _columnReaderMap.put(column, new PinotSegmentColumnReader(indexSegment, column));
+            PinotSegmentColumnReader reader = new PinotSegmentColumnReader(indexSegment, column);
+            _columnReaderMap.put(column, reader);
+            _columnNames.add(column);
+            _columnReaders.add(reader);
           } else {
             LOGGER.warn("Ignoring column: {} that does not exist in the segment", column);
           }
@@ -224,6 +238,33 @@ public class PinotSegmentRecordReader implements RecordReader {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
+  }
+
+  public Object[] getRecordValues(int docId, int[] columnIndexes) {
+    Object[] values = new Object[columnIndexes.length];
+    for (int i = 0, n = columnIndexes.length; i < n; i++) {
+      int columnIndex = columnIndexes[i];
+      if (columnIndex > -1) {
+        PinotSegmentColumnReader columnReader = _columnReaders.get(columnIndex);
+        if (!columnReader.isNull(docId)) {
+          values[i] = columnReader.getValue(docId);
+        } else if (!_skipDefaultNullValues) {
+          values[i] = columnReader.getValue(docId);
+        } // else null value is kept
+      } // else keep null value
+    }
+
+    return values;
+  }
+
+  public int[] getIndexesForColumns(List<String> columnNames) {
+    int[] indexes = new int[columnNames.size()];
+
+    for (int i = 0, n = columnNames.size(); i < n; i++) {
+      indexes[i] = _columnNames.indexOf(columnNames.get(i));
+    }
+
+    return indexes;
   }
 
   // TODO:

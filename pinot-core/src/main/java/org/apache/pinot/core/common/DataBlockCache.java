@@ -34,7 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * to prevent garbage collection.
  */
 @SuppressWarnings("Duplicates")
-public class DataBlockCache {
+public class DataBlockCache implements AutoCloseable {
   private final DataFetcher _dataFetcher;
 
   // Mark whether data have been fetched, need to be cleared in initNewBlock()
@@ -405,5 +405,13 @@ public class DataBlockCache {
 
   public void addDataSource(String fullColumnKeyName, DataSource keyDataSource) {
     _dataFetcher.addDataSource(fullColumnKeyName, keyDataSource);
+  }
+
+  /**
+   * Close the data block cache and release all resources.
+   */
+  @Override
+  public void close() {
+    _dataFetcher.close();
   }
 }
