@@ -130,6 +130,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
+  private static final int TOP_N_IN_CONSUMING_SEGMENT_SUMMARY = 10;
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
@@ -876,7 +877,7 @@ public class TableRebalancer {
           .stream()
           .sorted(
               Collections.reverseOrder(Map.Entry.comparingByValue()))
-          .limit(10)
+          .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
           .forEach(entry -> topTenOffset.put(entry.getKey(), entry.getValue()));
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         int totalOffsetsToCatchUp =
@@ -890,17 +891,13 @@ public class TableRebalancer {
     }
 
     Map<String, Integer> oldestTenSegment;
-    if (consumingSegmentsAge != null) {
-      oldestTenSegment = new LinkedHashMap<>();
-      consumingSegmentsAge.entrySet()
-          .stream()
-          .sorted(
-              Map.Entry.comparingByValue())
-          .limit(10)
-          .forEach(entry -> oldestTenSegment.put(entry.getKey(), entry.getValue()));
-    } else {
-      oldestTenSegment = null;
-    }
+    oldestTenSegment = new LinkedHashMap<>();
+    consumingSegmentsAge.entrySet()
+        .stream()
+        .sorted(
+            Map.Entry.comparingByValue())
+        .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
+        .forEach(entry -> oldestTenSegment.put(entry.getKey(), entry.getValue()));
 
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
         newServersToConsumingSegmentMap.size(), topTenOffset, oldestTenSegment, consumingSegmentSummaryPerServer);
@@ -910,8 +907,14 @@ public class TableRebalancer {
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
     Map<String, Integer> consumingSegmentsAge = new HashMap<>();
     long now = System.currentTimeMillis();
-    consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> consumingSegmentsAge.put(s,
-        (int) (now - segmentZKMetadata.getCreationTime()) / 60_000)));
+    consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
+      long creationTime = segmentZKMetadata.getCreationTime();
+      if (creationTime < 0) {
+        LOGGER.warn("Creation time is not found for segment: {} in table: {}", s, tableNameWithType);
+        return;
+      }
+      consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
+    }));
     return consumingSegmentsAge;
   }
 
