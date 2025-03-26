@@ -20,60 +20,48 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.realtime.utils.FailureInjectingRealtimeTableDataManager.MAX_NUMBER_OF_FAILURES;
-import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertNotNull;
 
 
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
-
-  private static final int NUM_REALTIME_SEGMENTS = 48;
-  protected static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000; // 5 MINUTES
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(PauselessRealtimeIngestionSegmentCommitFailureTest.class);
   private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
-  private List<File> _avroFiles;
+  private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
 
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
-    properties.put(SegmentCompletionConfig.FSM_SCHEME + "pauseless",
-        "org.apache.pinot.controller.helix.core.realtime.PauselessSegmentCompletionFSM");
     // Set the delay more than the time we sleep before triggering RealtimeSegmentValidationManager manually, i.e.
     // MAX_SEGMENT_COMPLETION_TIME_MILLIS, to ensure that the segment level validations are performed.
     properties.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
@@ -82,13 +70,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    // Set segment store uri to the one used by controller as data dir (i.e. deep store)
-    try {
-      LOGGER.info("Set segment.store.uri: {} for server with scheme: {}", _controllerConfig.getDataDir(),
-          new URI(_controllerConfig.getDataDir()).getScheme());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
     serverConf.setProperty("pinot.server.instance.segment.store.uri", "file:" + _controllerConfig.getDataDir());
     serverConf.setProperty("pinot.server.instance." + HelixInstanceDataManagerConfig.UPLOAD_SEGMENT_TO_DEEP_STORE,
         "true");
@@ -114,9 +95,9 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     startServer();
 
     // load data in kafka
-    _avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_tempDir);
     startKafka();
-    pushAvroIntoKafka(_avroFiles);
+    pushAvroIntoKafka(avroFiles);
 
     setMaxSegmentCompletionTimeMillis();
     // create schema for non-pauseless table
@@ -125,105 +106,104 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     addSchema(schema);
 
     // add non-pauseless table
-    TableConfig tableConfig2 = createRealtimeTableConfig(_avroFiles.get(0));
+    TableConfig tableConfig2 = createRealtimeTableConfig(avroFiles.get(0));
     tableConfig2.setTableName(DEFAULT_TABLE_NAME_2);
     tableConfig2.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig2);
 
-    // Ensure that the commit protocol for all the segments have completed before injecting failure
     waitForDocsLoaded(600_000L, true, tableConfig2.getTableName());
-    TestUtils.waitForCondition((aVoid) -> {
-      List<SegmentZKMetadata> segmentZKMetadataList =
-          _helixResourceManager.getSegmentsZKMetadata(tableConfig2.getTableName());
-      return assertUrlPresent(segmentZKMetadataList);
-    }, 1000, 100000, "Some segments still have missing url");
 
     // create schema for pauseless table
     schema.setSchemaName(DEFAULT_TABLE_NAME);
     addSchema(schema);
 
     // add pauseless table
-    TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
 
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
+    indexingConfig.setStreamConfigs(null);
+    assertNotNull(streamConfigs);
+    streamConfigs.put(StreamConfigProperties.PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS, "10");
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(
-        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
-    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
-    Map<String, String> streamConfigMap = ingestionConfig.getStreamIngestionConfig()
-        .getStreamConfigMaps()
-        .get(0);
-    streamConfigMap.put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
-    streamConfigMap.put("segmentDownloadTimeoutMinutes", "1");
-    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
     tableConfig.setIngestionConfig(ingestionConfig);
 
     addTableConfig(tableConfig);
-    Thread.sleep(60000L);
-    TestUtils.waitForCondition(
-        (aVoid) -> numberOfErrorSegmentInExternalView(TableNameBuilder.REALTIME.tableNameWithType(getTableName()))
-            == MAX_NUMBER_OF_FAILURES,
-        1000, 600000, "Segments still not in error state");
-  }
-
-  @Test
-  public void testSegmentAssignment()
-      throws Exception {
-    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-
-    // 1) Capture which segments went into the ERROR state
-    List<String> erroredSegments = getErroredSegmentsInExternalView(tableNameWithType);
-    assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
-
-    // Let the RealtimeSegmentValidationManager run so it can fix up segments
-    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
-    LOGGER.info("Triggering RealtimeSegmentValidationManager to reingest errored segments");
-    _controllerStarter.getRealtimeSegmentValidationManager().run();
-    LOGGER.info("Finished RealtimeSegmentValidationManager to reingest errored segments");
-
-    // Wait until there are no ERROR segments in the ExternalView
-    TestUtils.waitForCondition(aVoid -> {
-      List<String> errorSegmentsRemaining = getErroredSegmentsInExternalView(tableNameWithType);
-      return errorSegmentsRemaining.isEmpty();
-    }, 10000, 100000, "Some segments are still in ERROR state after resetSegments()");
-
-    // Finally compare metadata across your two tables
-    compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(tableNameWithType),
-        _helixResourceManager.getSegmentsZKMetadata(
-            TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME_2)));
-  }
-
-  /**
-   * Returns the list of segment names in ERROR state from the ExternalView of the given table.
-   */
-  private List<String> getErroredSegmentsInExternalView(String tableName) {
-    ExternalView resourceEV = _helixResourceManager.getHelixAdmin()
-        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), tableName);
-    Map<String, Map<String, String>> segmentAssignment = resourceEV.getRecord().getMapFields();
-    List<String> erroredSegments = new ArrayList<>();
-    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
-      String segmentName = entry.getKey();
-      Map<String, String> serverToStateMap = entry.getValue();
-      for (String state : serverToStateMap.values()) {
-        if ("ERROR".equals(state)) {
-          erroredSegments.add(segmentName);
-          break; // No need to check other servers for this segment
-        }
-      }
-    }
-    return erroredSegments;
+    String realtimeTableName = tableConfig.getTableName();
+    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 600_000L,
+        "Segments still not in error state");
   }
 
   private void setMaxSegmentCompletionTimeMillis() {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
-      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)
-          .setMaxSegmentCompletionTimeoutMs(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
+          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
     }
   }
 
+  private int getNumErrorSegmentsInEV(String realtimeTableName) {
+    ExternalView externalView = _helixResourceManager.getHelixAdmin()
+        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
+    if (externalView == null) {
+      return 0;
+    }
+    int numErrorSegments = 0;
+    for (Map<String, String> instanceStateMap : externalView.getRecord().getMapFields().values()) {
+      for (String state : instanceStateMap.values()) {
+        if (state.equals(SegmentStateModel.ERROR)) {
+          numErrorSegments++;
+        }
+      }
+    }
+    return numErrorSegments;
+  }
+
+  @Test
+  public void testSegmentAssignment()
+      throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+
+    // 1) Capture which segments went into the ERROR state
+    List<String> erroredSegments = getErrorSegmentsInEV(realtimeTableName);
+    assertFalse(erroredSegments.isEmpty(), "No segments found in ERROR state, expected at least one.");
+
+    // Let the RealtimeSegmentValidationManager run so it can fix up segments
+    Thread.sleep(MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+    _controllerStarter.getRealtimeSegmentValidationManager().run();
+
+    // Wait until there are no ERROR segments in the ExternalView
+    TestUtils.waitForCondition(aVoid -> getErrorSegmentsInEV(realtimeTableName).isEmpty(), 600_000L,
+        "Some segments are still in ERROR state after resetSegments()");
+
+    // Finally compare metadata across your two tables
+    compareZKMetadataForSegments(_helixResourceManager.getSegmentsZKMetadata(realtimeTableName),
+        _helixResourceManager.getSegmentsZKMetadata(TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME_2)));
+  }
+
+  /**
+   * Returns the list of segment names in ERROR state from the ExternalView of the given table.
+   */
+  private List<String> getErrorSegmentsInEV(String realtimeTableName) {
+    ExternalView externalView = _helixResourceManager.getHelixAdmin()
+        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
+    if (externalView == null) {
+      return List.of();
+    }
+    List<String> errorSegments = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
+      if (entry.getValue().containsValue(SegmentStateModel.ERROR)) {
+        errorSegments.add(entry.getKey());
+      }
+    }
+    return errorSegments;
+  }
 
   private void compareZKMetadataForSegments(List<SegmentZKMetadata> segmentsZKMetadata,
       List<SegmentZKMetadata> segmentsZKMetadata1) {
@@ -261,7 +241,6 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
   @AfterClass
   public void tearDown()
       throws IOException {
-    LOGGER.info("Tearing down...");
     dropRealtimeTable(getTableName());
     stopServer();
     stopBroker();
@@ -269,43 +248,5 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
-  }
-
-  private void verifyIdealState(String tableName, int numSegmentsExpected) {
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableName);
-    Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
-    assertEquals(segmentAssignment.size(), numSegmentsExpected);
-  }
-
-  private int numberOfErrorSegmentInExternalView(String tableName) {
-    int errorSegmentCount = 0;
-    ExternalView resourceEV = _helixResourceManager.getHelixAdmin()
-        .getResourceExternalView(_helixResourceManager.getHelixClusterName(), tableName);
-    Map<String, Map<String, String>> segmentAssigment = resourceEV.getRecord().getMapFields();
-    for (Map<String, String> serverToStateMap : segmentAssigment.values()) {
-      for (String state : serverToStateMap.values()) {
-        if (state.equals("ERROR")) {
-          errorSegmentCount++;
-        }
-      }
-    }
-    return errorSegmentCount;
-  }
-
-  private void assertUploadUrlEmpty(List<SegmentZKMetadata> segmentZKMetadataList) {
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      assertNull(segmentZKMetadata.getDownloadUrl());
-    }
-  }
-
-  private boolean assertUrlPresent(List<SegmentZKMetadata> segmentZKMetadataList) {
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
-          && segmentZKMetadata.getDownloadUrl() == null) {
-        LOGGER.warn("URl not found for segment: {}", segmentZKMetadata.getSegmentName());
-        return false;
-      }
-    }
-    return true;
   }
 }

@@ -79,14 +79,15 @@ public class ParserUtils {
     // useMSEToFillEmptyResponseSchema=true) only for clusters where no queries with huge IN clauses are expected
     // (see https://github.com/apache/pinot/issues/15064)
     if (useMSE) {
-      try {
-        QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
-        RelRoot node = queryEnvironment.getRelRootIfCanCompile(query);
-        if (node != null && node.validatedRowType != null) {
-          dataTypeFields = node.validatedRowType.getFieldList();
-        }
+      QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
+      RelRoot root;
+      try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+        root = compiledQuery.getRelRoot();
       } catch (Exception ignored) {
-        // Ignored
+        root = null;
+      }
+      if (root != null && root.validatedRowType != null) {
+        dataTypeFields = root.validatedRowType.getFieldList();
       }
     }
 

@@ -20,11 +20,15 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,6 +63,17 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   // Storing singletons per table in a map
   private static final Map<String, DimensionTableDataManager> INSTANCES = new ConcurrentHashMap<>();
+  public static final Hash.Strategy<Object[]> HASH_STRATEGY = new Hash.Strategy<>() {
+    @Override
+    public int hashCode(Object[] o) {
+      return Arrays.hashCode(o);
+    }
+
+    @Override
+    public boolean equals(Object[] a, Object[] b) {
+      return Arrays.equals(a, b);
+    }
+  };
 
   private DimensionTableDataManager() {
   }
@@ -110,11 +125,19 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
 
     if (_disablePreload) {
+      Object2LongOpenCustomHashMap<Object[]> lookupTable = new Object2LongOpenCustomHashMap<>(HASH_STRATEGY);
+      lookupTable.defaultReturnValue(Long.MIN_VALUE);
+
       _dimensionTable.set(
-          new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, Collections.emptyMap(), Collections.emptyList(),
+          new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, Collections.emptyList(),
               Collections.emptyList(), this));
     } else {
-      _dimensionTable.set(new FastLookupDimensionTable(schema, primaryKeyColumns, new HashMap<>()));
+      List<String> valueColumns = getValueColumns(schema.getColumnNames(), primaryKeyColumns);
+
+      Object2ObjectOpenCustomHashMap<Object[], Object[]> lookupTable =
+          new Object2ObjectOpenCustomHashMap<>(HASH_STRATEGY);
+
+      _dimensionTable.set(new FastLookupDimensionTable(schema, primaryKeyColumns, valueColumns, lookupTable));
     }
   }
 
@@ -151,7 +174,9 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   protected void doShutdown() {
     releaseAndRemoveAllSegments();
     closeDimensionTable(_dimensionTable.get());
+    INSTANCES.remove(_tableNameWithType);
   }
+
 
   private void closeDimensionTable(DimensionTable dimensionTable) {
     try {
@@ -187,41 +212,68 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
 
-    Map<PrimaryKey, GenericRow> lookupTable = new HashMap<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
     try {
+      // count all documents to limit map re-sizings
+      int totalDocs = 0;
+      for (SegmentDataManager segmentManager : segmentDataManagers) {
+        IndexSegment indexSegment = segmentManager.getSegment();
+        totalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
+      }
+
+      Object2ObjectOpenCustomHashMap<Object[], Object[]> lookupTable =
+          new Object2ObjectOpenCustomHashMap<>(totalDocs, HASH_STRATEGY);
+
+      List<String> valueColumns = getValueColumns(schema.getColumnNames(), primaryKeyColumns);
+
       for (SegmentDataManager segmentManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentManager.getSegment();
         int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         if (numTotalDocs > 0) {
           try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
             recordReader.init(indexSegment);
+
+            int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
+            int[] valIndexes = recordReader.getIndexesForColumns(valueColumns);
+
             for (int i = 0; i < numTotalDocs; i++) {
               if (_loadToken.get() != token) {
                 // Token changed during the loading, abort the loading
                 return null;
               }
-              GenericRow row = new GenericRow();
-              recordReader.getRecord(i, row);
-              GenericRow previousRow = lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
-              if (_errorOnDuplicatePrimaryKey && previousRow != null) {
+
+              Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+              Object[] values = recordReader.getRecordValues(i, valIndexes);
+
+              Object[] previousValue = lookupTable.put(primaryKey, values);
+              if (_errorOnDuplicatePrimaryKey && previousValue != null) {
                 throw new IllegalStateException(
                     "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
-                        + "primary key already exist for: " + row.getPrimaryKey(primaryKeyColumns));
+                        + "primary key already exist for: " + Arrays.toString(primaryKey));
               }
             }
           } catch (Exception e) {
             throw new RuntimeException(
-                "Caught exception while reading records from segment: " + indexSegment.getSegmentName());
+                "Caught exception while reading records from segment: " + indexSegment.getSegmentName(), e);
           }
         }
       }
-      return new FastLookupDimensionTable(schema, primaryKeyColumns, lookupTable);
+      return new FastLookupDimensionTable(schema, primaryKeyColumns, valueColumns, lookupTable);
     } finally {
       for (SegmentDataManager segmentManager : segmentDataManagers) {
         releaseSegment(segmentManager);
       }
     }
+  }
+
+  private static List<String> getValueColumns(NavigableSet<String> columnNames, List<String> primaryKeyColumns) {
+    List<String> nonPkColumns = new ArrayList<>(columnNames.size() - primaryKeyColumns.size());
+    for (String columnName : columnNames) {
+      if (!primaryKeyColumns.contains(columnName)) {
+        nonPkColumns.add(columnName);
+      }
+    }
+    return nonPkColumns;
   }
 
   @Nullable
@@ -235,40 +287,41 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     Preconditions.checkState(CollectionUtils.isNotEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dimension table: %s", _tableNameWithType);
-    int numPrimaryKeyColumns = primaryKeyColumns.size();
 
-    Map<PrimaryKey, LookupRecordLocation> lookupTable = new HashMap<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
     List<PinotSegmentRecordReader> recordReaders = new ArrayList<>(segmentDataManagers.size());
+
+    int totalDocs = 0;
+    for (SegmentDataManager segmentManager : segmentDataManagers) {
+      IndexSegment indexSegment = segmentManager.getSegment();
+      totalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
+    }
+
+    Object2LongOpenCustomHashMap<Object[]> lookupTable = new Object2LongOpenCustomHashMap<>(totalDocs, HASH_STRATEGY);
+    lookupTable.defaultReturnValue(Long.MIN_VALUE);
+
     for (SegmentDataManager segmentManager : segmentDataManagers) {
       IndexSegment indexSegment = segmentManager.getSegment();
       int numTotalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
       if (numTotalDocs > 0) {
         try {
+          int readerIdx = recordReaders.size();
           PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
           recordReader.init(indexSegment);
           recordReaders.add(recordReader);
+          int[] pkIndexes = recordReader.getIndexesForColumns(primaryKeyColumns);
+
           for (int i = 0; i < numTotalDocs; i++) {
             if (_loadToken.get() != token) {
               // Token changed during the loading, abort the loading
-              for (PinotSegmentRecordReader reader : recordReaders) {
-                try {
-                  reader.close();
-                } catch (Exception e) {
-                  _logger.error("Caught exception while closing record reader for segment: {}", reader.getSegmentName(),
-                      e);
-                }
-              }
-              for (SegmentDataManager dataManager : segmentDataManagers) {
-                releaseSegment(dataManager);
-              }
+              releaseResources(recordReaders, segmentDataManagers);
               return null;
             }
-            Object[] values = new Object[numPrimaryKeyColumns];
-            for (int j = 0; j < numPrimaryKeyColumns; j++) {
-              values[j] = recordReader.getValue(i, primaryKeyColumns.get(j));
-            }
-            lookupTable.put(new PrimaryKey(values), new LookupRecordLocation(recordReader, i));
+
+            Object[] primaryKey = recordReader.getRecordValues(i, pkIndexes);
+
+            long readerIdxAndDocId = (((long) readerIdx) << 32) | (i & 0xffffffffL);
+            lookupTable.put(primaryKey, readerIdxAndDocId);
           }
         } catch (Exception e) {
           throw new RuntimeException(
@@ -278,6 +331,21 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
     }
     return new MemoryOptimizedDimensionTable(schema, primaryKeyColumns, lookupTable, segmentDataManagers, recordReaders,
         this);
+  }
+
+  private void releaseResources(List<PinotSegmentRecordReader> recordReaders,
+      List<SegmentDataManager> segmentDataManagers) {
+    for (PinotSegmentRecordReader reader : recordReaders) {
+      try {
+        reader.close();
+      } catch (Exception e) {
+        _logger.error("Caught exception while closing record reader for segment: {}", reader.getSegmentName(),
+            e);
+      }
+    }
+    for (SegmentDataManager dataManager : segmentDataManagers) {
+      releaseSegment(dataManager);
+    }
   }
 
   public boolean isPopulated() {

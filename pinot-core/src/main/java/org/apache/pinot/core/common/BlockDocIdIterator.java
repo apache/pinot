@@ -25,7 +25,7 @@ import org.apache.pinot.segment.spi.Constants;
  * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
  * ids returned from the iterator should be in ascending order.
  */
-public interface BlockDocIdIterator {
+public interface BlockDocIdIterator extends AutoCloseable {
 
   /**
    * Returns the next matching document id, or {@link Constants#EOF} if there is no more matching documents.
@@ -47,4 +47,12 @@ public interface BlockDocIdIterator {
    * @see {https://github.com/RoaringBitmap/RoaringBitmap/pull/243#issuecomment-381278304}
    */
   int OPTIMAL_ITERATOR_BATCH_SIZE = 256;
+
+  /**
+   * Close resources if applicable.
+   */
+  @Override
+  default void close() {
+    // do nothing by default
+  }
 }

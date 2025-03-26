@@ -202,13 +202,17 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       TransferableBlock block = _input.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
-        updateEosBlock(block, _statMap);
-        // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(block);
-        // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
-        // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
-        if (_context.getStageId() == 1) {
-          updateMetrics(block);
+        if (_context.isSendStats()) {
+          block = updateEosBlock(block, _statMap);
+          // no need to check early terminate signal b/c the current block is already EOS
+          sendTransferableBlock(block);
+          // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
+          // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
+          if (_context.getStageId() == 1) {
+            updateMetrics(block);
+          }
+        } else {
+          sendTransferableBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock());
         }
       } else {
         if (sendTransferableBlock(block)) {

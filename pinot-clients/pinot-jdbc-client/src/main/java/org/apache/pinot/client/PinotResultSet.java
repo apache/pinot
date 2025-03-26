@@ -49,9 +49,9 @@ public class PinotResultSet extends AbstractBaseResultSet {
   private org.apache.pinot.client.ResultSet _resultSet;
   private int _totalRows;
   private int _currentRow;
-  private int _totalColumns;
-  private Map<String, Integer> _columns = new HashMap<>();
-  private Map<Integer, String> _columnDataTypes = new HashMap<>();
+  private final int _totalColumns;
+  private final Map<String, Integer> _columns = new HashMap<>();
+  private final Map<Integer, String> _columnDataTypes = new HashMap<>();
   private boolean _closed;
   private boolean _wasNull = false;
 

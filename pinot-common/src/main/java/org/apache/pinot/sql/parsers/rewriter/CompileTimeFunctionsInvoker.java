@@ -103,8 +103,8 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       return RequestUtils.getLiteralExpression(result);
     } catch (Exception e) {
       throw new SqlCompilationException(
-          "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
-              arguments) + ": " + e.getMessage(), e);
+          "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
+              + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
   }
 }
