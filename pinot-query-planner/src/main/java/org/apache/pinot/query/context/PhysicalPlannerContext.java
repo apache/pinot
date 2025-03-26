@@ -26,6 +26,9 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
+/**
+ * Per-query unique context dedicated for the physical planner.
+ */
 public class PhysicalPlannerContext {
   private final Supplier<Integer> _nodeIdGenerator = new Supplier<>() {
     private int _id = 0;
@@ -46,6 +49,9 @@ public class PhysicalPlannerContext {
   private final String _hostName;
   private final int _port;
   private final long _requestId;
+  /**
+   * Instance ID of the instance corresponding to this process.
+   */
   private final String _instanceId;
 
   /**

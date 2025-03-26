@@ -23,25 +23,25 @@ package org.apache.pinot.query.planner.physical.v2;
  */
 public enum ExchangeStrategy {
   /**
-   * There's a single worker in the receiver, so each worker in the sender sends data to the same.
+   * There's a single stream in the receiver, so each stream in the sender sends data to the same.
    */
   SINGLETON_EXCHANGE,
   /**
-   * Worker-ID X sends data to Worker-ID X. This cannot be modeled by PARTITIONING_EXCHANGE because the fan-out for
+   * stream-ID X sends data to stream-ID X. This cannot be modeled by PARTITIONING_EXCHANGE because the fan-out for
    * this type of exchange is 1:1.
    */
   IDENTITY_EXCHANGE,
   /**
-   * Each worker will partition the outgoing stream based on a set of keys and a hash function.
+   * Each stream will partition the outgoing stream based on a set of keys and a hash function.
    * Fanout for this type of exchange is 1:all.
    */
   PARTITIONING_EXCHANGE,
   /**
-   * 1-to-1 but the exchange is a permutation of worker-ids.
+   * 1-to-1 but the exchange is a permutation of stream-ids.
    */
   PERMUTATION_EXCHANGE,
   /**
-   * Worker-ID X will sub-partition: i.e. divide the stream so that the data is sent to the streams
+   * stream-ID X will sub-partition: i.e. divide the stream so that the data is sent to the streams
    * {@code X, X + F, X + 2*F, ...}. Here F is the sub-partitioning factor. Records are assigned based on a
    * hash function. This is useful when joining two tables which have different number of partitions, but one of the
    * partition counts divides the other.
@@ -61,7 +61,7 @@ public enum ExchangeStrategy {
    */
   COALESCING_PARTITIONING_EXCHANGE,
   /**
-   * Each worker will send data to all receiving workers.
+   * Each stream will send data to all receiving streams.
    */
   BROADCAST_EXCHANGE
 }
