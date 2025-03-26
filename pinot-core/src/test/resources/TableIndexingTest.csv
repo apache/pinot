@@ -198,7 +198,7 @@ DECIMAL;sv_BIG;dict;range_index;true;
 DECIMAL;sv_BIG;dict;startree_index;true;
 DECIMAL;sv_BIG;dict;vector_index;false;Vector index is currently only supported on float array columns
 BOOLEAN;sv;raw;timestamp_index;true;
-BOOLEAN;sv;raw;bloom_filter;false;Bloom filter index is not supported for BOOLEAN type
+BOOLEAN;sv;raw;bloom_filter;false;Cannot create a bloom filter on boolean column col
 BOOLEAN;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 BOOLEAN;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
 BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
@@ -209,7 +209,7 @@ BOOLEAN;sv;raw;range_index;false;Unsupported data type BOOLEAN for range index
 BOOLEAN;sv;raw;startree_index;false;Dimension: col does not have dictionary
 BOOLEAN;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
 BOOLEAN;mv;raw;timestamp_index;false;Caught exception while reading data
-BOOLEAN;mv;raw;bloom_filter;false;Bloom filter index is not supported for BOOLEAN type
+BOOLEAN;mv;raw;bloom_filter;false;Cannot create a bloom filter on boolean column col
 BOOLEAN;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
 BOOLEAN;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
 BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col

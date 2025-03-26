@@ -297,9 +297,6 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          if (field.getDataType() == DataType.BOOLEAN) {
-            throw new IllegalArgumentException("Bloom filter index is not supported for BOOLEAN type");
-          }
           indexes.put("bloom", JsonUtils.newObjectNode());
 
           break;
