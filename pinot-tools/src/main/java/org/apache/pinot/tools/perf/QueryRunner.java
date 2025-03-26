@@ -24,10 +24,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -292,6 +294,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long totalBrokerTime = 0L;
     long totalClientTime = 0L;
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    Map<String, QueryStat> queryStatMap = new HashMap<>();
 
     final long startTimeAbsolute = System.currentTimeMillis();
     boolean timeoutReached = false;
@@ -317,6 +320,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         boolean hasException = !response.get("exceptions").isEmpty();
         numExceptions += hasException ? 1 : 0;
         statisticsList.get(0).addValue(clientTime);
+        queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -350,7 +354,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
-            statisticsList);
+            statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -395,12 +399,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -462,7 +467,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info(querySummary.toString());
@@ -508,12 +513,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -585,7 +591,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Target QPS: {}", startQPS);
@@ -636,12 +642,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
+    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
           new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, numExceptions,
-              statisticsList, headers));
+              statisticsList, headers, queryStatMap));
     }
     executorService.shutdown();
 
@@ -735,7 +742,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long timePassed = System.currentTimeMillis() - startTime;
     QuerySummary querySummary =
         new QuerySummary(timePassed, numQueriesExecuted.get(), numExceptions.get(), totalBrokerTime.get(),
-            totalClientTime.get(), statisticsList);
+            totalClientTime.get(), statisticsList, queryStatMap);
     LOGGER.info("--------------------------------------------------------------------------------");
     LOGGER.info("FINAL REPORT:");
     LOGGER.info("Current Target QPS: {}", currentQPS);
@@ -783,7 +790,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
-      AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers)
+      AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers,
+      Map<String, QueryStat> queryStatMap)
       throws Exception {
     JsonNode response = driver.postQuery(query, headers);
     numQueriesExecuted.getAndIncrement();
@@ -793,6 +801,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     totalClientTime.getAndAdd(clientTime);
     boolean hasException = !response.get("exceptions").isEmpty();
     numExceptions.getAndAdd(hasException ? 1 : 0);
+    queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
 
     statisticsList.get(0).addValue(clientTime);
   }
@@ -806,10 +815,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final AtomicInteger _numExceptions;
     private final List<Statistics> _statisticsList;
     private final Map<String, String> _headers;
+    private final Map<String, QueryStat> _queryStatMap;
 
     private Worker(PerfBenchmarkDriver driver, Queue<String> queryQueue, AtomicInteger numQueriesExecuted,
         AtomicLong totalBrokerTime, AtomicLong totalClientTime, AtomicInteger numExceptions,
-        List<Statistics> statisticsList, Map<String, String> headers) {
+        List<Statistics> statisticsList, Map<String, String> headers, Map<String, QueryStat> queryStatMap) {
       _driver = driver;
       _queryQueue = queryQueue;
       _numQueriesExecuted = numQueriesExecuted;
@@ -818,6 +828,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       _numExceptions = numExceptions;
       _statisticsList = statisticsList;
       _headers = headers;
+      _queryStatMap = queryStatMap;
     }
 
     @Override
@@ -834,7 +845,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         try {
           executeQueryInMultiThreads(_driver, query, _numQueriesExecuted, _totalBrokerTime, _totalClientTime,
-              _numExceptions, _statisticsList, _headers);
+              _numExceptions, _statisticsList, _headers, _queryStatMap);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running query: {}", query, e);
           return;
@@ -893,9 +904,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final double _avgBrokerTime;
     private final double _avgClientTime;
     private final List<Statistics> _statisticsList;
+    private final Map<String, QueryStat> _queryStats;
 
     private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions, long totalBrokerTime,
-        long totalClientTime, List<Statistics> statisticsList) {
+        long totalClientTime, List<Statistics> statisticsList, Map<String, QueryStat> queryStats) {
       _timePassed = timePassed;
       _numQueriesExecuted = numQueriesExecuted;
       _numExceptions = numExceptions;
@@ -903,6 +915,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       _avgBrokerTime = totalBrokerTime / (double) numQueriesExecuted;
       _avgClientTime = totalClientTime / (double) numQueriesExecuted;
       _statisticsList = statisticsList;
+      _queryStats = queryStats;
     }
 
     public long getTimePassed() {
@@ -930,7 +943,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     public double getPercentile(double p) {
-      if (_statisticsList == null || _statisticsList.size() == 0) {
+      if (_statisticsList == null || _statisticsList.isEmpty()) {
         return 0.0;
       }
 
@@ -942,12 +955,48 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       return _statisticsList;
     }
 
+    public Map<String, QueryStat> getQueryStats() {
+      return _queryStats;
+    }
+
     @Override
     public String toString() {
       return String.format("Time Passed: %sms\nQueries Executed: %s\nExceptions: %s\n"
               + "Average QPS: %s\nAverage Broker Time: %sms\nAverage Client Time: %sms", _timePassed,
           _numQueriesExecuted,
           _numExceptions, _avgQps, _avgBrokerTime, _avgClientTime);
+    }
+  }
+
+  public static class QueryStat {
+    private int _numExecutions = 0;
+    private int _numExceptionalExecutions = 0;
+    private double _totalBrokerTime = 0.0;
+    private double _totalClientTime = 0.0;
+
+    public synchronized void addExecution(double brokerTime, double clientTime, boolean hasException) {
+      _numExecutions++;
+      if (hasException) {
+        _numExceptionalExecutions++;
+      }
+      _totalBrokerTime += brokerTime;
+      _totalClientTime += clientTime;
+    }
+
+    public double getAvgBrokerTime() {
+      return _totalBrokerTime / _numExecutions;
+    }
+
+    public double getAvgClientTime() {
+      return _totalClientTime / _numExecutions;
+    }
+
+    public int getNumExecutions() {
+      return _numExecutions;
+    }
+
+    public int getNumExceptionalExecutions() {
+      return _numExceptionalExecutions;
     }
   }
 
