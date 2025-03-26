@@ -160,7 +160,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
-    assertNull(rebalanceSummaryResult.getSegmentInfo().getConsumingSegmentSummary());
+    assertNull(rebalanceSummaryResult.getSegmentInfo().getConsumingSegmentToBeMovedSummary());
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertNotNull(rebalanceSummaryResult.getTagsInfo());
@@ -1645,38 +1645,34 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     RebalanceSummaryResult summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    RebalanceSummaryResult.ConsumingSegmentSummary consumingSegmentSummary =
-        summaryResult.getSegmentInfo().getConsumingSegmentSummary();
-    assertNotNull(consumingSegmentSummary);
-    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
-    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
-        0);
-    assertEquals(consumingSegmentSummary
+    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary =
+        summaryResult.getSegmentInfo().getConsumingSegmentToBeMovedSummary();
+    assertNotNull(consumingSegmentToBeMovedSummary);
+    assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
-        .size(), numServers);
-    assertTrue(consumingSegmentSummary
+        .size(), 0);
+    assertTrue(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
-        .allMatch(x -> x == 0));
+        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 0));
 
     rebalanceConfig.setIncludeConsuming(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    consumingSegmentSummary = summaryResult.getSegmentInfo().getConsumingSegmentSummary();
-    assertNotNull(consumingSegmentSummary);
-    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
-    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
-        0);
-    assertEquals(consumingSegmentSummary
+    consumingSegmentToBeMovedSummary = summaryResult.getSegmentInfo().getConsumingSegmentToBeMovedSummary();
+    assertNotNull(consumingSegmentToBeMovedSummary);
+    assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    assertEquals(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
-        .size(), numServers);
-    assertTrue(consumingSegmentSummary
+        .size(), 0);
+    assertTrue(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
-        .allMatch(x -> x == 0));
+        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 0));
 
     for (int i = numServers; i < numServers * 2; i++) {
       String instanceId = "consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i;
@@ -1690,20 +1686,18 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     summaryResult = rebalanceResult.getRebalanceSummaryResult();
     assertNotNull(summaryResult.getSegmentInfo());
-    consumingSegmentSummary = summaryResult.getSegmentInfo().getConsumingSegmentSummary();
-    assertNotNull(consumingSegmentSummary);
-    assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(),
+    consumingSegmentToBeMovedSummary = summaryResult.getSegmentInfo().getConsumingSegmentToBeMovedSummary();
+    assertNotNull(consumingSegmentToBeMovedSummary);
+    assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
-    assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
-        mockOffsetBig);
-    assertEquals(consumingSegmentSummary
+    assertEquals(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
-    assertTrue(consumingSegmentSummary
+    assertTrue(consumingSegmentToBeMovedSummary
         .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
-        .allMatch(x -> x == mockOffsetSmall * (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS - 1) + mockOffsetBig));
+        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == mockOffsetSmall * (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS - 1) + mockOffsetBig));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
