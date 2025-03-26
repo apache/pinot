@@ -1652,10 +1652,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         0);
     assertEquals(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
     assertTrue(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .allMatch(x -> x == 0));
@@ -1670,10 +1670,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         0);
     assertEquals(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
     assertTrue(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .allMatch(x -> x == 0));
@@ -1697,10 +1697,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(),
         mockOffsetBig);
     assertEquals(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .size(), numServers);
     assertTrue(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .allMatch(x -> x == mockOffsetSmall * (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS - 1) + mockOffsetBig));

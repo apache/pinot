@@ -309,22 +309,22 @@ public class RebalanceSummaryResult {
   public static class ConsumingSegmentSummary {
     private final int _numConsumingSegmentsToBeMoved;
     private final Integer _maxBytesConsumingSegmentsToCatchUp;
-    private final Map<String, Integer> _bytesConsumingSegmentsToCatchUpPerServer;
+    private final Map<String, Integer> _offsetsConsumingSegmentsToCatchUpPerServer;
 
     /**
      * Constructor for ConsumingSegmentInfo
      * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
      * @param maxBytesConsumingSegmentsToCatchUp maximum bytes of consuming segments to be moved to catch up
-     * @param bytesConsumingSegmentsToCatchUpPerServer bytes of consuming segments to be moved to catch up per server
+     * @param offsetsConsumingSegmentsToCatchUpPerServer offsets of consuming segments to be moved to catch up per server
      */
     @JsonCreator
     public ConsumingSegmentSummary(@JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
         @JsonProperty("maxBytesConsumingSegmentsToCatchUp") @Nullable Integer maxBytesConsumingSegmentsToCatchUp,
-        @JsonProperty("bytesConsumingSegmentsToCatchUpPerServer") @Nullable
-        Map<String, Integer> bytesConsumingSegmentsToCatchUpPerServer) {
+        @JsonProperty("offsetsConsumingSegmentsToCatchUpPerServer") @Nullable
+        Map<String, Integer> offsetsConsumingSegmentsToCatchUpPerServer) {
       _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
       _maxBytesConsumingSegmentsToCatchUp = maxBytesConsumingSegmentsToCatchUp;
-      _bytesConsumingSegmentsToCatchUpPerServer = bytesConsumingSegmentsToCatchUpPerServer;
+      _offsetsConsumingSegmentsToCatchUpPerServer = offsetsConsumingSegmentsToCatchUpPerServer;
     }
 
     @JsonProperty
@@ -340,8 +340,8 @@ public class RebalanceSummaryResult {
 
     @JsonProperty
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public Map<String, Integer> getBytesConsumingSegmentsToCatchUpPerServer() {
-      return _bytesConsumingSegmentsToCatchUpPerServer;
+    public Map<String, Integer> getOffsetsConsumingSegmentsToCatchUpPerServer() {
+      return _offsetsConsumingSegmentsToCatchUpPerServer;
     }
   }
 

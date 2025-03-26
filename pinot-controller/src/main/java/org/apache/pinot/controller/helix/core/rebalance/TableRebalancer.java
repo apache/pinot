@@ -724,14 +724,14 @@ public class TableRebalancer {
     boolean isOfflineTable = TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE;
     Integer consumingSegmentsToBeMoved = null;
     Integer maxBytesToCatchUpForConsumingSegments = null;
-    Map<String, Integer> bytesToCatchUpForSegments = null;
-    Map<String, Integer> bytesToCatchUpForServers = null;
+    Map<String, Integer> offsetsToCatchUpForSegments = null;
+    Map<String, Integer> offsetsToCatchUpForServers = null;
     if (!isOfflineTable) {
       consumingSegmentsToBeMoved = 0;
-      bytesToCatchUpForSegments = getConsumingSegmentsBytesToCatchUp(tableNameWithType);
-      if (bytesToCatchUpForSegments != null) {
+      offsetsToCatchUpForSegments = getConsumingSegmentsOffsetsToCatchUp(tableNameWithType);
+      if (offsetsToCatchUpForSegments != null) {
         maxBytesToCatchUpForConsumingSegments = 0;
-        bytesToCatchUpForServers = new HashMap<>();
+        offsetsToCatchUpForServers = new HashMap<>();
       }
       for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
         String segmentName = entry.getKey();
@@ -773,16 +773,16 @@ public class TableRebalancer {
         serversGettingNewSegments.add(server);
       }
       if (!isOfflineTable) {
-        if (bytesToCatchUpForServers != null) {
-          bytesToCatchUpForServers.put(server, 0);
+        if (offsetsToCatchUpForServers != null) {
+          offsetsToCatchUpForServers.put(server, 0);
         }
         for (String segment : newSegmentSet) {
           if (consumingSegments.contains(segment)) {
             consumingSegmentsToBeMoved++;
-            if (bytesToCatchUpForSegments != null) {
-              int bytesToCatchUp = bytesToCatchUpForSegments.getOrDefault(segment, 0);
-              maxBytesToCatchUpForConsumingSegments = Math.max(maxBytesToCatchUpForConsumingSegments, bytesToCatchUp);
-              bytesToCatchUpForServers.put(server, bytesToCatchUpForServers.get(server) + bytesToCatchUp);
+            if (offsetsToCatchUpForSegments != null) {
+              int offsets = offsetsToCatchUpForSegments.getOrDefault(segment, 0);
+              maxBytesToCatchUpForConsumingSegments = Math.max(maxBytesToCatchUpForConsumingSegments, offsets);
+              offsetsToCatchUpForServers.put(server, offsetsToCatchUpForServers.get(server) + offsets);
             }
           }
         }
@@ -853,7 +853,7 @@ public class TableRebalancer {
     //       rebalance time can vary with number of segments added
     RebalanceSummaryResult.ConsumingSegmentSummary consumingSegmentSummary =
         isOfflineTable ? null : new RebalanceSummaryResult.ConsumingSegmentSummary(
-            consumingSegmentsToBeMoved, maxBytesToCatchUpForConsumingSegments, bytesToCatchUpForServers);
+            consumingSegmentsToBeMoved, maxBytesToCatchUpForConsumingSegments, offsetsToCatchUpForServers);
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
         maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
         replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentSummary);
@@ -878,18 +878,18 @@ public class TableRebalancer {
   }
 
   /**
-   * Fetches the consuming segment info for the table and calculates the number of bytes to catch up for each consuming
-   * segment. Returns a map from segment name to the number of bytes to catch up for that consuming segment. Return
+   * Fetches the consuming segment info for the table and calculates the number of offsets to catch up for each consuming
+   * segment. Returns a map from segment name to the number of offsets to catch up for that consuming segment. Return
    * null if failed to obtain info for any consuming segment.
    */
-  private Map<String, Integer> getConsumingSegmentsBytesToCatchUp(String tableNameWithType) {
+  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(String tableNameWithType) {
     ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
     if (consumingSegmentInfoReader == null) {
       LOGGER.warn("ConsumingSegmentInfoReader is null, cannot calculate consuming segments info for table: {}",
           tableNameWithType);
       return null;
     }
-    Map<String, Integer> segmentToBytesToCatchUp = new HashMap<>();
+    Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
     try {
       ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
           consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 30_000);
@@ -913,9 +913,9 @@ public class TableRebalancer {
           if (!consumingSegmentInfoList.isEmpty()) {
             // this value should be the same regardless of which server the consuming segment info is from, use the
             // first in the list here
-            int bytesToCatchUp = consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
+            int offsetsToCatchUp = consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
                 .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
-            segmentToBytesToCatchUp.put(segmentName, bytesToCatchUp);
+            segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
           } else {
             LOGGER.warn("No available consuming segment info from any server. Segment: {} in table: {}", segmentName,
                 tableNameWithType);
@@ -927,7 +927,7 @@ public class TableRebalancer {
       LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);
       return null;
     }
-    return segmentToBytesToCatchUp;
+    return segmentToOffsetsToCatchUp;
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {

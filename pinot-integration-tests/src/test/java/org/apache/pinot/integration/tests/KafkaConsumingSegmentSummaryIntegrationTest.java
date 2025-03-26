@@ -112,7 +112,7 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(consumingSegmentSummary);
     Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 0);
     Assert.assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(), 0);
-    Assert.assertEquals(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer().size(),
+    Assert.assertEquals(consumingSegmentSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
         1);
 
     startServer();
@@ -127,15 +127,15 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(consumingSegmentSummary);
     Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertEquals(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp(), 57801);
-    Assert.assertEquals(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer().size(),
+    Assert.assertEquals(consumingSegmentSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
         2);
     Assert.assertTrue(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .allMatch(x -> x == 57801 || x == 0));
     Assert.assertEquals(consumingSegmentSummary
-        .getBytesConsumingSegmentsToCatchUpPerServer()
+        .getOffsetsConsumingSegmentsToCatchUpPerServer()
         .values()
         .stream()
         .reduce(0, Integer::sum), 57801);
@@ -152,6 +152,6 @@ public class KafkaConsumingSegmentSummaryIntegrationTest extends BaseRealtimeClu
     Assert.assertNotNull(consumingSegmentSummary);
     Assert.assertEquals(consumingSegmentSummary.getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertNull(consumingSegmentSummary.getMaxBytesConsumingSegmentsToCatchUp());
-    Assert.assertNull(consumingSegmentSummary.getBytesConsumingSegmentsToCatchUpPerServer());
+    Assert.assertNull(consumingSegmentSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
   }
 }
