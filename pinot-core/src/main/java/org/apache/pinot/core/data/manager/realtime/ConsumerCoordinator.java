@@ -241,7 +241,7 @@ public class ConsumerCoordinator {
 
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName == null) {
-        // can't compare with this segment, hence skip.
+        // ignore uploaded segments
         continue;
       }
 
