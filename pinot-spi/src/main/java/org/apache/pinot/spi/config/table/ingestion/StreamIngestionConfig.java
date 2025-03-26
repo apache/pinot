@@ -43,6 +43,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
   private boolean _pauselessConsumptionEnabled = false;
 
+  @JsonPropertyDescription("Policy to determine the behaviour of parallel consumption.")
+  private ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -74,5 +77,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
     _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
+  public ParallelSegmentConsumptionPolicy getParallelSegmentConsumptionPolicy() {
+    return _parallelSegmentConsumptionPolicy;
+  }
+
+  public void setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy) {
+    _parallelSegmentConsumptionPolicy = parallelSegmentConsumptionPolicy;
   }
 }

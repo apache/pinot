@@ -78,6 +78,8 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -170,14 +172,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     public boolean isFinal() {
       return this.equals(ERROR) || this.equals(COMMITTED) || this.equals(RETAINED) || this.equals(DISCARDED);
     }
-  }
-
-  @VisibleForTesting
-  enum ParallelSegmentConsumptionPolicy {
-    ALLOW_ALWAYS,               // Allow consumption of next segment during both build and download of the previous
-    ALLOW_DURING_BUILD_ONLY,    // Allow consumption of next segment during build but not download of the previous
-    ALLOW_DURING_DOWNLOAD_ONLY, // Allow consumption of next segment during download but not build of the previous
-    DISALLOW_ALWAYS             // Don't allow consumption of next segment during either build or download of the
   }
 
   @VisibleForTesting
@@ -1753,6 +1747,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
   // Consumption while downloading and replacing consuming segment is not allowed for the following tables:
   // 1. Partial Upserts
   // 2. Dedup Tables
@@ -1761,17 +1756,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
   // upsert tables. If tables are dedup/partial upsert enabled check for table and server config properties to see if
   // consumption is allowed
+  private boolean isConsumptionAllowedDuringCommit() {
+    return (!_realtimeTableDataManager.isDedupEnabled() || _tableConfig.getDedupConfig()
+        .isAllowDedupConsumptionDuringCommit()) && (!_realtimeTableDataManager.isPartialUpsertEnabled()
+        || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
+  }
+
   @VisibleForTesting
   ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
-    if (_realtimeTableDataManager.isDedupEnabled() && _tableConfig.getDedupConfig()
-        .isAllowDedupConsumptionDuringCommit()) {
-      // if dedup is enabled
-      return ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY;
+    ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy = null;
+    if ((_tableConfig.getIngestionConfig() != null) && (_tableConfig.getIngestionConfig().getStreamIngestionConfig()
+        != null)) {
+      parallelSegmentConsumptionPolicy =
+          _tableConfig.getIngestionConfig().getStreamIngestionConfig().getParallelSegmentConsumptionPolicy();
     }
-    if (_realtimeTableDataManager.isPartialUpsertEnabled() && _tableConfig.getUpsertConfig()
-        .isAllowPartialUpsertConsumptionDuringCommit()) {
-      // if partial upserts is enabled
-      return ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY;
+    if (parallelSegmentConsumptionPolicy != null) {
+      return parallelSegmentConsumptionPolicy;
+    }
+    if (!isConsumptionAllowedDuringCommit()) {
+      return ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
     }
     return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
   }
