@@ -199,8 +199,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   // Metric used to track when segments in error state are detected for pauseless table for which needs
   // manual intervention for repair
-  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false);
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false),
 
+  // ZK JUTE max buffer size in bytes
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true);
 
   private final String _gaugeName;
   private final String _unit;
