@@ -58,6 +58,18 @@ public interface SegmentCompletionFSM {
   boolean isDone();
 
   /**
+   * The method is used to decide whether we should reduce segment size and reset when server reports
+   * cannot build segment due to non-recoverable error.
+   * In most of cases, when such request is sent, the error should be deterministic. However, due to possible data lost,
+   * replicas may not hold exact same data and some of them might be able to build the segment.
+   * If the FSM _state indicates that one replica starts to commit.
+   * It means immutable segment can be created successfully, returns true.
+   *
+   * @return {@code true} if the FSM receives segment created signal, {@code false} otherwise.
+   */
+   boolean isImmutableSegmentCreated();
+
+  /**
    * Processes the event where a server indicates it has consumed up to a specified offset.
    *
    * This is typically triggered when a server finishes consuming data for a segment due

@@ -116,6 +116,7 @@ public class QueryRunner {
   // Group-by settings
   @Nullable
   private Integer _numGroupsLimit;
+  @Nullable
   private Integer _numGroupsWarningLimit;
   @Nullable
   private Integer _mseMinGroupTrimSize;
@@ -157,10 +158,8 @@ public class QueryRunner {
     String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
 
-    String numGroupsWarningFactorStr = config.getProperty(Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR);
-    double numGroupsWarningFactor = numGroupsWarningFactorStr != null ? Double.parseDouble(numGroupsWarningFactorStr)
-        : Server.DEFAULT_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR;
-    _numGroupsWarningLimit = (int) Math.floor(Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT * numGroupsWarningFactor);
+    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_NUM_GROUPS_WARN_LIMIT);
+    _numGroupsWarningLimit = numGroupsWarnLimitStr != null ? Integer.parseInt(numGroupsWarnLimitStr) : null;
 
     String mseMinGroupTrimSizeStr = config.getProperty(Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE);
     _mseMinGroupTrimSize = mseMinGroupTrimSizeStr != null ? Integer.parseInt(mseMinGroupTrimSizeStr) : null;
@@ -384,7 +383,9 @@ public class QueryRunner {
     // 2. put all stageMetadata.customProperties.
     opChainMetadata.putAll(customProperties);
     // 3. put some config not allowed through query options but propagated that way
-    opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, Integer.toString(_numGroupsWarningLimit));
+    if (_numGroupsWarningLimit != null) {
+      opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, Integer.toString(_numGroupsWarningLimit));
+    }
     // 4. add all overrides from config if anything is still empty.
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     if (numGroupsLimit == null) {
