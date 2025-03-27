@@ -273,7 +273,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
-        "All rebalance parameters look good\n");
+        "All rebalance parameters look good");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -718,7 +718,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
-    assertEquals(preCheckerResult.getMessage(), "includeConsuming is disabled for a realtime table.\n");
+    assertEquals(preCheckerResult.getMessage(), "includeConsuming is disabled for a realtime table.");
 
     // trigger bootstrap and bestEfforts warning
     rebalanceConfig.setIncludeConsuming(true);
@@ -731,7 +731,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getMessage(),
         "bestEfforts is enabled, only enable it if you know what you are doing\n"
             + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
-            + "intended\n");
+            + "intended");
 
     // trigger downtime warning
     TableConfig newTableConfig =
@@ -745,7 +745,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Number of replicas (3) is greater than 1, downtime is not recommended.\n");
+        "Number of replicas (3) is greater than 1, downtime is not recommended.");
 
     // no downtime warning with 1 replica
     newTableConfig =
@@ -756,7 +756,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good\n");
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
     // test pass
     rebalanceConfig.setDowntime(false);
@@ -764,7 +764,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good\n");
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 

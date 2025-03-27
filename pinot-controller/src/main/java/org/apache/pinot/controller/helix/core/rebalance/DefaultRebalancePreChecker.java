@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,8 +161,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           if (instanceAssignmentConfig.isMinimizeDataMovement()) {
             return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
                 ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
-                + "with disabled")
-                : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
+                + "with disabled") : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
           return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment is "
               + "allowed");
@@ -301,11 +302,11 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
   private RebalancePreCheckerResult checkRebalanceConfig(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment) {
-    StringBuilder message = new StringBuilder();
+    List<String> warnings = new ArrayList<>();
     boolean pass = true;
     if (rebalanceConfig.isBestEfforts()) {
       pass = false;
-      message.append("bestEfforts is enabled, only enable it if you know what you are doing\n");
+      warnings.add("bestEfforts is enabled, only enable it if you know what you are doing");
     }
     List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
@@ -316,24 +317,22 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
-        message.append("Number of replicas (")
-            .append(numReplicas)
-            .append(") is greater than 1, downtime is not recommended.\n");
+        warnings.add("Number of replicas (" + numReplicas + ") is greater than 1, downtime is not recommended.");
       }
     }
 
     if (!rebalanceConfig.isIncludeConsuming() && tableConfig.getTableType() == TableType.REALTIME) {
       pass = false;
-      message.append("includeConsuming is disabled for a realtime table.\n");
+      warnings.add("includeConsuming is disabled for a realtime table.");
     }
     if (rebalanceConfig.isBootstrap()) {
       pass = false;
-      message.append(
-          "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended\n");
+      warnings.add(
+          "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended");
     }
 
-    return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good\n")
-        : RebalancePreCheckerResult.warn(message.toString());
+    return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
+        : RebalancePreCheckerResult.warn(StringUtil.join("\n", warnings.toArray(String[]::new)));
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {
