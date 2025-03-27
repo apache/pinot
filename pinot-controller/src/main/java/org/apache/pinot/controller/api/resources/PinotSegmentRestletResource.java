@@ -1228,10 +1228,13 @@ public class PinotSegmentRestletResource {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
 
-    Map<Integer, LLCSegmentName> partitionToOldestSegment = getPartitionIDToOldestSegment(segments);
+    Set<String> idealStateSegmentsSet = idealState.getRecord().getMapFields().keySet();
+    Map<Integer, LLCSegmentName> partitionToOldestSegment =
+        getPartitionIDToOldestSegment(segments, idealStateSegmentsSet);
     Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
-        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealState, partitionIdToLatestSegment);
+        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
+            partitionIdToLatestSegment);
     for (Integer partitionID : partitionToOldestSegment.keySet()) {
       Set<String> segmentToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
       LOGGER.info("Deleting : {} segments from segment: {} to segment: {} for partition: {}",
@@ -1254,7 +1257,7 @@ public class PinotSegmentRestletResource {
    * @param partitionToOldestSegment Map of partition IDs to their corresponding oldest segment (lowest sequence ID)
    *                                that serves as the threshold for deletion. All segments with sequence IDs
    *                                greater than or equal to this will be selected for deletion.
-   * @param idealState The table's ideal state which contains information about all existing segments.
+   * @param idealStateSegmentsSet The segments present in the ideal state for the table
    * @param partitionIdToLatestSegment A map that will be populated with the latest segment (highest sequence ID)
    *                                  for each partition. This is passed by reference and modified by this method.
    *
@@ -1265,13 +1268,12 @@ public class PinotSegmentRestletResource {
   @VisibleForTesting
   Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
       Map<Integer, LLCSegmentName> partitionToOldestSegment,
-      IdealState idealState, Map<Integer, LLCSegmentName> partitionIdToLatestSegment) {
+      Set<String> idealStateSegmentsSet, Map<Integer, LLCSegmentName> partitionIdToLatestSegment) {
 
     // Find segments to delete (those with higher sequence numbers)
     Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
-    Map<String, Map<String, String>> segmentsToInstanceState = idealState.getRecord().getMapFields();
 
-    for (String segmentName : segmentsToInstanceState.keySet()) {
+    for (String segmentName : idealStateSegmentsSet) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       int partitionId = llcSegmentName.getPartitionGroupId();
 
@@ -1293,11 +1295,18 @@ public class PinotSegmentRestletResource {
   }
 
   @VisibleForTesting
-  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments) {
+  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments, Set<String> idealStateSegmentsSet) {
     Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
 
     for (String segment : segments) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segment);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      Preconditions.checkState(llcSegmentName != null, "Invalid LLC segment: " + segment);
+
+      // ignore segments that are not present in the ideal state
+      if (!idealStateSegmentsSet.contains(segment)) {
+        LOGGER.warn("Segment: {} is not present in the ideal state", segment);
+        continue;
+      }
       int partitionId = llcSegmentName.getPartitionGroupId();
 
       LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);

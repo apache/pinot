@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -131,7 +132,7 @@ public class PinotSegmentRestletResourceTest {
 
     // Call the method and check the result
     Map<Integer, Set<String>> result = _pinotSegmentRestletResource.getPartitionIdToSegmentsToDeleteMap(
-        partitionToOldestSegment, idealState, partitionIdToLatestSegment);
+        partitionToOldestSegment, segmentsToInstanceState.keySet(), partitionIdToLatestSegment);
 
     assertEquals(expectedResponse, result);
 
@@ -151,13 +152,21 @@ public class PinotSegmentRestletResourceTest {
     segments.addAll(getSegmentForPartition(tableName, 0, 3, 3, currentTime)); // Segments with seq 3,4,5 for partition 0
     segments.addAll(getSegmentForPartition(tableName, 1, 4, 2, currentTime)); // Segments with seq 4,5 for partition 1
 
+    // Only add the above segment to the ideal state segment list
+    Set<String> idealStateSegmentSet = new HashSet<>(segments);
+
+    // Add a segment from another table to this list that has lower sequence ID for the above partitions
+    segments.addAll(
+        getSegmentForPartition(tableName + "fake", 0, 1, 3, currentTime)); // Segments with seq 1,2,3 for partition 0
+
     // Create expected result map
     Map<Integer, LLCSegmentName> expectedResult = new HashMap<>();
     expectedResult.put(0, new LLCSegmentName(tableName, 0, 3, currentTime));
     expectedResult.put(1, new LLCSegmentName(tableName, 1, 4, currentTime));
 
     // Call the method and check the result
-    Map<Integer, LLCSegmentName> result = _pinotSegmentRestletResource.getPartitionIDToOldestSegment(segments);
+    Map<Integer, LLCSegmentName> result =
+        _pinotSegmentRestletResource.getPartitionIDToOldestSegment(segments, idealStateSegmentSet);
 
     assertEquals(expectedResult, result);
   }
