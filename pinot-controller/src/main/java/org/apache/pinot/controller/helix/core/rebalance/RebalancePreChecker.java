@@ -37,16 +37,18 @@ public interface RebalancePreChecker {
     private final Map<String, Map<String, String>> _currentAssignment;
     private final Map<String, Map<String, String>> _targetAssignment;
     private final TableSizeReader.TableSubTypeSizeDetails _tableSubTypeSizeDetails;
+    private final RebalanceConfig _rebalanceConfig;
 
     public PreCheckContext(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig,
         Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-        @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails) {
+        @Nullable TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, RebalanceConfig rebalanceConfig) {
       _rebalanceJobId = rebalanceJobId;
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
       _currentAssignment = currentAssignment;
       _targetAssignment = targetAssignment;
       _tableSubTypeSizeDetails = tableSubTypeSizeDetails;
+      _rebalanceConfig = rebalanceConfig;
     }
 
     public String getRebalanceJobId() {
@@ -71,6 +73,10 @@ public interface RebalancePreChecker {
 
     public TableSizeReader.TableSubTypeSizeDetails getTableSubTypeSizeDetails() {
       return _tableSubTypeSizeDetails;
+    }
+
+    public RebalanceConfig getRebalanceConfig() {
+      return _rebalanceConfig;
     }
   }
 
