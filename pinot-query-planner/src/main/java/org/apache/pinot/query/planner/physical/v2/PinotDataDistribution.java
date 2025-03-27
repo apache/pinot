@@ -143,8 +143,7 @@ public class PinotDataDistribution {
   public HashDistributionDesc satisfiesHashDistributionDesc(List<Integer> keys) {
     Preconditions.checkNotNull(_hashDistributionDesc, "null hashDistributionDesc in satisfies");
     // Return any hash distribution descriptor that matches the given constraint *exactly*.
-    // TODO: Add support for partial check here. e.g. (GROUP BY 1, 2, 3, 4 > GROUP BY 2, 4), does not require
-    //   re-partitioning.
+    // TODO: Add support for partial check (i.e. if distributed by [1], then we can avoid re-dist for constraint [1, 2].
     return _hashDistributionDesc.stream().filter(x -> x.getKeys().equals(keys)).findFirst().orElse(null);
   }
 
