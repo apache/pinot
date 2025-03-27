@@ -563,7 +563,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(), indexLoadingConfig,
               schema, llcSegmentName, consumerCoordinator, _serverMetrics, partitionUpsertMetadataManager,
               partitionDedupMetadataManager, _isTableReadyToConsumeData);
-    } catch (SegmentAlreadyExistsException e) {
+    } catch (SegmentAlreadyConsumedException e) {
       // Don't do anything since segment was already committed by another instance.
       // Eventually this server should receive a CONSUMING -> ONLINE helix state transition
       // to add it.

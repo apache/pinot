@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-public class SegmentAlreadyExistsException extends RuntimeException {
+public class SegmentAlreadyConsumedException extends RuntimeException {
 
-  public SegmentAlreadyExistsException(String msg) {
-    super(msg);
+  public SegmentAlreadyConsumedException(String currSegmentName) {
+    super("Skipping consumption for segment: " + currSegmentName);
   }
 }
