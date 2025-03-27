@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -30,6 +32,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -72,6 +75,8 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertThrows;
 
 
 /**
@@ -1319,6 +1324,31 @@ public class TableConfigUtilsTest {
       Assert.assertEquals(e.getMessage(),
           "Cannot disable forward index for column intCol, as the table type is REALTIME.");
     }
+  }
+
+  @Test
+  public void testValidateBFOnBoolean() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension("mycol2", FieldSpec.DataType.STRING).build();
+
+    TableConfig tableconfig1 = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setBloomFilterColumns(Arrays.asList("mycol")).build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig1, schema));
+
+    TableConfig tableconfig2 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    tableconfig2.getIndexingConfig().setBloomFilterConfigs(
+        Collections.singletonMap("myCol", new BloomFilterConfig(0.01, 1000, true)));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig2, schema));
+
+    TableConfig tableconfig3 = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    ObjectNode indexesNode = JsonNodeFactory.instance.objectNode();
+    indexesNode.putObject("bloom");
+    FieldConfig fieldConfig = new FieldConfig(
+        "MyCol", FieldConfig.EncodingType.DICTIONARY, null, null, null,
+        null, indexesNode, null, null);
+    tableconfig3.setFieldConfigList(Arrays.asList(fieldConfig));
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableconfig3, schema));
   }
 
   @Test

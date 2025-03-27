@@ -1094,6 +1094,11 @@ public final class TableConfigUtils {
       }
     }
 
+    for (String bloomFilterColumn : bloomFilterColumns) {
+      Preconditions.checkState(schema.getFieldSpecFor(bloomFilterColumn).getDataType() != FieldSpec.DataType.BOOLEAN,
+          "Cannot create bloom filter on BOOLEAN column: " + bloomFilterColumn);
+    }
+
     for (String jsonIndexColumn : jsonIndexColumns) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(jsonIndexColumn);
       Preconditions.checkState(
@@ -1234,6 +1239,12 @@ public final class TableConfigUtils {
 
       // Validate the forward index disabled compatibility with other indexes if enabled for this column
       validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema, tableType);
+
+      // Validate bloom filter is not added to boolean column
+      if (fieldConfig.getIndexes() != null && fieldConfig.getIndexes().has("bloom")) {
+        Preconditions.checkState(fieldSpec.getDataType() != FieldSpec.DataType.BOOLEAN,
+          "Cannot create a bloom filter on boolean column " + columnName);
+      }
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {

@@ -105,6 +105,11 @@ public interface BrokerResponse {
   boolean isNumGroupsLimitReached();
 
   /**
+   * Returns whether the number of groups warning limit has been reached.
+   */
+  boolean isNumGroupsWarningLimitReached();
+
+  /**
    * Returns whether the limit for max rows in join has been reached.
    */
   boolean isMaxRowsInJoinReached();
