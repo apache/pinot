@@ -870,10 +870,10 @@ public class TableRebalancer {
     Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
 
     Map<String, Integer> topTenOffset;
-    Map<String, RebalanceSummaryResult.ConsumingSegmentSummaryPerServer> consumingSegmentSummaryPerServer;
+    Map<String, RebalanceSummaryResult.ConsumingSegmentSummaryPerServer> consumingSegmentSummaryPerServer =
+        new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
       topTenOffset = new LinkedHashMap<>();
-      consumingSegmentSummaryPerServer = new HashMap<>();
       consumingSegmentsOffsetsToCatchUp.entrySet()
           .stream()
           .sorted(
@@ -888,7 +888,10 @@ public class TableRebalancer {
       });
     } else {
       topTenOffset = null;
-      consumingSegmentSummaryPerServer = null;
+      newServersToConsumingSegmentMap.forEach((server, segments) -> {
+        consumingSegmentSummaryPerServer.put(server, new RebalanceSummaryResult.ConsumingSegmentSummaryPerServer(
+            segments.size(), null));
+      });
     }
 
     Map<String, Integer> oldestTenSegment;

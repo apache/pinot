@@ -214,7 +214,7 @@ public class ControllerRequestURLBuilder {
     if (reassignInstances) {
       stringBuilder.append("&reassignInstances=").append(reassignInstances);
     }
-    if (includeConsuming) {
+    if (!includeConsuming) {
       stringBuilder.append("&includeConsuming=").append(includeConsuming);
     }
     if (downtime) {

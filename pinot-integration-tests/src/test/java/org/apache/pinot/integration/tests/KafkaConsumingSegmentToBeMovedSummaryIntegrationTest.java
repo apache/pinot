@@ -141,6 +141,21 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         .stream()
         .reduce(0, (a, b) -> a + b.getTotalOffsetsNeedToCatchUp(), Integer::sum), 57801);
 
+    // set includeConsuming to false
+    response = sendPostRequest(
+        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, false, false, -1));
+    result = JsonUtils.stringToObject(response, RebalanceResult.class);
+    Assert.assertNotNull(result);
+    Assert.assertNotNull(result.getRebalanceSummaryResult());
+    Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
+    segmentInfo = result.getRebalanceSummaryResult().getSegmentInfo();
+    consumingSegmentToBeMovedSummary = segmentInfo.getConsumingSegmentToBeMovedSummary();
+    Assert.assertNotNull(consumingSegmentToBeMovedSummary);
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 0);
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
+        0);
+
     stopServer();
     response = sendPostRequest(
         getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
@@ -153,6 +168,7 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertNotNull(consumingSegmentToBeMovedSummary);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 1);
-    Assert.assertNull(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
+    Assert.assertNotNull(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
+    Assert.assertNull(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp());
   }
 }

@@ -308,12 +308,12 @@ public class RebalanceSummaryResult {
 
   public static class ConsumingSegmentSummaryPerServer {
     private final int _numConsumingSegmentToBeAdded;
-    private final int _totalOffsetsNeedToCatchUp;
+    private final Integer _totalOffsetsNeedToCatchUp;
 
     @JsonCreator
     public ConsumingSegmentSummaryPerServer(
         @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
-        @JsonProperty("totalOffsetsNeedToCatchUp") int totalOffsetsNeedToCatchUp) {
+        @JsonProperty("totalOffsetsNeedToCatchUp") @Nullable Integer totalOffsetsNeedToCatchUp) {
       _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
       _totalOffsetsNeedToCatchUp = totalOffsetsNeedToCatchUp;
     }
@@ -324,7 +324,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public int getTotalOffsetsNeedToCatchUp() {
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public Integer getTotalOffsetsNeedToCatchUp() {
       return _totalOffsetsNeedToCatchUp;
     }
   }
