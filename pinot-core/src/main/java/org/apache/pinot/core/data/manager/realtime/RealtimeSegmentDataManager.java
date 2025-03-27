@@ -244,6 +244,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final Schema _schema;
+  private final AtomicBoolean _streamConsumerClosed = new AtomicBoolean(false);
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
   // See the comments in {@link RealtimeTableDataManager}.
@@ -252,7 +253,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // This boolean is needed because the semaphore is shared by threads; every thread holding this semaphore can
   // modify the permit. This boolean make sure the semaphore gets released only once when the partition group stops
   // consuming.
-  private final AtomicBoolean _acquiredConsumerSemaphore;
+  private final AtomicBoolean _consumerSemaphoreAcquired = new AtomicBoolean(false);
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
@@ -1070,14 +1071,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   @VisibleForTesting
-  AtomicBoolean getAcquiredConsumerSemaphore() {
-    return _acquiredConsumerSemaphore;
+  AtomicBoolean getConsumerSemaphoreAcquired() {
+    return _consumerSemaphoreAcquired;
   }
 
   @VisibleForTesting
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
-      closeStreamConsumers();
+      closeStreamConsumer();
     }
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
@@ -1276,12 +1277,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  private void closeStreamConsumers() {
-    closePartitionGroupConsumer();
-    closePartitionMetadataProvider();
-    if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
-      _segmentLogger.info("Releasing the consumer semaphore");
-      _consumerCoordinator.release();
+  private void closeStreamConsumer() {
+    if (_streamConsumerClosed.compareAndSet(false, true)) {
+      closePartitionGroupConsumer();
+      closePartitionMetadataProvider();
+      releaseConsumerSemaphore();
     }
   }
 
@@ -1300,6 +1300,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       } catch (Exception e) {
         _segmentLogger.warn("Could not close stream metadata provider", e);
       }
+    }
+  }
+
+  private void releaseConsumerSemaphore() {
+    if (_consumerSemaphoreAcquired.compareAndSet(true, false)) {
+      _segmentLogger.info("Releasing consumer semaphore");
+      _consumerCoordinator.release();
     }
   }
 
@@ -1461,7 +1468,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
     if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
-      closeStreamConsumers();
+      closeStreamConsumer();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
   }
@@ -1500,7 +1507,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Caught exception while stopping the consumer thread", e);
     }
-    closeStreamConsumers();
+    closeStreamConsumer();
     cleanupMetrics();
     _realtimeSegment.offload();
   }
@@ -1586,7 +1593,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
             _segmentZKMetadata.getStatus().toString());
     _consumerCoordinator = consumerCoordinator;
-    _acquiredConsumerSemaphore = new AtomicBoolean(false);
     InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
@@ -1680,7 +1686,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Acquire semaphore to create stream consumers
     try {
       _consumerCoordinator.acquire(llcSegmentName);
-      _acquiredConsumerSemaphore.set(true);
+      _consumerSemaphoreAcquired.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
       _segmentLogger.error(errorMsg);
@@ -1710,9 +1716,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
-      _segmentLogger.info("Releasing the consumer semaphore");
-      _consumerCoordinator.release();
-      _acquiredConsumerSemaphore.set(false);
+      releaseConsumerSemaphore();
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
