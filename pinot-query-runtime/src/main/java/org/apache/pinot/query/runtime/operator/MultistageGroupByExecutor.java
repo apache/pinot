@@ -126,8 +126,7 @@ public class MultistageGroupByExecutor {
 
   private int getNumGroupsWarningLimit(Map<String, String> opChainMetadata) {
     Integer numGroupsWarningLimit = QueryOptionsUtils.getNumGroupsWarningLimit(opChainMetadata);
-    return numGroupsWarningLimit != null ? numGroupsWarningLimit : (int) Math.floor(
-        Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT * Server.DEFAULT_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR);
+    return numGroupsWarningLimit != null ? numGroupsWarningLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   }
 
   private int getResolvedMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
