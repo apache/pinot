@@ -209,6 +209,6 @@ public class JmxMetricsIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_LIMIT_DEFAULT_WARN_FACTOR, 0.0001);
+    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_NUM_GROUPS_WARN_LIMIT, 1);
   }
 }
