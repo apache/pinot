@@ -156,7 +156,7 @@ public class ConsumerCoordinator {
         while (segmentDataManager == null) {
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
-          while (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
+          if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waited on previous segment: {} for: {}ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
