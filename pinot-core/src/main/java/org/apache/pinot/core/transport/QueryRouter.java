@@ -82,7 +82,7 @@ public class QueryRouter {
     _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
-  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, Route route, long timeoutMs) {
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRoute route, long timeoutMs) {
     assert !route.isEmpty();
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
