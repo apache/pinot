@@ -34,90 +34,96 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   // TODO - Validate
   //  1. the name of the metric with existing metric name
   //  2. units, global flags
-  public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("uncaughtGetExceptions", "exceptions", true);
-  public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("uncaughtPostExceptions", "exceptions", true);
-  public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("webApplicationExceptions", "exceptions", true);
-  public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("healthcheckBadCalls", "healthcheck", true);
-  public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("healthcheckOkCalls", "healthcheck", true);
-  public static final BrokerMeter QUERIES = create("queries", "queries", false);
-  public static final BrokerMeter QUERIES_GLOBAL = create("queriesGlobal", "queries", true);
-  public static final BrokerMeter MULTI_STAGE_QUERIES_GLOBAL = create("multiStageQueriesGlobal", "queries", true);
-  public static final BrokerMeter MULTI_STAGE_QUERIES = create("multiStageQueries", "queries", false);
+  public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
+  public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
+  public static final BrokerMeter QUERIES = create("QUERIES", "queries", false);
+  public static final BrokerMeter QUERIES_GLOBAL = create("QUERIES_GLOBAL", "queries", true);
+  public static final BrokerMeter MULTI_STAGE_QUERIES_GLOBAL = create("MULTI_STAGE_QUERIES_GLOBAL", "queries", true);
+  public static final BrokerMeter MULTI_STAGE_QUERIES = create("MULTI_STAGE_QUERIES", "queries", false);
   public static final BrokerMeter SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE = create(
-      "singleStageQueriesInvalidMultiStage", "queries", true);
-  public static final BrokerMeter TIME_SERIES_GLOBAL_QUERIES = create("timeSeriesGlobalQueries", "queries", true);
+      "SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE", "queries", true);
+  public static final BrokerMeter TIME_SERIES_GLOBAL_QUERIES = create("TIME_SERIES_GLOBAL_QUERIES", "queries", true);
   public static final BrokerMeter TIME_SERIES_GLOBAL_QUERIES_FAILED = create(
-      "timeSeriesGlobalQueriesFailed", "queries", true);
-  public static final BrokerMeter QUERY_REJECTED_EXCEPTIONS = create("queryRejectedExceptions", "exceptions", true);
+      "TIME_SERIES_GLOBAL_QUERIES_FAILED", "queries", true);
+  public static final BrokerMeter QUERY_REJECTED_EXCEPTIONS = create("QUERY_REJECTED_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter REQUEST_COMPILATION_EXCEPTIONS = create(
-      "requestCompilationExceptions", "exceptions", true);
-  public static final BrokerMeter RESOURCE_MISSING_EXCEPTIONS = create("resourceMissingExceptions", "exceptions", true);
+      "REQUEST_COMPILATION_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter RESOURCE_MISSING_EXCEPTIONS = create(
+      "RESOURCE_MISSING_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter QUERY_VALIDATION_EXCEPTIONS = create(
-      "queryValidationExceptions", "exceptions", false);
-  public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("unknownColumnExceptions", "exceptions", false);
-  public static final BrokerMeter QUERIES_KILLED = create("queriesKilled", "query", true);
-  public static final BrokerMeter NO_SERVER_FOUND_EXCEPTIONS = create("noServerFoundExceptions", "exceptions", false);
+      "QUERY_VALIDATION_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
+  public static final BrokerMeter NO_SERVER_FOUND_EXCEPTIONS = create(
+      "NO_SERVER_FOUND_EXCEPTIONS", "exceptions", false);
   public static final BrokerMeter REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS = create(
-      "requestTimeoutBeforeScatteredExceptions", "exceptions", false);
+      "REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS", "exceptions", false);
   public static final BrokerMeter REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS = create(
-      "requestChannelLockTimeoutExceptions", "exceptions", false);
-  public static final BrokerMeter REQUEST_SEND_EXCEPTIONS = create("requestSendExceptions", "exceptions", false);
-  public static final BrokerMeter RESPONSE_FETCH_EXCEPTIONS = create("responseFetchExceptions", "exceptions", false);
+      "REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter REQUEST_SEND_EXCEPTIONS = create("REQUEST_SEND_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter RESPONSE_FETCH_EXCEPTIONS = create("RESPONSE_FETCH_EXCEPTIONS", "exceptions", false);
   public static final BrokerMeter DATA_TABLE_DESERIALIZATION_EXCEPTIONS = create(
-      "dataTableDeserializationExceptions", "exceptions", false);
-  public static final BrokerMeter RESPONSE_MERGE_EXCEPTIONS = create("responseMergeExceptions", "exceptions", false);
-  public static final BrokerMeter HEAP_CRITICAL_LEVEL_EXCEEDED = create("heapCriticalLevelExceeded", "count", true);
-  public static final BrokerMeter HEAP_PANIC_LEVEL_EXCEEDED = create("heapPanicLevelExceeded", "count", true);
+      "DATA_TABLE_DESERIALIZATION_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter RESPONSE_MERGE_EXCEPTIONS = create("RESPONSE_MERGE_EXCEPTIONS", "exceptions", false);
+  public static final BrokerMeter HEAP_CRITICAL_LEVEL_EXCEEDED = create("HEAP_CRITICAL_LEVEL_EXCEEDED", "count", true);
+  public static final BrokerMeter HEAP_PANIC_LEVEL_EXCEEDED = create("HEAP_PANIC_LEVEL_EXCEEDED", "count", true);
   public static final BrokerMeter BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS = create(
-      "brokerResponsesWithProcessingExceptions", "badResponses", false);
+      "BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS", "badResponses", false);
   public static final BrokerMeter BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS = create(
-      "brokerResponsesWithUnavailableSegments", "badResponses", false);
+      "BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS", "badResponses", false);
   public static final BrokerMeter BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
-      "brokerResponsesWithPartialServersResponded", "badResponses", false);
+      "BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
   public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED = create(
-      "secondaryWorkloadBrokerResponsesWithPartialServersResponded", "badResponses", false);
+      "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED", "badResponses", false);
   public static final BrokerMeter BROKER_RESPONSES_WITH_TIMEOUTS = create(
-      "brokerResponsesWithTimeouts", "badResponses", false);
+      "BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
   public static final BrokerMeter SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS = create(
-      "secondaryWorkloadBrokerResponsesWithTimeouts", "badResponses", false);
+      "SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS", "badResponses", false);
   public static final BrokerMeter BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED = create(
-      "brokerResponsesWithNumGroupsLimitReached", "badResponses", false);
-  public static final BrokerMeter DOCUMENTS_SCANNED = create("documentsScanned", "documents", false);
-  public static final BrokerMeter ENTRIES_SCANNED_IN_FILTER = create("entriesScannedInFilter", "documents", false);
-  public static final BrokerMeter ENTRIES_SCANNED_POST_FILTER = create("entriesScannedPostFilter", "documents", false);
-  public static final BrokerMeter NUM_RESIZES = create("numResizes", "numResizes", false);
-  public static final BrokerMeter HELIX_ZOOKEEPER_RECONNECTS = create("helixZookeeperReconnects", "reconnects", true);
+      "BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED", "badResponses", false);
+  public static final BrokerMeter DOCUMENTS_SCANNED = create(
+      "DOCUMENTS_SCANNED", "documents", false);
+  public static final BrokerMeter ENTRIES_SCANNED_IN_FILTER = create("ENTRIES_SCANNED_IN_FILTER", "documents", false);
+  public static final BrokerMeter ENTRIES_SCANNED_POST_FILTER = create(
+      "ENTRIES_SCANNED_POST_FILTER", "documents", false);
+  public static final BrokerMeter NUM_RESIZES = create("NUM_RESIZES", "numResizes", false);
+  public static final BrokerMeter HELIX_ZOOKEEPER_RECONNECTS = create("HELIX_ZOOKEEPER_RECONNECTS", "reconnects", true);
   public static final BrokerMeter REQUEST_DROPPED_DUE_TO_ACCESS_ERROR = create(
-      "requestDroppedDueToAccessError", "requestsDropped", false);
-  public static final BrokerMeter GROUP_BY_SIZE = create("groupBySize", "queries", false);
-  public static final BrokerMeter TOTAL_SERVER_RESPONSE_SIZE = create("totalServerResponseSize", "queries", false);
-  public static final BrokerMeter QUERY_QUOTA_EXCEEDED = create("queryQuotaExceeded", "exceptions", false);
+      "REQUEST_DROPPED_DUE_TO_ACCESS_ERROR", "requestsDropped", false);
+  public static final BrokerMeter GROUP_BY_SIZE = create("GROUP_BY_SIZE", "queries", false);
+  public static final BrokerMeter TOTAL_SERVER_RESPONSE_SIZE = create("TOTAL_SERVER_RESPONSE_SIZE", "queries", false);
+  public static final BrokerMeter QUERY_QUOTA_EXCEEDED = create("QUERY_QUOTA_EXCEEDED", "exceptions", false);
   public static final BrokerMeter NO_SERVING_HOST_FOR_SEGMENT = create(
-      "noServingHostForSegment", "badResponses", false);
-  public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create("serverMissingForRouting", "badResponses", false);
+      "NO_SERVING_HOST_FOR_SEGMENT", "badResponses", false);
+  public static final BrokerMeter SERVER_MISSING_FOR_ROUTING = create(
+      "SERVER_MISSING_FOR_ROUTING", "badResponses", false);
   public static final BrokerMeter NETTY_CONNECTION_REQUESTS_SENT = create(
-      "nettyConnectionRequestsSent", "nettyConnection", true);
+      "NETTY_CONNECTION_REQUESTS_SENT", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_BYTES_SENT = create(
-      "nettyConnectionBytesSent", "nettyConnection", true);
+      "NETTY_CONNECTION_BYTES_SENT", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_BYTES_RECEIVED = create(
-      "nettyConnectionBytesReceived", "nettyConnection", true);
+      "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
-      "proactiveClusterChangeCheck", "proactiveClusterChangeCheck", true);
-  public static final BrokerMeter DIRECT_MEMORY_OOM = create("directMemoryOom", "directMemoryOOMCount", true);
-  public static final BrokerMeter QUERIES_WITH_JOINS = create("queriesWithJoins", "queries", true);
-  public static final BrokerMeter JOIN_COUNT = create("joinCount", "queries", true);
-  public static final BrokerMeter QUERIES_WITH_WINDOW = create("queriesWithWindow", "queries", true);
-  public static final BrokerMeter WINDOW_COUNT = create("windowCount", "queries", true);
-  public static final BrokerMeter CURSOR_QUERIES_GLOBAL = create("cursorQueriesGlobal", "queries", true);
-  public static final BrokerMeter CURSOR_WRITE_EXCEPTION = create("cursorWriteException", "exceptions", true);
-  public static final BrokerMeter CURSOR_READ_EXCEPTION = create("cursorReadException", "exceptions", true);
-  public static final BrokerMeter CURSOR_RESPONSE_STORE_SIZE = create("cursorResponseStoreSize", "bytes", true);
-  public static final BrokerMeter GRPC_QUERIES = create("grpcQueries", "grpcQueries", true);
-  public static final BrokerMeter GRPC_QUERY_EXCEPTIONS = create("grpcQueryExceptions", "grpcExceptions", true);
-  public static final BrokerMeter GRPC_BYTES_RECEIVED = create("grpcBytesReceived", "grpcBytesReceived", true);
-  public static final BrokerMeter GRPC_BYTES_SENT = create("grpcBytesSent", "grpcBytesSent", true);
-  public static final BrokerMeter GRPC_TRANSPORT_READY = create("grpcTransportReady", "grpcTransport", true);
-  public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create("grpcTransportTerminated", "grpcTransport", true);
+      "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);
+  public static final BrokerMeter DIRECT_MEMORY_OOM = create("DIRECT_MEMORY_OOM", "directMemoryOOMCount", true);
+  public static final BrokerMeter QUERIES_WITH_JOINS = create("QUERIES_WITH_JOINS", "queries", true);
+  public static final BrokerMeter JOIN_COUNT = create("JOIN_COUNT", "queries", true);
+  public static final BrokerMeter QUERIES_WITH_WINDOW = create("QUERIES_WITH_WINDOW", "queries", true);
+  public static final BrokerMeter WINDOW_COUNT = create("WINDOW_COUNT", "queries", true);
+  public static final BrokerMeter CURSOR_QUERIES_GLOBAL = create("CURSOR_QUERIES_GLOBAL", "queries", true);
+  public static final BrokerMeter CURSOR_WRITE_EXCEPTION = create("CURSOR_WRITE_EXCEPTION", "exceptions", true);
+  public static final BrokerMeter CURSOR_READ_EXCEPTION = create("CURSOR_READ_EXCEPTION", "exceptions", true);
+  public static final BrokerMeter CURSOR_RESPONSE_STORE_SIZE = create("CURSOR_RESPONSE_STORE_SIZE", "bytes", true);
+  public static final BrokerMeter GRPC_QUERIES = create("GRPC_QUERIES", "grpcQueries", true);
+  public static final BrokerMeter GRPC_QUERY_EXCEPTIONS = create("GRPC_QUERY_EXCEPTIONS", "grpcExceptions", true);
+  public static final BrokerMeter GRPC_BYTES_RECEIVED = create("GRPC_BYTES_RECEIVED", "grpcBytesReceived", true);
+  public static final BrokerMeter GRPC_BYTES_SENT = create("GRPC_BYTES_SENT", "grpcBytesSent", true);
+  public static final BrokerMeter GRPC_TRANSPORT_READY = create("GRPC_TRANSPORT_READY", "grpcTransport", true);
+  public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
+      "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
