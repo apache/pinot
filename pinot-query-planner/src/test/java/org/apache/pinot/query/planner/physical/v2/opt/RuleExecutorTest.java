@@ -54,8 +54,8 @@ public class RuleExecutorTest {
       Map<Integer, Collection<PRelNode>> nodeIdToParents = new HashMap<>();
       List<Integer> visitOrder = new ArrayList<>();
       MockPRelOptRule rule = new MockPRelOptRule(nodeIdToParents, visitOrder);
-      assertEquals(new LeftInputFirstRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1),
-          expectedOrder);
+      assertEquals(new LeftInputFirstRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), node1);
+      assertEquals(visitOrder, expectedOrder);
     }
     {
       /*
@@ -72,12 +72,12 @@ public class RuleExecutorTest {
       PRelNode node7 = pRelNode(7, List.of());
       PRelNode node4 = pRelNode(4, List.of(node3, node7));
       PRelNode node1 = pRelNode(1, List.of(node2, node4));
-      List<Integer> expectedOrder = List.of(5, 2, 8, 3, 4, 7, 1);
+      List<Integer> expectedOrder = List.of(5, 2, 8, 1, 3, 4, 7);
       Map<Integer, Collection<PRelNode>> nodeIdToParents = new HashMap<>();
       List<Integer> visitOrder = new ArrayList<>();
       MockPRelOptRule rule = new MockPRelOptRule(nodeIdToParents, visitOrder);
-      assertEquals(new LeftInputFirstRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1),
-          expectedOrder);
+      assertEquals(new LeftInputFirstRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), node1);
+      assertEquals(visitOrder, expectedOrder);
     }
   }
 
@@ -100,7 +100,8 @@ public class RuleExecutorTest {
       Map<Integer, Collection<PRelNode>> nodeIdToParents = new HashMap<>();
       List<Integer> visitOrder = new ArrayList<>();
       MockPRelOptRule rule = new MockPRelOptRule(nodeIdToParents, visitOrder);
-      assertEquals(new PostOrderRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), expectedOrder);
+      assertEquals(new PostOrderRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), node1);
+      assertEquals(visitOrder, expectedOrder);
     }
     {
       /*
@@ -121,7 +122,8 @@ public class RuleExecutorTest {
       Map<Integer, Collection<PRelNode>> nodeIdToParents = new HashMap<>();
       List<Integer> visitOrder = new ArrayList<>();
       MockPRelOptRule rule = new MockPRelOptRule(nodeIdToParents, visitOrder);
-      assertEquals(new PostOrderRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), expectedOrder);
+      assertEquals(new PostOrderRuleExecutor(rule, mock(PhysicalPlannerContext.class)).execute(node1), node1);
+      assertEquals(visitOrder, expectedOrder);
     }
   }
 

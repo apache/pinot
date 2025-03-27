@@ -33,7 +33,6 @@ import static org.testng.Assert.*;
 
 public class PinotDataDistributionTest {
   private static final String MURMUR_HASH_FUNCTION = "murmur";
-  private static final String ABS_CODE_HASH_FUNCTION = "absHashCode";
 
   @Test
   public void testValidations() {
@@ -42,7 +41,7 @@ public class PinotDataDistributionTest {
       try {
         new PinotDataDistribution(RelDistribution.Type.SINGLETON, ImmutableList.of("0@0", "1@0"), 0L, null, null);
         fail();
-      } catch (IllegalArgumentException ignored) {
+      } catch (IllegalStateException ignored) {
       }
     }
     {
@@ -51,7 +50,7 @@ public class PinotDataDistributionTest {
         new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED, ImmutableList.of("0@0"), 0L,
             Collections.emptySet(), null);
         fail();
-      } catch (IllegalArgumentException ignored) {
+      } catch (IllegalStateException ignored) {
       }
     }
   }
@@ -60,15 +59,14 @@ public class PinotDataDistributionTest {
   public void testSatisfiesDistribution() {
     {
       // Case-1: Singleton constraint / Singleton actual distribution.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          Collections.singletonList("0@0"), 0L, null, null);
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertTrue(distribution.satisfies(RelDistributions.SINGLETON));
     }
     {
-      // Case-2: Singleton constraint / Non-singleton actual distribution / Single worker.
+      // Case-2: Singleton constraint / Non-singleton actual distribution.
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          Collections.singletonList("0@0"), 0L, null, null);
-      assertTrue(distribution.satisfies(RelDistributions.SINGLETON));
+          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+      assertFalse(distribution.satisfies(RelDistributions.SINGLETON));
     }
     {
       // Case-3: Broadcast constraint / Broadcast distribution across multiple workers.
@@ -78,8 +76,7 @@ public class PinotDataDistributionTest {
     }
     {
       // Case-4: Broadcast constraint / Non-broadcast distribution but single worker.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          ImmutableList.of("0@0"), 0L, null, null);
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertTrue(distribution.satisfies(RelDistributions.BROADCAST_DISTRIBUTED));
     }
     {
@@ -108,17 +105,13 @@ public class PinotDataDistributionTest {
       final List<Integer> keys = ImmutableList.of(1, 3);
       final int numPartitions = 8;
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, Collections.singleton(
-              new HashDistributionDesc(keys, MURMUR_HASH_FUNCTION, numPartitions)), null);
+          ImmutableList.of("0@0", "1@0"), 0L, null, null);
       assertFalse(distribution.satisfies(RelDistributions.hash(keys)));
     }
     {
       // Case-9: Hash constraint / Non-hash distribution but single worker
       final List<Integer> keys = ImmutableList.of(1, 3);
-      final int numPartitions = 8;
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          ImmutableList.of("0@0"), 0L, Collections.singleton(
-              new HashDistributionDesc(keys, MURMUR_HASH_FUNCTION, numPartitions)), null);
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertTrue(distribution.satisfies(RelDistributions.hash(keys)));
     }
   }
@@ -144,26 +137,23 @@ public class PinotDataDistributionTest {
         RelFieldCollation.NullDirection.FIRST);
     {
       // Case-1: No collation constraint / No collation in actual distribution.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          Collections.singletonList("0@0"), 0L, null, null);
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertTrue(distribution.satisfies((RelCollation) null));
     }
     {
       // Case-2: No collation constraint / Collation in actual distribution.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          Collections.singletonList("0@0"), 0L, null, RelCollations.of(exampleCollation));
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", RelCollations.of(exampleCollation));
       assertTrue(distribution.satisfies((RelCollation) null));
     }
     {
       // Case-3: Collation constraint / No collation in actual distribution.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          Collections.singletonList("0@0"), 0L, null, null);
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertFalse(distribution.satisfies(RelCollations.of(exampleCollation)));
     }
     {
       // Case-4: Collation constraint / Collation in actual distribution.
-      PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
-          Collections.singletonList("0@0"), 0L, null, RelCollations.of(exampleCollation));
+      PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0",
+          RelCollations.of(exampleCollation));
       assertTrue(distribution.satisfies(RelCollations.of(exampleCollation)));
     }
   }

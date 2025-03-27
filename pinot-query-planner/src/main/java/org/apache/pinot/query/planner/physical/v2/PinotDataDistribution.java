@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -74,6 +75,12 @@ public class PinotDataDistribution {
     _hashDistributionDesc = desc == null ? Collections.emptySet() : desc;
     _collation = collation == null ? RelCollations.EMPTY : collation;
     validate();
+  }
+
+  public static PinotDataDistribution singleton(String worker, @Nullable RelCollation collation) {
+    List<String> workers = ImmutableList.of(worker);
+    return new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(), null,
+        collation);
   }
 
   public PinotDataDistribution withCollation(RelCollation collation) {
@@ -174,6 +181,9 @@ public class PinotDataDistribution {
   }
 
   private void validate() {
+    if (_type != RelDistribution.Type.SINGLETON && _workers.size() == 1) {
+      throw new IllegalStateException("Single worker but non singleton distribution");
+    }
     if (_type == RelDistribution.Type.SINGLETON && _workers.size() > 1) {
       throw new IllegalStateException("Singleton distribution with multiple workers");
     }
