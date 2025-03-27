@@ -53,6 +53,7 @@ import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.proto.PinotQueryBrokerGrpc;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
@@ -181,15 +182,17 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
-      // Do not log or emit metric here because it is pure user error
+      BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
+        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
-            new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()).toJsonString().getBytes())).build();
+            brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {
         responseObserver.onCompleted();
         throw new RuntimeException(ex);
       }
+      emitBrokerResponseMetrics(brokerResponse);
       responseObserver.onNext(errorBlock);
       responseObserver.onCompleted();
       return;
@@ -210,6 +213,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .asRuntimeException());
       throw new RuntimeException(e);
     }
+    emitBrokerResponseMetrics(brokerResponse);
     ResultTable resultTable = brokerResponse.getResultTable();
     // Handle empty and error block
     if (resultTable == null) {
@@ -293,6 +297,24 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
       }
     }
     responseObserver.onCompleted();
+  }
+
+  // If a broker response has multiple exceptions, we will emit metrics for all of them.
+  // Thus, the sum total of all exceptions is >= total number of queries impacted.
+  // Additionally, some parts of code might already be emitting metrics for individual error codes.
+  // But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
+  // This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
+  private void emitBrokerResponseMetrics(BrokerResponse brokerResponse) {
+    for (QueryProcessingException exception : brokerResponse.getExceptions()) {
+      QueryErrorCode queryErrorCode;
+      try {
+        queryErrorCode = QueryErrorCode.fromErrorCode(exception.getErrorCode());
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid error code: " + exception.getErrorCode(), e);
+        queryErrorCode = QueryErrorCode.UNKNOWN;
+      }
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
+    }
   }
 
   //TODO: move this method from OSS Pinot class into util, and then re-use this util
