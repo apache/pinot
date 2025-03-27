@@ -36,6 +36,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -49,7 +50,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class ImplicitHybridTableRouteTest {
+public class ImplicitTableRouteCalculationTest {
   //@formatter:off
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of(
@@ -235,33 +236,35 @@ public class ImplicitHybridTableRouteTest {
 
   private void assertTableRoute(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    tableRoute.getTableConfig(_tableCache);
+    tableRoute.checkRoutes(_routingManager);
+
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
 
-    if (hybridTable.hasOffline()) {
+    if (tableRoute.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
-      offlinePinotQuery.getDataSource().setTableName(hybridTable.getOfflineTable().getTableNameWithType());
+      offlinePinotQuery.getDataSource().setTableName(tableRoute.getOfflineTableName());
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (hybridTable.hasRealtime()) {
+    if (tableRoute.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
-      realtimePinotQuery.getDataSource().setTableName(hybridTable.getRealtimeTable().getTableNameWithType());
+      realtimePinotQuery.getDataSource().setTableName(tableRoute.getRealtimeTableName());
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
     }
 
-    ImplicitHybridTableRoute route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (isOfflineExpected) {
-      assertNotNull(route.getOfflineRoutingTable());
-      assertFalse(route.getOfflineRoutingTable().isEmpty());
-      assertEquals(route.getOfflineRoutingTable().size(), expectedOfflineRoutingTable.size());
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : route.getOfflineRoutingTable().entrySet()) {
+      assertNotNull(tableRoute.getOfflineRoutingTable());
+      assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
+      assertEquals(tableRoute.getOfflineRoutingTable().size(), expectedOfflineRoutingTable.size());
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : tableRoute.getOfflineRoutingTable().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
         ServerRouteInfo serverRouteInfo = entry.getValue();
         Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
@@ -269,18 +272,18 @@ public class ImplicitHybridTableRouteTest {
         assertEquals(expectedOfflineRoutingTable.get(serverInstance.toString()), segments);
       }
 
-      Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = route.getOfflineRequestMap(0, "broker", false);
+      Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = tableRoute.getOfflineRequestMap(0, "broker", false);
       assertNotNull(offlineRequestMap);
       assertFalse(offlineRequestMap.isEmpty());
     } else {
-      assertNull(route.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
     }
 
     if (isRealtimeExpected) {
-      assertNotNull(route.getRealtimeRoutingTable());
-      assertFalse(route.getRealtimeRoutingTable().isEmpty());
-      assertEquals(route.getRealtimeRoutingTable().size(), expectedRealtimeRoutingTable.size());
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : route.getRealtimeRoutingTable().entrySet()) {
+      assertNotNull(tableRoute.getRealtimeRoutingTable());
+      assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
+      assertEquals(tableRoute.getRealtimeRoutingTable().size(), expectedRealtimeRoutingTable.size());
+      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : tableRoute.getRealtimeRoutingTable().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
         ServerRouteInfo serverRouteInfo = entry.getValue();
         Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
@@ -288,20 +291,20 @@ public class ImplicitHybridTableRouteTest {
         assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
       }
 
-      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = route.getRealtimeRequestMap(0, "broker", false);
+      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = tableRoute.getRealtimeRequestMap(0, "broker", false);
       assertNotNull(realtimeRequestMap);
       assertFalse(realtimeRequestMap.isEmpty());
     } else {
-      assertNull(route.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
     }
 
-    assertTrue(route.getUnavailableSegments().isEmpty());
-    assertEquals(route.getNumPrunedSegmentsTotal(), 0);
+    assertTrue(tableRoute.getUnavailableSegments().isEmpty());
+    assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertTrue(route.isEmpty());
+      assertTrue(tableRoute.isEmpty());
     } else {
-      assertFalse(route.isEmpty());
-      Map<ServerRoutingInstance, InstanceRequest> requestMap = route.getRequestMap(0, "broker", false);
+      assertFalse(tableRoute.isEmpty());
+      Map<ServerRoutingInstance, InstanceRequest> requestMap = tableRoute.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());
     }
@@ -341,7 +344,7 @@ public class ImplicitHybridTableRouteTest {
     assertTableRoute(tableName, null, null, false, false);
   }
 
-  private static class TableRoute {
+  private static class GetTableRouteResult {
     public final BrokerRequest _offlineBrokerRequest;
     public final BrokerRequest _realtimeBrokerRequest;
     public final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
@@ -351,7 +354,7 @@ public class ImplicitHybridTableRouteTest {
     public final boolean _offlineTableDisabled;
     public final boolean _realtimeTableDisabled;
 
-    public TableRoute(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+    public GetTableRouteResult(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
         Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
         Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, List<String> unavailableSegments,
         int numPrunedSegmentsTotal, boolean offlineTableDisabled, boolean realtimeTableDisabled) {
@@ -366,7 +369,7 @@ public class ImplicitHybridTableRouteTest {
     }
   }
 
-  private static TableRoute getTableRouting(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+  private static GetTableRouteResult getTableRouting(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
       String offlineTableName, String realtimeTableName, RoutingManager routingManager) {
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
@@ -418,13 +421,16 @@ public class ImplicitHybridTableRouteTest {
       }
     }
 
-    return new TableRoute(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable, realtimeRoutingTable,
+    return new GetTableRouteResult(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable, realtimeRoutingTable,
         unavailableSegments, numPrunedSegmentsTotal, offlineTableDisabled, realtimeTableDisabled);
   }
 
   private void assertTableRouting(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    tableRoute.getTableConfig(_tableCache);
+    tableRoute.checkRoutes(_routingManager);
+
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
@@ -433,48 +439,47 @@ public class ImplicitHybridTableRouteTest {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
 
-    if (hybridTable.hasOffline()) {
+    if (tableRoute.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (hybridTable.hasRealtime()) {
+    if (tableRoute.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
     }
 
-    TableRoute expectedTableRoute =
+    GetTableRouteResult expectedTableRoute =
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
-    ImplicitHybridTableRoute route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (isOfflineExpected) {
-      assertNotNull(route.getOfflineRoutingTable());
-      assertFalse(route.getOfflineRoutingTable().isEmpty());
+      assertNotNull(tableRoute.getOfflineRoutingTable());
+      assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._offlineRoutingTable);
-      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), route.getOfflineRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRoute.getOfflineRoutingTable().entrySet());
     } else {
-      assertNull(route.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
     }
 
     if (isRealtimeExpected) {
-      assertNotNull(route.getRealtimeRoutingTable());
-      assertFalse(route.getRealtimeRoutingTable().isEmpty());
+      assertNotNull(tableRoute.getRealtimeRoutingTable());
+      assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
-      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), route.getRealtimeRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), tableRoute.getRealtimeRoutingTable().entrySet());
     } else {
-      assertNull(route.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
     }
 
-    assertEquals(route.getUnavailableSegments(), expectedTableRoute._unavailableSegments);
-    assertEquals(route.getNumPrunedSegmentsTotal(), expectedTableRoute._numPrunedSegmentsTotal);
+    assertEquals(tableRoute.getUnavailableSegments(), expectedTableRoute._unavailableSegments);
+    assertEquals(tableRoute.getNumPrunedSegmentsTotal(), expectedTableRoute._numPrunedSegmentsTotal);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertTrue(route.isEmpty());
+      assertTrue(tableRoute.isEmpty());
     } else {
-      assertFalse(route.isEmpty());
+      assertFalse(tableRoute.isEmpty());
     }
   }
 
@@ -497,7 +502,10 @@ public class ImplicitHybridTableRouteTest {
 
   @Test(dataProvider = "routeNotExistsProvider")
   void testTableRoutingForRouteNotExists(String tableName) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    tableRoute.getTableConfig(_tableCache);
+    tableRoute.checkRoutes(_routingManager);
+
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
@@ -506,39 +514,41 @@ public class ImplicitHybridTableRouteTest {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
 
-    if (hybridTable.hasOffline()) {
+    if (tableRoute.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (hybridTable.hasRealtime()) {
+    if (tableRoute.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
     }
 
-    TableRoute expectedTableRoute =
+    GetTableRouteResult expectedTableRoute =
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
 
     assertNull(expectedTableRoute._offlineRoutingTable);
     assertNull(expectedTableRoute._realtimeRoutingTable);
 
-    ImplicitHybridTableRoute route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
-    assertNull(route.getOfflineRoutingTable());
-    assertNull(route.getRealtimeRoutingTable());
-    assertTrue(route.getUnavailableSegments().isEmpty());
-    assertEquals(route.getNumPrunedSegmentsTotal(), 0);
-    assertTrue(route.isEmpty());
+    assertNull(tableRoute.getOfflineRoutingTable());
+    assertNull(tableRoute.getRealtimeRoutingTable());
+    assertTrue(tableRoute.getUnavailableSegments().isEmpty());
+    assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
+    assertTrue(tableRoute.isEmpty());
   }
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   void testTableRoutingForPartiallyDisabledTable(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    tableRoute.getTableConfig(_tableCache);
+    tableRoute.checkRoutes(_routingManager);
+
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
@@ -555,41 +565,43 @@ public class ImplicitHybridTableRouteTest {
     realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
     realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
-    TableRoute expectedTableRoute =
+    GetTableRouteResult expectedTableRoute =
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
 
-    ImplicitHybridTableRoute route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (expectedOfflineRoutingTable == null) {
-      assertNull(route.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
       assertNull(expectedTableRoute._offlineRoutingTable);
     }
 
     if (expectedRealtimeRoutingTable == null) {
-      assertNull(route.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
       assertNull(expectedTableRoute._realtimeRoutingTable);
     }
 
-    if (route.getOfflineRoutingTable() != null) {
-      assertFalse(route.getOfflineRoutingTable().isEmpty());
+    if (tableRoute.getOfflineRoutingTable() != null) {
+      assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._offlineRoutingTable);
       assertFalse(expectedTableRoute._offlineTableDisabled);
-      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), route.getOfflineRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRoute.getOfflineRoutingTable().entrySet());
     }
 
-    if (route.getRealtimeRoutingTable() != null) {
-      assertFalse(route.getRealtimeRoutingTable().isEmpty());
+    if (tableRoute.getRealtimeRoutingTable() != null) {
+      assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
       assertFalse(expectedTableRoute._realtimeTableDisabled);
-      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), route.getRealtimeRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), tableRoute.getRealtimeRoutingTable().entrySet());
     }
   }
 
   @Test(dataProvider = "disabledTableProvider")
   void testTableRoutingForDisabledTable(String tableName) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    tableRoute.getTableConfig(_tableCache);
+    tableRoute.checkRoutes(_routingManager);
+
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
         CalciteSqlCompiler.convertToBrokerRequest(CalciteSqlParser.compileToPinotQuery(query));
@@ -598,35 +610,34 @@ public class ImplicitHybridTableRouteTest {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
 
-    if (hybridTable.hasOffline()) {
+    if (tableRoute.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (hybridTable.hasRealtime()) {
+    if (tableRoute.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
     }
 
-    TableRoute expectedTableRoute =
+    GetTableRouteResult expectedTableRoute =
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
 
-    ImplicitHybridTableRoute route =
-        ImplicitHybridTableRoute.from(hybridTable, _routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (expectedTableRoute._offlineTableDisabled) {
-      assertNull(route.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
     } else if (expectedTableRoute._offlineRoutingTable != null) {
-      assertNotNull(route.getOfflineRoutingTable());
+      assertNotNull(tableRoute.getOfflineRoutingTable());
     }
 
     if (expectedTableRoute._realtimeTableDisabled) {
-      assertNull(route.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
     } else if (expectedTableRoute._realtimeRoutingTable != null) {
-      assertNotNull(route.getRealtimeRoutingTable());
+      assertNotNull(tableRoute.getRealtimeRoutingTable());
     }
   }
 }
