@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
+import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -52,7 +53,7 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
   @Override
   protected RealtimeSegmentDataManager createRealtimeSegmentDataManager(SegmentZKMetadata zkMetadata,
       TableConfig tableConfig, IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      Semaphore semaphore, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      ConsumerCoordinator consumerCoordinator, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, BooleanSupplier isTableReadyToConsumeData)
       throws AttemptsExceededException, RetriableOperationException {
 
@@ -61,6 +62,6 @@ public class FailureInjectingRealtimeTableDataManager extends RealtimeTableDataM
       addFailureToCommits = false;
     }
     return new FailureInjectingRealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
-        indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, addFailureToCommits);
+        indexLoadingConfig, schema, llcSegmentName, consumerCoordinator, _serverMetrics, addFailureToCommits);
   }
 }

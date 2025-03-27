@@ -97,7 +97,8 @@ public class RealtimeSegmentDataManagerTest {
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
 
-  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
+      new ConcurrentHashMap<>();
 
   private static TableConfig createTableConfig()
       throws Exception {
@@ -166,12 +167,13 @@ public class RealtimeSegmentDataManagerTest {
     tableConfig.getIngestionConfig().setRetryOnSegmentBuildPrecheckFailure(true);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
-    _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
-        _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
+        _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
   }
 
   @BeforeClass
@@ -992,7 +994,7 @@ public class RealtimeSegmentDataManagerTest {
     private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
-    public Map<Integer, Semaphore> _semaphoreMap;
+    public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
@@ -1009,12 +1011,13 @@ public class RealtimeSegmentDataManagerTest {
 
     public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
-        LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics,
-        TimeSupplier timeSupplier)
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
+          () -> true);
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
@@ -1024,7 +1027,7 @@ public class RealtimeSegmentDataManagerTest {
       _segmentBuildFailedWithDeterministicError =
           RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
       _segmentBuildFailedWithDeterministicError.setAccessible(true);
-      _semaphoreMap = semaphoreMap;
+      _consumerCoordinatorMap = consumerCoordinatorMap;
       _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
