@@ -889,6 +889,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     try {
+      segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS),
+          1000);
+      fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+    try {
       segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfigs, null);
       fail();
     } catch (IllegalStateException e) {
@@ -1384,6 +1391,28 @@ public class PinotLLCRealtimeSegmentManagerTest {
         .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList);
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
+  }
+
+  @Test
+  public void testReduceSegmentSizeAndReset() {
+    // Set up a new table with 2 replicas, 5 instances, 4 partitions
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    setUpNewTable(segmentManager, 2, 5, 5);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setRetentionTimeUnit(TimeUnit.DAYS.toString());
+    segmentsValidationAndRetentionConfig.setRetentionTimeValue("3");
+    segmentManager._tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    String segmentName = new ArrayList<>(segmentManager._segmentZKMetadataMap.keySet()).get(0);
+
+    SegmentZKMetadata segmentZKMetadata =
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
+    int prevRowSize = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(segmentName), 100);
+    Assert.assertEquals(Math.min(100 / 2, prevRowSize / 2),
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null).getSizeThresholdToFlushSegment());
   }
 
   @Test

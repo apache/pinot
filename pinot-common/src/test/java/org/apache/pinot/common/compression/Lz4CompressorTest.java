@@ -85,9 +85,6 @@ public class Lz4CompressorTest {
     byte[] compressedFast = _fastCompressor.compress(input);
     byte[] compressedHigh = _highCompressor.compress(input);
 
-    System.out.println("Fast compression size: " + compressedFast.length + " vs Original size: " + input.length);
-    System.out.println("High compression size: " + compressedHigh.length + " vs Original size: " + input.length);
-
     Assert.assertTrue(compressedFast.length < input.length, "Fast compressed data should be smaller than original");
     Assert.assertTrue(compressedHigh.length <= compressedFast.length, "High compression should produce smaller output");
   }
