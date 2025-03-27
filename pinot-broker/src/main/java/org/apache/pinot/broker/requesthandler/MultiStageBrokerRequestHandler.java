@@ -248,7 +248,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    LOGGER.debug("SQL query for request {}: {}", requestId, query);
+    _queryLogger.log(requestId, query);
 
     long queryTimeoutMs = getTimeout(sqlNodeAndOptions.getOptions());
     Timer queryTimer = new Timer(queryTimeoutMs, TimeUnit.MILLISECONDS);
