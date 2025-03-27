@@ -20,6 +20,9 @@ package org.apache.pinot.client;
 
 import java.sql.DatabaseMetaData;
 import java.sql.Statement;
+import java.util.Map;
+import java.util.Properties;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -95,5 +98,51 @@ public class PinotConnectionTest {
         new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
+  }
+
+  @Test
+  public void testValidQueryOptions() {
+    Properties props = new Properties();
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, 3000);
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS, 20);
+    PinotConnection pinotConnection =
+            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+                    _dummyPinotControllerTransport);
+    Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
+    Assert.assertEquals(queryOptions.size(), 4);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING), true);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE), true);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS), 3000);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS), 20);
+  }
+
+  @Test
+  public void testInvalidQueryOptions() {
+    Properties props = new Properties();
+    props.put("unknown", "true");
+    PinotConnection pinotConnection =
+            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+                    _dummyPinotControllerTransport);
+    Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
+    Assert.assertEquals(queryOptions.size(), 0);
+  }
+
+  @Test
+  public void testSomeInvalidSomeValidQueryOptions() {
+    Properties props = new Properties();
+    props.put("unknown", "true");
+    // lower case of property name also should considered as wrong query option.
+    props.put("enablenullhandling", "true");
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, 5000);
+    props.put(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS, 30);
+    PinotConnection pinotConnection =
+            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+                    _dummyPinotControllerTransport);
+    Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
+    Assert.assertEquals(queryOptions.size(), 3);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS), 5000);
+    Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS), 30);
   }
 }

@@ -84,7 +84,7 @@ public class QueryOptionsUtils {
 
     Map<String, String> resolved = new HashMap<>();
     for (Map.Entry<String, String> configEntry : queryOptions.entrySet()) {
-      String config = CONFIG_RESOLVER.get(configEntry.getKey().toLowerCase());
+      String config = resolveCaseInsensitiveKey(configEntry.getKey());
       if (config != null) {
         resolved.put(config, configEntry.getValue());
       } else {
@@ -93,6 +93,14 @@ public class QueryOptionsUtils {
     }
 
     return resolved;
+  }
+
+  @Nullable
+  public static String resolveCaseInsensitiveKey(Object property) {
+    if (property instanceof String) {
+      return QueryOptionsUtils.CONFIG_RESOLVER.get(((String) property).toLowerCase());
+    }
+    return null;
   }
 
   @Nullable
