@@ -29,7 +29,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public abstract class AbstractRoute implements Route {
+public abstract class BaseTableRoute implements TableRoute {
   public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap =

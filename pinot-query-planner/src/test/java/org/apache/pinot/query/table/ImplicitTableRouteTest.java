@@ -41,10 +41,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
-public class ImplicitHybridTableTest {
+public class ImplicitTableRouteTest {
   //@formatter:off
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of(
@@ -154,14 +157,11 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "offlineTableProvider")
   public void testOfflineTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isOffline(), "The table should be offline");
-    assertNotNull(table.getOfflineTables());
-    assertEquals(table.getOfflineTables().size(), 1);
-    assertNotNull(table.getOfflineTable());
-    assertEquals(table.getOfflineTable().getTableNameWithType(),
-        TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "realtimeTableProvider")
@@ -181,14 +181,11 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "realtimeTableProvider")
   public void testRealtimeTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isRealtime(), "The table should be realtime");
-    assertNotNull(table.getRealtimeTables());
-    assertEquals(table.getRealtimeTables().size(), 1);
-    assertNotNull(table.getRealtimeTable());
-    assertEquals(table.getRealtimeTable().getTableNameWithType(),
-        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
   }
 
   @DataProvider(name = "hybridTableProvider")
@@ -207,24 +204,11 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "hybridTableProvider")
   public void testHybridTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isHybrid(), "The table should be hybrid");
-
-    assertNotNull(table.getOfflineTables());
-    assertEquals(table.getOfflineTables().size(), 1);
-    assertNotNull(table.getOfflineTable());
-    assertEquals(table.getOfflineTable().getTableNameWithType(),
-        TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(parameter));
-
-    assertNotNull(table.getRealtimeTables());
-    assertEquals(table.getRealtimeTables().size(), 1);
-    assertNotNull(table.getRealtimeTable());
-    assertEquals(table.getRealtimeTable().getTableNameWithType(),
-        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(parameter));
-
-    assertNotNull(table.getAllPhysicalTables());
-    assertEquals(table.getAllPhysicalTables().size(), 2);
   }
 
   /**
@@ -232,14 +216,11 @@ public class ImplicitHybridTableTest {
    */
   @Test
   public void testWithNoTimeBoundary() {
-    ImplicitHybridTable table = ImplicitHybridTable.from("b", _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute("b");
+    table.getTableConfig(_tableCache);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isRealtime(), "The table should be realtime");
-    assertNotNull(table.getRealtimeTables());
-    assertEquals(table.getRealtimeTables().size(), 1);
-    assertNotNull(table.getRealtimeTable());
-    assertEquals(table.getRealtimeTable().getTableNameWithType(),
-        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType("b"));
   }
 
   @DataProvider(name = "nonExistentTableProvider")
@@ -261,7 +242,9 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "nonExistentTableProvider")
   public void testNonExistentTableName(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+
     assertFalse(table.isExists(), "The table should not exist");
   }
 
@@ -287,7 +270,10 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "routeExistsProvider")
   public void testRouteExists(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isRouteExists(), "The table should have route");
   }
@@ -308,7 +294,10 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "routeNotExistsProvider")
   public void testRouteNotExists(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertTrue(table.isExists(), "The table should exist");
     assertFalse(table.isRouteExists(), "The table should not have route");
   }
@@ -342,10 +331,12 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertTrue(table.isExists(), "The table should exist");
     assertFalse(table.isDisabled(), "The table should not be disabled");
-    assertNull(table.getDisabledTables());
   }
 
   @DataProvider(name = "partiallyDisabledTableProvider")
@@ -360,11 +351,12 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertTrue(table.isExists(), "The table should exist");
     assertFalse(table.isDisabled(), "The table should be disabled");
-    assertNotNull(table.getDisabledTables());
-    assertEquals(table.getDisabledTables().size(), 1);
   }
 
   @DataProvider(name = "disabledTableProvider")
@@ -384,11 +376,12 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledTable(String parameter) {
-    ImplicitHybridTable table = ImplicitHybridTable.from(parameter, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isDisabled(), "The table should not have route");
-    assertNotNull(table.getDisabledTables(), "The table should have disabled tables");
-    assertFalse(table.getDisabledTables().isEmpty(), "The table should have disabled tables");
   }
 
   static class TableNameAndConfig {
@@ -415,21 +408,21 @@ public class ImplicitHybridTableTest {
       _brokerResponse = brokerResponse;
     }
 
-    boolean similar(HybridTable hybridTable) {
+    boolean similar(ImplicitTableRoute hybridTable) {
       boolean isEquals = true;
 
       if (_offlineTableName != null) {
         isEquals &= hybridTable.hasOffline() && hybridTable.isOfflineRouteExists()
-            && _offlineTableName.equals(hybridTable.getOfflineTable().getTableNameWithType());
+            && _offlineTableName.equals(hybridTable.getOfflineTableName());
       } else {
-        isEquals &= !hybridTable.hasOffline() || !hybridTable.getOfflineTable().isRouteExists();
+        isEquals &= !hybridTable.hasOffline() || !hybridTable.isOfflineRouteExists();
       }
 
       if (_realtimeTableName != null) {
         isEquals &= hybridTable.hasRealtime() && hybridTable.isRealtimeRouteExists()
-            && _realtimeTableName.equals(hybridTable.getRealtimeTable().getTableNameWithType());
+            && _realtimeTableName.equals(hybridTable.getRealtimeTableName());
       } else {
-        isEquals &= !hybridTable.hasRealtime() || !hybridTable.getRealtimeTable().isRouteExists();
+        isEquals &= !hybridTable.hasRealtime() || !hybridTable.isRealtimeRouteExists();
       }
 
       return isEquals;
@@ -521,8 +514,11 @@ public class ImplicitHybridTableTest {
   @Test(dataProvider = "tableNameAndConfigSuccessProvider")
   public void testTableNameAndConfigSuccess(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
-    assertTrue(tableNameAndConfig.similar(hybridTable), "The table name and config should match the hybrid table");
+    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
+    assertTrue(tableNameAndConfig.similar(table), "The table name and config should match the hybrid table");
   }
 
   @DataProvider(name = "tableNameAndConfigFailureProvider")
@@ -547,15 +543,18 @@ public class ImplicitHybridTableTest {
   @Test(dataProvider = "tableNameAndConfigFailureProvider")
   public void testTableNameAndConfigFailure(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
+
     assertNotNull(tableNameAndConfig._brokerResponse);
     assertTrue(tableNameAndConfig._brokerResponse == BrokerResponseNative.TABLE_DOES_NOT_EXIST
         || tableNameAndConfig._brokerResponse == BrokerResponseNative.NO_TABLE_RESULT);
 
     if (tableNameAndConfig._brokerResponse == BrokerResponseNative.TABLE_DOES_NOT_EXIST) {
-      assertFalse(hybridTable.isExists(), "The table should not exist");
+      assertFalse(table.isExists(), "The table should not exist");
     } else {
-      assertFalse(hybridTable.isRouteExists(), "The table should not have route");
+      assertFalse(table.isRouteExists(), "The table should not have route");
     }
   }
 
@@ -595,52 +594,53 @@ public class ImplicitHybridTableTest {
 
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledWithCheckDisabled(String tableName) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
 
     ExceptionOrResponse exceptionOrResponse =
-        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
-            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
-            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
-            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+        checkTableDisabled(table.hasOffline() && table.isOfflineTableDisabled(),
+            table.hasRealtime() && table.isRealtimeTableDisabled(),
+            table.hasOffline() ? table.getOfflineTableConfig() : null,
+            table.hasRealtime() ? table.getRealtimeTableConfig() : null);
 
     assertNull(exceptionOrResponse);
-    assertFalse(hybridTable.isDisabled());
-    assertNull(hybridTable.getDisabledTables());
+    assertFalse(table.isDisabled());
   }
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledWithCheckDisabled(String tableName) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
 
     ExceptionOrResponse exceptionOrResponse =
-        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
-            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
-            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
-            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+        checkTableDisabled(table.hasOffline() && table.isOfflineTableDisabled(),
+            table.hasRealtime() && table.isRealtimeTableDisabled(),
+            table.hasOffline() ? table.getOfflineTableConfig() : null,
+            table.hasRealtime() ? table.getRealtimeTableConfig() : null);
 
     assertNotNull(exceptionOrResponse);
     assertNull(exceptionOrResponse._brokerResponse);
     assertNotNull(exceptionOrResponse._exception);
-    assertFalse(hybridTable.isDisabled());
-    assertNotNull(hybridTable.getDisabledTables());
-    assertFalse(hybridTable.getDisabledTables().isEmpty());
+    assertFalse(table.isDisabled());
   }
 
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledWithCheckDisabled(String tableName) {
-    HybridTable hybridTable = ImplicitHybridTable.from(tableName, _routingManager, _tableCache);
+    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
 
     ExceptionOrResponse exceptionOrResponse =
-        checkTableDisabled(hybridTable.hasOffline() && hybridTable.getOfflineTable().isDisabled(),
-            hybridTable.hasRealtime() && hybridTable.getRealtimeTable().isDisabled(),
-            hybridTable.hasOffline() ? hybridTable.getOfflineTable().getTableConfig() : null,
-            hybridTable.hasRealtime() ? hybridTable.getRealtimeTable().getTableConfig() : null);
+        checkTableDisabled(table.hasOffline() && table.isOfflineTableDisabled(),
+            table.hasRealtime() && table.isRealtimeTableDisabled(),
+            table.hasOffline() ? table.getOfflineTableConfig() : null,
+            table.hasRealtime() ? table.getRealtimeTableConfig() : null);
 
     assertNotNull(exceptionOrResponse);
     assertNull(exceptionOrResponse._exception);
     assertNotNull(exceptionOrResponse._brokerResponse);
-    assertTrue(hybridTable.isDisabled());
-    assertNotNull(hybridTable.getDisabledTables());
-    assertFalse(hybridTable.getDisabledTables().isEmpty());
+    assertTrue(table.isDisabled());
   }
 }
