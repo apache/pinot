@@ -564,8 +564,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               schema, llcSegmentName, consumerCoordinator, _serverMetrics, partitionUpsertMetadataManager,
               partitionDedupMetadataManager, _isTableReadyToConsumeData);
     } catch (SegmentAlreadyConsumedException e) {
-      // Don't register segment since segment was already committed by another instance.
-      // Eventually this server should receive a CONSUMING -> ONLINE helix state transition if segment is not deleted.
+      // Don't register segment.
+      // If segment is not deleted, Eventually this server should receive a CONSUMING -> ONLINE helix state transition.
+      // If consumption in order is enforced:
+      // 1. If segment was deleted: Helix thread waiting on this deleted segment will fallback to fetch prev segment
+      //    from ideal state.
+      // 2. If segment is not deleted, Helix thread waiting on this segment will be notified and unblocked during
+      //    consuming -> online transition of this segment.
       return;
     }
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
