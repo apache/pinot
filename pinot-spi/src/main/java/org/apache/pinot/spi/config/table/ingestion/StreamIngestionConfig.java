@@ -101,6 +101,7 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setUseIdealStateToCalculatePreviousSegment(boolean useIdealStateToCalculatePreviousSegment) {
     _useIdealStateToCalculatePreviousSegment = useIdealStateToCalculatePreviousSegment;
+  }
 
   @Nullable
   public ParallelSegmentConsumptionPolicy getParallelSegmentConsumptionPolicy() {
