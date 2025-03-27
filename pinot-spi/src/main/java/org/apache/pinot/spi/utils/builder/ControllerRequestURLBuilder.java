@@ -282,7 +282,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableDelete(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableDelete(tableName, null);
+  }
+
+  public String forTableDelete(String tableName, String retention) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (retention != null) {
+      url += "?retention=" + retention;
+    }
+    return url;
   }
 
   public String forTableView(String tableName, String view, @Nullable String tableType) {

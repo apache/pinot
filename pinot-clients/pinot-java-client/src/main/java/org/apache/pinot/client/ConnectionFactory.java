@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import org.apache.pinot.client.grpc.GrpcConnection;
 
 
 /**
@@ -144,6 +145,20 @@ public class ConnectionFactory {
   }
 
   /**
+   * @param properties
+   * @param controllerUrl url host:port of the controller
+   * @return A connection that connects to brokers as per the given controller
+   */
+  public static GrpcConnection fromControllerGrpc(Properties properties, String controllerUrl) {
+    try {
+      properties.setProperty("useGrpcPort", "true");
+      return new GrpcConnection(properties, new ControllerBasedBrokerSelector(properties, controllerUrl));
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *
    * @param properties The Pinot connection properties
@@ -153,7 +168,9 @@ public class ConnectionFactory {
    */
   public static Connection fromZookeeper(Properties properties, String zkUrl, PinotClientTransport transport) {
     try {
-      return fromZookeeper(properties, new DynamicBrokerSelector(zkUrl), transport);
+      boolean preferTls = Boolean.parseBoolean(properties.getProperty("preferTLS", "false"));
+      boolean useGrpcPort = Boolean.parseBoolean(properties.getProperty("useGrpcPort", "false"));
+      return fromZookeeper(properties, new DynamicBrokerSelector(zkUrl, preferTls, useGrpcPort), transport);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -168,6 +185,21 @@ public class ConnectionFactory {
   static Connection fromZookeeper(Properties properties, DynamicBrokerSelector dynamicBrokerSelector,
       PinotClientTransport transport) {
     return new Connection(properties, dynamicBrokerSelector, transport);
+  }
+
+  /**
+   * Creates a connection to a Pinot cluster, given its Zookeeper URL
+   *
+   * @param properties The Pinot connection properties
+   * @param zkUrl The URL to the Zookeeper cluster, must include the cluster name e.g host:port/chroot/pinot-cluster
+   * @return A connection that connects to the brokers in the given Helix cluster
+   */
+  public static GrpcConnection fromZookeeperGrpc(Properties properties, String zkUrl) {
+    try {
+      return new GrpcConnection(properties, new DynamicBrokerSelector(zkUrl, false, true));
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
   }
 
   /**
@@ -223,6 +255,10 @@ public class ConnectionFactory {
   public static Connection fromHostList(Properties properties, List<String> brokers,
       PinotClientTransport transport) {
     return new Connection(properties, brokers, transport);
+  }
+
+  public static GrpcConnection fromHostListGrpc(Properties properties, List<String> brokers) {
+    return new GrpcConnection(properties, brokers);
   }
 
   private static PinotClientTransport getDefault(Properties connectionProperties) {

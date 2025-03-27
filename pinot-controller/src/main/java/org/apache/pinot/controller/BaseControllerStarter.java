@@ -37,15 +37,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.util.Timeout;
-import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -73,7 +70,6 @@ import org.apache.pinot.common.minion.InMemoryTaskManagerStatusCache;
 import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.PinotAppConfigs;
-import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -111,6 +107,7 @@ import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceM
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
@@ -125,6 +122,8 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -135,13 +134,9 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -272,6 +267,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
+
+    ContinuousJfrStarter.init(_config);
   }
 
   // If thread pool size is not configured executor will use cached thread pool
@@ -387,7 +384,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   @Override
-  public void start() {
+  public void start()
+      throws Exception {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     long startTimeMs = System.currentTimeMillis();
@@ -411,6 +409,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         LOGGER.error("Invalid mode: {}", _controllerMode);
         break;
     }
+
+    // Initializing Groovy execution security
+    GroovyFunctionEvaluator.configureGroovySecurity(
+        _config.getProperty(CommonConstants.Groovy.GROOVY_INGESTION_STATIC_ANALYZER_CONFIG,
+            _config.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
@@ -584,30 +587,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);
-    List<String> existingHlcTables = new ArrayList<>();
-    _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
-      TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
-      if (tableConfig != null) {
-        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-        try {
-          for (Map<String, String> streamConfigMap : streamConfigMaps) {
-            StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-                streamConfigMap);
-          }
-        } catch (Exception e) {
-          existingHlcTables.add(rt);
-        }
-      }
-    });
-    if (existingHlcTables.size() > 0) {
-      LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
-          + "following HLC tables before proceeding: {}\n", existingHlcTables);
-      throw new RuntimeException("Unable to start controller due to existing HLC tables!");
-    }
 
-    // One time job to fix schema name in all tables
-    // This method can be removed after the next major release.
-    fixSchemaNameInTableConfig();
+    enforceTableConfigAndSchema();
 
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {
@@ -638,91 +619,46 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   }
 
   /**
-   * This method is used to fix table/schema names.
-   * TODO: in the next release, maybe 2.0.0, we can remove this method. Meanwhile we can delete the orphan schemas
-   * that has been existed longer than a certain time period.
-   *
+   * Scan all table resources in the cluster and ensure table config and schema exist for each table.
+   * TODO: Cleanup orphan table config and schema
    */
-  @VisibleForTesting
-  public void fixSchemaNameInTableConfig() {
-    AtomicInteger misconfiguredTableCount = new AtomicInteger();
-    AtomicInteger tableWithoutSchemaCount = new AtomicInteger();
-    AtomicInteger fixedSchemaTableCount = new AtomicInteger();
-    AtomicInteger failedToCopySchemaCount = new AtomicInteger();
-    AtomicInteger failedToUpdateTableConfigCount = new AtomicInteger();
+  private void enforceTableConfigAndSchema() {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
-
-    _helixResourceManager.getAllTables().forEach(tableNameWithType -> {
-      Pair<TableConfig, Integer> tableConfigWithVersion =
-          ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableNameWithType);
-      if (tableConfigWithVersion == null) {
-        // This might due to table deletion, just log it here.
-        LOGGER.warn("Failed to find table config for table: {}, the table likely already got deleted",
-            tableNameWithType);
-        return;
+    List<String> tablesWithoutTableConfig = new ArrayList<>();
+    List<String> tablesWithoutSchema = new ArrayList<>();
+    for (String tableNameWithType : _helixResourceManager.getAllTables()) {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
+      if (tableConfig == null) {
+        tablesWithoutTableConfig.add(tableNameWithType);
+        continue;
       }
-      TableConfig tableConfig = tableConfigWithVersion.getLeft();
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(rawTableName);
-      boolean schemaExists = propertyStore.exists(schemaPath, AccessOption.PERSISTENT);
-      String existSchemaName = tableConfig.getValidationConfig().getSchemaName();
-      if (existSchemaName == null || existSchemaName.equals(rawTableName)) {
-        // Although the table config is valid, we still need to ensure the schema exists
-        if (!schemaExists) {
-          LOGGER.warn("Failed to find schema for table: {}", tableNameWithType);
-          tableWithoutSchemaCount.getAndIncrement();
-          return;
-        }
-        // Table config is already in good status
-        return;
+      Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
+      if (schema == null) {
+        tablesWithoutSchema.add(tableNameWithType);
       }
-      misconfiguredTableCount.getAndIncrement();
-      if (schemaExists) {
-        // If a schema named `rawTableName` already exists, then likely this is a misconfiguration.
-        // Reset schema name in table config to null to let the table point to the existing schema.
-        LOGGER.warn("Schema: {} already exists, fix the schema name in table config from {} to null", rawTableName,
-            existSchemaName);
+    }
+    if (!tablesWithoutTableConfig.isEmpty()) {
+      LOGGER.error("[CRITICAL!!!] Failed to find table config for tables: {}", tablesWithoutTableConfig);
+      if (_config.isExitOnTableConfigCheckFailure()) {
+        throw new IllegalStateException("Failed to find table config for tables: " + tablesWithoutTableConfig
+            + ", exiting! Please set controller.startup.exitOnTableConfigCheckFailure=false to not exit and fix these "
+            + "tables.");
       } else {
-        // Copy the schema current table referring to to `rawTableName` if it does not exist
-        Schema schema = _helixResourceManager.getSchema(existSchemaName);
-        if (schema == null) {
-          LOGGER.warn("Failed to find schema: {} for table: {}", existSchemaName, tableNameWithType);
-          tableWithoutSchemaCount.getAndIncrement();
-          return;
-        }
-        schema.setSchemaName(rawTableName);
-        if (propertyStore.create(schemaPath, SchemaUtils.toZNRecord(schema), AccessOption.PERSISTENT)) {
-          LOGGER.info("Copied schema: {} to {}", existSchemaName, rawTableName);
-        } else {
-          LOGGER.warn("Failed to copy schema: {} to {}", existSchemaName, rawTableName);
-          failedToCopySchemaCount.getAndIncrement();
-          return;
-        }
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_WITHOUT_TABLE_CONFIG_COUNT,
+            tablesWithoutTableConfig.size());
       }
-      // Update table config to remove schema name
-      tableConfig.getValidationConfig().setSchemaName(null);
-      if (ZKMetadataProvider.setTableConfig(propertyStore, tableConfig, tableConfigWithVersion.getRight())) {
-        LOGGER.info("Removed schema name from table config for table: {}", tableNameWithType);
-        fixedSchemaTableCount.getAndIncrement();
+    }
+    if (!tablesWithoutSchema.isEmpty()) {
+      LOGGER.error("[CRITICAL!!!] Failed to find schema for tables: {}", tablesWithoutSchema);
+      if (_config.isExitOnSchemaCheckFailure()) {
+        throw new IllegalStateException("Failed to find schema for tables: " + tablesWithoutSchema
+            + ", exiting! Please set controller.startup.exitOnSchemaCheckFailure=false to not exit and fix these "
+            + "tables.");
       } else {
-        LOGGER.warn("Failed to update table config for table: {}", tableNameWithType);
-        failedToUpdateTableConfigCount.getAndIncrement();
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT,
+            tablesWithoutSchema.size());
       }
-    });
-    LOGGER.info(
-        "Found {} tables misconfigured, {} tables without schema. Successfully fixed schema for {} tables, failed to "
-            + "fix {} tables due to copy schema failure, failed to fix {} tables due to update table config failure.",
-        misconfiguredTableCount.get(), tableWithoutSchemaCount.get(), fixedSchemaTableCount.get(),
-        failedToCopySchemaCount.get(), failedToUpdateTableConfigCount.get());
-
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT,
-        misconfiguredTableCount.get());
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT, tableWithoutSchemaCount.get());
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FIXED_SCHEMA_TABLE_COUNT, fixedSchemaTableCount.get());
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FAILED_TO_COPY_SCHEMA_COUNT,
-        failedToCopySchemaCount.get());
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG_COUNT,
-        failedToUpdateTableConfigCount.get());
+    }
   }
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
@@ -853,6 +789,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     updated |= HelixHelper.addDefaultTags(instanceConfig,
         () -> Collections.singletonList(CommonConstants.Helix.CONTROLLER_INSTANCE));
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+
     if (updated) {
       HelixHelper.updateInstanceConfig(_helixParticipantManager, instanceConfig);
     }
@@ -876,8 +814,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager,
             _resourceUtilizationManager);
     periodicTasks.add(_taskManager);
-    _retentionManager =
-        new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
+    _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        brokerServiceHelper);
     periodicTasks.add(_retentionManager);
     _offlineSegmentIntervalChecker =
         new OfflineSegmentIntervalChecker(_config, _helixResourceManager, _leadControllerManager,

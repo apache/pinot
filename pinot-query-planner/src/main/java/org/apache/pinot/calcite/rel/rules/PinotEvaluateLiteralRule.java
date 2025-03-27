@@ -44,8 +44,8 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -178,7 +178,7 @@ public class PinotEvaluateLiteralRule {
     RelDataType rexNodeType = rexCall.getType();
     Object resultValue;
     try {
-      FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+      QueryFunctionInvoker invoker = new QueryFunctionInvoker(functionInfo);
       if (functionInfo.getMethod().isVarArgs()) {
         resultValue = invoker.invoke(new Object[]{arguments});
       } else {
@@ -197,8 +197,8 @@ public class PinotEvaluateLiteralRule {
       }
     } catch (Exception e) {
       throw new SqlCompilationException(
-          "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
-              arguments), e);
+          "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
+              + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
     try {
       resultValue = convertResultValue(resultValue, rexNodeType);

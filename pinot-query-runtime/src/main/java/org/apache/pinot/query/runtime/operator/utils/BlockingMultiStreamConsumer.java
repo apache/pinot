@@ -23,15 +23,25 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class is a utility class that helps to consume multiple mailboxes in a blocking manner by a single thread.
+ *
+ * The reader entry point is {@link #readBlockBlocking()} which will block until some of the mailboxes is ready to be
+ * read. The method is blocking and will return the next block to be consumed. This method is designed to be called by
+ * a single thread we call the consumer thread.
+ *
+ * All other methods but the ones specifically specified can only be called by the consumer thread.
+ * @param <E>
+ */
 public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiStreamConsumer.class);
   private final Object _id;
@@ -55,44 +65,97 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     _lastRead = _mailboxes.size() - 1;
   }
 
+  /**
+   * Returns whether the element is considered an error element or not.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract boolean isError(E element);
 
+  /**
+   * Returns whether the element is considered a successful end of stream element or not.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract boolean isEos(E element);
 
   /**
-   * This method is called whenever one of the consumer sends a EOS. It is guaranteed that the received element is
-   * an EOS as defined by {@link #isEos(Object)}
+   * This method is called whenever a {@link #isEos(Object) successful EOS} is read from one of the mailboxes.
+   *
+   * It is guaranteed that the received element is an EOS as defined by {@link #isEos(Object)}.
+   *
+   * This method is called by the consumer thread.
    */
-  protected abstract void onConsumerFinish(E element);
+  protected abstract void onMailboxEnd(E element);
 
+  /**
+   * This method is called whenever a timeout is reached while reading an element.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onTimeout();
 
+  /**
+   * This method is called whenever an exception is thrown while reading an element.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onException(Exception e);
 
+  /**
+   * This method is called whenever all mailboxes emitted EOS.
+   *
+   * This method is called by the consumer thread.
+   */
   protected abstract E onEos();
 
+  /**
+   * This method must be called when the consumer is not going to read anymore from the mailboxes.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   @Override
   public void close() {
     cancelRemainingMailboxes();
   }
 
+  /**
+   * This method is called whenever the consumer is cancelled.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   public void cancel(Throwable t) {
     cancelRemainingMailboxes();
   }
 
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * This method is called by the consumer thread.
+   */
   public void earlyTerminate() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.earlyTerminate();
     }
   }
 
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * <strong>This method can be called from any thread</strong>.
+   */
   protected void cancelRemainingMailboxes() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.cancel();
     }
   }
 
-  public void onData() {
+  /**
+   * This method is called whenever the consumer is early terminated.
+   *
+   * <strong>This method can be called by any thread</strong>, although it is expected to be called by producer threads.
+   */
+  protected void onData() {
     if (_newDataReady.offer(Boolean.TRUE)) {
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace("New data notification delivered on " + _id + ". " + System.identityHashCode(_newDataReady));
@@ -116,7 +179,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    * Right now the implementation tries to be fair. If one call returned the block from mailbox {@code i}, then next
    * call will look for mailbox {@code i+1}, {@code i+2}... in a circular manner.
    *
-   * In order to unblock a thread blocked here, {@link #onData()} should be called.   *
+   * In order to unblock a thread blocked here, {@link #onData()} should be called.
+   *
+   * This method is called by the consumer thread.
    */
   public E readBlockBlocking() {
     if (LOGGER.isTraceEnabled()) {
@@ -192,7 +257,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
             + " (mailboxes alive: " + ids + ")");
       }
-      onConsumerFinish(block);
+      onMailboxEnd(block);
 
       block = readBlockOrNull();
     }
@@ -244,11 +309,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
 
-    private final MultiStageQueryStats _stats;
+    private final int _stageId;
+    @Nullable
+    private MultiStageQueryStats _stats;
 
     public OfTransferableBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
       super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
@@ -263,27 +331,53 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
 
     @Override
-    protected void onConsumerFinish(TransferableBlock element) {
-      if (element.getQueryStats() != null) {
-        _stats.mergeUpstream(element.getQueryStats());
-      } else {
-        _stats.mergeUpstream(element.getSerializedStatsByStage());
+    protected void onMailboxEnd(TransferableBlock element) {
+      try {
+        MultiStageQueryStats stats = _stats;
+        if (stats != null) {
+          if (element.getQueryStats() != null) {
+            stats.mergeUpstream(element.getQueryStats(), true);
+          } else {
+            stats.mergeUpstream(element.getSerializedStatsByStage(), true);
+          }
+        }
+      } catch (Exception e) {
+        // If there is any error merging stats, continue without them
+        LOGGER.warn("Error merging stats", e);
+        _stats = null;
       }
     }
 
     @Override
     protected TransferableBlock onTimeout() {
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      // TODO: Add the sender stage id to the error message
+      String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
+      // We log this case as debug because:
+      // - The opchain will already log a stackless message once the opchain fail
+      // - The trace is not useful (the log message is good enough to find where we failed)
+      // - We may fail for timeout reasons often and in case there is an execution error this log will be noisy and
+      //   will make it more difficult to find the real error in the log.
+      LOGGER.debug(errMsg);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.EXECUTION_TIMEOUT.asException(errMsg));
     }
 
     @Override
     protected TransferableBlock onException(Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+      // TODO: Add the sender stage id to the error message
+      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
+      // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
+      // with an exception and the stack trace may be useful to find the root cause.
+      LOGGER.warn(errMsg, e);
+      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.INTERNAL.asException(errMsg));
     }
 
     @Override
     protected TransferableBlock onEos() {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_stats);
+      MultiStageQueryStats stats = _stats;
+      if (stats == null) { // possible in case of error
+        stats = MultiStageQueryStats.emptyStats(_stageId);
+      }
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(stats);
     }
   }
 }

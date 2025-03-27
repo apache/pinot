@@ -39,6 +39,9 @@ public class TableDedupMetadataManagerFactory {
   public static final String DEDUP_DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
   public static final String DEDUP_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
+  public static final String DEDUP_DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
+      "default.allow.dedup.consumption.during.commit";
+
   public static TableDedupMetadataManager create(TableConfig tableConfig, Schema schema,
       TableDataManager tableDataManager, ServerMetrics serverMetrics,
       @Nullable PinotConfiguration instanceDedupConfig) {
@@ -58,6 +61,11 @@ public class TableDedupMetadataManagerFactory {
       if (!dedupConfig.isEnablePreload()) {
         dedupConfig.setEnablePreload(
             Boolean.parseBoolean(instanceDedupConfig.getProperty(DEDUP_DEFAULT_ENABLE_PRELOAD, "false")));
+      }
+      // server level config honoured only when table level config is not set to true
+      if (!dedupConfig.isAllowDedupConsumptionDuringCommit()) {
+        dedupConfig.setAllowDedupConsumptionDuringCommit(Boolean.parseBoolean(
+            instanceDedupConfig.getProperty(DEDUP_DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT, "false")));
       }
     }
     if (StringUtils.isNotEmpty(metadataManagerClass)) {

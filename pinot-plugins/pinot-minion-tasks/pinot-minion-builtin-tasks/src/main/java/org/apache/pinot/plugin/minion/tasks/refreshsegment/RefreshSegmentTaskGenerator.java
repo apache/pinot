@@ -81,7 +81,6 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
-
     String taskType = RefreshSegmentTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
@@ -102,7 +101,8 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
 
     // Get info about table and schema.
     Stat tableStat = pinotHelixResourceManager.getTableStat(tableNameWithType);
-    Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+    Schema schema = pinotHelixResourceManager.getTableSchema(tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
     Stat schemaStat = pinotHelixResourceManager.getSchemaStat(schema.getSchemaName());
 
     // Get the running segments for a table.
@@ -110,17 +110,15 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
         TaskGeneratorUtils.getRunningSegments(RefreshSegmentTask.TASK_TYPE, _clusterInfoAccessor);
 
     // Make a single ZK call to get the segments.
-    List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+    List<SegmentZKMetadata> allSegments =
+        tableConfig.getTableType() == TableType.OFFLINE
+            ? getSegmentsZKMetadataForTable(tableNameWithType)
+            : getNonConsumingSegmentsZKMetadataForRealtimeTable(tableNameWithType);
 
     for (SegmentZKMetadata segmentZKMetadata : allSegments) {
       // Skip if we have reached the maximum number of permissible tasks per iteration.
       if (tableNumTasks >= tableMaxNumTasks) {
         break;
-      }
-
-      // Skip consuming segments.
-      if (tableConfig.getTableType() == TableType.REALTIME && !segmentZKMetadata.getStatus().isCompleted()) {
-        continue;
       }
 
       // Skip segments for which a task is already running.

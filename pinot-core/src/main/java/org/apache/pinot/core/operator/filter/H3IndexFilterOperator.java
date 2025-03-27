@@ -77,8 +77,8 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
-    _h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, resolution);
-    _edgeLength = H3Utils.H3_CORE.edgeLength(resolution, LengthUnit.m);
+    _h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, resolution);
+    _edgeLength = H3Utils.H3_CORE.getHexagonEdgeLengthAvg(resolution, LengthUnit.m);
 
     RangePredicate rangePredicate = (RangePredicate) predicate;
     if (!rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED)) {
@@ -223,7 +223,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
    */
   private List<Long> getH3Ids(int numRings) {
     Preconditions.checkState(numRings <= 100, "Expect numRings <= 100, got: %s", numRings);
-    return H3Utils.H3_CORE.kRing(_h3Id, numRings);
+    return H3Utils.H3_CORE.gridDisk(_h3Id, numRings);
   }
 
   /**

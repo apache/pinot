@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -38,7 +39,11 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -51,8 +56,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class MailboxReceiveOperatorTest {
@@ -110,7 +114,7 @@ public class MailboxReceiveOperatorTest {
         System.currentTimeMillis() + 100L)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+      assertTrue(block.getExceptions().containsKey(QueryErrorCode.EXECUTION_TIMEOUT.getId()));
     }
   }
 
@@ -146,7 +150,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadata1, RelDistribution.Type.SINGLETON)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(errorMessage));
     }
   }
 
@@ -201,7 +205,7 @@ public class MailboxReceiveOperatorTest {
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED)) {
       TransferableBlock block = operator.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(errorMessage));
     }
   }
 
@@ -226,6 +230,75 @@ public class MailboxReceiveOperatorTest {
       // Assure that early terminate signal goes into each mailbox
       verify(_mailbox1).earlyTerminate();
       verify(_mailbox2).earlyTerminate();
+    }
+  }
+
+  @Test
+  public void differentUpstreamHeapStatsProduceEmptyStats() {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    MultiStageQueryStats stats1 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+            .close())
+        .build();
+    TransferableBlock block1 = TransferableBlockUtils.getEndOfStreamTransferableBlock(stats1);
+    when(_mailbox1.poll()).thenReturn(block1);
+
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    MultiStageQueryStats stats2 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+                .close())
+        .build();
+    TransferableBlock block2 = TransferableBlockUtils.getEndOfStreamTransferableBlock(stats2);
+    when(_mailbox2.poll()).thenReturn(block2);
+
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.SINGLETON)) {
+      TransferableBlock block = operator.nextBlock();
+      assertTrue(block.isSuccessfulEndOfStreamBlock(), "Block should be successful EOS");
+      assertNotNull(block.getQueryStats(), "Query stats should not be null");
+      MultiStageQueryStats.StageStats.Closed upstreamStats = block.getQueryStats().getUpstreamStageStats(1);
+      assertNull(upstreamStats, "Upstream stats should be null in case of error merging stats");
+    }
+  }
+
+  @Test
+  public void differentSerializedUpstreamStatsProduceEmptyStats()
+      throws IOException {
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    List<DataBuffer> stats1 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+                .close())
+        .build()
+        .serialize();
+    MetadataBlock metadataBlock1 = new MetadataBlock(stats1);
+    TransferableBlock block1 = TransferableBlockUtils.wrap(metadataBlock1);
+    when(_mailbox1.poll()).thenReturn(block1);
+
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    List<DataBuffer> stats2 = new MultiStageQueryStats.Builder(1)
+        .addLast(open ->
+            open.addLastOperator(Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class))
+                .addLastOperator(Type.FILTER, new StatMap<>(FilterOperator.StatKey.class))
+                .addLastOperator(Type.LEAF, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class))
+                .close())
+        .build()
+        .serialize();
+    MetadataBlock metadataBlock2 = new MetadataBlock(stats2);
+    TransferableBlock block2 = TransferableBlockUtils.wrap(metadataBlock2);
+    when(_mailbox2.poll()).thenReturn(block2);
+
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.SINGLETON)) {
+      TransferableBlock block = operator.nextBlock();
+      assertTrue(block.isSuccessfulEndOfStreamBlock(), "Block should be successful EOS");
+      assertNotNull(block.getQueryStats(), "Query stats should not be null");
+      MultiStageQueryStats.StageStats.Closed upstreamStats = block.getQueryStats().getUpstreamStageStats(1);
+      assertNull(upstreamStats, "Upstream stats should be null in case of error merging stats");
     }
   }
 

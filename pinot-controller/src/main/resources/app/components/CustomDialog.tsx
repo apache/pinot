@@ -17,8 +17,17 @@
  * under the License.
  */
 
-import React from 'react';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, makeStyles, withStyles } from '@material-ui/core';
+import React, {ReactNode} from 'react';
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  makeStyles,
+  withStyles
+} from '@material-ui/core';
 import { red } from '@material-ui/core/colors';
 
 const useStyles = makeStyles((theme) => ({
@@ -27,7 +36,7 @@ const useStyles = makeStyles((theme) => ({
       minWidth: '600px'
     },
     "& .MuiDialogContent-root": {
-      padding: 8
+      padding: '10px 24px',
     }
   },
   dialogTitle: {
@@ -56,8 +65,11 @@ type Props = {
   showCancelBtn?: boolean,
   showOkBtn?: boolean,
   size?: false | "xs" | "sm" | "md" | "lg" | "xl",
-  disableBackdropClick?: boolean
-  disableEscapeKeyDown?: boolean
+  disableBackdropClick?: boolean,
+  disableEscapeKeyDown?: boolean,
+  showTitleDivider?: boolean,
+  showFooterDivider?: boolean,
+  moreActions?: ReactNode
 };
 
 export default function CustomDialog({
@@ -72,7 +84,10 @@ export default function CustomDialog({
   showOkBtn = true,
   size,
   disableBackdropClick = false,
-  disableEscapeKeyDown = false
+  disableEscapeKeyDown = false,
+  showTitleDivider = false,
+  showFooterDivider = false,
+  moreActions
 }: Props) {
 
   const classes = useStyles();
@@ -89,16 +104,19 @@ export default function CustomDialog({
       disableEscapeKeyDown={disableEscapeKeyDown}
     >
       <DialogTitle className={classes.dialogTitle}>{title}</DialogTitle>
+      {showTitleDivider && <Divider style={{ marginBottom: 10 }} />}
       <DialogContent>
         {children}
       </DialogContent>
+      {showFooterDivider && <Divider style={{ marginBottom: 10 }} />}
       <DialogActions>
         {showCancelBtn &&
-        <CancelButton onClick={handleClose} variant="outlined">
+        <CancelButton onClick={handleClose}  style={{ textTransform: 'none' }} variant="outlined">
           {btnCancelText || 'Cancel'}
         </CancelButton>}
+        {moreActions}
         {showOkBtn &&
-        <Button onClick={handleSave} variant="outlined" color="primary">
+        <Button onClick={handleSave} variant="contained" style={{ textTransform: 'none' }} color="primary">
           {btnOkText || 'Save'}
         </Button>}
       </DialogActions>

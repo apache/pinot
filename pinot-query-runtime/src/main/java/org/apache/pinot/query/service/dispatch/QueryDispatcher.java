@@ -48,8 +48,6 @@ import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.QueryInfoException;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -82,6 +80,8 @@ import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -146,7 +146,13 @@ public class QueryDispatcher {
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      try {
+        return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      } finally {
+        if (isQueryCancellationEnabled()) {
+          _serversByQuery.remove(requestId);
+        }
+      }
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId, servers);
@@ -260,7 +266,8 @@ public class QueryDispatcher {
       throw new RuntimeException("No server instances to dispatch query to");
     }
 
-    Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(requestId, QueryThreadContext.getCid(), queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
@@ -368,10 +375,11 @@ public class QueryDispatcher {
     return requestBuilder.build();
   }
 
-  private static Map<String, String> prepareRequestMetadata(long requestId, Map<String, String> queryOptions,
-      Deadline deadline) {
+  private static Map<String, String> prepareRequestMetadata(long requestId, String cid,
+      Map<String, String> queryOptions, Deadline deadline) {
     Map<String, String> requestMetadata = new HashMap<>();
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID, cid);
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.putAll(queryOptions);
@@ -489,7 +497,7 @@ public class QueryDispatcher {
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext);
+            workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = receiveNode.getDataSchema();
@@ -531,20 +539,38 @@ public class QueryDispatcher {
     // TODO: Improve the error handling, e.g. return partial response
     if (block.isErrorBlock()) {
       Map<Integer, String> queryExceptions = block.getExceptions();
-      String errorMessage = "Received error query execution result block: " + queryExceptions;
-      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
-        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
-        throw queryInfoException;
-      }
 
-      throw new RuntimeException(errorMessage);
+      if (queryExceptions.size() == 1) {
+        Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(error.getKey());
+        throw errorCode.asException("Received 1 error from servers: " + error.getValue());
+      } else {
+        Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
+            .max(QueryDispatcher::compareErrors)
+            .orElseThrow();
+        throw QueryErrorCode.fromErrorCode(highestPriorityError.getKey())
+            .asException("Received " + queryExceptions.size() + " errors from servers. "
+                + "The one with highest priority is: " + highestPriorityError.getValue());
+      }
     }
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
     assert queryStats != null;
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<Integer, String> entry1, Map.Entry<Integer, String> entry2) {
+    int errorCode1 = entry1.getKey();
+    int errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode1;
+    }
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION.getId()) {
+      return errorCode2;
+    }
+    return Integer.compare(errorCode1, errorCode2);
   }
 
   public void shutdown() {

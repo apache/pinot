@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
@@ -31,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +73,11 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotClusterConfigs {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClusterConfigs.class);
+  public static final List<String> GROOVY_STATIC_ANALYZER_CONFIG_LIST = List.of(
+      CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG,
+      CommonConstants.Groovy.GROOVY_INGESTION_STATIC_ANALYZER_CONFIG,
+      CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG
+  );
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -167,5 +176,86 @@ public class PinotClusterConfigs {
       String errStr = "Failed to delete cluster config: " + configName;
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @GET
+  @Path("/cluster/configs/groovy/staticAnalyzerConfig")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_GROOVY_STATIC_ANALYZER_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the configuration for Groovy Static analysis",
+      notes = "Get the configuration for Groovy static analysis")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getGroovyStaticAnalysisConfig()
+      throws Exception {
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    Map<String, String> configs = helixAdmin.getConfig(configScope, GROOVY_STATIC_ANALYZER_CONFIG_LIST);
+    if (configs == null) {
+      return null;
+    }
+
+    Map<String, GroovyStaticAnalyzerConfig> groovyStaticAnalyzerConfigMap = new HashMap<>();
+    for (Map.Entry<String, String> entry : configs.entrySet()) {
+      groovyStaticAnalyzerConfigMap.put(entry.getKey(), GroovyStaticAnalyzerConfig.fromJson(entry.getValue()));
+    }
+    return JsonUtils.objectToString(groovyStaticAnalyzerConfigMap);
+  }
+
+  @POST
+  @Path("/cluster/configs/groovy/staticAnalyzerConfig")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_GROOVY_STATIC_ANALYZER_CONFIG)
+  @Authenticate(AccessType.UPDATE)
+  @ApiOperation(value = "Update Groovy static analysis configuration")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
+  })
+  public SuccessResponse setGroovyStaticAnalysisConfig(Map<String, GroovyStaticAnalyzerConfig> configMap) {
+    try {
+      HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
+      HelixConfigScope configScope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+              _pinotHelixResourceManager.getHelixClusterName()).build();
+      Map<String, String> properties = new TreeMap<>();
+      for (Map.Entry<String, GroovyStaticAnalyzerConfig> entry : configMap.entrySet()) {
+        String key = entry.getKey();
+        if (!GROOVY_STATIC_ANALYZER_CONFIG_LIST.contains(key)) {
+          throw new IOException(String.format("Invalid groovy static analysis config: %s. Valid configs are: %s",
+              key, GROOVY_STATIC_ANALYZER_CONFIG_LIST));
+        }
+        properties.put(key, entry.getValue().toJson());
+      }
+      admin.setConfig(configScope, properties);
+      return new SuccessResponse("Updated Groovy Static Analyzer config.");
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to update Groovy Static Analyzer config",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @GET
+  @Path("/cluster/configs/groovy/staticAnalyzerConfig/default")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_GROOVY_STATIC_ANALYZER_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the default configuration for Groovy Static analysis",
+      notes = "Get the default configuration for Groovy static analysis")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getDefaultGroovyStaticAnalysisConfig()
+      throws JsonProcessingException {
+    return JsonUtils.objectToString(
+        Map.of(
+            CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG,
+            GroovyStaticAnalyzerConfig.createDefault())
+    );
   }
 }

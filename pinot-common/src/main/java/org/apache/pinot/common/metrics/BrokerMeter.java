@@ -189,7 +189,15 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   /**
    * The number of bytes stored in the response store. Only the size of the result table is tracked.
    */
-  CURSOR_RESPONSE_STORE_SIZE("bytes", true);
+  CURSOR_RESPONSE_STORE_SIZE("bytes", true),
+
+  // GRPC related metrics
+  GRPC_QUERIES("grpcQueries", true),
+  GRPC_QUERY_EXCEPTIONS("grpcExceptions", true),
+  GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
+  GRPC_BYTES_SENT("grpcBytesSent", true),
+  GRPC_TRANSPORT_READY("grpcTransport", true),
+  GRPC_TRANSPORT_TERMINATED("grpcTransport", true);
 
   private final String _brokerMeterName;
   private final String _unit;
