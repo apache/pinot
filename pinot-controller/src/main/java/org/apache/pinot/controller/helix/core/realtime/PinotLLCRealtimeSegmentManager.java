@@ -108,6 +108,7 @@ import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -2359,9 +2360,10 @@ public class PinotLLCRealtimeSegmentManager {
    *   Request body (JSON):
    *
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
-   * @param realtimeTableName The table name with type, e.g. "myTable_REALTIME"
+   * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(String realtimeTableName) {
+  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig) {
+    String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
@@ -2425,7 +2427,19 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
+    _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+        ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
+
     if (segmentsInErrorStateInAtLeastOneReplica.isEmpty()) {
+      return;
+    }
+
+    boolean isPartialUpsertEnabled =
+        tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+    boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
+    if ((isPartialUpsertEnabled || isDedupEnabled)) {
+      // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
+      // lead to data inconsistencies
       return;
     }
 
