@@ -124,14 +124,14 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       // Only send needReload request to servers that are part of the current assignment. The tagged server list may
       // include new servers which are part of target assignment but not current assignment. needReload throws an
       // exception for servers that don't contain segments for the given table
-      Set<String> serverInstanceSet = getCurrentlyAssignedServerSet(currentAssignment);
+      Set<String> currentlyAssignedServers = getCurrentlyAssignedServers(currentAssignment);
       TableMetadataReader.TableReloadJsonResponse needsReloadMetadataPair =
-          metadataReader.getServerSetCheckSegmentsReloadMetadata(tableNameWithType, 30_000, serverInstanceSet);
+          metadataReader.getServerSetCheckSegmentsReloadMetadata(tableNameWithType, 30_000, currentlyAssignedServers);
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
-          + "rebalanceJobId: {}, serverSet queried: {}", needsReloadMetadata.size(), failedResponses, tableNameWithType,
-          rebalanceJobId, serverInstanceSet);
+          + "rebalanceJobId: {}, number of servers queried: {}", needsReloadMetadata.size(), failedResponses,
+          tableNameWithType, rebalanceJobId, currentlyAssignedServers.size());
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
         LOGGER.warn("Received {} failed responses from servers and needsReload is false from returned responses, "
@@ -236,12 +236,12 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
   }
 
-  private Set<String> getCurrentlyAssignedServerSet(Map<String, Map<String, String>> currentAssignment) {
-    Set<String> serverList = new HashSet<>();
+  private Set<String> getCurrentlyAssignedServers(Map<String, Map<String, String>> currentAssignment) {
+    Set<String> servers = new HashSet<>();
     for (Map<String, String> serverStateMap : currentAssignment.values()) {
-      serverList.addAll(serverStateMap.keySet());
+      servers.addAll(serverStateMap.keySet());
     }
-    return serverList;
+    return servers;
   }
 
   private RebalancePreCheckerResult checkDiskUtilization(Map<String, Map<String, String>> currentAssignment,

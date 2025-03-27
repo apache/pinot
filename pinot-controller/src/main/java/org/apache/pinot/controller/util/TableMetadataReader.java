@@ -80,8 +80,8 @@ public class TableMetadataReader {
   }
 
   /**
-   * Check if segments need a reload on any servers based on a provided server list (useful for rebalance where the
-   * server list may not match the currently tagged server list)
+   * Check if segments need a reload on any servers based on a provided server set (useful for rebalance where the
+   * currently assigned servers may not match the currently tagged server list)
    * @return response containing a) number of failed responses, b) reload responses returned
    */
   public TableReloadJsonResponse getServerSetCheckSegmentsReloadMetadata(String tableNameWithType,
