@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -42,6 +43,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
   private boolean _pauselessConsumptionEnabled = false;
+
+  @JsonPropertyDescription("Policy to determine the behaviour of parallel consumption.")
+  private ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
@@ -74,5 +78,14 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
     _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
+  @Nullable
+  public ParallelSegmentConsumptionPolicy getParallelSegmentConsumptionPolicy() {
+    return _parallelSegmentConsumptionPolicy;
+  }
+
+  public void setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy) {
+    _parallelSegmentConsumptionPolicy = parallelSegmentConsumptionPolicy;
   }
 }
