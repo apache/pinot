@@ -98,22 +98,6 @@ public class ConsumerCoordinator {
     }
   }
 
-  private boolean isSegmentAlreadyConsumed(String currSegmentName) {
-    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(currSegmentName);
-    if (segmentZKMetadata == null) {
-      // segment is deleted. no need to consume.
-      LOGGER.warn("Skipping consumption for segment: {} because ZK metadata does not exists.", currSegmentName);
-      return true;
-    }
-    if (segmentZKMetadata.getStatus().isCompleted()) {
-      // if segment is done or uploaded, no need to consume.
-      LOGGER.warn("Skipping consumption for segment: {} because ZK status is already marked as completed.",
-          currSegmentName);
-      return true;
-    }
-    return false;
-  }
-
   public void release() {
     _semaphore.release();
   }
@@ -328,4 +312,22 @@ public class ConsumerCoordinator {
   int getMaxSegmentSeqNumLoaded() {
     return _maxSegmentSeqNumRegistered;
   }
+
+  @VisibleForTesting
+  boolean isSegmentAlreadyConsumed(String currSegmentName) {
+    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(currSegmentName);
+    if (segmentZKMetadata == null) {
+      // segment is deleted. no need to consume.
+      LOGGER.warn("Skipping consumption for segment: {} because ZK metadata does not exists.", currSegmentName);
+      return true;
+    }
+    if (segmentZKMetadata.getStatus().isCompleted()) {
+      // if segment is done or uploaded, no need to consume.
+      LOGGER.warn("Skipping consumption for segment: {} because ZK status is already marked as completed.",
+          currSegmentName);
+      return true;
+    }
+    return false;
+  }
+
 }
