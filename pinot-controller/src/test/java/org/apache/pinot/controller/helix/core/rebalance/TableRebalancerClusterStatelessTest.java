@@ -1829,7 +1829,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertNotNull(consumingSegmentToBeMovedSummary.getOldestConsumingSegmentsToBeMovedInMinutes());
     assertNull(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp());
-    assertNull(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
+    assertNotNull(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
+    assertTrue(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer()
+        .values()
+        .stream()
+        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == null));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
