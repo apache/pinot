@@ -106,26 +106,27 @@ public class PinotDataDistribution {
    * contain all the records. This method will return true if that is already the case.
    */
   public boolean satisfies(@Nullable RelDistribution distributionConstraint) {
-    if (distributionConstraint == null) {
+    if (distributionConstraint == null || _workers.size() == 1) {
       return true;
     }
     RelDistribution.Type constraintType = distributionConstraint.getType();
-    if (constraintType == RelDistribution.Type.ANY) {
-      return true;
-    } else if (constraintType == RelDistribution.Type.BROADCAST_DISTRIBUTED) {
-      return _type == RelDistribution.Type.BROADCAST_DISTRIBUTED || _workers.size() == 1;
-    } else if (constraintType == RelDistribution.Type.SINGLETON) {
-      return _type == RelDistribution.Type.SINGLETON;
-    } else if (constraintType == RelDistribution.Type.RANDOM_DISTRIBUTED) {
-      return _type == RelDistribution.Type.RANDOM_DISTRIBUTED;
+    switch (constraintType) {
+      case ANY:
+        return true;
+      case BROADCAST_DISTRIBUTED:
+        return _type == RelDistribution.Type.BROADCAST_DISTRIBUTED;
+      case SINGLETON:
+        return _type == RelDistribution.Type.SINGLETON;
+      case RANDOM_DISTRIBUTED:
+        return _type == RelDistribution.Type.RANDOM_DISTRIBUTED;
+      case HASH_DISTRIBUTED:
+        if (_type != RelDistribution.Type.HASH_DISTRIBUTED) {
+          return false;
+        }
+        return satisfiesHashDistributionDesc(distributionConstraint.getKeys()) != null;
+      default:
+        throw new IllegalStateException("Unexpected distribution constraint type: " + distributionConstraint.getType());
     }
-    if (constraintType != RelDistribution.Type.HASH_DISTRIBUTED) {
-      throw new IllegalStateException("Unexpected distribution constraint type: " + distributionConstraint.getType());
-    }
-    if (_type != RelDistribution.Type.HASH_DISTRIBUTED) {
-      return false;
-    }
-    return satisfiesHashDistributionDesc(distributionConstraint.getKeys()) != null;
   }
 
   /**
