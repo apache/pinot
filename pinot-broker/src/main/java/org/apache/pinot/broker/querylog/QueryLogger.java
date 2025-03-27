@@ -247,6 +247,12 @@ public class QueryLogger {
         builder.append(params._response.isNumGroupsLimitReached());
       }
     },
+    GROUP_WARNING_LIMIT_REACHED("groupWarningLimitReached") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isNumGroupsWarningLimitReached());
+      }
+    },
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
