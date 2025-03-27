@@ -158,7 +158,7 @@ public class QueryRunner {
     String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
 
-    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_NUM_GROUPS_WARN_LIMIT);
+    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT);
     _numGroupsWarningLimit = numGroupsWarnLimitStr != null ? Integer.parseInt(numGroupsWarnLimitStr) : null;
 
     String mseMinGroupTrimSizeStr = config.getProperty(Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE);

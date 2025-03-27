@@ -221,20 +221,10 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
-      @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
-        @SuppressWarnings("unchecked")
-        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
-        boolean limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
-        if (limitReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
-        }
-        limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED);
-        if (limitReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED, 1);
-        }
-      }
+      /// So far this keys do not need to be modified from here because they are incremented in a per-worker basis:
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED
+      /// public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics);
     },
     FILTER(FilterOperator.StatKey.class) {
       @Override
