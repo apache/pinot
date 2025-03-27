@@ -671,6 +671,15 @@ public class TableRebalancer {
       tagsInfoMap.put(serverTenantTag,
           new RebalanceSummaryResult.TagsInfo(serverTenantTag));
     }
+    if (tableConfig.getInstanceAssignmentConfigMap() != null) {
+      // for simplicity, including all segment types present in instanceAssignmentConfigMap
+      tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
+        if (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()) {
+          String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
+          tagsInfoMap.put(tag, new RebalanceSummaryResult.TagsInfo(tag));
+        }
+      });
+    }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {
         String tierTag = tierConfig.getServerTag();
