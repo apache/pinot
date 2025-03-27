@@ -4232,16 +4232,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), newNumServers,
         "New number of servers don't match");
     // In this cluster integration test, servers are tagged with DefaultTenant only
-    assertEquals(summaryResult.getTenantsInfo().size(), 1);
-    assertEquals(summaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertEquals(summaryResult.getTagsInfos().size(), 1);
+    assertEquals(summaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(getServerTenant()));
-    assertEquals(summaryResult.getTenantsInfo().get(0).getNumServerParticipants(), newNumServers);
+    assertEquals(summaryResult.getTagsInfos().get(0).getNumServerParticipants(), newNumServers);
     assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(),
-        summaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload());
+        summaryResult.getTagsInfos().get(0).getNumSegmentsToDownload());
     // For this single tenant, the number of unchanged segments and the number of received segments should add up to
     // the total present segment
     assertEquals(summaryResult.getSegmentInfo().getNumSegmentsAcrossAllReplicas().getExpectedValueAfterRebalance(),
-        summaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged() + summaryResult.getTenantsInfo()
+        summaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged() + summaryResult.getTagsInfos()
             .get(0)
             .getNumSegmentsToDownload());
     if (_tableSize > 0) {

@@ -663,18 +663,18 @@ public class TableRebalancer {
     Set<String> serversRemoved = new HashSet<>();
     Set<String> serversUnchanged = new HashSet<>();
     Set<String> serversGettingNewSegments = new HashSet<>();
-    Map<String, RebalanceSummaryResult.TenantInfo> tenantInfoMap = new HashMap<>();
+    Map<String, RebalanceSummaryResult.TagsInfo> tagsInfoMap = new HashMap<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantNameWithType =
+      String serverTenantTag =
           TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
-      tenantInfoMap.put(serverTenantNameWithType,
-          new RebalanceSummaryResult.TenantInfo(serverTenantNameWithType));
+      tagsInfoMap.put(serverTenantTag,
+          new RebalanceSummaryResult.TagsInfo(serverTenantTag));
     }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {
-        String tierTenantNameWithType = tierConfig.getServerTag();
-        tenantInfoMap.put(tierTenantNameWithType, new RebalanceSummaryResult.TenantInfo(tierTenantNameWithType));
+        String tierTag = tierConfig.getServerTag();
+        tagsInfoMap.put(tierTag, new RebalanceSummaryResult.TagsInfo(tierTag));
       });
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
@@ -715,26 +715,26 @@ public class TableRebalancer {
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
           instanceToTagsMap.getOrDefault(server, null)));
       List<String> serverTags = getServerTag(server);
-      Set<String> relevantTenants = new HashSet<>(serverTags);
-      relevantTenants.retainAll(tenantInfoMap.keySet());
-      // The segments remain unchanged or need to download will be accounted to every tenant associated with this
+      Set<String> relevantTags = new HashSet<>(serverTags);
+      relevantTags.retainAll(tagsInfoMap.keySet());
+      // The segments remain unchanged or need to download will be accounted to every tag associated with this
       // server instance
-      if (relevantTenants.isEmpty()) {
+      if (relevantTags.isEmpty()) {
         LOGGER.warn("Server: {} was assigned to table: {} but does not have any relevant tags", server,
             tableNameWithType);
 
-        RebalanceSummaryResult.TenantInfo tenantInfo =
-            tenantInfoMap.computeIfAbsent(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE,
-                RebalanceSummaryResult.TenantInfo::new);
-        tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
-        tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
-        tenantInfo.increaseNumServerParticipants(1);
+        RebalanceSummaryResult.TagsInfo tagsInfo =
+            tagsInfoMap.computeIfAbsent(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE,
+                RebalanceSummaryResult.TagsInfo::new);
+        tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+        tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
+        tagsInfo.increaseNumServerParticipants(1);
       }
-      for (String tenantNameWithType : relevantTenants) {
-        RebalanceSummaryResult.TenantInfo tenantInfo = tenantInfoMap.get(tenantNameWithType);
-        tenantInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
-        tenantInfo.increaseNumSegmentsToDownload(segmentsAdded);
-        tenantInfo.increaseNumServerParticipants(1);
+      for (String tag : relevantTags) {
+        RebalanceSummaryResult.TagsInfo tagsInfo = tagsInfoMap.get(tag);
+        tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+        tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
+        tagsInfo.increaseNumServerParticipants(1);
       }
     }
 
@@ -776,7 +776,7 @@ public class TableRebalancer {
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
-    return new RebalanceSummaryResult(serverInfo, segmentInfo, new ArrayList<>(tenantInfoMap.values()));
+    return new RebalanceSummaryResult(serverInfo, segmentInfo, new ArrayList<>(tagsInfoMap.values()));
   }
 
   private List<String> getServerTag(String serverName) {

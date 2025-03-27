@@ -152,13 +152,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(), numServers);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(), numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -208,14 +208,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 3);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 14);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 14);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS - 14);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers + numServersToAdd);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -381,14 +381,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 11);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 11);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 11);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS - 11);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers + numServersToAdd);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -470,14 +470,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers + numServersToAdd);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -504,14 +504,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers + numServersToAdd);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -559,14 +559,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 3);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(null));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 15);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 15);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS - 15);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -774,14 +774,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(NO_TIER_NAME));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -815,14 +815,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(NO_TIER_NAME));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -858,11 +858,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 9);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 6);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 3);
-    Map<String, RebalanceSummaryResult.TenantInfo> tenantInfoMap = rebalanceSummaryResult.getTenantsInfo()
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 3);
+    Map<String, RebalanceSummaryResult.TagsInfo> tenantInfoMap = rebalanceSummaryResult.getTagsInfos()
         .stream()
-        .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
+        .collect(Collectors.toMap(RebalanceSummaryResult.TagsInfo::getTagName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant(NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant(TIER_A_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant(TIER_B_NAME)));
@@ -956,14 +956,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -993,14 +993,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 1);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getTenantName(),
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 1);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME));
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumSegmentsUnchanged(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsToDownload(), 0);
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().get(0).getNumServerParticipants(),
+    assertEquals(rebalanceSummaryResult.getTagsInfos().get(0).getNumServerParticipants(),
         numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
@@ -1030,11 +1030,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 6);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 2);
-    Map<String, RebalanceSummaryResult.TenantInfo> tenantInfoMap = rebalanceSummaryResult.getTenantsInfo()
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 2);
+    Map<String, RebalanceSummaryResult.TagsInfo> tenantInfoMap = rebalanceSummaryResult.getTagsInfos()
         .stream()
-        .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
+        .collect(Collectors.toMap(RebalanceSummaryResult.TagsInfo::getTagName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
@@ -1091,11 +1091,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 13);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 2);
-    tenantInfoMap = rebalanceSummaryResult.getTenantsInfo()
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 2);
+    tenantInfoMap = rebalanceSummaryResult.getTagsInfos()
         .stream()
-        .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
+        .collect(Collectors.toMap(RebalanceSummaryResult.TagsInfo::getTagName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
@@ -1179,14 +1179,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
-    assertNotNull(rebalanceSummaryResult.getTenantsInfo());
-    assertEquals(rebalanceSummaryResult.getTenantsInfo().size(), 3);
-    tenantInfoMap = rebalanceSummaryResult.getTenantsInfo()
+    assertNotNull(rebalanceSummaryResult.getTagsInfos());
+    assertEquals(rebalanceSummaryResult.getTagsInfos().size(), 3);
+    tenantInfoMap = rebalanceSummaryResult.getTagsInfos()
         .stream()
-        .collect(Collectors.toMap(RebalanceSummaryResult.TenantInfo::getTenantName, info -> info));
+        .collect(Collectors.toMap(RebalanceSummaryResult.TagsInfo::getTagName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
-    assertTrue(tenantInfoMap.containsKey(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE));
+    assertTrue(tenantInfoMap.containsKey(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE));
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
@@ -1203,13 +1203,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumServerParticipants(), 0);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumSegmentsToDownload(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumSegmentsToDownload(),
         0);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumSegmentsUnchanged(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TenantInfo.TENANT_NOT_TAGGED_WITH_TABLE).getNumServerParticipants(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumServerParticipants(),
         6);
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);

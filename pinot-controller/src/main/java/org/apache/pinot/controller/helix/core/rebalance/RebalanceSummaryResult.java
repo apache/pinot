@@ -40,7 +40,7 @@ public class RebalanceSummaryResult {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final SegmentInfo _segmentInfo;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private final List<TenantInfo> _tenantsInfo;
+  private final List<TagsInfo> _tagsInfos;
 
   /**
    * Constructor for RebalanceSummaryResult
@@ -50,10 +50,10 @@ public class RebalanceSummaryResult {
   @JsonCreator
   public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
       @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo,
-      @JsonProperty("tenantsInfo") @Nullable List<TenantInfo> tenantsInfo) {
+      @JsonProperty("tagsInfo") @Nullable List<TagsInfo> tagsInfo) {
     _serverInfo = serverInfo;
     _segmentInfo = segmentInfo;
-    _tenantsInfo = tenantsInfo;
+    _tagsInfos = tagsInfo;
   }
 
   @JsonProperty
@@ -67,8 +67,8 @@ public class RebalanceSummaryResult {
   }
 
   @JsonProperty
-  public List<TenantInfo> getTenantsInfo() {
-    return _tenantsInfo;
+  public List<TagsInfo> getTagsInfos() {
+    return _tagsInfos;
   }
 
   public static class ServerSegmentChangeInfo {
@@ -170,33 +170,33 @@ public class RebalanceSummaryResult {
     }
   }
 
-  public static class TenantInfo {
-    public static final String TENANT_NOT_TAGGED_WITH_TABLE = "OUTDATED_SERVERS";
-    private final String _tenantName;
+  public static class TagsInfo {
+    public static final String TAGS_NOT_TAGGED_WITH_TABLE = "OUTDATED_SERVERS";
+    private final String _tagName;
     private int _numSegmentsUnchanged;
     private int _numSegmentsToDownload;
     private int _numServerParticipants;
 
     @JsonCreator
-    public TenantInfo(
-        @JsonProperty("tenantName") String tenantName,
+    public TagsInfo(
+        @JsonProperty("tagName") String tagName,
         @JsonProperty("numSegmentsToDownload") int numSegmentsToDownload,
         @JsonProperty("numSegmentsUnchanged") int numSegmentsUnchanged,
         @JsonProperty("numServerParticipants") int numServerParticipants
     ) {
-      _tenantName = tenantName;
+      _tagName = tagName;
       _numSegmentsUnchanged = numSegmentsUnchanged;
       _numSegmentsToDownload = numSegmentsToDownload;
       _numServerParticipants = numServerParticipants;
     }
 
-    public TenantInfo(String tenantName) {
-      this(tenantName, 0, 0, 0);
+    public TagsInfo(String tagName) {
+      this(tagName, 0, 0, 0);
     }
 
     @JsonProperty
-    public String getTenantName() {
-      return _tenantName;
+    public String getTagName() {
+      return _tagName;
     }
 
     @JsonProperty
