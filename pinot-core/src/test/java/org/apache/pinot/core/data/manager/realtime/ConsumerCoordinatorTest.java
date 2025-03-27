@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/// **
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.cache.CacheBuilder;
@@ -37,9 +36,8 @@ import org.testng.annotations.Test;
 public class ConsumerCoordinatorTest {
 
   private static class FakeRealtimeTableDataManager extends RealtimeTableDataManager {
-
+    private final StreamIngestionConfig _streamIngestionConfig;
     private ConsumerCoordinator _consumerCoordinator;
-    private StreamIngestionConfig _streamIngestionConfig = null;
 
     public FakeRealtimeTableDataManager(Semaphore segmentBuildSemaphore,
         boolean useIdealStateToCalculatePreviousSegment) {
@@ -445,9 +443,8 @@ public class ConsumerCoordinatorTest {
     String segmentName = "tableTest_REALTIME__1__101__20250304T0035Z";
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     Assert.assertNotNull(llcSegmentName);
-    LLCSegmentName previousSegment = consumerCoordinator.getPreviousSegmentFromIdealState(llcSegmentName);
-    Assert.assertNotNull(previousSegment);
-    Assert.assertEquals(previousSegment.getSegmentName(), "tableTest_REALTIME__1__91__20250304T0035Z");
+    String previousSegment = consumerCoordinator.getPreviousSegmentFromIdealState(llcSegmentName);
+    Assert.assertEquals(previousSegment, "tableTest_REALTIME__1__91__20250304T0035Z");
 
     consumerCoordinator.getSegmentAssignment().clear();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{

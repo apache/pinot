@@ -75,6 +75,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -225,7 +226,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _tableUpsertMetadataManager.init(_tableConfig, schema, this);
     }
 
-    _enforceConsumptionInOrder = enforceConsumptionInOrder();
+    _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
@@ -874,10 +875,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
-    if ((_tableConfig == null) || (_tableConfig.getIngestionConfig() == null)) {
-      return null;
-    }
-    return _tableConfig.getIngestionConfig().getStreamIngestionConfig();
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    return ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
   }
 
   @VisibleForTesting
@@ -926,11 +925,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     SchemaUtils.validate(schema);
   }
 
-  private boolean enforceConsumptionInOrder() {
+  private boolean isEnforceConsumptionInOrder() {
     StreamIngestionConfig streamIngestionConfig = getStreamIngestionConfig();
-    if (streamIngestionConfig == null) {
-      return false;
-    }
-    return streamIngestionConfig.isEnforceConsumptionInOrder();
+    return streamIngestionConfig != null && streamIngestionConfig.isEnforceConsumptionInOrder();
   }
 }

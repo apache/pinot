@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
  * The ConsumerCoordinator coordinates the offline->consuming helix transitions.
  */
 public class ConsumerCoordinator {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
   private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
 
@@ -79,20 +78,16 @@ public class ConsumerCoordinator {
 
   public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException {
-    long startTimeMs;
-
     if (_enforceConsumptionInOrder) {
-      startTimeMs = System.currentTimeMillis();
-
+      long startTimeMs = System.currentTimeMillis();
       waitForPrevSegment(llcSegmentName);
-
-      _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-          ServerTimer.PREV_SEGMENT_WAIT_TIME_MS, System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+      _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(), ServerTimer.PREV_SEGMENT_WAIT_TIME_MS,
+          System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
     }
 
-    startTimeMs = System.currentTimeMillis();
+    long startTimeMs = System.currentTimeMillis();
     while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-      LOGGER.warn("Failed to acquire partitionGroup consumer semaphore in: {} ms. Retrying.",
+      LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", llcSegmentName,
           System.currentTimeMillis() - startTimeMs);
     }
   }
@@ -125,7 +120,7 @@ public class ConsumerCoordinator {
     if (_alwaysRelyOnIdealState || !_firstTransitionProcessed.get()) {
       // if _alwaysRelyOnIdealState or no offline -> consuming transition has been processed, it means rely on
       // ideal state to fetch previous segment.
-      acquireSegmentRelyingOnIdealState(currSegment);
+      awaitForPreviousSegmentFromIdealState(currSegment);
 
       // the first transition will always be prone to error, consider edge case where segment previous to current
       // helix transition's segment was deleted and this server came alive after successful deletion. the prev
@@ -141,18 +136,17 @@ public class ConsumerCoordinator {
 
     // tried using prevSegSeqNumber watermark, but could not acquire the previous segment.
     // fallback to acquire prev segment from ideal state.
-    acquireSegmentRelyingOnIdealState(currSegment);
+    awaitForPreviousSegmentFromIdealState(currSegment);
   }
 
-  private void acquireSegmentRelyingOnIdealState(LLCSegmentName currSegment)
+  private void awaitForPreviousSegmentFromIdealState(LLCSegmentName currSegment)
       throws InterruptedException {
-    LLCSegmentName previousLLCSegmentName = getPreviousSegmentFromIdealState(currSegment);
-    if (previousLLCSegmentName == null) {
+    String previousSegment = getPreviousSegmentFromIdealState(currSegment);
+    if (previousSegment == null) {
       // previous segment can only be null if either all the previous segments are deleted or this is the starting
       // sequence segment of the partition Group.
       return;
     }
-    String previousSegment = previousLLCSegmentName.getSegmentName();
 
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
     try {
@@ -163,15 +157,14 @@ public class ConsumerCoordinator {
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
           while (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-            LOGGER.warn("Semaphore access denied to segment: {}. Waiting on previous segment: {} since: {} ms.",
+            LOGGER.warn("Semaphore access denied to segment: {}. Waited on previous segment: {} for: {}ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
             // changed in ideal state.
-            previousLLCSegmentName = getPreviousSegmentFromIdealState(currSegment);
-            if (previousLLCSegmentName == null) {
+            previousSegment = getPreviousSegmentFromIdealState(currSegment);
+            if (previousSegment == null) {
               return;
             }
-            previousSegment = previousLLCSegmentName.getSegmentName();
           }
           segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
         }
@@ -199,17 +192,16 @@ public class ConsumerCoordinator {
     _lock.lock();
     try {
       while (_maxSegmentSeqNumRegistered < prevSeqNum) {
-        // it means all segments until _maxSegmentSeqNumRegistered is not loaded in the server. Wait until it's loaded.
+        // it means the previous segment is not loaded in the server. Wait until it's loaded.
         if (!_condition.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-          LOGGER.warn("Semaphore access denied to segment: {}."
-                  + " Waiting on previous segment with sequence number: {} since: {} ms.", currSegment.getSegmentName(),
-              prevSeqNum, System.currentTimeMillis() - startTimeMs);
+          LOGGER.warn(
+              "Semaphore access denied to segment: {}. Waited on previous segment with sequence number: {} for: {}ms.",
+              currSegment.getSegmentName(), prevSeqNum, System.currentTimeMillis() - startTimeMs);
           // waited until the timeout. Rely on ideal state now.
-          return (_maxSegmentSeqNumRegistered >= prevSeqNum);
+          return _maxSegmentSeqNumRegistered >= prevSeqNum;
         }
       }
-
-      return (_maxSegmentSeqNumRegistered >= prevSeqNum);
+      return true;
     } finally {
       _lock.unlock();
     }
@@ -217,12 +209,12 @@ public class ConsumerCoordinator {
 
   @VisibleForTesting
   @Nullable
-  LLCSegmentName getPreviousSegmentFromIdealState(LLCSegmentName currSegment) {
+  String getPreviousSegmentFromIdealState(LLCSegmentName currSegment) {
     long startTimeMs = System.currentTimeMillis();
     // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
     // created before current segment
     int maxSequenceNumBelowCurrentSegment = -1;
-    LLCSegmentName previousSegment = null;
+    String previousSegment = null;
     int currPartitionGroupId = currSegment.getPartitionGroupId();
     int currSequenceNum = currSegment.getSequenceNumber();
     Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
@@ -259,19 +251,15 @@ public class ConsumerCoordinator {
       if (llcSegmentName.getSequenceNumber() > maxSequenceNumBelowCurrentSegment) {
         maxSequenceNumBelowCurrentSegment = llcSegmentName.getSequenceNumber();
         // also track the name of segment
-        previousSegment = llcSegmentName;
+        previousSegment = segmentName;
       }
     }
 
-    long duration = System.currentTimeMillis() - startTimeMs;
-    String prevSegmentName = null;
-    if (previousSegment != null) {
-      prevSegmentName = previousSegment.getSegmentName();
-    }
-    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {} ms.", prevSegmentName,
-        currSegment.getSegmentName(), duration);
+    long timeSpentMs = System.currentTimeMillis() - startTimeMs;
+    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {}ms.", previousSegment, currSegment,
+        timeSpentMs);
     _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS, duration, TimeUnit.MILLISECONDS);
+        ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS, timeSpentMs, TimeUnit.MILLISECONDS);
 
     return previousSegment;
   }
