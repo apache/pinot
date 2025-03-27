@@ -32,7 +32,7 @@ public class TypeSystem extends RelDataTypeSystemImpl {
   public static final TypeSystem INSTANCE = new TypeSystem();
 
   private static final int MAX_DECIMAL_SCALE = 1000;
-  private static final int MAX_DECIMAL_PRECISION = 1000;
+  private static final int MAX_DECIMAL_PRECISION = 2000;
 
   /**
    * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return
