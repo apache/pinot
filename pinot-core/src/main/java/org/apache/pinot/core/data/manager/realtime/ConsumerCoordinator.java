@@ -329,5 +329,4 @@ public class ConsumerCoordinator {
     }
     return false;
   }
-
 }
