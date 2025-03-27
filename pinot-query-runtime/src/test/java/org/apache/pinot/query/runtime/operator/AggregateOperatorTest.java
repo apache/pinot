@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -255,7 +256,9 @@ public class AggregateOperatorTest {
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, 3.0}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
-    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint);
+    Map<String, String> opChainMetadata = new HashMap<>();
+    opChainMetadata.put(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, "1");
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint, opChainMetadata);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -315,14 +318,15 @@ public class AggregateOperatorTest {
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,
-      List<Integer> filterArgs, List<Integer> groupKeys, PlanNode.NodeHint nodeHint) {
-    return new AggregateOperator(OperatorTestUtil.getTracingContext(), _input,
+      List<Integer> filterArgs, List<Integer> groupKeys, PlanNode.NodeHint nodeHint,
+      Map<String, String> opChainMetadata) {
+    return new AggregateOperator(OperatorTestUtil.getContext(opChainMetadata), _input,
         new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT,
             false, null, 0));
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,
       List<Integer> filterArgs, List<Integer> groupKeys) {
-    return getOperator(resultSchema, aggCalls, filterArgs, groupKeys, PlanNode.NodeHint.EMPTY);
+    return getOperator(resultSchema, aggCalls, filterArgs, groupKeys, PlanNode.NodeHint.EMPTY, Map.of());
   }
 }

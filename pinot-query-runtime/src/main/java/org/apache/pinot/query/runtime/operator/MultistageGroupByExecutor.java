@@ -61,6 +61,7 @@ public class MultistageGroupByExecutor {
   private final boolean _leafReturnFinalResult;
   private final DataSchema _resultSchema;
   private final int _numGroupsLimit;
+  private final int _numGroupsWarningLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
 
   // Group By Result holders for each mode
@@ -85,6 +86,7 @@ public class MultistageGroupByExecutor {
     int maxInitialResultHolderCapacity = getResolvedMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
 
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
+    _numGroupsWarningLimit = getNumGroupsWarningLimit(opChainMetadata);
 
     // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
     // query option for improved performance.
@@ -120,6 +122,11 @@ public class MultistageGroupByExecutor {
     }
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     return numGroupsLimit != null ? numGroupsLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  }
+
+  private int getNumGroupsWarningLimit(Map<String, String> opChainMetadata) {
+    Integer numGroupsWarningLimit = QueryOptionsUtils.getNumGroupsWarningLimit(opChainMetadata);
+    return numGroupsWarningLimit != null ? numGroupsWarningLimit : Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   }
 
   private int getResolvedMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
@@ -164,6 +171,10 @@ public class MultistageGroupByExecutor {
 
   public int getNumGroupsLimit() {
     return _numGroupsLimit;
+  }
+
+  public int getNumGroupsWarningLimit() {
+    return _numGroupsWarningLimit;
   }
 
   /**
@@ -275,6 +286,10 @@ public class MultistageGroupByExecutor {
       default:
         throw new IllegalStateException("Unsupported aggType: " + _aggType);
     }
+  }
+
+  public int getNumGroups() {
+    return _groupIdGenerator.getNumGroups();
   }
 
   public boolean isNumGroupsLimitReached() {
