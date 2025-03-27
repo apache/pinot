@@ -74,10 +74,14 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -329,8 +333,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
-  private final boolean _allowConsumptionDuringCommit;
-  private boolean _trackFilteredMessageOffsets = false;
+  private final boolean _trackFilteredMessageOffsets;
+  private final ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -1072,10 +1076,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
-    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
-    if (_allowConsumptionDuringCommit) {
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringBuild()) {
       closeStreamConsumers();
     }
     // Do not allow building segment when table data manager is already shut down
@@ -1279,6 +1280,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     closePartitionMetadataProvider();
     if (_acquiredConsumerSemaphore.compareAndSet(true, false)) {
+      _segmentLogger.info("Releasing the consumer semaphore");
       _consumerCoordinator.release();
     }
   }
@@ -1458,10 +1460,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   protected void downloadSegmentAndReplace(SegmentZKMetadata segmentZKMetadata)
       throws Exception {
-    // for partial upsert tables, do not release _partitionGroupConsumerSemaphore proactively and rely on offload()
-    // to release the semaphore. This ensures new consuming segment is not consuming until the segment replacement is
-    // complete.
-    if (_allowConsumptionDuringCommit) {
+    if (_parallelSegmentConsumptionPolicy.isAllowedDuringDownload()) {
       closeStreamConsumers();
     }
     _realtimeTableDataManager.downloadAndReplaceConsumingSegment(segmentZKMetadata);
@@ -1564,6 +1563,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentCompletionMode = completionConfig != null
         && CompletionMode.DOWNLOAD.toString().equalsIgnoreCase(completionConfig.getCompletionMode())
         ? CompletionMode.DOWNLOAD : CompletionMode.DEFAULT;
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    _trackFilteredMessageOffsets = ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null
+        && ingestionConfig.getStreamIngestionConfig().isTrackFilteredMessageOffsets();
+    _parallelSegmentConsumptionPolicy = getParallelConsumptionPolicy();
 
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
@@ -1606,12 +1609,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionRateLimiter = RealtimeConsumptionRateManager.getInstance()
         .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
     _serverRateLimiter = RealtimeConsumptionRateManager.getInstance().getServerRateLimiter();
-
-    if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      _trackFilteredMessageOffsets =
-          tableConfig.getIngestionConfig().getStreamIngestionConfig().isTrackFilteredMessageOffsets();
-    }
 
     // Read the max number of rows
     int segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
@@ -1709,11 +1706,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
       _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
           llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = isConsumptionAllowedDuringCommit();
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
+      _segmentLogger.info("Releasing the consumer semaphore");
       _consumerCoordinator.release();
       _acquiredConsumerSemaphore.set(false);
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
@@ -1743,18 +1740,46 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  // Consumption while downloading and replacing the slow replicas is not allowed for the following tables:
-  // 1. Partial Upserts
-  // 2. Dedup Tables
-  // For the above table types, we would be looking into the metadata information when inserting a new record,
-  // so it is not right to allow consumption while downloading and replacing the consuming segment as we might see
-  // duplicates in dedup tables and inconsistent entries compared to lead replicas for partial
-  // upsert tables. If tables are dedup/partial upsert enabled check for table and server config properties to see if
-  // consumption is allowed
-  private boolean isConsumptionAllowedDuringCommit() {
-    return (!_realtimeTableDataManager.isDedupEnabled() || _tableConfig.getDedupConfig()
-        .isAllowDedupConsumptionDuringCommit()) && (!_realtimeTableDataManager.isPartialUpsertEnabled()
-        || _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit());
+  @VisibleForTesting
+  ParallelSegmentConsumptionPolicy getParallelConsumptionPolicy() {
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy = null;
+    boolean pauseless = false;
+    if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+      parallelSegmentConsumptionPolicy =
+          ingestionConfig.getStreamIngestionConfig().getParallelSegmentConsumptionPolicy();
+      pauseless = ingestionConfig.getStreamIngestionConfig().isPauselessConsumptionEnabled();
+    }
+    if (parallelSegmentConsumptionPolicy != null) {
+      return parallelSegmentConsumptionPolicy;
+    }
+    // When the policy is not set:
+    // - Without dedup or partial upsert, allow consumption during build and download
+    // - With dedup or partial upsert, in order to get consistent behavior we need to ensure the metadata contains all
+    //   previous records before starting consumption:
+    //   - If the table config allows consumption during commit, allow consumption during build and download
+    //   - For pauseless tables, allow consumption during build, but disallow consumption during download
+    //   - For non-pauseless tables, disallow consumption during build and download
+    //     TODO: Revisit the non-pauseless handling
+    if (_realtimeTableDataManager.isDedupEnabled()) {
+      DedupConfig dedupConfig = _tableConfig.getDedupConfig();
+      assert dedupConfig != null;
+      if (dedupConfig.isAllowDedupConsumptionDuringCommit()) {
+        return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
+      }
+      return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
+          : ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+    }
+    if (_realtimeTableDataManager.isPartialUpsertEnabled()) {
+      UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+      assert upsertConfig != null;
+      if (upsertConfig.isAllowPartialUpsertConsumptionDuringCommit()) {
+        return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
+      }
+      return pauseless ? ParallelSegmentConsumptionPolicy.ALLOW_DURING_BUILD_ONLY
+          : ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS;
+    }
+    return ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS;
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {

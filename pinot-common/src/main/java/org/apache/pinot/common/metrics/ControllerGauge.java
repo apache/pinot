@@ -54,6 +54,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // be queried from the table.
   SEGMENT_COUNT_INCLUDING_REPLACED("SegmentCount", false),
 
+  // Track response size of getChildren from /PROPERTYSTORE/SEGMENTS/<table>
+  PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE("propertystore", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   IDEALSTATE_ZNODE_BYTE_SIZE("idealstate", false),
   EXTERNALVIEW_ZNODE_SIZE("externalview", false),
