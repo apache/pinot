@@ -163,7 +163,7 @@ public class ConsumerCoordinator {
         while (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
 
           int prevSeqNum = LLCSegmentName.of(segmentDataManager.getSegmentName()).getSequenceNumber();
-          if (_maxSegmentSeqNumRegistered < prevSeqNum) {
+          if (_maxSegmentSeqNumRegistered >= prevSeqNum) {
             return;
           }
 
