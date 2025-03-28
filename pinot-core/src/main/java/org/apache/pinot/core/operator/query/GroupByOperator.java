@@ -43,6 +43,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,6 +52,7 @@ import org.apache.pinot.spi.trace.Tracing;
  */
 @SuppressWarnings("rawtypes")
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByOperator.class);
   private static final String EXPLAIN_NAME = "GROUP_BY";
 
   private final QueryContext _queryContext;
@@ -116,6 +119,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
 
+    boolean numGroupsWarningLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsWarningLimit();
+    if (numGroupsWarningLimitReached) {
+      LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+          _queryContext.getNumGroupsWarningLimit(), groupByExecutor.getNumGroups());
+    }
+
     // Trim the groups when iff:
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
@@ -130,12 +139,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;
   }
 

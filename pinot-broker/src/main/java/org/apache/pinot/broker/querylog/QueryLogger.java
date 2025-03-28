@@ -74,11 +74,20 @@ public class QueryLogger {
     _droppedLogRateLimiter = droppedLogRateLimiter;
   }
 
+  public void log(long requestId, String query) {
+    if (!checkRateLimiter(null)) {
+      return;
+    }
+
+    _logger.info("SQL query for request {}: {}", requestId, query);
+
+    tryLogDropped();
+  }
+
   public void log(QueryLogParams params) {
     _logger.debug("Broker Response: {}", params._response);
 
-    if (!(_logRateLimiter.tryAcquire() || shouldForceLog(params))) {
-      _numDroppedLogs.incrementAndGet();
+    if (!checkRateLimiter(params)) {
       return;
     }
 
@@ -93,6 +102,18 @@ public class QueryLogger {
         .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
+    tryLogDropped();
+  }
+
+  private boolean checkRateLimiter(@Nullable QueryLogParams params) {
+    boolean allowed = _logRateLimiter.tryAcquire() || shouldForceLog(params);
+    if (!allowed) {
+      _numDroppedLogs.incrementAndGet();
+    }
+    return allowed;
+  }
+
+  private void tryLogDropped() {
     if (_droppedLogRateLimiter.tryAcquire()) {
       // use getAndSet to 0 so that there will be no race condition between
       // loggers that increment this counter and this thread
@@ -112,7 +133,10 @@ public class QueryLogger {
     return _logRateLimiter.getRate();
   }
 
-  private boolean shouldForceLog(QueryLogParams params) {
+  private boolean shouldForceLog(@Nullable QueryLogParams params) {
+    if (params == null) {
+      return false;
+    }
     return params._response.isPartialResult() || params._response.getTimeUsedMs() > TimeUnit.SECONDS.toMillis(1);
   }
 
@@ -221,6 +245,12 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.isNumGroupsLimitReached());
+      }
+    },
+    GROUP_WARNING_LIMIT_REACHED("groupWarningLimitReached") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isNumGroupsWarningLimitReached());
       }
     },
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {

@@ -175,7 +175,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.6</aws.sdk.version>
+    <aws.sdk.version>2.31.9</aws.sdk.version>
     <azure.sdk.version>1.2.32</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.13.1</joda-time.version>
@@ -226,7 +226,7 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.4.2</httpclient5.version>
+    <httpclient5.version>5.4.3</httpclient5.version>
     <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->

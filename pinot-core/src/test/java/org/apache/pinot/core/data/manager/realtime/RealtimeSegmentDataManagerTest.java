@@ -755,7 +755,7 @@ public class RealtimeSegmentDataManagerTest {
       throws Exception {
     long timeout = 10_000L;
     FakeRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
-    Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
+    Assert.assertTrue(firstSegmentDataManager.getConsumerSemaphoreAcquired().get());
     Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore.availablePermits(), 0);
     Assert.assertFalse(firstSemaphore.hasQueuedThreads());
@@ -787,7 +787,7 @@ public class RealtimeSegmentDataManagerTest {
     TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
         "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
 
-    Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
+    Assert.assertTrue(secondSegmentDataManager.get().getConsumerSemaphoreAcquired().get());
     Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore, secondSemaphore);
     Assert.assertEquals(secondSemaphore.availablePermits(), 0);
