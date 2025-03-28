@@ -311,7 +311,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String ENABLE_RESOURCE_UTILIZATION_CHECK = "controller.enable.resource.utilization.check";
   public static final String RESOURCE_UTILIZATION_CHECKER_INITIAL_DELAY =
       "controller.resource.utilization.checker.initial.delay";
-  private static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
+  public static final String RESOURCE_UTILIZATION_CHECKER_FREQUENCY =
       "controller.resource.utilization.checker.frequency";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
