@@ -179,8 +179,12 @@ public enum AggregationFunctionType {
   // funnel aggregate functions
   FUNNELMAXSTEP("funnelMaxStep", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELCOMPLETECOUNT("funnelCompleteCount", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  FUNNELSTEPDURATIONSTATS("funnelStepDurationStats", new ArrayReturnTypeInference(SqlTypeName.DOUBLE),
+      OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELMATCHSTEP("funnelMatchStep", new ArrayReturnTypeInference(SqlTypeName.INTEGER), OperandTypes.VARIADIC,
       SqlTypeName.OTHER),
+  FUNNELEVENTSFUNCTIONEVAL("funnelEventsFunctionEval", new ArrayReturnTypeInference(SqlTypeName.VARCHAR),
+      OperandTypes.VARIADIC, SqlTypeName.OTHER),
   FUNNELCOUNT("funnelCount", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.VARIADIC,
       SqlTypeName.OTHER),
 
