@@ -40,7 +40,7 @@ public class RebalanceSummaryResult {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final SegmentInfo _segmentInfo;
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private final List<TagsInfo> _tagsInfos;
+  private final List<TagInfo> _tagsInfo;
 
   /**
    * Constructor for RebalanceSummaryResult
@@ -50,10 +50,10 @@ public class RebalanceSummaryResult {
   @JsonCreator
   public RebalanceSummaryResult(@JsonProperty("serverInfo") @Nullable ServerInfo serverInfo,
       @JsonProperty("segmentInfo") @Nullable SegmentInfo segmentInfo,
-      @JsonProperty("tagsInfo") @Nullable List<TagsInfo> tagsInfo) {
+      @JsonProperty("tagsInfo") @Nullable List<TagInfo> tagsInfo) {
     _serverInfo = serverInfo;
     _segmentInfo = segmentInfo;
-    _tagsInfos = tagsInfo;
+    _tagsInfo = tagsInfo;
   }
 
   @JsonProperty
@@ -67,8 +67,8 @@ public class RebalanceSummaryResult {
   }
 
   @JsonProperty
-  public List<TagsInfo> getTagsInfos() {
-    return _tagsInfos;
+  public List<TagInfo> getTagsInfo() {
+    return _tagsInfo;
   }
 
   public static class ServerSegmentChangeInfo {
@@ -170,7 +170,7 @@ public class RebalanceSummaryResult {
     }
   }
 
-  public static class TagsInfo {
+  public static class TagInfo {
     public static final String TAGS_NOT_TAGGED_WITH_TABLE = "OUTDATED_SERVERS";
     private final String _tagName;
     private int _numSegmentsUnchanged;
@@ -178,7 +178,7 @@ public class RebalanceSummaryResult {
     private int _numServerParticipants;
 
     @JsonCreator
-    public TagsInfo(
+    public TagInfo(
         @JsonProperty("tagName") String tagName,
         @JsonProperty("numSegmentsToDownload") int numSegmentsToDownload,
         @JsonProperty("numSegmentsUnchanged") int numSegmentsUnchanged,
@@ -190,7 +190,7 @@ public class RebalanceSummaryResult {
       _numServerParticipants = numServerParticipants;
     }
 
-    public TagsInfo(String tagName) {
+    public TagInfo(String tagName) {
       this(tagName, 0, 0, 0);
     }
 

@@ -663,27 +663,27 @@ public class TableRebalancer {
     Set<String> serversRemoved = new HashSet<>();
     Set<String> serversUnchanged = new HashSet<>();
     Set<String> serversGettingNewSegments = new HashSet<>();
-    Map<String, RebalanceSummaryResult.TagsInfo> tagsInfoMap = new HashMap<>();
+    Map<String, RebalanceSummaryResult.TagInfo> tagsInfoMap = new HashMap<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
       String serverTenantTag =
           TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       tagsInfoMap.put(serverTenantTag,
-          new RebalanceSummaryResult.TagsInfo(serverTenantTag));
+          new RebalanceSummaryResult.TagInfo(serverTenantTag));
     }
     if (tableConfig.getInstanceAssignmentConfigMap() != null) {
       // for simplicity, including all segment types present in instanceAssignmentConfigMap
       tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
         if (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()) {
           String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
-          tagsInfoMap.put(tag, new RebalanceSummaryResult.TagsInfo(tag));
+          tagsInfoMap.put(tag, new RebalanceSummaryResult.TagInfo(tag));
         }
       });
     }
     if (tableConfig.getTierConfigsList() != null) {
       tableConfig.getTierConfigsList().forEach(tierConfig -> {
         String tierTag = tierConfig.getServerTag();
-        tagsInfoMap.put(tierTag, new RebalanceSummaryResult.TagsInfo(tierTag));
+        tagsInfoMap.put(tierTag, new RebalanceSummaryResult.TagInfo(tierTag));
       });
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
@@ -732,15 +732,15 @@ public class TableRebalancer {
         LOGGER.warn("Server: {} was assigned to table: {} but does not have any relevant tags", server,
             tableNameWithType);
 
-        RebalanceSummaryResult.TagsInfo tagsInfo =
-            tagsInfoMap.computeIfAbsent(RebalanceSummaryResult.TagsInfo.TAGS_NOT_TAGGED_WITH_TABLE,
-                RebalanceSummaryResult.TagsInfo::new);
+        RebalanceSummaryResult.TagInfo tagsInfo =
+            tagsInfoMap.computeIfAbsent(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE,
+                RebalanceSummaryResult.TagInfo::new);
         tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
         tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
         tagsInfo.increaseNumServerParticipants(1);
       }
       for (String tag : relevantTags) {
-        RebalanceSummaryResult.TagsInfo tagsInfo = tagsInfoMap.get(tag);
+        RebalanceSummaryResult.TagInfo tagsInfo = tagsInfoMap.get(tag);
         tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
         tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
         tagsInfo.increaseNumServerParticipants(1);
