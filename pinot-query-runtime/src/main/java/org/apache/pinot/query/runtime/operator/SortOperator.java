@@ -25,12 +25,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.plannode.SortNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -51,7 +51,7 @@ public class SortOperator extends MultiStageOperator {
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   private boolean _hasConstructedSortedBlock;
-  private TransferableBlock _eosBlock;
+  private MseBlock.Eos _eosBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
     this(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
@@ -116,27 +116,31 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected MseBlock getNextBlock() {
     if (_hasConstructedSortedBlock) {
       assert _eosBlock != null;
       return _eosBlock;
     }
-    TransferableBlock finalBlock = consumeInputBlocks();
+    _eosBlock = consumeInputBlocks();
     // returning upstream error block if finalBlock contains error.
-    if (finalBlock.isErrorBlock()) {
-      return finalBlock;
-    }
     _statMap.merge(StatKey.REQUIRE_SORT, _priorityQueue != null);
-    _eosBlock = updateEosBlock(finalBlock, _statMap);
+    if (_eosBlock.isError()) {
+      return _eosBlock;
+    }
     return produceSortedBlock();
   }
 
-  private TransferableBlock produceSortedBlock() {
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
+  }
+
+  private MseBlock produceSortedBlock() {
     _hasConstructedSortedBlock = true;
     if (_priorityQueue == null) {
       if (_rows.size() > _offset) {
         List<Object[]> row = _rows.subList(_offset, _rows.size());
-        return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(row, _dataSchema);
       } else {
         return _eosBlock;
       }
@@ -150,14 +154,14 @@ public class SortOperator extends MultiStageOperator {
         Object[] row = _priorityQueue.poll();
         rowsArr[i] = row;
       }
-      return new TransferableBlock(Arrays.asList(rowsArr), _dataSchema, DataBlock.Type.ROW);
+      return new RowHeapDataBlock(Arrays.asList(rowsArr), _dataSchema);
     }
   }
 
-  private TransferableBlock consumeInputBlocks() {
-    TransferableBlock block = _input.nextBlock();
-    while (block.isDataBlock()) {
-      List<Object[]> container = block.getContainer();
+  private MseBlock.Eos consumeInputBlocks() {
+    MseBlock block = _input.nextBlock();
+    while (block.isData()) {
+      List<Object[]> container = ((MseBlock.Data) block).asRowHeap().getRows();
       if (_priorityQueue == null) {
         // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
         int numRows = _rows.size();
@@ -185,7 +189,7 @@ public class SortOperator extends MultiStageOperator {
       }
       block = _input.nextBlock();
     }
-    return block;
+    return (MseBlock.Eos) block;
   }
 
   public enum StatKey implements StatMap.Key {

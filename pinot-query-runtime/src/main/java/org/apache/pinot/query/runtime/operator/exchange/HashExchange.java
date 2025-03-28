@@ -29,7 +29,8 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.EmptyKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 
 
 /**
@@ -53,7 +54,7 @@ class HashExchange extends BlockExchange {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   @Override
-  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
+  protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
       throws IOException, TimeoutException {
     int numMailboxes = destinations.size();
     if (numMailboxes == 1 || _keySelector == EmptyKeySelector.INSTANCE) {
@@ -65,16 +66,17 @@ class HashExchange extends BlockExchange {
     for (int i = 0; i < numMailboxes; i++) {
       mailboxIdToRowsMap[i] = new ArrayList<>();
     }
-    List<Object[]> rows = block.getContainer();
+    RowHeapDataBlock rowHeapBlock = block.asRowHeap();
+    List<Object[]> rows = rowHeapBlock.getRows();
     for (Object[] row : rows) {
       int mailboxId = _keySelector.computeHash(row) % numMailboxes;
       mailboxIdToRowsMap[mailboxId].add(row);
     }
-    AggregationFunction[] aggFunctions = block.getAggFunctions();
+    AggregationFunction[] aggFunctions = rowHeapBlock.getAggFunctions();
     for (int i = 0; i < numMailboxes; i++) {
       if (!mailboxIdToRowsMap[i].isEmpty()) {
         sendBlock(destinations.get(i),
-            new TransferableBlock(mailboxIdToRowsMap[i], block.getDataSchema(), block.getType(), aggFunctions));
+            new RowHeapDataBlock(mailboxIdToRowsMap[i], block.getDataSchema(), aggFunctions));
       }
     }
   }

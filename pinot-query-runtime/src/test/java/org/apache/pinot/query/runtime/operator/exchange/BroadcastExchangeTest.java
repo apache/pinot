@@ -19,10 +19,11 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -33,6 +34,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
+
 public class BroadcastExchangeTest {
   private AutoCloseable _mocks;
 
@@ -40,13 +42,12 @@ public class BroadcastExchangeTest {
   private SendingMailbox _mailbox1;
   @Mock
   private SendingMailbox _mailbox2;
-  @Mock
-  TransferableBlock _block;
+  MseBlock.Data _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
+    _block = OperatorTestUtil.block(DataSchema.EXPLAIN_RESULT_SCHEMA, new Object[] {"something", 1, 2});
   }
 
   @AfterMethod
@@ -62,9 +63,9 @@ public class BroadcastExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    new BroadcastExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new BroadcastExchange(destinations, BlockSplitter.DEFAULT).route(destinations, _block);
 
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
 
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
     Assert.assertEquals(captor.getValue(), _block);

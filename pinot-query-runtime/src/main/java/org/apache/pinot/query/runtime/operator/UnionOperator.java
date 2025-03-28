@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
@@ -61,42 +61,31 @@ public class UnionOperator extends SetOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
+  protected MseBlock getNextBlock() {
+    if (_eos != null) {
+      return _eos;
     }
     List<MultiStageOperator> childOperators = getChildOperators();
     for (int i = _finishedChildren; i < childOperators.size(); i++) {
       MultiStageOperator upstreamOperator = childOperators.get(i);
-      TransferableBlock block = upstreamOperator.nextBlock();
-      if (block.isDataBlock()) {
+      MseBlock block = upstreamOperator.nextBlock();
+      if (block.isData()) {
         return block;
-      } else if (block.isSuccessfulEndOfStreamBlock()) {
+      }
+      MseBlock.Eos eosBlock = (MseBlock.Eos) block;
+      if (eosBlock.isSuccess()) {
         _finishedChildren++;
-        consumeEos(block);
       } else {
-        assert block.isErrorBlock();
-        _upstreamErrorBlock = block;
+        _eos = eosBlock;
         return block;
       }
     }
-    assert _queryStats != null : "Should have at least one EOS block from the upstream operators";
-    addStats(_queryStats, _statMap);
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+    return SuccessMseBlock.INSTANCE;
   }
 
-  private void consumeEos(TransferableBlock block) {
-    MultiStageQueryStats queryStats = block.getQueryStats();
-    assert queryStats != null;
-    if (_queryStats == null) {
-      Preconditions.checkArgument(queryStats.getCurrentStageId() == _context.getStageId(),
-          "The current stage id of the stats holder: %s does not match the current stage id: %s",
-          queryStats.getCurrentStageId(), _context.getStageId());
-      _queryStats = queryStats;
-    } else {
-      _queryStats.mergeUpstream(queryStats);
-      _queryStats.getCurrentStats().concat(queryStats.getCurrentStats());
-    }
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   @Override

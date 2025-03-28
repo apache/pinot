@@ -56,6 +56,16 @@ public class MetadataBlock extends BaseDataBlock {
     return errorBlock;
   }
 
+  public static MetadataBlock newErrorWithStats(Map<Integer, String> exceptions, List<DataBuffer> statsByStage) {
+    MetadataBlock errorBlock = newError(exceptions);
+    errorBlock._statsByStage = statsByStage;
+    return errorBlock;
+  }
+
+  public static MetadataBlock newEosWithStats(List<DataBuffer> statsByStage) {
+    return new MetadataBlock(statsByStage);
+  }
+
   public MetadataBlock(List<DataBuffer> statsByStage) {
     super(0, null, new String[0], new byte[0], new byte[0]);
     _statsByStage = statsByStage;
