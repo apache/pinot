@@ -81,8 +81,8 @@ public class GridDiskFunction extends BaseTransformFunction {
     int[] ks = _kArgument.transformToIntValuesSV(valueBlock);
 
     for (int i = 0; i < numDocs; i++) {
-      List<Long> diskIndexes = ScalarFunctions.gridDisk(origins[i], ks[i]);
-      _longValuesMV[i] = diskIndexes.stream().mapToLong(Long::longValue).toArray();
+      long[] diskIndexes = ScalarFunctions.gridDisk(origins[i], ks[i]);
+      _longValuesMV[i] = diskIndexes;
     }
 
     return _longValuesMV;

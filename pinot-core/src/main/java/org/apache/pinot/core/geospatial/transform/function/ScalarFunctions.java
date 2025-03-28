@@ -275,11 +275,10 @@ public class ScalarFunctions {
    *
    * @param origin The starting H3 index from which to compute the grid disk.
    * @param k      The radius of the disk in hexagonal grid steps.
-   * @return A list of H3 indexes within the specified distance from the origin. If the origin is a pentagon, some
-   * distortions may occur due to pentagonal gaps.
+   * @return An array of H3 indexes within the specified distance from the origin.
    */
   @ScalarFunction
-  public static List<Long> gridDisk(long origin, int k) {
-    return H3Utils.H3_CORE.gridDisk(origin, k);
+  public static long[] gridDisk(long origin, int k) {
+    return H3Utils.H3_CORE.gridDisk(origin, k).toArray();
   }
 }
