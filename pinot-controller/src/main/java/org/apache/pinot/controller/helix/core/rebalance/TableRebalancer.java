@@ -663,24 +663,31 @@ public class TableRebalancer {
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       existingReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
-        if (existingServersToConsumingSegmentMap != null && entrySet.getValue()
-            .get(segmentKey)
-            .equals(SegmentStateModel.CONSUMING)) {
-          existingServersToConsumingSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      String segmentName = entrySet.getKey();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && entrySet.getValue()
+          .values()
+          .stream()
+          .allMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        if (isSegmentConsuming) {
+          existingServersToConsumingSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
         }
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
       newReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
-        if (newServersToConsumingSegmentMap != null && entrySet.getValue()
-            .get(segmentKey)
-            .equals(SegmentStateModel.CONSUMING)) {
-          newServersToConsumingSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      String segmentName = entrySet.getKey();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && entrySet.getValue()
+          .values()
+          .stream()
+          .allMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        if (isSegmentConsuming) {
+          newServersToConsumingSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
         }
       }
     }
@@ -809,11 +816,11 @@ public class TableRebalancer {
     }
 
     if (existingServersToConsumingSegmentMap != null && newServersToConsumingSegmentMap != null) {
+      // turn the map into {server: added consuming segments}
       for (Map.Entry<String, Set<String>> entry : newServersToConsumingSegmentMap.entrySet()) {
         String server = entry.getKey();
         entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Collections.emptySet()));
       }
-      // turn the map into server -> consuming segments added
       newServersToConsumingSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
@@ -858,6 +865,10 @@ public class TableRebalancer {
 
   private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(String tableNameWithType,
       Map<String, Set<String>> newServersToConsumingSegmentMap) {
+    if (newServersToConsumingSegmentMap.isEmpty()) {
+      return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(0, 0, new HashMap<>(), new HashMap<>(),
+          new HashMap<>());
+    }
     int numConsumingSegmentsToBeMoved =
         newServersToConsumingSegmentMap.values().stream().reduce(0, (a, b) -> a + b.size(), Integer::sum);
     Set<String> uniqueConsumingSegments =
@@ -869,17 +880,17 @@ public class TableRebalancer {
         getConsumingSegmentsOffsetsToCatchUp(tableNameWithType, consumingSegmentZKmetadata);
     Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
 
-    Map<String, Integer> topTenOffset;
+    Map<String, Integer> topOffset;
     Map<String, RebalanceSummaryResult.ConsumingSegmentSummaryPerServer> consumingSegmentSummaryPerServer =
         new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
-      topTenOffset = new LinkedHashMap<>();
+      topOffset = new LinkedHashMap<>();
       consumingSegmentsOffsetsToCatchUp.entrySet()
           .stream()
           .sorted(
               Collections.reverseOrder(Map.Entry.comparingByValue()))
           .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
-          .forEach(entry -> topTenOffset.put(entry.getKey(), entry.getValue()));
+          .forEach(entry -> topOffset.put(entry.getKey(), entry.getValue()));
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         int totalOffsetsToCatchUp =
             segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
@@ -887,26 +898,33 @@ public class TableRebalancer {
             segments.size(), totalOffsetsToCatchUp));
       });
     } else {
-      topTenOffset = null;
+      topOffset = null;
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         consumingSegmentSummaryPerServer.put(server, new RebalanceSummaryResult.ConsumingSegmentSummaryPerServer(
             segments.size(), null));
       });
     }
 
-    Map<String, Integer> oldestTenSegment;
-    oldestTenSegment = new LinkedHashMap<>();
+    Map<String, Integer> oldestConsumingSegments;
+    oldestConsumingSegments = new LinkedHashMap<>();
     consumingSegmentsAge.entrySet()
         .stream()
         .sorted(
             Map.Entry.comparingByValue())
         .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
-        .forEach(entry -> oldestTenSegment.put(entry.getKey(), entry.getValue()));
+        .forEach(entry -> oldestConsumingSegments.put(entry.getKey(), entry.getValue()));
 
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
-        newServersToConsumingSegmentMap.size(), topTenOffset, oldestTenSegment, consumingSegmentSummaryPerServer);
+        newServersToConsumingSegmentMap.size(), topOffset, oldestConsumingSegments, consumingSegmentSummaryPerServer);
   }
 
+  /**
+   * Fetches the age of each consuming segment.
+   * The age of a consuming segment is the time since the segment was created in ZK, it could be different to when
+   * the stream should start to be consumed for the segment.
+   * consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata. Returns a map from
+   * segment name to the age of that consuming segment. Return null if failed to obtain info for any consuming segment.
+   */
   private Map<String, Integer> getConsumingSegmentsAge(String tableNameWithType,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
     Map<String, Integer> consumingSegmentsAge = new HashMap<>();
