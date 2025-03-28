@@ -55,6 +55,7 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
+import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
@@ -149,7 +150,7 @@ public class QueryEnvironment {
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
-    HepProgram traitProgram = getTraitProgram(workerManager);
+    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -465,7 +466,7 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager) {
+  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -474,7 +475,9 @@ public class QueryEnvironment {
     // ----
     // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
     for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
+      if (isEligibleQueryPostRule(relOptRule, config)) {
+        hepProgramBuilder.addRuleInstance(relOptRule);
+      }
     }
 
     // apply RelDistribution trait to all nodes
@@ -484,6 +487,14 @@ public class QueryEnvironment {
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
     return hepProgramBuilder.build();
+  }
+
+  // This method is used to filter out post rules that are not eligible to run based on the config.
+  private static boolean isEligibleQueryPostRule(RelOptRule relOptRule, Config config) {
+    if (relOptRule instanceof PinotJoinToDynamicBroadcastRule && !config.defaultEnableDynamicBroadcast()) {
+      return false;
+    }
+    return true;
   }
 
   public static ImmutableQueryEnvironment.Config.Builder configBuilder() {
@@ -532,9 +543,15 @@ public class QueryEnvironment {
       return CommonConstants.Broker.DEFAULT_OF_SPOOLS;
     }
 
+
     @Value.Default
     default boolean defaultEnableGroupTrim() {
       return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
+    }
+
+    @Value.Default
+    default boolean defaultEnableDynamicBroadcast() {
+      return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_BROADCAST;
     }
 
     /**
