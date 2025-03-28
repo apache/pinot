@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {Box, Divider, Typography} from "@material-ui/core";
+import {Box, Typography} from "@material-ui/core";
 import React, {ReactNode, useEffect, useRef, useState} from "react";
 import Link from "@material-ui/core/Link";
 
