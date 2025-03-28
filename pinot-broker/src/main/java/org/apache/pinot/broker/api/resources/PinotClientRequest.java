@@ -142,8 +142,10 @@ public class PinotClientRequest {
         requestJson.put(Request.TRACE, traceEnabled);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -177,8 +179,10 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
@@ -211,8 +215,10 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -246,8 +252,10 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);

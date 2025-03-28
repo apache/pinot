@@ -181,15 +181,17 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
-      // Do not log or emit metric here because it is pure user error
+      BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
+        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
-            new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()).toJsonString().getBytes())).build();
+            brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {
         responseObserver.onCompleted();
         throw new RuntimeException(ex);
       }
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       responseObserver.onNext(errorBlock);
       responseObserver.onCompleted();
       return;
@@ -210,6 +212,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .asRuntimeException());
       throw new RuntimeException(e);
     }
+    brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
     ResultTable resultTable = brokerResponse.getResultTable();
     // Handle empty and error block
     if (resultTable == null) {
