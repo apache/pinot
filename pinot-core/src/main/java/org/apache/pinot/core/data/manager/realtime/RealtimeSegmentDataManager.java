@@ -737,7 +737,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
         _consumerCoordinator.acquire(llcSegmentName);
         _consumerSemaphoreAcquired.set(true);
-        _consumerCoordinator.trackSegment(llcSegmentName);
+        _consumerCoordinator.updateMaxSegmentSeqNumTillConsumedInOrder(llcSegmentName.getSequenceNumber());
 
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is

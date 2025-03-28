@@ -1,25 +1,23 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -114,10 +112,6 @@ public class ConsumerCoordinator {
   public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      seqIdToSegment.put(llcSegmentName.getSequenceNumber(), llcSegmentName);
-      if (llcSegmentName.getSequenceNumber() == (_maxSegmentSeqNumTillConsumedInOrder+1)) {
-        _maxSegmentSeqNumTillConsumedInOrder += 1;
-      }
       // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
       _condition.signalAll();
     } finally {
@@ -137,63 +131,45 @@ public class ConsumerCoordinator {
   private void waitForPrevSegment(LLCSegmentName currSegment)
       throws InterruptedException {
 
-    int preSeqNum = currSegment.getSequenceNumber() - 1;
-    int uptoSeqToCheck = _maxSegmentSeqNumTillConsumedInOrder + 1;
-    // check if all segment upto uptoSeqToCheck are present.
+    List<LLCSegmentName> previousSegments = getPreviousSegments(currSegment);
+    previousSegments.sort(Comparator.comparingInt(LLCSegmentName::getSequenceNumber));
 
-    _lock.lock();
-    try {
-      while (uptoSeqToCheck <= preSeqNum) {
-        while (seqIdToSegment.get(uptoSeqToCheck) == null) {
-          _condition.wait();
-        }
-        _maxSegmentSeqNumTillConsumedInOrder = uptoSeqToCheck;
-        uptoSeqToCheck += 1;
+    for (LLCSegmentName llcSegmentName : previousSegments) {
+      if (llcSegmentName.getSequenceNumber() < _maxSegmentSeqNumTillConsumedInOrder) {
+        continue;
       }
-    } finally {
-      _lock.unlock();
+      awaitForPreviousSegmentFromIdealState(llcSegmentName);
+      _lock.lock();
+      try {
+        _maxSegmentSeqNumTillConsumedInOrder = llcSegmentName.getSequenceNumber();
+      } finally {
+        _lock.unlock();
+      }
     }
-
-//    if (_alwaysRelyOnIdealState || !_firstTransitionProcessed.get()) {
-//      // if _alwaysRelyOnIdealState or no offline -> consuming transition has been processed, it means rely on
-//      // ideal state to fetch previous segment.
-//      awaitForPreviousSegmentFromIdealState(currSegment);
-//
-//      // the first transition will always be prone to error, consider edge case where segment previous to current
-//      // helix transition's segment was deleted and this server came alive after successful deletion. the prev
-//      // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
-//      _firstTransitionProcessed.set(true);
-//      return;
-//    }
-//
-//    // rely on _maxSegmentSeqNumRegistered watermark for previous segment.
-//    if (awaitForPreviousSegmentSequenceNumber(currSegment, WAIT_INTERVAL_MS)) {
-//      return;
-//    }
-//
-//    // tried using prevSegSeqNumber watermark, but could not acquire the previous segment.
-//    // fallback to acquire prev segment from ideal state.
-//    awaitForPreviousSegmentFromIdealState(currSegment);
   }
 
   private void awaitForPreviousSegmentFromIdealState(LLCSegmentName currSegment)
       throws InterruptedException {
-    String previousSegment = getPreviousSegmentFromIdealState(currSegment);
+    String previousSegment = currSegment.getSegmentName();
     if (previousSegment == null) {
       // previous segment can only be null if either all the previous segments are deleted or this is the starting
       // sequence segment of the partition Group.
       return;
     }
 
-
-
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
-    int prevSeqNum = LLCSegmentName.getSequenceNumber(segmentDataManager.getSegmentName());
     try {
       long startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
-        while (_maxSegmentSeqNumTillConsumedInOrder < prevSeqNum) {
+        while ((segmentDataManager == null) || (segmentDataManager instanceof RealtimeSegmentDataManager)) {
+          if (segmentDataManager != null) {
+            RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
+            if (_maxSegmentSeqNumTillConsumedInOrder >= LLCSegmentName.getSequenceNumber(
+                realtimeSegmentDataManager.getSegmentName())) {
+              return;
+            }
+          }
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
           if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
@@ -207,16 +183,9 @@ public class ConsumerCoordinator {
               // state for previous segment.
               throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
             }
-
-            // waited until timeout, fetch previous segment again from ideal state as previous segment might be
-            // changed in ideal state.
-            previousSegment = getPreviousSegmentFromIdealState(currSegment);
-            if (previousSegment == null) {
-              return;
-            }
           }
+          // TODO: handle segment deletion
           segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
-          prevSeqNum = LLCSegmentName.getSequenceNumber(segmentDataManager.getSegmentName());
         }
       } finally {
         _lock.unlock();
@@ -267,8 +236,7 @@ public class ConsumerCoordinator {
   }
 
   @VisibleForTesting
-  @Nullable
-  String getPreviousSegmentFromIdealState(LLCSegmentName currSegment) {
+  List<LLCSegmentName> getPreviousSegments(LLCSegmentName currSegment) {
     long startTimeMs = System.currentTimeMillis();
     // if seq num of current segment is 102, maxSequenceNumBelowCurrentSegment must be highest seq num of any segment
     // created before current segment
@@ -278,6 +246,7 @@ public class ConsumerCoordinator {
     int currSequenceNum = currSegment.getSequenceNumber();
     Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
     String currentServerInstanceId = _realtimeTableDataManager.getServerInstance();
+    List<LLCSegmentName> list = new ArrayList<>();
 
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
@@ -307,11 +276,7 @@ public class ConsumerCoordinator {
         continue;
       }
 
-      if (llcSegmentName.getSequenceNumber() > maxSequenceNumBelowCurrentSegment) {
-        maxSequenceNumBelowCurrentSegment = llcSegmentName.getSequenceNumber();
-        // also track the name of segment
-        previousSegment = segmentName;
-      }
+      list.add(llcSegmentName);
     }
 
     long timeSpentMs = System.currentTimeMillis() - startTimeMs;
@@ -320,7 +285,7 @@ public class ConsumerCoordinator {
     _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
         ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS, timeSpentMs, TimeUnit.MILLISECONDS);
 
-    return previousSegment;
+    return list;
   }
 
   @VisibleForTesting
