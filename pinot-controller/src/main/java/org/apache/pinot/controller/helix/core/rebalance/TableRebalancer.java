@@ -739,6 +739,7 @@ public class TableRebalancer {
       // The segments remain unchanged or need to download will be accounted to every tag associated with this
       // server instance
       if (relevantTags.isEmpty()) {
+        // this could happen when server's tags changed but reassignInstance=false in the rebalance config
         LOGGER.warn("Server: {} was assigned to table: {} but does not have any relevant tags", server,
             tableNameWithType);
 
