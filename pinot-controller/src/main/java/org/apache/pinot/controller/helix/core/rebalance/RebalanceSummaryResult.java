@@ -304,7 +304,7 @@ public class RebalanceSummaryResult {
     private final int _numServerGettingConsumingSegmentsAdded;
     // the top N consuming segments with most offsets to be consumed by a server. this is essentially the difference
     // between the latest offset of the stream and the segment's start offset of the stream
-    private final Map<String, Integer> _topConsumingSegmentsOffsetsToCatchUp;
+    private final Map<String, Integer> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
     // top N oldest consuming segments. the age of a segment is determined by its creation time
     private final Map<String, Integer> _oldestConsumingSegmentsToBeMovedInMinutes;
     private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
@@ -313,7 +313,7 @@ public class RebalanceSummaryResult {
      * Constructor for ConsumingSegmentInfo
      * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
      * @param numServerGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
-     * @param topConsumingSegmentsOffsetsToCatchUp top consuming segments to be moved to catch up
+     * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up
      * @param oldestConsumingSegmentsToBeMovedInMinutes oldest consuming segments to be moved to catch up
      * @param serverConsumingSegmentSummary offsets of consuming segments to be moved to catch up per
      *                                                   server
@@ -322,15 +322,15 @@ public class RebalanceSummaryResult {
     public ConsumingSegmentToBeMovedSummary(
         @JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
         @JsonProperty("numServerGettingConsumingSegmentsAdded") int numServerGettingConsumingSegmentsAdded,
-        @JsonProperty("topConsumingSegmentsOffsetsToCatchUp") @Nullable
-        Map<String, Integer> topConsumingSegmentsOffsetsToCatchUp,
+        @JsonProperty("consumingSegmentsToBeMovedWithMostOffsetsToCatchUp") @Nullable
+        Map<String, Integer> consumingSegmentsToBeMovedWithMostOffsetsToCatchUp,
         @JsonProperty("oldestConsumingSegmentsToBeMovedInMinutes") @Nullable
         Map<String, Integer> oldestConsumingSegmentsToBeMovedInMinutes,
         @JsonProperty("serverConsumingSegmentSummary") @Nullable
         Map<String, ConsumingSegmentSummaryPerServer> serverConsumingSegmentSummary) {
       _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
       _numServerGettingConsumingSegmentsAdded = numServerGettingConsumingSegmentsAdded;
-      _topConsumingSegmentsOffsetsToCatchUp = topConsumingSegmentsOffsetsToCatchUp;
+      _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp = consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
       _oldestConsumingSegmentsToBeMovedInMinutes = oldestConsumingSegmentsToBeMovedInMinutes;
       _serverConsumingSegmentSummary = serverConsumingSegmentSummary;
     }
@@ -346,8 +346,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public Map<String, Integer> getTopConsumingSegmentsOffsetsToCatchUp() {
-      return _topConsumingSegmentsOffsetsToCatchUp;
+    public Map<String, Integer> getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() {
+      return _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
     }
 
     @JsonProperty
@@ -359,31 +359,31 @@ public class RebalanceSummaryResult {
     public Map<String, ConsumingSegmentSummaryPerServer> getServerConsumingSegmentSummary() {
       return _serverConsumingSegmentSummary;
     }
-  }
 
-  public static class ConsumingSegmentSummaryPerServer {
-    private final int _numConsumingSegmentToBeAdded;
-    // How much offset this server would need to catch up to consume its newly added consuming segments from their
-    // start offset to latest offset in the topic
-    private final Integer _totalOffsetsNeedToCatchUp;
+    public static class ConsumingSegmentSummaryPerServer {
+      private final int _numConsumingSegmentToBeAdded;
+      // How much offset this server would need to catch up to consume its newly added consuming segments from their
+      // start offset to latest offset in the topic
+      private final Integer _totalOffsetsNeedToCatchUp;
 
-    @JsonCreator
-    public ConsumingSegmentSummaryPerServer(
-        @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
-        @JsonProperty("totalOffsetsNeedToCatchUp") @Nullable Integer totalOffsetsNeedToCatchUp) {
-      _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
-      _totalOffsetsNeedToCatchUp = totalOffsetsNeedToCatchUp;
-    }
+      @JsonCreator
+      public ConsumingSegmentSummaryPerServer(
+          @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
+          @JsonProperty("totalOffsetsNeedToCatchUp") @Nullable Integer totalOffsetsNeedToCatchUp) {
+        _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
+        _totalOffsetsNeedToCatchUp = totalOffsetsNeedToCatchUp;
+      }
 
-    @JsonProperty
-    public int getNumConsumingSegmentToBeAdded() {
-      return _numConsumingSegmentToBeAdded;
-    }
+      @JsonProperty
+      public int getNumConsumingSegmentToBeAdded() {
+        return _numConsumingSegmentToBeAdded;
+      }
 
-    @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    public Integer getTotalOffsetsNeedToCatchUp() {
-      return _totalOffsetsNeedToCatchUp;
+      @JsonProperty
+      @JsonInclude(JsonInclude.Include.NON_NULL)
+      public Integer getTotalOffsetsNeedToCatchUp() {
+        return _totalOffsetsNeedToCatchUp;
+      }
     }
   }
 

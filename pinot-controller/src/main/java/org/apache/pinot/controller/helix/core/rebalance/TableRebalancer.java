@@ -881,21 +881,24 @@ public class TableRebalancer {
     Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
 
     Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
-    Map<String, RebalanceSummaryResult.ConsumingSegmentSummaryPerServer> consumingSegmentSummaryPerServer =
+    Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
+        consumingSegmentSummaryPerServer =
         new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
       consumingSegmentsOffsetsToCatchUpTopN = getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp);
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         int totalOffsetsToCatchUp =
             segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
-        consumingSegmentSummaryPerServer.put(server, new RebalanceSummaryResult.ConsumingSegmentSummaryPerServer(
-            segments.size(), totalOffsetsToCatchUp));
+        consumingSegmentSummaryPerServer.put(server,
+            new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
+                segments.size(), totalOffsetsToCatchUp));
       });
     } else {
       consumingSegmentsOffsetsToCatchUpTopN = null;
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
-        consumingSegmentSummaryPerServer.put(server, new RebalanceSummaryResult.ConsumingSegmentSummaryPerServer(
-            segments.size(), null));
+        consumingSegmentSummaryPerServer.put(server,
+            new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
+                segments.size(), null));
       });
     }
 
