@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.client.grpc;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.client.AbstractResultSet;
 import org.apache.pinot.client.TextTable;
 import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -35,7 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 public class GrpcResultSet extends AbstractResultSet {
   private final List<String> _columnNamesArray;
   private final List<String> _columnDataTypesArray;
-  private final ArrayNode _currentBatchRows;
+  private final ResultTable _currentBatchRows;
 
   public GrpcResultSet(DataSchema schema, Broker.BrokerResponse brokerResponse) {
     _columnNamesArray = new ArrayList<>(schema.size());
@@ -45,7 +44,7 @@ public class GrpcResultSet extends AbstractResultSet {
       _columnDataTypesArray.add(schema.getColumnDataType(i).toString());
     }
     try {
-      _currentBatchRows = GrpcUtils.extractRowsJson(brokerResponse);
+      _currentBatchRows = GrpcUtils.extractResultTable(brokerResponse, schema);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -53,7 +52,7 @@ public class GrpcResultSet extends AbstractResultSet {
 
   @Override
   public int getRowCount() {
-    return _currentBatchRows.size();
+    return _currentBatchRows.getRows().size();
   }
 
   @Override
@@ -73,12 +72,7 @@ public class GrpcResultSet extends AbstractResultSet {
 
   @Override
   public String getString(int rowIndex, int columnIndex) {
-    JsonNode jsonValue = _currentBatchRows.get(rowIndex).get(columnIndex);
-    if (jsonValue.isTextual()) {
-      return jsonValue.textValue();
-    } else {
-      return jsonValue.toString();
-    }
+    return _currentBatchRows.getRows().get(rowIndex)[columnIndex].toString();
   }
 
   public List<String> getAllColumns() {
