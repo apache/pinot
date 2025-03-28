@@ -28,6 +28,8 @@ import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -370,6 +372,53 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         break;
       default:
         throw new IllegalArgumentException();
+    }
+  }
+
+  default void readValuesSV(int[] docIds, int length, String[] values, T context) {
+    switch (getStoredType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Integer.toString(getInt(docIds[i], context));
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = Long.toString(getLong(docIds[i], context));
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Float.toString(getFloat(docIds[i], context));
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = Double.toString(getDouble(docIds[i], context));
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).toPlainString();
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = getString(docIds[i], context);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          values[i] = BytesUtils.toHexString(getBytes(docIds[i], context));
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < length; i++) {
+          values[i] = MapUtils.toString(getMap(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalStateException();
     }
   }
 
