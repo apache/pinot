@@ -19,16 +19,17 @@
 package org.apache.pinot.client.grpc;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.common.compression.CompressionFactory;
 import org.apache.pinot.common.compression.Compressor;
 import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.encoder.ResponseEncoder;
+import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -59,16 +60,18 @@ public class GrpcUtils {
 
   public static JsonNode extractSchemaJson(Broker.BrokerResponse brokerResponse)
       throws IOException {
-    DataSchema schema = DataSchema.fromBytes(brokerResponse.getPayload().asReadOnlyByteBuffer());
-    return JsonUtils.objectToJsonNode(schema);
+    return JsonUtils.objectToJsonNode(extractSchema(brokerResponse));
   }
 
-  public static ArrayNode extractRowsJson(Broker.BrokerResponse brokerResponse)
+  public static ResultTable extractResultTable(Broker.BrokerResponse brokerResponse, DataSchema schema)
       throws IOException {
     Map<String, String> metadataMap = brokerResponse.getMetadataMap();
     String compressionAlgorithm = metadataMap.getOrDefault(CommonConstants.Broker.Grpc.COMPRESSION,
         CommonConstants.Broker.Grpc.DEFAULT_COMPRESSION);
     Compressor compressor = CompressionFactory.getCompressor(compressionAlgorithm);
+    String encodingType = metadataMap.getOrDefault(CommonConstants.Broker.Grpc.ENCODING,
+        CommonConstants.Broker.Grpc.DEFAULT_ENCODING);
+    ResponseEncoder responseEncoder = ResponseEncoderFactory.getResponseEncoder(encodingType);
 
     byte[] respBytes = brokerResponse.getPayload().toByteArray();
     int rowSize = Integer.parseInt(brokerResponse.getMetadataOrThrow("rowSize"));
@@ -78,20 +81,7 @@ public class GrpcUtils {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    ArrayNode jsonRows = JsonUtils.newArrayNode();
-    int bytesRead = 0;
-    ByteBuffer byteBuffer = ByteBuffer.wrap(uncompressedPayload);
-    for (int i = 0; i < rowSize; i++) {
-      int nextRowSize = byteBuffer.getInt(bytesRead);
-      bytesRead += 4;
-      byte[] rowBytes = new byte[nextRowSize];
-      byteBuffer.position(bytesRead);
-      byteBuffer.get(rowBytes);
-      bytesRead += nextRowSize;
-      String rowString = new String(rowBytes);
-      jsonRows.add(JsonUtils.stringToJsonNode(rowString));
-    }
-    return jsonRows;
+    return responseEncoder.decodeResultTable(uncompressedPayload, rowSize, schema);
   }
 
   public static ExecutionStats extractExecutionStats(JsonNode executionStatsJson) {
