@@ -2772,7 +2772,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(row.get(0).asInt(), tmpTableRow.get(0).asInt());
       assertEquals(row.get(1).asLong(), tmpTableRow.get(1).asLong());
       assertTrue(row.get(2).isNull());
-      assertTrue(row.get(2).isNull());
+      assertTrue(row.get(3).isNull());
     }
     for (int i = 2; i < 363; i++) {
       JsonNode row = rows.get(i);

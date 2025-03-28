@@ -739,6 +739,8 @@ public class CommonConstants {
       public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
       public static final String COMPRESSION = "compression";
       public static final String DEFAULT_COMPRESSION = "ZSTD";
+      public static final String ENCODING = "encoding";
+      public static final String DEFAULT_ENCODING = "JSON";
     }
 
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";

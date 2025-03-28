@@ -528,14 +528,9 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode queryGrpcEndpoint(String query, Map<String, String> metadataMap)
       throws IOException {
-    GrpcConnection grpcConnection = null;
-    try {
-      grpcConnection = ConnectionFactory.fromHostListGrpc(new Properties(), List.of(getBrokerGrpcEndpoint()));
+    try (GrpcConnection grpcConnection = ConnectionFactory.fromHostListGrpc(new Properties(),
+        List.of(getBrokerGrpcEndpoint()))) {
       return grpcConnection.getJsonResponse(query, metadataMap);
-    } finally {
-      if (grpcConnection != null) {
-        grpcConnection.close();
-      }
     }
   }
 
