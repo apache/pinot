@@ -156,11 +156,15 @@ public class ConsumerCoordinator {
     }
 
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
+    int prevSeqNum = LLCSegmentName.of(previousSegment).getSequenceNumber();
     try {
       long startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
         while (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+          if (_maxSegmentSeqNumRegistered < prevSeqNum) {
+            return;
+          }
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
           if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
