@@ -65,6 +65,7 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -4294,6 +4295,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "Existing number of servers don't match");
     assertEquals(summaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), newNumServers,
         "New number of servers don't match");
+    // In this cluster integration test, servers are tagged with DefaultTenant only
+    assertEquals(summaryResult.getTagsInfo().size(), 1);
+    assertEquals(summaryResult.getTagsInfo().get(0).getTagName(),
+        TagNameUtils.getOfflineTagForTenant(getServerTenant()));
+    assertEquals(summaryResult.getTagsInfo().get(0).getNumServerParticipants(), newNumServers);
+    assertEquals(summaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(),
+        summaryResult.getTagsInfo().get(0).getNumSegmentsToDownload());
+    // For this single tenant, the number of unchanged segments and the number of received segments should add up to
+    // the total present segment
+    assertEquals(summaryResult.getSegmentInfo().getNumSegmentsAcrossAllReplicas().getExpectedValueAfterRebalance(),
+        summaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged() + summaryResult.getTagsInfo()
+            .get(0)
+            .getNumSegmentsToDownload());
     if (_tableSize > 0) {
       assertTrue(summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes() > 0L,
           "Avg segment size expected to be > 0 but found to be 0");
