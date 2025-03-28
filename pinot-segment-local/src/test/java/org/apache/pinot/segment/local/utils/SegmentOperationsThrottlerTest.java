@@ -37,11 +37,11 @@ import static org.mockito.Mockito.spy;
 
 public class SegmentOperationsThrottlerTest {
 
-  private final List<String> THRESHOLD_GAUGES =
+  private final List<String> _thresholdGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
           ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD.getGaugeName());
-  private final List<String> COUNT_GAUGES =
+  private final List<String> _countGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT.getGaugeName(),
           ServerGauge.SEGMENT_DOWNLOAD_COUNT.getGaugeName());
@@ -56,8 +56,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.availablePermits(), 4);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
@@ -98,8 +98,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
 
@@ -178,8 +178,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       int defaultPermits = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM)
@@ -220,8 +220,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
@@ -265,8 +265,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -340,8 +340,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -404,8 +404,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
@@ -449,8 +449,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
@@ -520,8 +520,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
@@ -622,8 +622,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       int defaultPermitsBeforeQuery = operationsThrottler instanceof SegmentAllIndexPreprocessThrottler
           ? Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES)
@@ -732,8 +732,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -767,8 +767,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -813,8 +813,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
@@ -864,8 +864,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -905,8 +905,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
@@ -954,8 +954,8 @@ public class SegmentOperationsThrottlerTest {
 
     for (int i = 0; i < segmentOperationsThrottlerList.size(); i++) {
       BaseSegmentOperationsThrottler operationsThrottler = segmentOperationsThrottlerList.get(i);
-      String thresholdGaugeName = THRESHOLD_GAUGES.get(i);
-      String countGaugeName = COUNT_GAUGES.get(i);
+      String thresholdGaugeName = _thresholdGauges.get(i);
+      String countGaugeName = _countGauges.get(i);
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
@@ -1007,12 +1007,12 @@ public class SegmentOperationsThrottlerTest {
         initialPermits);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits);
 
-    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+    for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
     }
 
-    for (String countGaugeName : COUNT_GAUGES) {
+    for (String countGaugeName : _countGauges) {
       Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -1033,12 +1033,12 @@ public class SegmentOperationsThrottlerTest {
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
 
-    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+    for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
     }
 
-    for (String countGaugeName : COUNT_GAUGES) {
+    for (String countGaugeName : _countGauges) {
       Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -1062,12 +1062,12 @@ public class SegmentOperationsThrottlerTest {
         initialPermits * 2);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
 
-    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+    for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
     }
 
-    for (String countGaugeName : COUNT_GAUGES) {
+    for (String countGaugeName : _countGauges) {
       Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -1096,12 +1096,12 @@ public class SegmentOperationsThrottlerTest {
         initialPermits * 4);
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 4);
 
-    for (String thresholdGaugeName : THRESHOLD_GAUGES) {
+    for (String thresholdGaugeName : _thresholdGauges) {
       Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 4);
     }
 
-    for (String countGaugeName : COUNT_GAUGES) {
+    for (String countGaugeName : _countGauges) {
       Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
