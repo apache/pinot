@@ -562,7 +562,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       if (StringUtils.isNotEmpty(instanceTagsConfig)) {
         for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
           Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                instanceTag);
+                  instanceTag);
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;
