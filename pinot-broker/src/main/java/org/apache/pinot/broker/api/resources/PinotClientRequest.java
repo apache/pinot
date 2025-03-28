@@ -142,7 +142,7 @@ public class PinotClientRequest {
         requestJson.put(Request.TRACE, traceEnabled);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
-      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -179,7 +179,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
-      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -215,7 +215,7 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
-      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -252,7 +252,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
-      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);

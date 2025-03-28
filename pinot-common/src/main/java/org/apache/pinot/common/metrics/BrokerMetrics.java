@@ -21,13 +21,8 @@ package org.apache.pinot.common.metrics;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.QueryProcessingException;
-import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX;
@@ -38,9 +33,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_METRICS_
  *
  */
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerMetrics.class);
-
   private static final BrokerMetrics NOOP = new BrokerMetrics(new NoopPinotMetricsRegistry());
   private static final AtomicReference<BrokerMetrics> BROKER_METRICS_INSTANCE = new AtomicReference<>(NOOP);
 
@@ -90,24 +82,5 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
   @Override
   protected BrokerGauge[] getGauges() {
     return BrokerGauge.values();
-  }
-
-  // Emits metrics based on BrokerResponse. Currently only emits metrics for exceptions.
-  // If a broker response has multiple exceptions, we will emit metrics for all of them.
-  // Thus, the sum total of all exceptions is >= total number of queries impacted.
-  // Additionally, some parts of code might already be emitting metrics for individual error codes.
-  // But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
-  // This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
-  public void emitBrokerResponseMetrics(BrokerResponse brokerResponse) {
-    for (QueryProcessingException exception : brokerResponse.getExceptions()) {
-      QueryErrorCode queryErrorCode;
-      try {
-        queryErrorCode = QueryErrorCode.fromErrorCode(exception.getErrorCode());
-      } catch (IllegalArgumentException e) {
-        LOGGER.warn("Invalid error code: " + exception.getErrorCode(), e);
-        queryErrorCode = QueryErrorCode.UNKNOWN;
-      }
-      this.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
-    }
   }
 }

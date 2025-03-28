@@ -191,7 +191,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
         responseObserver.onCompleted();
         throw new RuntimeException(ex);
       }
-      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       responseObserver.onNext(errorBlock);
       responseObserver.onCompleted();
       return;
@@ -212,7 +212,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .asRuntimeException());
       throw new RuntimeException(e);
     }
-    _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
+    brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
     ResultTable resultTable = brokerResponse.getResultTable();
     // Handle empty and error block
     if (resultTable == null) {
