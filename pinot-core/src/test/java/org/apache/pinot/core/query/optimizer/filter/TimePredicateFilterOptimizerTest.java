@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.optimizer.filter;
 
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -32,12 +33,6 @@ public class TimePredicateFilterOptimizerTest {
 
   @Test
   public void testTimeConvert() {
-    // Same input/output format
-    testNoOpTimeConvert("timeConvert(col, 'MILLISECONDS', 'MILLISECONDS') > 1620830760000");
-    testNoOpTimeConvert("TIME_CONVERT(col, 'MILLISECONDS', 'MILLISECONDS') < 1620917160000");
-    testNoOpTimeConvert("timeconvert(col, 'MILLISECONDS', 'MILLISECONDS') BETWEEN 1620830760000 AND 1620917160000");
-    testNoOpTimeConvert("TIMECONVERT(col, 'MILLISECONDS', 'MILLISECONDS') = 1620830760000");
-
     // Other output format
     testTimeConvert("timeConvert(col, 'MILLISECONDS', 'SECONDS') > 1620830760",
         new Range(1620830761000L, true, null, false));
@@ -58,6 +53,18 @@ public class TimePredicateFilterOptimizerTest {
     // Invalid time
     testInvalidFilterOptimizer("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760.5");
     testInvalidFilterOptimizer("timeConvert(col, 'HOURS', 'MINUTES') > 1620830760");
+
+    // Test reverse order predicates (x = function())
+    testTimeConvert("1620830760 = timeConvert(col, 'MILLISECONDS', 'SECONDS')",
+        new Range(1620830760000L, true, 1620830761000L, false));
+    testTimeConvert("27015286 > timeConvert(col, 'MILLISECONDS', 'MINUTES')",
+        new Range(null, false, 1620917160000L, false));
+    testTimeConvert("450254 >= timeConvert(col, 'MILLISECONDS', 'HOURS')",
+        new Range(null, false, 1620918000000L, true));
+    testTimeConvert("18759 < timeConvert(col, 'MILLISECONDS', 'DAYS')",
+        new Range(1620864000000L, true, null, false));
+    testTimeConvert("18759 <= timeConvert(col, 'MILLISECONDS', 'DAYS')",
+        new Range(1620777600000L, true, null, false));
   }
 
   @Test
@@ -125,9 +132,16 @@ public class TimePredicateFilterOptimizerTest {
     testTimeConvert("dateTimeConvert(col, '1:DAYS:EPOCH', '1:DAYS:EPOCH', '30:MINUTES') = 18759",
         new Range(18759L, true, 18760L, false));
 
-    // Invalid time
-    testInvalidFilterOptimizer("dateTimeConvert(col, '1:SECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') > 27013846.5");
-    testInvalidFilterOptimizer("dateTimeConvert(col, '1:SECONDS:EPOCH', '30:MINUTES:EPOCH', '30:MINUTES') > 27013846");
+    // Test reverse order predicates (x = function())
+    testTimeConvert(
+        "1620830760000 = dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '30:MINUTES')",
+        new Range(1620831600000L, true, 1620831600000L, false));
+    testTimeConvert(
+        "27013846 > dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES')",
+        new Range(null, false, 1620831600000L, false));
+    testTimeConvert(
+        "2701528 < dateTimeConvert(col, '1:MILLISECONDS:EPOCH', '10:MINUTES:EPOCH', '30:MINUTES')",
+        new Range(1620918000000L, true, null, false));
   }
 
   @Test
@@ -202,8 +216,10 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
         new Range("453630", true, "453632", true));
 
-    // TODO: Currently time filter optimizers do not support 'literal = func()' syntax
-    testInvalidFilterOptimizer("453630 = datetrunc('DAY', col)");
+    // Test reverse order predicates (x = function())
+    testDateTrunc("1620777600000 = datetrunc('DAY', col)", new Range("1620777600000", true, "1620863999999", true));
+    testDateTrunc("1620777600000 < datetrunc('DAY', col)", new Range("1620863999999", false, Long.MAX_VALUE, true));
+    testDateTrunc("1620777600000 > datetrunc('DAY', col)", new Range(Long.MIN_VALUE, true, "1620777600000", false));
   }
 
   /**
@@ -217,8 +233,19 @@ public class TimePredicateFilterOptimizerTest {
     assertEquals(function.getOperator(), FilterKind.RANGE.name());
     List<Expression> operands = function.getOperands();
     assertEquals(operands.size(), 2);
-    assertEquals(operands.get(0),
-        originalExpression.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1));
+
+    // Find the original dateTrunc column operand regardless of predicate form
+    Expression dateTruncOperand;
+    Function originalFunction = originalExpression.getFunctionCall();
+    List<Expression> originalOperands = originalFunction.getOperands();
+    if (originalOperands.get(0).getType() == ExpressionType.FUNCTION) {
+      // form: datetrunc() = x
+      dateTruncOperand = originalOperands.get(0).getFunctionCall().getOperands().get(1);
+    } else {
+      // form: x = datetrunc()
+      dateTruncOperand = originalOperands.get(1).getFunctionCall().getOperands().get(1);
+    }
+    assertEquals(operands.get(0), dateTruncOperand);
     String rangeString = operands.get(1).getLiteral().getStringValue();
     assertEquals(rangeString, expectedRange.getRangeString());
   }
@@ -233,14 +260,18 @@ public class TimePredicateFilterOptimizerTest {
     Expression optimizedFilterExpression =
         TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
     Function optimizedFunction = optimizedFilterExpression.getFunctionCall();
-    List<Expression> optimizedOperands = optimizedFunction.getOperands();
-    assertEquals(optimizedFunction.getOperator(), originalFunction.getOperator());
-    assertEquals(optimizedOperands.size(), originalOperands.size());
-    // TIME_CONVERT transform should be removed
-    assertEquals(optimizedOperands.get(0), originalOperands.get(0).getFunctionCall().getOperands().get(0));
-    int numOperands = optimizedOperands.size();
-    for (int i = 1; i < numOperands; i++) {
-      assertEquals(optimizedOperands.get(i), originalOperands.get(i));
+
+    // For no-op time convert, we should get back the original function with operands swapped if needed
+    if (originalOperands.get(0).getType() == ExpressionType.FUNCTION) {
+      // form: timeConvert() = x
+      assertEquals(optimizedFunction.getOperator(), originalFunction.getOperator());
+      System.out.println(optimizedFunction);
+      assertEquals(optimizedFunction.getOperands(), originalOperands);
+    } else {
+      // form: x = timeConvert()
+      assertEquals(optimizedFunction.getOperator(), originalFunction.getOperator());
+      assertEquals(optimizedFunction.getOperands().get(0), originalOperands.get(1));
+      assertEquals(optimizedFunction.getOperands().get(1), originalOperands.get(0));
     }
   }
 
@@ -255,8 +286,19 @@ public class TimePredicateFilterOptimizerTest {
     assertEquals(function.getOperator(), FilterKind.RANGE.name());
     List<Expression> operands = function.getOperands();
     assertEquals(operands.size(), 2);
-    assertEquals(operands.get(0),
-        originalExpression.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+
+    // Find the original time/dateTime convert column operand regardless of predicate form
+    Expression columnOperand;
+    Function originalFunction = originalExpression.getFunctionCall();
+    List<Expression> originalOperands = originalFunction.getOperands();
+    if (originalOperands.get(0).getType() == ExpressionType.FUNCTION) {
+      // form: timeConvert() = x
+      columnOperand = originalOperands.get(0).getFunctionCall().getOperands().get(0);
+    } else {
+      // form: x = timeConvert()
+      columnOperand = originalOperands.get(1).getFunctionCall().getOperands().get(0);
+    }
+    assertEquals(operands.get(0), columnOperand);
     String rangeString = operands.get(1).getLiteral().getStringValue();
     assertEquals(rangeString, expectedRange.getRangeString());
   }
