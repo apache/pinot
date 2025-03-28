@@ -84,6 +84,14 @@ public class ConsumerCoordinator {
       waitForPrevSegment(llcSegmentName);
       _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(), ServerTimer.PREV_SEGMENT_WAIT_TIME_MS,
           System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+
+      if (isSegmentAlreadyConsumed(llcSegmentName.getSegmentName())) {
+        // if segment is already consumed, just return from here.
+        // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
+        // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
+        // state for previous segment.
+        throw new SegmentAlreadyConsumedException(llcSegmentName.getSegmentName());
+      }
     }
 
     long startTimeMs = System.currentTimeMillis();
@@ -166,14 +174,6 @@ public class ConsumerCoordinator {
             LOGGER.warn("Semaphore access denied to segment: {}. Waited on previous segment: {} for: {}ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
 
-            if (isSegmentAlreadyConsumed(currSegment.getSegmentName())) {
-              // if segment is already consumed, just return from here.
-              // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
-              // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
-              // state for previous segment.
-              throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
-            }
-
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
             // changed in ideal state.
             previousSegment = getPreviousSegmentFromIdealState(currSegment);
@@ -212,14 +212,6 @@ public class ConsumerCoordinator {
           LOGGER.warn(
               "Semaphore access denied to segment: {}. Waited on previous segment with sequence number: {} for: {}ms.",
               currSegment.getSegmentName(), prevSeqNum, System.currentTimeMillis() - startTimeMs);
-
-          if (isSegmentAlreadyConsumed(currSegment.getSegmentName())) {
-            // if segment is already consumed, just return from here.
-            // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
-            // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
-            // state for previous segment.
-            throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
-          }
 
           // waited until the timeout. Rely on ideal state now.
           return _maxSegmentSeqNumRegistered >= prevSeqNum;
