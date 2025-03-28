@@ -56,7 +56,6 @@ public class ConsumerCoordinator {
   private final boolean _alwaysRelyOnIdealState;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _firstTransitionProcessed;
-  private final ConcurrentHashMap<Integer, LLCSegmentName> seqIdToSegment;
 
   private volatile int _maxSegmentSeqNumTillConsumedInOrder = -1;
 
@@ -76,7 +75,6 @@ public class ConsumerCoordinator {
     }
     _firstTransitionProcessed = new AtomicBoolean(false);
     _serverMetrics = ServerMetrics.get();
-    seqIdToSegment = new ConcurrentHashMap<>();
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
