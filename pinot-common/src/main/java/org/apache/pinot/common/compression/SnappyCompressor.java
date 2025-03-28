@@ -16,32 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.memory;
+package org.apache.pinot.common.compression;
 
-import net.openhft.chronicle.core.Jvm;
-import org.apache.pinot.segment.spi.utils.JavaVersion;
-import org.testng.SkipException;
-import org.testng.annotations.BeforeClass;
+import org.xerial.snappy.Snappy;
 
 
-public class PinotLArrayByteBufferTest extends PinotDataBufferTest {
-  public PinotLArrayByteBufferTest() {
-    super(new LArrayPinotBufferFactory());
+public class SnappyCompressor implements Compressor {
+  public static final SnappyCompressor INSTANCE = new SnappyCompressor();
+
+  @Override
+  public byte[] compress(byte[] input)
+      throws Exception {
+    return Snappy.compress(input);
   }
 
   @Override
-  protected boolean prioritizeByteBuffer() {
-    return false;
-  }
-
-  @BeforeClass
-  public void abortOnModernJava() {
-    //larray isn't supported on Mac/aarch64
-    if (Jvm.isMacArm()) {
-      throw new SkipException("Skipping LArray tests because they cannot run on Mac/aarch64");
-    }
-    if (JavaVersion.VERSION > 15) {
-      throw new SkipException("Skipping LArray tests because they cannot run in Java " + JavaVersion.VERSION);
-    }
+  public byte[] decompress(byte[] input)
+      throws Exception {
+    return Snappy.uncompress(input);
   }
 }

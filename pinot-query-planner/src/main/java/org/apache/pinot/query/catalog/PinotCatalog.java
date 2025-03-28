@@ -49,9 +49,6 @@ public class PinotCatalog implements Schema {
   private final TableCache _tableCache;
   private final String _databaseName;
 
-  // list of tables resolved via this catalog instance
-  private Set<String> _resolvedTables;
-
   /**
    * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
    * table available for query and processes table/segment metadata updates when cluster status changes.
@@ -71,13 +68,6 @@ public class PinotCatalog implements Schema {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     String tableName = _tableCache.getActualTableName(physicalTableName);
-
-    if (tableName != null) {
-      if (_resolvedTables == null) {
-        _resolvedTables = new HashSet<>();
-      }
-      _resolvedTables.add(tableName);
-    }
 
     Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
@@ -146,9 +136,5 @@ public class PinotCatalog implements Schema {
   @Override
   public Schema snapshot(SchemaVersion version) {
     return this;
-  }
-
-  public Set<String> getResolvedTables() {
-    return _resolvedTables;
   }
 }

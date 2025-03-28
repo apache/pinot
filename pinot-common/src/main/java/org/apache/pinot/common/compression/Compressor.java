@@ -16,30 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.memory;
+package org.apache.pinot.common.compression;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteOrder;
+/**
+ * Compressor interface for bytes compress/decompress.
+ * Note that the compress method will also encode the size of original bytes as the first
+ */
+public interface Compressor {
 
+  byte[] compress(byte[] input)
+      throws Exception;
 
-public class LArrayPinotBufferFactory implements PinotBufferFactory {
+  byte[] decompress(byte[] input)
+      throws Exception;
+}
+
+class NoCompressor implements Compressor {
+  public static final Compressor INSTANCE = new NoCompressor();
+
   @Override
-  public PinotDataBuffer allocateDirect(long size, ByteOrder byteOrder) {
-    if (byteOrder == ByteOrder.nativeOrder()) {
-      return PinotNativeOrderLBuffer.allocateDirect(size);
-    } else {
-      return PinotNonNativeOrderLBuffer.allocateDirect(size);
-    }
+  public byte[] compress(byte[] input) {
+    return input;
   }
 
   @Override
-  public PinotDataBuffer mapFile(File file, boolean readOnly, long offset, long size, ByteOrder byteOrder)
-      throws IOException {
-    if (byteOrder == ByteOrder.nativeOrder()) {
-      return PinotNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
-    } else {
-      return PinotNonNativeOrderLBuffer.mapFile(file, readOnly, offset, size);
-    }
+  public byte[] decompress(byte[] input) {
+    return input;
   }
 }

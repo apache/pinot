@@ -1630,21 +1630,10 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
   }
 
-  /**
-   * Find schema with same name as rawTableName. If not found, find schema using schemaName in validationConfig.
-   * For OFFLINE table, it is possible that schema was not uploaded before creating the table. Hence for OFFLINE,
-   * this method can return null.
-   */
+  @Deprecated
   @Nullable
   public Schema getSchemaForTableConfig(TableConfig tableConfig) {
-    Schema schema = getSchema(TableNameBuilder.extractRawTableName(tableConfig.getTableName()));
-    if (schema == null) {
-      String schemaName = tableConfig.getValidationConfig().getSchemaName();
-      if (schemaName != null) {
-        schema = getSchema(schemaName);
-      }
-    }
-    return schema;
+    return ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
   }
 
   public List<String> getSchemaNames() {
@@ -4466,7 +4455,7 @@ public class PinotHelixResourceManager {
         if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
           InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
           hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-              Integer.parseInt(instanceConfig.getPort())));
+              Integer.parseInt(instanceConfig.getPort()), Integer.parseInt(HelixHelper.getGrpcPort(instanceConfig))));
         }
       }
       if (!hosts.isEmpty()) {

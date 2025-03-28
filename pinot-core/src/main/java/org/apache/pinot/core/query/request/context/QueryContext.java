@@ -117,6 +117,8 @@ public class QueryContext {
   private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  // Warning threshold of number of groups stored in each segment
+  private int _numGroupsWarningLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   // Minimum number of groups to keep across segments when trimming groups for SQL GROUP BY
@@ -382,6 +384,14 @@ public class QueryContext {
 
   public void setNumGroupsLimit(int numGroupsLimit) {
     _numGroupsLimit = numGroupsLimit;
+  }
+
+  public int getNumGroupsWarningLimit() {
+    return _numGroupsWarningLimit;
+  }
+
+  public void setNumGroupsWarningLimit(int numGroupsWarningLimit) {
+    _numGroupsWarningLimit = numGroupsWarningLimit;
   }
 
   public int getMinSegmentGroupTrimSize() {

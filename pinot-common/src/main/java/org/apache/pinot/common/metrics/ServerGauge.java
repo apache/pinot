@@ -41,6 +41,8 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN("bytes", false),
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
+  // Gauge to reflect whether pauseless is enabled or not
+  PAUSELESS_CONSUMPTION_ENABLED("pauselessConsumptionEnabled", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics

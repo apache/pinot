@@ -38,8 +38,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replication;
   @Deprecated // Use _replication instead
   private String _replicasPerPartition;
-  @Deprecated // Schema name should be the same as raw table name
-  private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
@@ -168,19 +166,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   @Deprecated
   public void setReplicasPerPartition(String replicasPerPartition) {
     _replicasPerPartition = replicasPerPartition;
-  }
-
-  /**
-   * @deprecated Schema name should be the same as raw table name
-   */
-  @Deprecated
-  public String getSchemaName() {
-    return _schemaName;
-  }
-
-  @Deprecated
-  public void setSchemaName(String schemaName) {
-    _schemaName = schemaName;
   }
 
   /**

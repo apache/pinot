@@ -326,7 +326,7 @@ public class TableRebalancer {
       } else {
         RebalancePreChecker.PreCheckContext preCheckContext =
             new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType,
-                tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails);
+                tableConfig, currentAssignment, targetAssignment, tableSubTypeSizeDetails, rebalanceConfig);
         preChecksResult = _rebalancePreChecker.check(preCheckContext);
       }
     }

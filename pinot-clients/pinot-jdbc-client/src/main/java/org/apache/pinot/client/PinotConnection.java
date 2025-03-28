@@ -31,6 +31,7 @@ import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
+import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 
 
@@ -73,39 +74,11 @@ public class PinotConnection extends AbstractBaseConnection {
     for (String possibleQueryOption: POSSIBLE_QUERY_OPTIONS) {
       Object property = properties.getProperty(possibleQueryOption);
       if (property != null) {
-        _queryOptions.put(possibleQueryOption, parseOptionValue(property));
+        _queryOptions.put(possibleQueryOption, DriverUtils.parseOptionValue(property));
       }
     }
   }
 
-  private Object parseOptionValue(Object value) {
-    if (value instanceof String) {
-      String str = (String) value;
-
-      try {
-        Long numVal = Long.valueOf(str);
-        if (numVal != null) {
-            return numVal;
-        }
-      } catch (NumberFormatException e) {
-      }
-
-      try {
-          Double numVal = Double.valueOf(str);
-          if (numVal != null) {
-              return numVal;
-          }
-      } catch (NumberFormatException e) {
-      }
-
-      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
-      if (boolVal != null) {
-          return boolVal;
-      }
-    }
-
-    return value;
-  }
 
   public org.apache.pinot.client.Connection getSession() {
     return _session;

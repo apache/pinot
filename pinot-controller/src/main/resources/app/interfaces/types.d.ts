@@ -171,6 +171,7 @@ declare module 'Models' {
     numEntriesScannedInFilter: number
     numEntriesScannedPostFilter: number
     numGroupsLimitReached: boolean
+    numGroupsWarningLimitReached: boolean
     partialResponse?: number
     minConsumingFreshnessTimeMs: number
     offlineThreadCpuTimeNs: number

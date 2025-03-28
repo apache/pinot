@@ -38,6 +38,7 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -61,6 +62,7 @@ import static org.testng.Assert.*;
 public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
+  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
 
@@ -240,11 +242,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     Map<String, RebalancePreCheckerResult> preCheckResult = rebalanceResult.getPreChecksResult();
     assertNotNull(preCheckResult);
-    assertEquals(preCheckResult.size(), 4);
+    assertEquals(preCheckResult.size(), 5);
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.IS_MINIMIZE_DATA_MOVEMENT));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
+    assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS));
     // Sending request to servers should fail for all, so needsPreprocess should be set to "error" to indicate that a
     // manual check is needed
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.NEEDS_RELOAD_STATUS).getPreCheckStatus(),
@@ -267,6 +270,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
             .getMessage()
             .startsWith("Within threshold"));
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
+        RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
+        "All rebalance parameters look good");
 
     // All servers should be assigned to the table
     instanceAssignment = rebalanceResult.getInstanceAssignment();
@@ -665,6 +672,104 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     for (int i = 0; i < numServersToAdd; i++) {
       stopAndDropFakeInstance("preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
+    executorService.shutdown();
+  }
+
+  @Test
+  public void testRebalancePreCheckerRebalanceConfig()
+      throws Exception {
+    int numServers = 3;
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = "preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+    }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, executorService, 0.5);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+            .setNumReplicas(2)
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setPreChecks(true);
+
+    // dry-run with default rebalance config
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    RebalancePreCheckerResult preCheckerResult =
+        rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(), "includeConsuming is disabled for a realtime table.");
+
+    // trigger bootstrap and bestEfforts warning
+    rebalanceConfig.setIncludeConsuming(true);
+    rebalanceConfig.setBootstrap(true);
+    rebalanceConfig.setBestEfforts(true);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "bestEfforts is enabled, only enable it if you know what you are doing\n"
+            + "bootstrap is enabled which can cause a large amount of data movement, double check if this is "
+            + "intended");
+
+    // trigger downtime warning
+    TableConfig newTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
+
+    rebalanceConfig.setBootstrap(false);
+    rebalanceConfig.setBestEfforts(false);
+    rebalanceConfig.setDowntime(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Number of replicas (3) is greater than 1, downtime is not recommended.");
+
+    // no downtime warning with 1 replica
+    newTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(1).build();
+
+    rebalanceConfig.setDowntime(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
+    // test pass
+    rebalanceConfig.setDowntime(false);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance("preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
     executorService.shutdown();
   }
