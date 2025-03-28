@@ -999,7 +999,7 @@ public class PinotLLCRealtimeSegmentManager {
       throws Exception {
     String clientId =
         PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
-            + streamConfig.getTopicName();
+            + streamConfig.getTopicName() + "-" + StreamConsumerFactory.CLIENT_ID_SEQ.getAndIncrement();
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     try (StreamMetadataProvider metadataProvider = consumerFactory.createStreamMetadataProvider(clientId)) {
       return metadataProvider.fetchPartitionIds(5000L);

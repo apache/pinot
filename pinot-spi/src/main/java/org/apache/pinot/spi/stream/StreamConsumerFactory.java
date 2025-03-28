@@ -19,12 +19,15 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
  * Factory for a stream which provides a consumer and a metadata provider for the stream
  */
 public abstract class StreamConsumerFactory {
+  public static final AtomicInteger CLIENT_ID_SEQ = new AtomicInteger(0);
+
   protected StreamConfig _streamConfig;
 
   /**
