@@ -93,7 +93,7 @@ public class ConsumerCoordinator {
           System.currentTimeMillis() - startTimeMs);
 
       if (isSegmentAlreadyConsumed(currSegmentName)) {
-//        throw new SegmentAlreadyConsumedException(currSegmentName);
+        throw new SegmentAlreadyConsumedException(currSegmentName);
       }
     }
   }
@@ -171,7 +171,7 @@ public class ConsumerCoordinator {
               // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
               // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
               // state for previous segment.
-//              throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
+              throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
             }
 
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
@@ -218,7 +218,7 @@ public class ConsumerCoordinator {
             // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
             // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
             // state for previous segment.
-//            throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
+            throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
           }
 
           // waited until the timeout. Rely on ideal state now.
