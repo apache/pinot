@@ -32,11 +32,15 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
+import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -56,8 +60,10 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -237,8 +243,18 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public DataSource getDataSource(String column) {
     DataSource result = _dataSources.get(column);
-    Preconditions.checkNotNull(result,
-        "DataSource for %s should not be null. Potentially invalid column name specified.", column);
+    if (result == null) {
+      // TODO: Try to get the field spec from the schema and build the data source
+      FieldSpec fieldSpec = new DimensionFieldSpec(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME,
+          FieldSpec.DataType.STRING, true,
+          DefaultNullValueVirtualColumnProvider.class, "DUMMY_VALUE");
+      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, 0);
+      VirtualColumnProvider virtualColumnProvider = VirtualColumnProviderFactory.buildProvider(virtualColumnContext);
+      DataSource dataSource = new ImmutableDataSource(virtualColumnProvider.buildMetadata(virtualColumnContext),
+          virtualColumnProvider.buildColumnIndexContainer(virtualColumnContext));
+      _dataSources.put(column, dataSource);
+      result = dataSource;
+    }
     return result;
   }
 
