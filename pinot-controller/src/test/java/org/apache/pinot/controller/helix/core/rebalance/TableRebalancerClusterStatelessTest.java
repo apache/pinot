@@ -1651,7 +1651,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(consumingSegmentToBeMovedSummary);
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 0);
-    assertEquals(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp().size(), 0);
+    assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getOldestConsumingSegmentsToBeMovedInMinutes().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary
         .getServerConsumingSegmentSummary()
@@ -1670,7 +1670,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(consumingSegmentToBeMovedSummary);
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 0);
-    assertEquals(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp().size(), 0);
+    assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getOldestConsumingSegmentsToBeMovedInMinutes().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary
         .getServerConsumingSegmentSummary()
@@ -1700,7 +1700,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), numServers);
     Iterator<Integer> offsetToCatchUpIterator =
-        consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp().values().iterator();
+        consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().values().iterator();
     assertEquals(offsetToCatchUpIterator.next(), mockOffsetBig);
     if (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS > 1) {
       assertEquals(offsetToCatchUpIterator.next(), mockOffsetSmall);
@@ -1810,7 +1810,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertNotNull(consumingSegmentToBeMovedSummary.getOldestConsumingSegmentsToBeMovedInMinutes());
-    assertNotNull(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp());
+    assertNotNull(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp());
     assertNotNull(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary());
 
     // simulate when all servers fail to answer consuming segment info
@@ -1828,7 +1828,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertNotNull(consumingSegmentToBeMovedSummary.getOldestConsumingSegmentsToBeMovedInMinutes());
-    assertNull(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp());
+    assertNull(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp());
     assertNotNull(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary());
     assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
