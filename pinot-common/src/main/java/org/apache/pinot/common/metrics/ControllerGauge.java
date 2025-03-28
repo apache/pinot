@@ -197,6 +197,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Metric used to track when segments in error state are detected for pauseless table
   PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
 
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
   PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false);
 
 
