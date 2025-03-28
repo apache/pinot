@@ -98,6 +98,11 @@ public class ConsumerCoordinatorTest {
     public Map<String, Map<String, String>> getSegmentAssignment() {
       return _segmentAssignmentMap;
     }
+
+    @Override
+    public boolean isSegmentAlreadyConsumed(String currSegmentName) {
+      return false;
+    }
   }
 
   @Test
@@ -462,7 +467,7 @@ public class ConsumerCoordinatorTest {
     RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
     Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(null);
 
-    FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
+    ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(true, realtimeTableDataManager);
     Assert.assertTrue(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
 
     SegmentZKMetadata mockSegmentZKMetadata = Mockito.mock(SegmentZKMetadata.class);
