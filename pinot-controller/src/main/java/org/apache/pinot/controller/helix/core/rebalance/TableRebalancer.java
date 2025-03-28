@@ -67,6 +67,7 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -671,6 +672,17 @@ public class TableRebalancer {
       tagsInfoMap.put(serverTenantTag,
           new RebalanceSummaryResult.TagInfo(serverTenantTag));
     }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig != null) {
+      String completedTag = tagOverrideConfig.getRealtimeCompleted();
+      String consumingTag = tagOverrideConfig.getRealtimeConsuming();
+      if (completedTag != null) {
+        tagsInfoMap.put(completedTag, new RebalanceSummaryResult.TagInfo(completedTag));
+      }
+      if (consumingTag != null) {
+        tagsInfoMap.put(consumingTag, new RebalanceSummaryResult.TagInfo(consumingTag));
+      }
+    }
     if (tableConfig.getInstanceAssignmentConfigMap() != null) {
       // for simplicity, including all segment types present in instanceAssignmentConfigMap
       tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
@@ -733,17 +745,18 @@ public class TableRebalancer {
             tableNameWithType);
 
         RebalanceSummaryResult.TagInfo tagsInfo =
-            tagsInfoMap.computeIfAbsent(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE,
+            tagsInfoMap.computeIfAbsent(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS,
                 RebalanceSummaryResult.TagInfo::new);
         tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
         tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
         tagsInfo.increaseNumServerParticipants(1);
-      }
-      for (String tag : relevantTags) {
-        RebalanceSummaryResult.TagInfo tagsInfo = tagsInfoMap.get(tag);
-        tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
-        tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
-        tagsInfo.increaseNumServerParticipants(1);
+      } else {
+        for (String tag : relevantTags) {
+          RebalanceSummaryResult.TagInfo tagsInfo = tagsInfoMap.get(tag);
+          tagsInfo.increaseNumSegmentsUnchanged(segmentsUnchanged);
+          tagsInfo.increaseNumSegmentsToDownload(segmentsAdded);
+          tagsInfo.increaseNumServerParticipants(1);
+        }
       }
     }
 

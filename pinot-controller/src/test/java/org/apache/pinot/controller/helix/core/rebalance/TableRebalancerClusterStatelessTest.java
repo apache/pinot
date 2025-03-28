@@ -1186,7 +1186,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .collect(Collectors.toMap(RebalanceSummaryResult.TagInfo::getTagName, info -> info));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME)));
     assertTrue(tenantInfoMap.containsKey(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME)));
-    assertTrue(tenantInfoMap.containsKey(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE));
+    assertTrue(tenantInfoMap.containsKey(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS));
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
@@ -1203,13 +1203,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumServerParticipants(), 0);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumSegmentsToDownload(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsToDownload(),
         0);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumSegmentsUnchanged(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
     assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAGS_NOT_TAGGED_WITH_TABLE).getNumServerParticipants(),
+        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumServerParticipants(),
         6);
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);

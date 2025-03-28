@@ -171,7 +171,7 @@ public class RebalanceSummaryResult {
   }
 
   public static class TagInfo {
-    public static final String TAGS_NOT_TAGGED_WITH_TABLE = "OUTDATED_SERVERS";
+    public static final String TAG_FOR_OUTDATED_SERVERS = "OUTDATED_SERVERS";
     private final String _tagName;
     private int _numSegmentsUnchanged;
     private int _numSegmentsToDownload;
