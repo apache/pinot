@@ -142,7 +142,7 @@ public class PinotClientRequest {
         requestJson.put(Request.TRACE, traceEnabled);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
-      emitBrokerResponseMetrics(brokerResponse);
+      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -179,7 +179,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
-      emitBrokerResponseMetrics(brokerResponse);
+      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -215,7 +215,7 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
-      emitBrokerResponseMetrics(brokerResponse);
+      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -252,7 +252,7 @@ public class PinotClientRequest {
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
-      emitBrokerResponseMetrics(brokerResponse);
+      _brokerMetrics.emitBrokerResponseMetrics(brokerResponse);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
@@ -566,24 +566,6 @@ public class PinotClientRequest {
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
         .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
         .build();
-  }
-
-  // If a broker response has multiple exceptions, we will emit metrics for all of them.
-  // Thus, the sum total of all exceptions is >= total number of queries impacted.
-  // Additionally, some parts of code might already be emitting metrics for individual error codes.
-  // But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
-  // This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
-  private void emitBrokerResponseMetrics(BrokerResponse brokerResponse) {
-    for (QueryProcessingException exception : brokerResponse.getExceptions()) {
-      QueryErrorCode queryErrorCode;
-      try {
-        queryErrorCode = QueryErrorCode.fromErrorCode(exception.getErrorCode());
-      } catch (IllegalArgumentException e) {
-        LOGGER.warn("Invalid error code: " + exception.getErrorCode(), e);
-        queryErrorCode = QueryErrorCode.UNKNOWN;
-      }
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
-    }
   }
 
   @VisibleForTesting
