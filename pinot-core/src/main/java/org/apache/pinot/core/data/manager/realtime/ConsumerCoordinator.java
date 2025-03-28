@@ -29,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -87,8 +88,13 @@ public class ConsumerCoordinator {
 
     long startTimeMs = System.currentTimeMillis();
     while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-      LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", llcSegmentName,
+      String currSegmentName = llcSegmentName.getSegmentName();
+      LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", currSegmentName,
           System.currentTimeMillis() - startTimeMs);
+
+      if (isSegmentAlreadyConsumed(currSegmentName)) {
+        throw new SegmentAlreadyConsumedException(currSegmentName);
+      }
     }
   }
 
@@ -159,6 +165,15 @@ public class ConsumerCoordinator {
           if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
             LOGGER.warn("Semaphore access denied to segment: {}. Waited on previous segment: {} for: {}ms.",
                 currSegment.getSegmentName(), previousSegment, System.currentTimeMillis() - startTimeMs);
+
+            if (isSegmentAlreadyConsumed(currSegment.getSegmentName())) {
+              // if segment is already consumed, just return from here.
+              // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
+              // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
+              // state for previous segment.
+              throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
+            }
+
             // waited until timeout, fetch previous segment again from ideal state as previous segment might be
             // changed in ideal state.
             previousSegment = getPreviousSegmentFromIdealState(currSegment);
@@ -197,6 +212,15 @@ public class ConsumerCoordinator {
           LOGGER.warn(
               "Semaphore access denied to segment: {}. Waited on previous segment with sequence number: {} for: {}ms.",
               currSegment.getSegmentName(), prevSeqNum, System.currentTimeMillis() - startTimeMs);
+
+          if (isSegmentAlreadyConsumed(currSegment.getSegmentName())) {
+            // if segment is already consumed, just return from here.
+            // NOTE: if segment is deleted, this segment will never be registered and helix thread waiting on
+            // watermark for prev segment won't be notified. All such helix threads will fallback to rely on ideal
+            // state for previous segment.
+            throw new SegmentAlreadyConsumedException(currSegment.getSegmentName());
+          }
+
           // waited until the timeout. Rely on ideal state now.
           return _maxSegmentSeqNumRegistered >= prevSeqNum;
         }
@@ -256,8 +280,8 @@ public class ConsumerCoordinator {
     }
 
     long timeSpentMs = System.currentTimeMillis() - startTimeMs;
-    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {}ms.", previousSegment, currSegment,
-        timeSpentMs);
+    LOGGER.info("Fetched previous segment: {} to current segment: {} in: {}ms.", previousSegment,
+        currSegment.getSegmentName(), timeSpentMs);
     _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
         ServerTimer.PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS, timeSpentMs, TimeUnit.MILLISECONDS);
 
@@ -287,5 +311,22 @@ public class ConsumerCoordinator {
   @VisibleForTesting
   int getMaxSegmentSeqNumLoaded() {
     return _maxSegmentSeqNumRegistered;
+  }
+
+  @VisibleForTesting
+  boolean isSegmentAlreadyConsumed(String currSegmentName) {
+    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(currSegmentName);
+    if (segmentZKMetadata == null) {
+      // segment is deleted. no need to consume.
+      LOGGER.warn("Skipping consumption for segment: {} because ZK metadata does not exists.", currSegmentName);
+      return true;
+    }
+    if (segmentZKMetadata.getStatus().isCompleted()) {
+      // if segment is done or uploaded, no need to consume.
+      LOGGER.warn("Skipping consumption for segment: {} because ZK status is already marked as completed.",
+          currSegmentName);
+      return true;
+    }
+    return false;
   }
 }

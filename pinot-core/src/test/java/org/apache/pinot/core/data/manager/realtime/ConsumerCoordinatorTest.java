@@ -25,8 +25,10 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -453,6 +455,33 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     previousSegment = consumerCoordinator.getPreviousSegmentFromIdealState(llcSegmentName);
     Assert.assertNull(previousSegment);
+  }
+
+  @Test
+  public void testIfSegmentIsConsumed() {
+    RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(null);
+
+    FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
+    Assert.assertTrue(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
+
+    SegmentZKMetadata mockSegmentZKMetadata = Mockito.mock(SegmentZKMetadata.class);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(mockSegmentZKMetadata);
+    Assert.assertFalse(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.COMMITTING);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(mockSegmentZKMetadata);
+    Assert.assertFalse(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(mockSegmentZKMetadata);
+    Assert.assertTrue(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.UPLOADED);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadata(getSegmentName(101))).thenReturn(mockSegmentZKMetadata);
+    Assert.assertTrue(consumerCoordinator.isSegmentAlreadyConsumed(getSegmentName(101)));
   }
 
   private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {
