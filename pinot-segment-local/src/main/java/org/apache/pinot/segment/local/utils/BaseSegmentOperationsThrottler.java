@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -47,6 +48,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   protected boolean _isServingQueries;
   protected ServerGauge _thresholdGauge;
   protected ServerGauge _countGauge;
+  private AtomicInteger _numSegmentsAcquiredSemaphore;
   private final Logger _logger;
 
   /**
@@ -83,6 +85,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
 
     int concurrency = _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries;
     _semaphore = new AdjustableSemaphore(concurrency, true);
+    _numSegmentsAcquiredSemaphore = new AtomicInteger(0);
     _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, concurrency);
     _serverMetrics.setValueOfGlobalGauge(_countGauge, 0);
     _logger.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
@@ -185,7 +188,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   }
 
   /**
-   * Block trying to acquire the semaphore to perform the segment StarTree index rebuild steps unless interrupted.
+   * Block trying to acquire the semaphore to perform the segment operation steps unless interrupted.
    * <p>
    * {@link #release()} should be called after the segment operation completes. It is the responsibility of the caller
    * to ensure that {@link #release()} is called exactly once for each call to this method.
@@ -195,16 +198,16 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   public void acquire()
       throws InterruptedException {
     _semaphore.acquire();
-    _serverMetrics.addValueToGlobalGauge(_countGauge, 1L);
+    _serverMetrics.setValueOfGlobalGauge(_countGauge, _numSegmentsAcquiredSemaphore.incrementAndGet());
   }
 
   /**
-   * Should be called after the segment StarTree index build completes. It is the responsibility of the caller to
+   * Should be called after the segment operation completes. It is the responsibility of the caller to
    * ensure that this method is called exactly once for each call to {@link #acquire()}.
    */
   public void release() {
     _semaphore.release();
-    _serverMetrics.addValueToGlobalGauge(_countGauge, -1L);
+    _serverMetrics.setValueOfGlobalGauge(_countGauge, _numSegmentsAcquiredSemaphore.decrementAndGet());
   }
 
   /**
