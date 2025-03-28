@@ -34,10 +34,7 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceSummaryResult {
-
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final ServerInfo _serverInfo;
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final SegmentInfo _segmentInfo;
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private final List<TagInfo> _tagsInfo;
@@ -78,7 +75,6 @@ public class RebalanceSummaryResult {
     private final int _segmentsAdded;
     private final int _segmentsDeleted;
     private final int _segmentsUnchanged;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final List<String> _tagList;
 
     /**
@@ -138,6 +134,7 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<String> getTagList() {
       return _tagList;
     }
@@ -227,19 +224,14 @@ public class RebalanceSummaryResult {
     }
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerInfo {
     private final int _numServersGettingNewSegments;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numServers;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversAdded;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversRemoved;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversUnchanged;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversGettingNewSegments;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
     /**
@@ -306,6 +298,7 @@ public class RebalanceSummaryResult {
     }
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ConsumingSegmentToBeMovedSummary {
     private final int _numConsumingSegmentsToBeMoved;
     private final int _numServerGettingConsumingSegmentsAdded;
@@ -353,7 +346,6 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public Map<String, Integer> getTopConsumingSegmentsOffsetsToCatchUp() {
       return _topConsumingSegmentsOffsetsToCatchUp;
     }
@@ -364,7 +356,6 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public Map<String, ConsumingSegmentSummaryPerServer> getServerConsumingSegmentSummary() {
       return _serverConsumingSegmentSummary;
     }
@@ -396,17 +387,15 @@ public class RebalanceSummaryResult {
     }
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class SegmentInfo {
     // TODO: Add a metric to estimate the total time it will take to rebalance
     private final int _totalSegmentsToBeMoved;
     private final int _maxSegmentsAddedToASingleServer;
     private final long _estimatedAverageSegmentSizeInBytes;
     private final long _totalEstimatedDataToBeMovedInBytes;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _replicationFactor;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numSegmentsInSingleReplica;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
     private final ConsumingSegmentToBeMovedSummary _consumingSegmentToBeMovedSummary;
 
@@ -476,7 +465,6 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public ConsumingSegmentToBeMovedSummary getConsumingSegmentToBeMovedSummary() {
       return _consumingSegmentToBeMovedSummary;
     }
