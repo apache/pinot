@@ -279,6 +279,12 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static long[] gridDisk(long origin, int k) {
-    return H3Utils.H3_CORE.gridDisk(origin, k).toArray();
+    List<Long> diskCells = H3Utils.H3_CORE.gridDisk(origin, k);
+    long[] result = new long[diskCells.size()];
+    int index = 0;
+    for (Long cell : diskCells) {
+      result[index++] = cell;
+    }
+    return result;
   }
 }
