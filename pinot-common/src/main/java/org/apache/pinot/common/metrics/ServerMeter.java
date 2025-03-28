@@ -185,7 +185,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
-  PREDOWNLOAD_FAILED("predownloadFailed", true);
+  PREDOWNLOAD_FAILED("predownloadFailed", true),
+
+  // reingestion metrics
+  SEGMENT_REINGESTION_FAILURE("segments", false);
 
   private final String _meterName;
   private final String _unit;
