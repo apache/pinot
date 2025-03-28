@@ -686,10 +686,8 @@ public class TableRebalancer {
     if (tableConfig.getInstanceAssignmentConfigMap() != null) {
       // for simplicity, including all segment types present in instanceAssignmentConfigMap
       tableConfig.getInstanceAssignmentConfigMap().values().forEach(instanceAssignmentConfig -> {
-        if (instanceAssignmentConfig.getTagPoolConfig().isPoolBased()) {
-          String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
-          tagsInfoMap.put(tag, new RebalanceSummaryResult.TagInfo(tag));
-        }
+        String tag = instanceAssignmentConfig.getTagPoolConfig().getTag();
+        tagsInfoMap.put(tag, new RebalanceSummaryResult.TagInfo(tag));
       });
     }
     if (tableConfig.getTierConfigsList() != null) {
