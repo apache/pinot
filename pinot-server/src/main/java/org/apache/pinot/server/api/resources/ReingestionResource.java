@@ -52,6 +52,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.realtime.writer.StatelessRealtimeSegmentWriter;
@@ -210,6 +211,8 @@ public class ReingestionResource {
             tableDataManager.getSegmentBuildSemaphore());
       } catch (Exception e) {
         LOGGER.error("Error during async re-ingestion for job {} (segment={})", jobId, segmentName, e);
+        _serverInstance.getServerMetrics()
+            .addMeteredTableValue(realtimeTableName, ServerMeter.SEGMENT_REINGESTION_FAILURE, 1);
       } finally {
         _runningJobs.remove(jobId);
         _reingestingSegments.remove(segmentName);
