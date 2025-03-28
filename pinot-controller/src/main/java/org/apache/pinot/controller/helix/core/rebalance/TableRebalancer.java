@@ -880,17 +880,11 @@ public class TableRebalancer {
         getConsumingSegmentsOffsetsToCatchUp(tableNameWithType, consumingSegmentZKmetadata);
     Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
 
-    Map<String, Integer> topOffset;
+    Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
     Map<String, RebalanceSummaryResult.ConsumingSegmentSummaryPerServer> consumingSegmentSummaryPerServer =
         new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
-      topOffset = new LinkedHashMap<>();
-      consumingSegmentsOffsetsToCatchUp.entrySet()
-          .stream()
-          .sorted(
-              Collections.reverseOrder(Map.Entry.comparingByValue()))
-          .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
-          .forEach(entry -> topOffset.put(entry.getKey(), entry.getValue()));
+      consumingSegmentsOffsetsToCatchUpTopN = getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp);
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         int totalOffsetsToCatchUp =
             segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
@@ -898,24 +892,29 @@ public class TableRebalancer {
             segments.size(), totalOffsetsToCatchUp));
       });
     } else {
-      topOffset = null;
+      consumingSegmentsOffsetsToCatchUpTopN = null;
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         consumingSegmentSummaryPerServer.put(server, new RebalanceSummaryResult.ConsumingSegmentSummaryPerServer(
             segments.size(), null));
       });
     }
 
-    Map<String, Integer> oldestConsumingSegments;
-    oldestConsumingSegments = new LinkedHashMap<>();
-    consumingSegmentsAge.entrySet()
-        .stream()
-        .sorted(
-            Map.Entry.comparingByValue())
-        .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
-        .forEach(entry -> oldestConsumingSegments.put(entry.getKey(), entry.getValue()));
+    Map<String, Integer> consumingSegmentsOldestTopN = getTopNConsumingSegmentWithValue(consumingSegmentsAge);
 
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
-        newServersToConsumingSegmentMap.size(), topOffset, oldestConsumingSegments, consumingSegmentSummaryPerServer);
+        newServersToConsumingSegmentMap.size(), consumingSegmentsOffsetsToCatchUpTopN, consumingSegmentsOldestTopN,
+        consumingSegmentSummaryPerServer);
+  }
+
+  private static Map<String, Integer> getTopNConsumingSegmentWithValue(
+      Map<String, Integer> consumingSegmentsWithValue) {
+    Map<String, Integer> topNConsumingSegments = new LinkedHashMap<>();
+    consumingSegmentsWithValue.entrySet()
+        .stream()
+        .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+        .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
+        .forEach(entry -> topNConsumingSegments.put(entry.getKey(), entry.getValue()));
+    return topNConsumingSegments;
   }
 
   /**

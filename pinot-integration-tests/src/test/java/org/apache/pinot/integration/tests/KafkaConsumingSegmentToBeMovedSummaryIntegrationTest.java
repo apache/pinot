@@ -113,7 +113,7 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertNotNull(consumingSegmentToBeMovedSummary);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
         0);
 
     startServer();
@@ -128,15 +128,15 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertNotNull(consumingSegmentToBeMovedSummary);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 1);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
         1);
     Assert.assertTrue(consumingSegmentToBeMovedSummary
-        .getOffsetsConsumingSegmentsToCatchUpPerServer()
+        .getServerConsumingSegmentSummary()
         .values()
         .stream()
         .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 57801 || x.getTotalOffsetsNeedToCatchUp() == 0));
     Assert.assertEquals(consumingSegmentToBeMovedSummary
-        .getOffsetsConsumingSegmentsToCatchUpPerServer()
+        .getServerConsumingSegmentSummary()
         .values()
         .stream()
         .reduce(0, (a, b) -> a + b.getTotalOffsetsNeedToCatchUp(), Integer::sum), 57801);
@@ -153,7 +153,7 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertNotNull(consumingSegmentToBeMovedSummary);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 0);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 0);
-    Assert.assertEquals(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer().size(),
+    Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
         0);
 
     stopServer();
@@ -168,7 +168,7 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertNotNull(consumingSegmentToBeMovedSummary);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(), 1);
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getNumServerGettingConsumingSegmentsAdded(), 1);
-    Assert.assertNotNull(consumingSegmentToBeMovedSummary.getOffsetsConsumingSegmentsToCatchUpPerServer());
+    Assert.assertNotNull(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary());
     Assert.assertNull(consumingSegmentToBeMovedSummary.getTopConsumingSegmentsOffsetsToCatchUp());
   }
 }
