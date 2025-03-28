@@ -736,6 +736,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
         LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
         _consumerCoordinator.acquire(llcSegmentName);
+        _consumerSemaphoreAcquired.set(true);
         _consumerCoordinator.trackSegment(llcSegmentName);
 
         // TODO:
@@ -1696,16 +1697,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
-    }
-
-    // Acquire semaphore to create stream consumers
-    try {
-      _consumerCoordinator.acquire(llcSegmentName);
-      _consumerSemaphoreAcquired.set(true);
-    } catch (InterruptedException e) {
-      String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
-      _segmentLogger.error(errorMsg);
-      throw new RuntimeException(errorMsg + " for segment: " + _segmentNameStr);
     }
 
     try {
