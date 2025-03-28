@@ -734,6 +734,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
         }
 
+        LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
+        _consumerCoordinator.acquire(llcSegmentName);
+        _consumerSemaphoreAcquired.set(true);
+        _consumerCoordinator.trackSegment(llcSegmentName);
+
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
         //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
@@ -1692,16 +1697,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
-    }
-
-    // Acquire semaphore to create stream consumers
-    try {
-      _consumerCoordinator.acquire(llcSegmentName);
-      _consumerSemaphoreAcquired.set(true);
-    } catch (InterruptedException e) {
-      String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
-      _segmentLogger.error(errorMsg);
-      throw new RuntimeException(errorMsg + " for segment: " + _segmentNameStr);
     }
 
     try {

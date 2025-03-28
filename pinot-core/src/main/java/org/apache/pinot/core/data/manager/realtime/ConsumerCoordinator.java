@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -56,8 +58,9 @@ public class ConsumerCoordinator {
   private final boolean _alwaysRelyOnIdealState;
   private final RealtimeTableDataManager _realtimeTableDataManager;
   private final AtomicBoolean _firstTransitionProcessed;
+  private final ConcurrentHashMap<Integer, LLCSegmentName> seqIdToSegment;
 
-  private volatile int _maxSegmentSeqNumRegistered = -1;
+  private volatile int _maxSegmentSeqNumTillConsumedInOrder = -1;
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _semaphore = new Semaphore(1);
@@ -75,6 +78,7 @@ public class ConsumerCoordinator {
     }
     _firstTransitionProcessed = new AtomicBoolean(false);
     _serverMetrics = ServerMetrics.get();
+    seqIdToSegment = new ConcurrentHashMap<>();
   }
 
   public void acquire(LLCSegmentName llcSegmentName)
@@ -118,8 +122,9 @@ public class ConsumerCoordinator {
   public void trackSegment(LLCSegmentName llcSegmentName) {
     _lock.lock();
     try {
-      if (!_alwaysRelyOnIdealState) {
-        _maxSegmentSeqNumRegistered = Math.max(_maxSegmentSeqNumRegistered, llcSegmentName.getSequenceNumber());
+      seqIdToSegment.put(llcSegmentName.getSequenceNumber(), llcSegmentName);
+      if (llcSegmentName.getSequenceNumber() == (_maxSegmentSeqNumTillConsumedInOrder+1)) {
+        _maxSegmentSeqNumTillConsumedInOrder += 1;
       }
       // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
       _condition.signalAll();
@@ -128,29 +133,55 @@ public class ConsumerCoordinator {
     }
   }
 
+  public void updateMaxSegmentSeqNumTillConsumedInOrder(int seqNum) {
+    _lock.lock();
+    try {
+      _maxSegmentSeqNumTillConsumedInOrder = seqNum;
+    } finally {
+      _lock.unlock();
+    }
+  }
+
   private void waitForPrevSegment(LLCSegmentName currSegment)
       throws InterruptedException {
 
-    if (_alwaysRelyOnIdealState || !_firstTransitionProcessed.get()) {
-      // if _alwaysRelyOnIdealState or no offline -> consuming transition has been processed, it means rely on
-      // ideal state to fetch previous segment.
-      awaitForPreviousSegmentFromIdealState(currSegment);
+    int preSeqNum = currSegment.getSequenceNumber() - 1;
+    int uptoSeqToCheck = _maxSegmentSeqNumTillConsumedInOrder + 1;
+    // check if all segment upto uptoSeqToCheck are present.
 
-      // the first transition will always be prone to error, consider edge case where segment previous to current
-      // helix transition's segment was deleted and this server came alive after successful deletion. the prev
-      // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
-      _firstTransitionProcessed.set(true);
-      return;
+    _lock.lock();
+    try {
+      while (uptoSeqToCheck <= preSeqNum) {
+        while (seqIdToSegment.get(uptoSeqToCheck) == null) {
+          _condition.wait();
+        }
+        _maxSegmentSeqNumTillConsumedInOrder = uptoSeqToCheck;
+        uptoSeqToCheck += 1;
+      }
+    } finally {
+      _lock.unlock();
     }
 
-    // rely on _maxSegmentSeqNumRegistered watermark for previous segment.
-    if (awaitForPreviousSegmentSequenceNumber(currSegment, WAIT_INTERVAL_MS)) {
-      return;
-    }
-
-    // tried using prevSegSeqNumber watermark, but could not acquire the previous segment.
-    // fallback to acquire prev segment from ideal state.
-    awaitForPreviousSegmentFromIdealState(currSegment);
+//    if (_alwaysRelyOnIdealState || !_firstTransitionProcessed.get()) {
+//      // if _alwaysRelyOnIdealState or no offline -> consuming transition has been processed, it means rely on
+//      // ideal state to fetch previous segment.
+//      awaitForPreviousSegmentFromIdealState(currSegment);
+//
+//      // the first transition will always be prone to error, consider edge case where segment previous to current
+//      // helix transition's segment was deleted and this server came alive after successful deletion. the prev
+//      // segment will not exist, hence first transition is handled using isFirstTransitionSuccessful.
+//      _firstTransitionProcessed.set(true);
+//      return;
+//    }
+//
+//    // rely on _maxSegmentSeqNumRegistered watermark for previous segment.
+//    if (awaitForPreviousSegmentSequenceNumber(currSegment, WAIT_INTERVAL_MS)) {
+//      return;
+//    }
+//
+//    // tried using prevSegSeqNumber watermark, but could not acquire the previous segment.
+//    // fallback to acquire prev segment from ideal state.
+//    awaitForPreviousSegmentFromIdealState(currSegment);
   }
 
   private void awaitForPreviousSegmentFromIdealState(LLCSegmentName currSegment)
@@ -162,12 +193,15 @@ public class ConsumerCoordinator {
       return;
     }
 
+
+
     SegmentDataManager segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
+    int prevSeqNum = LLCSegmentName.getSequenceNumber(segmentDataManager.getSegmentName());
     try {
       long startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
-        while (segmentDataManager == null) {
+        while (_maxSegmentSeqNumTillConsumedInOrder < prevSeqNum) {
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
           if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
@@ -182,6 +216,7 @@ public class ConsumerCoordinator {
             }
           }
           segmentDataManager = _realtimeTableDataManager.acquireSegment(previousSegment);
+          prevSeqNum = LLCSegmentName.getSequenceNumber(segmentDataManager.getSegmentName());
         }
       } finally {
         _lock.unlock();
@@ -206,7 +241,7 @@ public class ConsumerCoordinator {
     int prevSeqNum = currSegment.getSequenceNumber() - 1;
     _lock.lock();
     try {
-      while (_maxSegmentSeqNumRegistered < prevSeqNum) {
+      while (_maxSegmentSeqNumTillConsumedInOrder < prevSeqNum) {
         // it means the previous segment is not loaded in the server. Wait until it's loaded.
         if (!_condition.await(timeoutMs, TimeUnit.MILLISECONDS)) {
           LOGGER.warn(
@@ -214,7 +249,7 @@ public class ConsumerCoordinator {
               currSegment.getSegmentName(), prevSeqNum, System.currentTimeMillis() - startTimeMs);
 
           // waited until the timeout. Rely on ideal state now.
-          return _maxSegmentSeqNumRegistered >= prevSeqNum;
+          return _maxSegmentSeqNumTillConsumedInOrder >= prevSeqNum;
         }
       }
       return true;
@@ -302,7 +337,7 @@ public class ConsumerCoordinator {
   // this should not be used outside of tests.
   @VisibleForTesting
   int getMaxSegmentSeqNumLoaded() {
-    return _maxSegmentSeqNumRegistered;
+    return _maxSegmentSeqNumTillConsumedInOrder;
   }
 
   @VisibleForTesting
