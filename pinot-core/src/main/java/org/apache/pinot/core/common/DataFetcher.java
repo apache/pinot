@@ -185,6 +185,18 @@ public class DataFetcher implements AutoCloseable {
     _columnValueReaderMap.get(column).readMapValues(inDocIds, length, outValues);
   }
 
+  public void fetch32BitsMurmur3HashValues(String column, int[] inDocIds, int length, int[] outValues) {
+    _columnValueReaderMap.get(column).read32BitsMurmur3HashValues(inDocIds, length, outValues);
+  }
+
+  public void fetch64BitsMurmur3HashValues(String column, int[] inDocIds, int length, long[] outValues) {
+    _columnValueReaderMap.get(column).read64BitsMurmur3HashValues(inDocIds, length, outValues);
+  }
+
+  public void fetch128BitsMurmur3HashValues(String column, int[] inDocIds, int length, long[][] outValues) {
+    _columnValueReaderMap.get(column).read128BitsMurmur3HashValues(inDocIds, length, outValues);
+  }
+
   /**
    * MULTI-VALUED COLUMN API
    */
@@ -418,6 +430,48 @@ public class DataFetcher implements AutoCloseable {
       } else {
         for (int i = 0; i < length; i++) {
           valueBuffer[i] = MapUtils.deserializeMap(_reader.getBytes(docIds[i], readerContext));
+        }
+      }
+    }
+
+    void read32BitsMurmur3HashValues(int[] docIds, int length, int[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.read32BitsMurmur3HashValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.get32BitsMurmur3Hash(docIds[i], readerContext);
+        }
+      }
+    }
+
+    void read64BitsMurmur3HashValues(int[] docIds, int length, long[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.read64BitsMurmur3HashValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.get64BitsMurmur3Hash(docIds[i], readerContext);
+        }
+      }
+    }
+
+    void read128BitsMurmur3HashValues(int[] docIds, int length, long[][] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.read128BitsMurmur3HashValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = _reader.get128BitsMurmur3Hash(docIds[i], readerContext);
         }
       }
     }
