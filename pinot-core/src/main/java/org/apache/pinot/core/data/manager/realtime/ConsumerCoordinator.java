@@ -34,6 +34,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -159,7 +160,7 @@ public class ConsumerCoordinator {
       long startTimeMs = System.currentTimeMillis();
       _lock.lock();
       try {
-        while (segmentDataManager == null) {
+        while (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
           // if segmentDataManager == null, it means segment is not loaded in the server.
           // wait until it's loaded.
           if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {

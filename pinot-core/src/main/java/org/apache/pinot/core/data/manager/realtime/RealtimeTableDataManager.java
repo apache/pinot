@@ -824,15 +824,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     SegmentDataManager oldSegmentDataManager = super.registerSegment(segmentName, segmentDataManager);
-    if (_enforceConsumptionInOrder) {
-      // helix threads might be waiting for their respective previous segments to be loaded.
-      // they need to be notified here.
-      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      if (llcSegmentName != null) {
-        ConsumerCoordinator consumerCoordinator = getConsumerCoordinator(llcSegmentName.getPartitionGroupId());
-        consumerCoordinator.trackSegment(llcSegmentName);
-      }
-    }
     return oldSegmentDataManager;
   }
 

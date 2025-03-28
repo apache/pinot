@@ -734,6 +734,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
         }
 
+        LLCSegmentName llcSegmentName = new LLCSegmentName(_segmentNameStr);
+        _consumerCoordinator.acquire(llcSegmentName);
+        _consumerCoordinator.trackSegment(llcSegmentName);
+
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
         //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
