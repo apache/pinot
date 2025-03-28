@@ -36,6 +36,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.TlsConfig;
@@ -243,6 +244,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     MinionMetrics minionMetrics = new MinionMetrics(_config.getMetricsPrefix(), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    minionMetrics.setValueOfGlobalGauge(MinionGauge.ZK_JUTE_MAX_BUFFER,
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     MinionMetrics.register(minionMetrics);
     minionContext.setMinionMetrics(minionMetrics);
     minionContext.setAllowDownloadFromServer(_config.isAllowDownloadFromServer());
@@ -307,7 +310,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.connect();
     updateInstanceConfigIfNeeded();
     minionMetrics.setOrUpdateGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
-            () -> _helixManager.isConnected() ? 1L : 0L);
+        () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
