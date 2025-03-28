@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 /**
@@ -510,6 +511,18 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
         + "This indicates that either the column is getting mistyped or the wrong "
         + "ForwardIndexReader is being created to read this column.");
+  }
+
+  default int get32BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit32(getBytes(docId, context), 0);
+  }
+
+  default long get64BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit64(getBytes(docId, context), 0);
+  }
+
+  default long[] get128BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit128AsLongs(getBytes(docId, context), 0);
   }
 
   /**
@@ -995,10 +1008,10 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
   /**
    * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId.
-   * For readers that do support this info, caller should check if the buffer is a {@link isFixedOffsetMappingType()}.
-   * If yes, the byte range mapping for a docId can be calculated using the {@link getRawDataStartOffset()} and the
-   * {@link getDocLength()} functions.
-   * if not, caller should use the {@link recordDocIdByteRanges()} function to get the list of byte ranges accessed
+   * For readers that do support this info, caller should check if the buffer is a {@link #isFixedOffsetMappingType}.
+   * If yes, the byte range mapping for a docId can be calculated using the {@link #getRawDataStartOffset} and the
+   * {@link #getDocLength} functions.
+   * if not, caller should use the {@link #recordDocIdByteRanges} function to get the list of byte ranges accessed
    * for a docId.
    */
   default boolean isBufferByteRangeInfoSupported() {

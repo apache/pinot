@@ -22,8 +22,6 @@ import java.util.List;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 /**
  * The value reader for var-length values (STRING and BYTES). See {@link VarLengthValueWriter} for the file layout.
@@ -89,7 +87,7 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
-  public String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
+  public int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     // Read the offset of the byte array first and then read the actual byte array.
@@ -100,7 +98,7 @@ public class VarLengthValueReader implements ValueReader {
 
     assert numBytesPerValue >= length;
     _dataBuffer.copyTo(startOffset, buffer, 0, length);
-    return new String(buffer, 0, length, UTF_8);
+    return length;
   }
 
   public void recordOffsetRanges(int index, long baseOffset, List<ForwardIndexReader.ByteRange> rangeList) {

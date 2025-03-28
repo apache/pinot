@@ -113,6 +113,18 @@ public interface BlockValSet {
    */
   byte[][] getBytesValuesSV();
 
+  default int[] get32BitsMurmur3HashValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  default long[] get64BitsMurmur3HashValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  default long[][] get128BitsMurmur3HashValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * MULTI-VALUED COLUMN APIs
    */

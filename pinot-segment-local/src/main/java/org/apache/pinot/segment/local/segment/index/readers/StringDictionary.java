@@ -169,4 +169,28 @@ public class StringDictionary extends BaseImmutableDictionary {
       outValues[i] = getUnpaddedBytes(dictIds[i], buffer);
     }
   }
+
+  @Override
+  public void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get32BitsMurmur3Hash(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get64BitsMurmur3Hash(dictIds[i], buffer);
+    }
+  }
+
+  @Override
+  public void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get128BitsMurmur3HashValue(dictIds[i], buffer);
+    }
+  }
 }
