@@ -516,11 +516,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void doAddConsumingSegment(String segmentName)
       throws AttemptsExceededException, RetriableOperationException {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-    if (zkMetadata.getStatus().isCompleted()) {
+    if ((zkMetadata == null) || (zkMetadata.getStatus().isCompleted())) {
       // NOTE: We do not throw exception here because the segment might have just been committed before the state
       //       transition is processed. We can skip adding this segment, and the segment will enter CONSUMING state in
       //       Helix, then we can rely on the following CONSUMING -> ONLINE state transition to add it.
-      _logger.warn("Segment: {} is already committed, skipping adding it as CONSUMING segment", segmentName);
+      _logger.warn("Segment: {} is already consumed, skipping adding it as CONSUMING segment", segmentName);
       return;
     }
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
@@ -560,9 +560,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     RealtimeSegmentDataManager realtimeSegmentDataManager;
     try {
       realtimeSegmentDataManager =
-          new RealtimeSegmentDataManager(zkMetadata, tableConfig, this, _indexDir.getAbsolutePath(), indexLoadingConfig,
-              schema, llcSegmentName, consumerCoordinator, _serverMetrics, partitionUpsertMetadataManager,
-              partitionDedupMetadataManager, _isTableReadyToConsumeData);
+          createRealtimeSegmentDataManager(zkMetadata, tableConfig, indexLoadingConfig, schema, llcSegmentName,
+              consumerCoordinator, partitionUpsertMetadataManager, partitionDedupMetadataManager,
+              _isTableReadyToConsumeData);
     } catch (SegmentAlreadyConsumedException e) {
       // Don't register segment.
       // If segment is not deleted, Eventually this server should receive a CONSUMING -> ONLINE helix state transition.
