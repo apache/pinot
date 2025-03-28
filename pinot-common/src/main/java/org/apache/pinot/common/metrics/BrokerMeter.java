@@ -27,13 +27,11 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 
 /**
  * Class containing all the metrics exposed by the Pinot broker.
+ * This is implemented as a class rather than an enum to allow for dynamic addition of metrics for all QueryErrorCodes.
  */
 public class BrokerMeter implements AbstractMetrics.Meter {
   private static final List<BrokerMeter> BROKER_METERS = new ArrayList<>();
 
-  // TODO - Validate
-  //  1. the name of the metric with existing metric name
-  //  2. units, global flags
   public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
