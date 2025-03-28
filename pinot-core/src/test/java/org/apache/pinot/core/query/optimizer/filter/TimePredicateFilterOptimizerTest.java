@@ -60,7 +60,7 @@ public class TimePredicateFilterOptimizerTest {
     testInvalidFilterOptimizer("timeConvert(col, 'HOURS', 'MINUTES') > 1620830760");
   }
 
-  @Testg
+  @Test
   public void testEpochToEpochDateTimeConvert() {
     // Value not on granularity boundary
     testTimeConvert(
