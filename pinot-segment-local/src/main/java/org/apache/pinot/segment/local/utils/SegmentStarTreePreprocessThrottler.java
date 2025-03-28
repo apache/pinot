@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +42,8 @@ public class SegmentStarTreePreprocessThrottler extends BaseSegmentOperationsThr
   public SegmentStarTreePreprocessThrottler(int maxStarTreePreprocessConcurrency,
       int maxStarTreePreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
     super(maxStarTreePreprocessConcurrency, maxStarTreePreprocessConcurrencyBeforeServingQueries, isServingQueries,
-        LOGGER);
+        ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD,
+        ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT, LOGGER);
   }
 
   @Override

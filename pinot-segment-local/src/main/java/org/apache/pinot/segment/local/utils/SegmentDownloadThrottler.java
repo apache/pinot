@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,8 @@ public class SegmentDownloadThrottler extends BaseSegmentOperationsThrottler {
    */
   public SegmentDownloadThrottler(int maxDownloadConcurrency, int maxDownloadConcurrencyBeforeServingQueries,
       boolean isServingQueries) {
-    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries, LOGGER);
+    super(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries, isServingQueries,
+        ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, LOGGER);
   }
 
   @Override
