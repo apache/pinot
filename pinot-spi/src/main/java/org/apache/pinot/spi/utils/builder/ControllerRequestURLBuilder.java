@@ -206,24 +206,13 @@ public class ControllerRequestURLBuilder {
 
   public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
-    StringBuilder stringBuilder =
-        new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
-    if (dryRun) {
-      stringBuilder.append("&dryRun=").append(dryRun);
-    }
-    if (reassignInstances) {
-      stringBuilder.append("&reassignInstances=").append(reassignInstances);
-    }
-    if (includeConsuming) {
-      stringBuilder.append("&includeConsuming=").append(includeConsuming);
-    }
-    if (downtime) {
-      stringBuilder.append("&downtime=").append(downtime);
-    }
-    if (minAvailableReplicas != 1) {
-      stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
-    }
-    return stringBuilder.toString();
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance")
+        + "?type=" + tableType
+        + "&dryRun=" + dryRun
+        + "&reassignInstances=" + reassignInstances
+        + "&includeConsuming=" + includeConsuming
+        + "&downtime=" + downtime
+        + "&minAvailableReplicas=" + minAvailableReplicas;
   }
 
   public String forTableForceCommit(String tableName) {
