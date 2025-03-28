@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
@@ -110,6 +111,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private String _authToken;
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
+  @CommandLine.Option(names = {"-enablePerQueryStats"}, required = false, description = "Enable per query stats "
+      + "reporting (default: false).")
+  private boolean _enablePerQueryStats = false;
 
   private enum QueryMode {
     FULL, RESAMPLE
@@ -188,7 +192,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         singleThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
-                _authTokenUrl, _authToken, _user, _password)));
+                _authTokenUrl, _authToken, _user, _password)), _enablePerQueryStats);
         break;
       case "multiThreads":
         if (_numThreads <= 0) {
@@ -203,7 +207,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         multiThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
-                _authTokenUrl, _authToken, _user, _password)));
+                _authTokenUrl, _authToken, _user, _password)), _enablePerQueryStats);
         break;
       case "targetQPS":
         if (_numThreads <= 0) {
@@ -224,7 +228,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(
-                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)),
+            _enablePerQueryStats);
         break;
       case "increasingQPS":
         if (_numThreads <= 0) {
@@ -256,7 +261,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         increasingQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS, _deltaQPS,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS, _timeout,
             AuthProviderUtils.makeAuthHeadersMap(
-                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)),
+            _enablePerQueryStats);
         break;
       default:
         LOGGER.error("Invalid mode: {}", _mode);
@@ -286,7 +292,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout,
-      Map<String, String> headers)
+      Map<String, String> headers, boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     int numQueriesExecuted = 0;
@@ -294,7 +300,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     long totalBrokerTime = 0L;
     long totalClientTime = 0L;
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
-    Map<String, QueryStat> queryStatMap = new HashMap<>();
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new HashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     final long startTimeAbsolute = System.currentTimeMillis();
     boolean timeoutReached = false;
@@ -320,7 +332,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         boolean hasException = !response.get("exceptions").isEmpty();
         numExceptions += hasException ? 1 : 0;
         statisticsList.get(0).addValue(clientTime);
-        queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+        if (queryStatMap != null) {
+          queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+        }
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -390,7 +404,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
+      boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -399,7 +414,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
-    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
@@ -504,7 +525,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    */
   public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers)
+      int numIntervalsToReportAndClearStatistics, long timeout, Map<String, String> headers,
+      boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -513,7 +535,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
-    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
@@ -633,7 +661,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
       int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
       int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout,
-      Map<String, String> headers)
+      Map<String, String> headers, boolean enablePerQueryStats)
       throws Exception {
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     Queue<String> queryQueue = new LinkedBlockingDeque<>(queueDepth);
@@ -642,7 +670,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
-    Map<String, QueryStat> queryStatMap = new ConcurrentHashMap<>();
+    @Nullable
+    Map<String, QueryStat> queryStatMap;
+    if (enablePerQueryStats) {
+      queryStatMap = new ConcurrentHashMap<>();
+    } else {
+      queryStatMap = null;
+    }
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
@@ -791,7 +825,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
       AtomicInteger numExceptions, List<Statistics> statisticsList, Map<String, String> headers,
-      Map<String, QueryStat> queryStatMap)
+      @Nullable Map<String, QueryStat> queryStatMap)
       throws Exception {
     JsonNode response = driver.postQuery(query, headers);
     numQueriesExecuted.getAndIncrement();
@@ -801,7 +835,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     totalClientTime.getAndAdd(clientTime);
     boolean hasException = !response.get("exceptions").isEmpty();
     numExceptions.getAndAdd(hasException ? 1 : 0);
-    queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+    if (queryStatMap != null) {
+      queryStatMap.computeIfAbsent(query, k -> new QueryStat()).addExecution(brokerTime, clientTime, hasException);
+    }
 
     statisticsList.get(0).addValue(clientTime);
   }
@@ -815,11 +851,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final AtomicInteger _numExceptions;
     private final List<Statistics> _statisticsList;
     private final Map<String, String> _headers;
+    @Nullable
     private final Map<String, QueryStat> _queryStatMap;
 
     private Worker(PerfBenchmarkDriver driver, Queue<String> queryQueue, AtomicInteger numQueriesExecuted,
         AtomicLong totalBrokerTime, AtomicLong totalClientTime, AtomicInteger numExceptions,
-        List<Statistics> statisticsList, Map<String, String> headers, Map<String, QueryStat> queryStatMap) {
+        List<Statistics> statisticsList, Map<String, String> headers, @Nullable Map<String, QueryStat> queryStatMap) {
       _driver = driver;
       _queryQueue = queryQueue;
       _numQueriesExecuted = numQueriesExecuted;
@@ -904,10 +941,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final double _avgBrokerTime;
     private final double _avgClientTime;
     private final List<Statistics> _statisticsList;
+    @Nullable
     private final Map<String, QueryStat> _queryStats;
 
     private QuerySummary(long timePassed, int numQueriesExecuted, int numExceptions, long totalBrokerTime,
-        long totalClientTime, List<Statistics> statisticsList, Map<String, QueryStat> queryStats) {
+        long totalClientTime, List<Statistics> statisticsList, @Nullable Map<String, QueryStat> queryStats) {
       _timePassed = timePassed;
       _numQueriesExecuted = numQueriesExecuted;
       _numExceptions = numExceptions;
@@ -955,6 +993,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       return _statisticsList;
     }
 
+    @Nullable
     public Map<String, QueryStat> getQueryStats() {
       return _queryStats;
     }
