@@ -1660,7 +1660,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 0));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
 
     rebalanceConfig.setIncludeConsuming(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
@@ -1679,7 +1679,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 0));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
 
     // Create new servers to replace the old servers
     for (int i = numServers; i < numServers * 2; i++) {
@@ -1714,7 +1714,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp()
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments()
             == mockOffsetSmall * (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS - 1) + mockOffsetBig));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
@@ -1833,7 +1833,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == null));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == null));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
