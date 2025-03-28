@@ -32,7 +32,6 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
@@ -179,18 +178,6 @@ public class DataFetcher implements AutoCloseable {
    * @param outValues Buffer for output
    */
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
-    _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
-  }
-
-  /**
-   * Fetch byte[] values for a single-valued column.
-   *
-   * @param column Column to read
-   * @param inDocIds Input document id's buffer
-   * @param length Number of input document id'
-   * @param outValues Buffer for output
-   */
-  public void fetchBytesValues(String[] column, int[] inDocIds, int length, byte[][] outValues) {
     _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
   }
 
@@ -403,50 +390,7 @@ public class DataFetcher implements AutoCloseable {
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
         _dictionary.readStringValues(dictIdBuffer, length, valueBuffer);
       } else {
-        switch (_storedType) {
-          case INT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Integer.toString(_reader.getInt(docIds[i], readerContext));
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Long.toString(_reader.getLong(docIds[i], readerContext));
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Float.toString(_reader.getFloat(docIds[i], readerContext));
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = Double.toString(_reader.getDouble(docIds[i], readerContext));
-            }
-            break;
-          case BIG_DECIMAL:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getBigDecimal(docIds[i], readerContext).toPlainString();
-            }
-            break;
-          case STRING:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = _reader.getString(docIds[i], readerContext);
-            }
-            break;
-          case BYTES:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = BytesUtils.toHexString(_reader.getBytes(docIds[i], readerContext));
-            }
-            break;
-          case MAP:
-            for (int i = 0; i < length; i++) {
-              valueBuffer[i] = MapUtils.toString(_reader.getMap(docIds[i], readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException();
-        }
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }
     }
 
