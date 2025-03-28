@@ -37,6 +37,7 @@ import static org.mockito.Mockito.spy;
 
 public class SegmentOperationsThrottlerTest {
 
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
   private final List<String> _thresholdGauges =
       Arrays.asList(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
           ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD.getGaugeName(),
@@ -62,8 +63,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.availablePermits(), 4);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, 4);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -71,8 +72,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.availablePermits(), 3);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, 4);
       Assert.assertEquals(countGaugeValue, 1);
 
@@ -80,8 +81,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.availablePermits(), 4);
       Assert.assertEquals(operationsThrottler.totalPermits(), 4);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, 4);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -103,8 +104,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, totalPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -113,8 +114,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.availablePermits(), totalPermits - j - 1);
         Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, totalPermits);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -123,8 +124,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.availablePermits(), j + 1);
         Assert.assertEquals(operationsThrottler.totalPermits(), totalPermits);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, totalPermits);
         Assert.assertEquals(countGaugeValue, totalPermits - j - 1);
       }
@@ -189,8 +190,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -199,8 +200,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermits);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermits - j - 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, defaultPermits);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -226,8 +227,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -244,8 +245,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -270,16 +271,16 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
       for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -297,8 +298,8 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
       Assert.assertEquals(countGaugeValue, initialPermits);
 
@@ -306,8 +307,8 @@ public class SegmentOperationsThrottlerTest {
       for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
         Assert.assertEquals(countGaugeValue, initialPermits + j + 1);
       }
@@ -316,8 +317,8 @@ public class SegmentOperationsThrottlerTest {
       for (int j = 0; j < (initialPermits * 2); j++) {
         operationsThrottler.release();
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
         Assert.assertEquals(countGaugeValue, (initialPermits * 2) - j - 1);
       }
@@ -345,16 +346,16 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
       for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.acquire();
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -373,16 +374,16 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits / 2);
       Assert.assertEquals(operationsThrottler.availablePermits(), -(initialPermits / 2));
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits / 2);
       Assert.assertEquals(countGaugeValue, initialPermits);
 
       for (int j = 0; j < initialPermits; j++) {
         operationsThrottler.release();
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits / 2);
         Assert.assertEquals(countGaugeValue, initialPermits - j - 1);
       }
@@ -418,8 +419,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -428,8 +429,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -466,8 +467,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -476,8 +477,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -487,8 +488,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - numPermitsToTake);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, numPermitsToTake);
 
@@ -496,8 +497,8 @@ public class SegmentOperationsThrottlerTest {
         operationsThrottler.release();
         Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + j + 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits);
         Assert.assertEquals(countGaugeValue, numPermitsToTake - j - 1);
       }
@@ -537,8 +538,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - 5);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery - 5);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -547,8 +548,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery - 5);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1 - 5);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery - 5);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -566,8 +567,8 @@ public class SegmentOperationsThrottlerTest {
       // We increased permits but took some before the increase
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - numPermitsToTake);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
       Assert.assertEquals(countGaugeValue, numPermitsToTake);
 
@@ -578,8 +579,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.availablePermits(),
             defaultPermitsBeforeQuery - numPermitsToTake - j - 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
         Assert.assertEquals(countGaugeValue, numPermitsToTake + j + 1);
       }
@@ -589,8 +590,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - (numPermitsToTake * 2));
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, numPermitsToTake * 2);
 
@@ -598,8 +599,8 @@ public class SegmentOperationsThrottlerTest {
         operationsThrottler.release();
         Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake * 2) + j + 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits);
         Assert.assertEquals(countGaugeValue, (numPermitsToTake * 2) - j - 1);
       }
@@ -639,8 +640,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
       Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -649,8 +650,8 @@ public class SegmentOperationsThrottlerTest {
         Assert.assertEquals(operationsThrottler.totalPermits(), defaultPermitsBeforeQuery);
         Assert.assertEquals(operationsThrottler.availablePermits(), defaultPermitsBeforeQuery - j - 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, defaultPermitsBeforeQuery);
         Assert.assertEquals(countGaugeValue, j + 1);
       }
@@ -669,8 +670,8 @@ public class SegmentOperationsThrottlerTest {
       // We doubled permits but took all of the previous ones
       Assert.assertEquals(operationsThrottler.availablePermits(), newDefaultPermits - numPermitsToTake);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, newDefaultPermits);
       Assert.assertEquals(countGaugeValue, numPermitsToTake);
 
@@ -679,8 +680,8 @@ public class SegmentOperationsThrottlerTest {
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
       Assert.assertEquals(operationsThrottler.availablePermits(), initialPermits - numPermitsToTake);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, numPermitsToTake);
 
@@ -688,8 +689,8 @@ public class SegmentOperationsThrottlerTest {
         operationsThrottler.release();
         Assert.assertEquals(operationsThrottler.availablePermits(), (initialPermits - numPermitsToTake) + j + 1);
 
-        thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-        countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+        thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+        countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
         Assert.assertEquals(thresholdGaugeValue, initialPermits);
         Assert.assertEquals(countGaugeValue, numPermitsToTake - j - 1);
       }
@@ -737,8 +738,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -747,8 +748,8 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -772,8 +773,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -793,8 +794,8 @@ public class SegmentOperationsThrottlerTest {
               : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
       Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, newTotalPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -818,8 +819,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -844,8 +845,8 @@ public class SegmentOperationsThrottlerTest {
               : CommonConstants.Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES);
       Assert.assertEquals(operationsThrottler.totalPermits(), newTotalPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, newTotalPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -869,8 +870,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -885,8 +886,8 @@ public class SegmentOperationsThrottlerTest {
       operationsThrottler.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -910,8 +911,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -934,8 +935,8 @@ public class SegmentOperationsThrottlerTest {
       // Since isServingQueries = false, new total should match CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -959,8 +960,8 @@ public class SegmentOperationsThrottlerTest {
 
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 2);
 
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
       Assert.assertEquals(countGaugeValue, 0);
 
@@ -983,8 +984,8 @@ public class SegmentOperationsThrottlerTest {
       // Since isServingQueries = false, new total should match higher threshold of before serving queries
       Assert.assertEquals(operationsThrottler.totalPermits(), initialPermits * 4);
 
-      thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
-      countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
+      countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 4);
       Assert.assertEquals(countGaugeValue, 0);
     }
@@ -1008,12 +1009,12 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits);
 
     for (String thresholdGaugeName : _thresholdGauges) {
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits);
     }
 
     for (String countGaugeName : _countGauges) {
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
 
@@ -1034,12 +1035,12 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
 
     for (String thresholdGaugeName : _thresholdGauges) {
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
     }
 
     for (String countGaugeName : _countGauges) {
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
   }
@@ -1063,12 +1064,12 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 2);
 
     for (String thresholdGaugeName : _thresholdGauges) {
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 2);
     }
 
     for (String countGaugeName : _countGauges) {
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
 
@@ -1097,12 +1098,12 @@ public class SegmentOperationsThrottlerTest {
     Assert.assertEquals(segmentOperationsThrottler.getSegmentDownloadThrottler().totalPermits(), initialPermits * 4);
 
     for (String thresholdGaugeName : _thresholdGauges) {
-      Long thresholdGaugeValue = ServerMetrics.get().getGaugeValue(thresholdGaugeName);
+      Long thresholdGaugeValue = _serverMetrics.getGaugeValue(thresholdGaugeName);
       Assert.assertEquals(thresholdGaugeValue, initialPermits * 4);
     }
 
     for (String countGaugeName : _countGauges) {
-      Long countGaugeValue = ServerMetrics.get().getGaugeValue(countGaugeName);
+      Long countGaugeValue = _serverMetrics.getGaugeValue(countGaugeName);
       Assert.assertEquals(countGaugeValue, 0);
     }
   }
