@@ -67,7 +67,6 @@ public class GridDiskFunction extends BaseTransformFunction {
     return new TransformResultMetadata(FieldSpec.DataType.LONG, false, false);
   }
 
-  @Override
   @Nullable
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     return null;
