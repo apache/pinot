@@ -134,12 +134,12 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsNeedToCatchUp() == 57801 || x.getTotalOffsetsNeedToCatchUp() == 0));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 57801 || x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
     Assert.assertEquals(consumingSegmentToBeMovedSummary
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .reduce(0, (a, b) -> a + b.getTotalOffsetsNeedToCatchUp(), Integer::sum), 57801);
+        .reduce(0, (a, b) -> a + b.getTotalOffsetsToCatchUpAcrossAllConsumingSegments(), Integer::sum), 57801);
 
     // set includeConsuming to false
     response = sendPostRequest(
