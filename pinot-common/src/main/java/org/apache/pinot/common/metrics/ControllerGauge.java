@@ -192,7 +192,15 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   UNTRACKED_SEGMENTS_COUNT("untrackedSegmentsCount", false),
 
   // Metric used to track errors during the periodic table retention management
-  RETENTION_MANAGER_ERROR("retentionManagerError", false);
+  RETENTION_MANAGER_ERROR("retentionManagerError", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table
+  PAUSELESS_SEGMENTS_IN_ERROR_COUNT("pauselessSegmentsInErrorCount", false),
+
+  // Metric used to track when segments in error state are detected for pauseless table for which needs
+  // manual intervention for repair
+  PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT("pauselessSegmentsInUnrecoverableErrorCount", false);
+
 
   private final String _gaugeName;
   private final String _unit;

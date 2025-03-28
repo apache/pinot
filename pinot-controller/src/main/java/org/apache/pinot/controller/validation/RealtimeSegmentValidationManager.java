@@ -127,7 +127,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     if (isPauselessConsumptionEnabled) {
-      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig.getTableName());
+      // For pauseless tables without dedup or partial upsert, repair segments in error state
+      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig);
     } else if (_segmentAutoResetOnErrorAtValidation) {
       // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
       // additional checks for pauseless consumption
