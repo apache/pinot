@@ -516,6 +516,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
     _helixResourceManager.registerTableSizeReader(_tableSizeReader);
+    _helixResourceManager.registerConnectionManager(_connectionManager);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 
