@@ -201,7 +201,8 @@ public class RealtimeConsumptionRateManager {
 
   @VisibleForTesting
   static final PartitionCountFetcher DEFAULT_PARTITION_COUNT_FETCHER = streamConfig -> {
-    String clientId = streamConfig.getTopicName() + "-consumption.rate.manager";
+    String clientId = streamConfig.getTopicName() + "-consumption.rate.manager" + "-"
+        + StreamConsumerFactory.CLIENT_ID_SEQ.incrementAndGet();
     StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(streamConfig);
     try (StreamMetadataProvider streamMetadataProvider = factory.createStreamMetadataProvider(clientId)) {
       return streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs*/10_000);
