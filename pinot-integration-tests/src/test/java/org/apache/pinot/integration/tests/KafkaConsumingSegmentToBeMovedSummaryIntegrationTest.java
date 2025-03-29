@@ -134,7 +134,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         .getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 57801 || x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 57801
+            || x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
     Assert.assertEquals(consumingSegmentToBeMovedSummary
         .getServerConsumingSegmentSummary()
         .values()
