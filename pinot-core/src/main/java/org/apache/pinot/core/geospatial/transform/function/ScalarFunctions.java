@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
+import java.util.List;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -266,5 +267,24 @@ public class ScalarFunctions {
       return 0;
     }
     return H3Utils.H3_CORE.gridDistance(firstH3Index, secondH3Index);
+  }
+
+  /**
+   * Returns all H3 indexes within a specified hexagonal grid distance from a given origin index. The function considers
+   * hexagonal traversal rules and accounts for wrapping around pentagons.
+   *
+   * @param origin The starting H3 index from which to compute the grid disk.
+   * @param k      The radius of the disk in hexagonal grid steps.
+   * @return An array of H3 indexes within the specified distance from the origin.
+   */
+  @ScalarFunction
+  public static long[] gridDisk(long origin, int k) {
+    List<Long> diskCells = H3Utils.H3_CORE.gridDisk(origin, k);
+    long[] result = new long[diskCells.size()];
+    int index = 0;
+    for (Long cell : diskCells) {
+      result[index++] = cell;
+    }
+    return result;
   }
 }

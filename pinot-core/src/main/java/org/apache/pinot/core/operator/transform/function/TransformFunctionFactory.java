@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
+import org.apache.pinot.core.geospatial.transform.function.GridDiskFunction;
 import org.apache.pinot.core.geospatial.transform.function.GridDistanceFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
 import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
@@ -212,6 +213,7 @@ public class TransformFunctionFactory {
     // geo indexing
     typeToImplementation.put(TransformFunctionType.GEO_TO_H3, GeoToH3Function.class);
     typeToImplementation.put(TransformFunctionType.GRID_DISTANCE, GridDistanceFunction.class);
+    typeToImplementation.put(TransformFunctionType.GRID_DISK, GridDiskFunction.class);
 
     // tuple selection
     typeToImplementation.put(TransformFunctionType.LEAST, LeastTransformFunction.class);
