@@ -59,6 +59,7 @@ type Props = {
   addLinks?: boolean,
   cellClickCallback?: Function,
   isCellClickable?: boolean,
+  makeOnlyFirstCellClickable?: boolean,
   highlightBackground?: boolean,
   isSticky?: boolean,
   baseURL?: string,
@@ -271,6 +272,7 @@ export default function CustomizedTables({
   addLinks,
   cellClickCallback,
   isCellClickable,
+  makeOnlyFirstCellClickable,
   highlightBackground,
   isSticky,
   baseURL,
@@ -562,7 +564,7 @@ export default function CustomizedTables({
                         ) : (
                           <StyledTableCell
                             key={idx}
-                            className={isCellClickable ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
+                            className={isCellClickable && (!makeOnlyFirstCellClickable || !idx) ? classes.isCellClickable : (isSticky ? classes.isSticky : '')}
                             onClick={() => {cellClickCallback && cellClickCallback(cell);}}
                           >
                             {makeCell(cell ?? '--', index)}

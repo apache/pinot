@@ -44,6 +44,9 @@ import { get, isEmpty } from "lodash";
 import { SegmentStatusRenderer } from '../components/SegmentStatusRenderer';
 import Skeleton from '@material-ui/lab/Skeleton';
 import NotFound from '../components/NotFound';
+import {
+  RebalanceServerStatusOp, RebalanceTableSegmentJobs
+} from "../components/Homepage/Operations/RebalanceServerStatusOp";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -151,6 +154,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [tableJobsData, setTableJobsData] = useState<TableSegmentJobs | null>(null);
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
+  const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
+  const [rebalanceTableJobsData, setRebalanceTableJobsData] = useState<RebalanceTableSegmentJobs>({});
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -445,6 +450,17 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     }
   };
 
+  const handleRebalanceTableStatus = async () => {
+    try{
+      setShowRebalanceServerStatus(true);
+      const rebalanceServerJobs = await PinotMethodUtils.fetchTableJobs(tableName, "TABLE_REBALANCE");
+      setRebalanceTableJobsData(rebalanceServerJobs as RebalanceTableSegmentJobs);
+    } catch(error) {
+      dispatch({type: 'error', message: error, show: true});
+      setShowRebalanceServerStatus(false);
+    }
+  };
+
   const handleRebalanceBrokers = () => {
     setDialogDetails({
       title: (<>Rebalance brokers <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/operators/operating-pinot/rebalance/rebalance-brokers">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>),
@@ -535,6 +551,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 enableTooltip={true}
               >
                 Rebalance Servers
+              </CustomButton>
+              <CustomButton
+                  onClick={handleRebalanceTableStatus}
+                  tooltipTitle="The status of table rebalance job"
+                  enableTooltip={true}
+              >
+                Rebalance Servers Status
               </CustomButton>
               <CustomButton
                 onClick={handleRebalanceBrokers}
@@ -685,6 +708,11 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
             reloadStatusData={reloadStatusData}
             tableJobsData={tableJobsData}
           />
+        )}
+        {showRebalanceServerStatus && (
+            <RebalanceServerStatusOp
+                hideModal={() => setShowRebalanceServerStatus(false)}
+                rebalanceServerStatus={rebalanceTableJobsData} />
         )}
         {showRebalanceServerModal && (
           <RebalanceServerTableOp
