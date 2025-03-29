@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 
 /**
@@ -26,27 +28,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
  * is 4 and _replicasToRebalance is 16.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonPropertyOrder({"status", "startTimeMs", "timeToCompleteRebalanceInSeconds", "completionStatusMsg",
+    "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
+    "currentToTargetConvergence", "externalViewToIdealStateConvergence"})
 public class TableRebalanceProgressStats {
-  public static class RebalanceStateStats {
-    public int _segmentsMissing;
-    public int _segmentsToRebalance;
-    public double _percentSegmentsToRebalance;
-    public int _replicasToRebalance;
-
-    RebalanceStateStats() {
-      _segmentsMissing = 0;
-      _segmentsToRebalance = 0;
-      _replicasToRebalance = 0;
-      _percentSegmentsToRebalance = 0.0;
-    }
-  }
 
   // Done/In_progress/Failed
   private RebalanceResult.Status _status;
   // When did Rebalance start
   private long _startTimeMs;
   // How long did rebalance take
-  private long _timeToFinishInSeconds;
+  private long _timeToCompleteRebalanceInSeconds;
   // Success/failure message
   private String _completionStatusMsg;
   @JsonProperty("initialToTargetStateConvergence")
@@ -55,11 +48,19 @@ public class TableRebalanceProgressStats {
   private RebalanceStateStats _currentToTargetConvergence;
   @JsonProperty("externalViewToIdealStateConvergence")
   private RebalanceStateStats _externalViewToIdealStateConvergence;
+  // This tracks the overall progress of segments to be added / deleted as part of rebalance
+  @JsonProperty("rebalanceProgressStatsOverall")
+  private RebalanceProgressStats _rebalanceProgressStatsOverall;
+  // This tracks the segments to be added / deleted for a single rebalance step (each ideal-state update is 1 step)
+  @JsonProperty("rebalanceProgressStatsCurrentStep")
+  private RebalanceProgressStats _rebalanceProgressStatsCurrentStep;
 
   public TableRebalanceProgressStats() {
     _currentToTargetConvergence = new RebalanceStateStats();
     _externalViewToIdealStateConvergence = new RebalanceStateStats();
     _initialToTargetStateConvergence = new RebalanceStateStats();
+    _rebalanceProgressStatsOverall = new RebalanceProgressStats();
+    _rebalanceProgressStatsCurrentStep = new RebalanceProgressStats();
   }
 
   public void setStatus(RebalanceResult.Status status) {
@@ -74,8 +75,8 @@ public class TableRebalanceProgressStats {
     _startTimeMs = startTimeMs;
   }
 
-  public void setTimeToFinishInSeconds(Long timeToFinishInSeconds) {
-    _timeToFinishInSeconds = timeToFinishInSeconds;
+  public void setTimeToCompleteRebalanceInSeconds(Long timeToCompleteRebalanceInSeconds) {
+    _timeToCompleteRebalanceInSeconds = timeToCompleteRebalanceInSeconds;
   }
 
   public void setExternalViewToIdealStateConvergence(RebalanceStateStats externalViewToIdealStateConvergence) {
@@ -84,6 +85,16 @@ public class TableRebalanceProgressStats {
 
   public void setCurrentToTargetConvergence(RebalanceStateStats currentToTargetConvergence) {
     _currentToTargetConvergence = currentToTargetConvergence;
+  }
+
+  public void setRebalanceProgressStatsOverall(
+      RebalanceProgressStats rebalanceProgressStatsOverall) {
+    _rebalanceProgressStatsOverall = rebalanceProgressStatsOverall;
+  }
+
+  public void setRebalanceProgressStatsCurrentStep(
+      RebalanceProgressStats rebalanceProgressStatsCurrentStep) {
+    _rebalanceProgressStatsCurrentStep = rebalanceProgressStatsCurrentStep;
   }
 
   public void setCompletionStatusMsg(String completionStatusMsg) {
@@ -106,8 +117,8 @@ public class TableRebalanceProgressStats {
     return _startTimeMs;
   }
 
-  public long getTimeToFinishInSeconds() {
-    return _timeToFinishInSeconds;
+  public long getTimeToCompleteRebalanceInSeconds() {
+    return _timeToCompleteRebalanceInSeconds;
   }
 
   public RebalanceStateStats getExternalViewToIdealStateConvergence() {
@@ -118,13 +129,107 @@ public class TableRebalanceProgressStats {
     return _currentToTargetConvergence;
   }
 
+  public RebalanceProgressStats getRebalanceProgressStatsOverall() {
+    return _rebalanceProgressStatsOverall;
+  }
+
+  public RebalanceProgressStats getRebalanceProgressStatsCurrentStep() {
+    return _rebalanceProgressStatsCurrentStep;
+  }
+
+  public static boolean progressStatsDiffer(RebalanceProgressStats base, RebalanceProgressStats compare) {
+    // Don't check for changes in the estimated time for completion as this will always be updated since it is
+    // newly calculated for each iteration based on current time and start time
+    return base._totalSegmentsToBeAdded != compare._totalSegmentsToBeAdded
+        || base._totalSegmentsToBeDeleted != compare._totalSegmentsToBeDeleted
+        || base._totalRemainingSegmentsToBeAdded != compare._totalRemainingSegmentsToBeAdded
+        || base._totalRemainingSegmentsToBeDeleted != compare._totalRemainingSegmentsToBeDeleted
+        || base._totalRemainingSegmentsToConverge != compare._totalRemainingSegmentsToConverge
+        || base._totalUniqueNewUntrackedSegmentsDuringRebalance
+        != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
+        || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
+        || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
+        || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
+        || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes
+        || base._startTimeMs != compare._startTimeMs;
+  }
+
   public static boolean statsDiffer(RebalanceStateStats base, RebalanceStateStats compare) {
-    if (base._replicasToRebalance != compare._replicasToRebalance
-        || base._segmentsToRebalance != compare._segmentsToRebalance
-        || base._segmentsMissing != compare._segmentsMissing
-        || base._percentSegmentsToRebalance != compare._percentSegmentsToRebalance) {
+    if (base._totalSegmentsToRebalance != compare._totalSegmentsToRebalance
+        || base._uniqueSegmentsToRebalance != compare._uniqueSegmentsToRebalance
+        || base._segmentsMissingFromSource != compare._segmentsMissingFromSource
+        || base._percentRemainingSegmentsToRebalance != compare._percentRemainingSegmentsToRebalance) {
       return true;
     }
     return false;
+  }
+
+  public static class RebalanceStateStats {
+    @JsonProperty("segmentsMissingFromSource")
+    public int _segmentsMissingFromSource;
+    @JsonProperty("uniqueSegmentsToRebalance")
+    public int _uniqueSegmentsToRebalance;
+    @JsonProperty("percentRemainingSegmentsToRebalance")
+    public double _percentRemainingSegmentsToRebalance;
+    @JsonProperty("totalSegmentsToRebalance")
+    public int _totalSegmentsToRebalance;
+
+    RebalanceStateStats() {
+      _segmentsMissingFromSource = 0;
+      _uniqueSegmentsToRebalance = 0;
+      _totalSegmentsToRebalance = 0;
+      _percentRemainingSegmentsToRebalance = 0.0;
+    }
+  }
+
+  // These rebalance stats specifically track the total segments added / deleted across all replicas
+  public static class RebalanceProgressStats {
+    // Total segments - across all replicas
+    @JsonProperty("totalSegmentsToBeAdded")
+    public int _totalSegmentsToBeAdded;
+    @JsonProperty("totalSegmentsToBeDeleted")
+    public int _totalSegmentsToBeDeleted;
+    // Total segments processed so far - across all replicas
+    @JsonProperty("totalRemainingSegmentsToBeAdded")
+    public int _totalRemainingSegmentsToBeAdded;
+    @JsonProperty("totalRemainingSegmentsToBeDeleted")
+    public int _totalRemainingSegmentsToBeDeleted;
+    @JsonProperty("totalRemainingSegmentsToConverge")
+    public int _totalRemainingSegmentsToConverge;
+    // Total new segments stats (not tracked by rebalance)
+    @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
+    public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
+    // Derived
+    @JsonProperty("percentageTotalSegmentsAddsRemaining")
+    public double _percentageTotalSegmentsAddsRemaining;
+    @JsonProperty("percentageTotalSegmentDeletesRemaining")
+    public double _percentageTotalSegmentDeletesRemaining;
+    @JsonProperty("estimatedTimeToCompleteAddsInSeconds")
+    public double _estimatedTimeToCompleteAddsInSeconds;
+    @JsonProperty("estimatedTimeToCompleteDeletesInSeconds")
+    public double _estimatedTimeToCompleteDeletesInSeconds;
+    @JsonProperty("averageSegmentSizeInBytes")
+    public long _averageSegmentSizeInBytes;
+    @JsonProperty("totalEstimatedDataToBeMovedInBytes")
+    public long _totalEstimatedDataToBeMovedInBytes;
+    // Start time - mostly used for a given step, for overall the outer _startTimeMs is used which is rebalance start
+    @JsonProperty("startTimeMs")
+    public long _startTimeMs;
+
+    RebalanceProgressStats() {
+      _totalSegmentsToBeAdded = 0;
+      _totalSegmentsToBeDeleted = 0;
+      _totalRemainingSegmentsToBeAdded = 0;
+      _totalRemainingSegmentsToBeDeleted = 0;
+      _totalRemainingSegmentsToConverge = 0;
+      _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
+      _percentageTotalSegmentsAddsRemaining = 0.0;
+      _percentageTotalSegmentDeletesRemaining = 0.0;
+      _estimatedTimeToCompleteAddsInSeconds = 0;
+      _estimatedTimeToCompleteDeletesInSeconds = 0;
+      _averageSegmentSizeInBytes = 0;
+      _totalEstimatedDataToBeMovedInBytes = 0;
+      _startTimeMs = 0;
+    }
   }
 }
