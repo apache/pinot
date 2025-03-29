@@ -90,8 +90,12 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        if (Double.NEGATIVE_INFINITY == leftValues[i]) {
+          _doubleValuesSV[i] = Double.NaN;
+        } else {
+          _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+                  .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        }
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
