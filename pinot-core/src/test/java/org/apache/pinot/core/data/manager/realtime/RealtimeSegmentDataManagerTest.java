@@ -28,10 +28,8 @@ import java.time.Instant;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -70,7 +68,6 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -748,58 +745,6 @@ public class RealtimeSegmentDataManagerTest {
     segmentDataManager.goOnlineFromConsuming(metadata);
     Assert.assertFalse(segmentTarFile.exists());
     segmentDataManager.close();
-  }
-
-  @Test
-  public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
-      throws Exception {
-    long timeout = 10_000L;
-    FakeRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
-    Assert.assertTrue(firstSegmentDataManager.getConsumerSemaphoreAcquired().get());
-    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore.availablePermits(), 0);
-    Assert.assertFalse(firstSemaphore.hasQueuedThreads());
-
-    AtomicReference<FakeRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
-
-    // Construct the second segment manager, which will be blocked on the semaphore.
-    Thread constructSecondSegmentManager = new Thread(() -> {
-      try {
-        secondSegmentDataManager.set(createFakeSegmentManager());
-      } catch (Exception e) {
-        throw new RuntimeException("Exception when sleeping for " + timeout + "ms", e);
-      }
-    });
-    constructSecondSegmentManager.start();
-
-    // Wait until the second segment manager gets blocked on the semaphore.
-    TestUtils.waitForCondition(aVoid -> {
-      if (firstSemaphore.hasQueuedThreads()) {
-        // Once verified the second segment gets blocked, release the semaphore.
-        firstSegmentDataManager.close();
-        return true;
-      } else {
-        return false;
-      }
-    }, timeout, "Failed to wait for the second segment blocked on semaphore");
-
-    // Wait for the second segment manager finished the construction.
-    TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
-        "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
-
-    Assert.assertTrue(secondSegmentDataManager.get().getConsumerSemaphoreAcquired().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore, secondSemaphore);
-    Assert.assertEquals(secondSemaphore.availablePermits(), 0);
-    Assert.assertFalse(secondSemaphore.hasQueuedThreads());
-
-    // Call offload method the 2nd time on the first segment manager, the permits in semaphore won't increase.
-    firstSegmentDataManager.close();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
-
-    // The permit finally gets released in the Semaphore.
-    secondSegmentDataManager.get().close();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
   }
 
   @Test

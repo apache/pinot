@@ -344,6 +344,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doAddOnlineSegment(String segmentName)
       throws Exception;
 
+  @Nullable
+  public SegmentZKMetadata fetchZKMetadataNullable(String segmentName) {
+    return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
+  }
+
   @Override
   public SegmentZKMetadata fetchZKMetadata(String segmentName) {
     SegmentZKMetadata zkMetadata =
