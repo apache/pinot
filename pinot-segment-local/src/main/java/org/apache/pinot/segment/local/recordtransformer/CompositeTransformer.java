@@ -42,6 +42,32 @@ public class CompositeTransformer implements RecordTransformer {
   private final List<RecordTransformer> _transformers;
 
   /**
+   * Returns a list of record transformers that perform enrichment of the record before the record is passed onto the
+   * ComplexType transformer. The transform pipeline order is as follows: pre-enrichers, complex type transformers,
+   * other record transformers.
+   */
+  public static List<RecordTransformer> getDefaultPreEnrichers(TableConfig tableConfig, Schema schema) {
+    List<RecordTransformer> recordEnrichers = new ArrayList<>();
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null) {
+      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+      if (enrichmentConfigs != null) {
+        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+          try {
+            if (enrichmentConfig.isPreEnricher()) {
+              addIfNotNoOp(recordEnrichers, RecordEnricherRegistry.createRecordEnricher(enrichmentConfig));
+            }
+          } catch (IOException e) {
+            throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(),
+                e);
+          }
+        }
+      }
+    }
+    return recordEnrichers;
+  }
+
+  /**
    * Returns a record transformer that performs null value handling, time/expression/data-type transformation and record
    * sanitization.
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS

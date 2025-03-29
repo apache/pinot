@@ -39,18 +39,20 @@ import org.apache.pinot.spi.recordtransformer.RecordTransformer;
  * It is used mainly but not limited by RealTimeDataManager for each row that is going to be indexed into Pinot.
  */
 public class TransformPipeline {
-  private final RecordTransformer _recordTransformer;
+  private final List<RecordTransformer> _preRecordEnrichers;
   private final ComplexTypeTransformer _complexTypeTransformer;
+  private final RecordTransformer _recordTransformer;
 
   /**
    * Constructs a transform pipeline with customized RecordTransformer and customized ComplexTypeTransformer
    * @param recordTransformer the customized record transformer
    * @param complexTypeTransformer the customized complexType transformer
    */
-  public TransformPipeline(RecordTransformer recordTransformer,
-      @Nullable ComplexTypeTransformer complexTypeTransformer) {
-    _recordTransformer = recordTransformer;
+  public TransformPipeline(@Nullable List<RecordTransformer> preRecordEnrichers,
+      @Nullable ComplexTypeTransformer complexTypeTransformer, RecordTransformer recordTransformer) {
+    _preRecordEnrichers = preRecordEnrichers;
     _complexTypeTransformer = complexTypeTransformer;
+    _recordTransformer = recordTransformer;
   }
 
   /**
@@ -59,18 +61,21 @@ public class TransformPipeline {
    * @param schema the table schema
    */
   public TransformPipeline(TableConfig tableConfig, Schema schema) {
-    // Create record transformer
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    // Create pre enricher
+    _preRecordEnrichers = CompositeTransformer.getDefaultPreEnrichers(tableConfig, schema);
 
     // Create complex type transformer
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+
+    // Create record transformer
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
   }
 
   /**
    * Returns a pass through pipeline that does not transform the record.
    */
   public static TransformPipeline getPassThroughPipeline() {
-    return new TransformPipeline(CompositeTransformer.getPassThroughTransformer(), null);
+    return new TransformPipeline(null, null, CompositeTransformer.getPassThroughTransformer());
   }
 
   public Collection<String> getInputColumns() {
@@ -92,6 +97,13 @@ public class TransformPipeline {
   public void processRow(GenericRow decodedRow, Result reusedResult)
       throws Exception {
     reusedResult.reset();
+
+    if (_preRecordEnrichers != null) {
+      for (RecordTransformer recordEnricher : _preRecordEnrichers) {
+        decodedRow = recordEnricher.transform(decodedRow);
+      }
+    }
+
     if (_complexTypeTransformer != null) {
       // TODO: consolidate complex type transformer into composite type transformer
       decodedRow = _complexTypeTransformer.transform(decodedRow);

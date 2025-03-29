@@ -82,9 +82,14 @@ public class SegmentMapper {
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     this(recordReaderFileConfigs,
         new TransformPipeline(
-            CompositeTransformer.composeAllTransformers(customRecordTransformers, processorConfig.getTableConfig(),
-                processorConfig.getSchema()),
-            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig())),
+            // record pre-enrichers
+            CompositeTransformer.getDefaultPreEnrichers(processorConfig.getTableConfig(), processorConfig.getSchema()),
+            // complex type transformer
+            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig()),
+            // plain record transformations
+            CompositeTransformer.composeAllTransformers(
+                customRecordTransformers, processorConfig.getTableConfig(), processorConfig.getSchema()
+            )),
         processorConfig, mapperOutputDir);
   }
 

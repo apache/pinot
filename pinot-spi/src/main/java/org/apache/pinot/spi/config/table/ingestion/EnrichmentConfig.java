@@ -32,11 +32,19 @@ public class EnrichmentConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Enricher properties")
   private final JsonNode _properties;
 
+  @JsonPropertyDescription("Apply in pre enrichers")
+  private final boolean _preEnricher;
+
   @JsonCreator
   public EnrichmentConfig(@JsonProperty("enricherType") String enricherType,
-      @JsonProperty("properties") JsonNode properties) {
+      @JsonProperty("properties") JsonNode properties, @JsonProperty("preEnricher") boolean preEnricher) {
     _enricherType = enricherType;
+    _preEnricher = preEnricher;
     _properties = properties;
+  }
+
+  public boolean isPreEnricher() {
+    return _preEnricher;
   }
 
   public String getEnricherType() {
