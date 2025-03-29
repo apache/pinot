@@ -311,7 +311,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_OF_SPOOLS);
     boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
-    boolean defaultEnableDynamicBroadcast = _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_BROADCAST,
+    boolean defaultEnableDynamicBroadcast = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_BROADCAST,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_BROADCAST);
     return QueryEnvironment.configBuilder()
         .database(database)
