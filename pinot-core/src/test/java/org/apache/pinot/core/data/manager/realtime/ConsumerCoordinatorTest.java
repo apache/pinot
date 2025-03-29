@@ -25,8 +25,10 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
@@ -75,7 +77,7 @@ public class ConsumerCoordinatorTest {
   private static class FakeConsumerCoordinator extends ConsumerCoordinator {
     private final Map<String, Map<String, String>> _segmentAssignmentMap;
 
-    public FakeConsumerCoordinator(boolean enforceConsumptionInOrder,
+    FakeConsumerCoordinator(boolean enforceConsumptionInOrder,
         RealtimeTableDataManager realtimeTableDataManager) {
       super(enforceConsumptionInOrder, realtimeTableDataManager);
       Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
@@ -94,8 +96,13 @@ public class ConsumerCoordinatorTest {
     }
 
     @Override
-    public Map<String, Map<String, String>> getSegmentAssignment() {
+    Map<String, Map<String, String>> getSegmentAssignment() {
       return _segmentAssignmentMap;
+    }
+
+    @Override
+    void checkSegmentStatus(String segmentName) {
+      // Do nothing
     }
   }
 
@@ -437,6 +444,41 @@ public class ConsumerCoordinatorTest {
     consumerCoordinator.getSegmentAssignment().put(getSegmentName(100), serverSegmentStatusMap);
     previousSegmentSequenceNumber = consumerCoordinator.getPreviousSegmentSequenceNumberFromIdealState(llcSegmentName);
     Assert.assertEquals(previousSegmentSequenceNumber, -1);
+  }
+
+  @Test
+  public void testSegmentStatusCheck() {
+    RealtimeTableDataManager realtimeTableDataManager = Mockito.mock(RealtimeTableDataManager.class);
+    String segmentName = getSegmentName(101);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadataNullable(segmentName)).thenReturn(null);
+
+    ConsumerCoordinator consumerCoordinator = new ConsumerCoordinator(true, realtimeTableDataManager);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+
+    SegmentZKMetadata mockSegmentZKMetadata = Mockito.mock(SegmentZKMetadata.class);
+    Mockito.when(realtimeTableDataManager.fetchZKMetadataNullable(segmentName)).thenReturn(mockSegmentZKMetadata);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.IN_PROGRESS);
+    verifySegmentStatus(consumerCoordinator, segmentName, false);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.COMMITTING);
+    verifySegmentStatus(consumerCoordinator, segmentName, false);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.DONE);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+
+    Mockito.when(mockSegmentZKMetadata.getStatus()).thenReturn(Status.UPLOADED);
+    verifySegmentStatus(consumerCoordinator, segmentName, true);
+  }
+
+  private void verifySegmentStatus(ConsumerCoordinator consumerCoordinator, String segmentName,
+      boolean shouldNotConsumed) {
+    try {
+      consumerCoordinator.checkSegmentStatus(segmentName);
+      Assert.assertFalse(shouldNotConsumed);
+    } catch (ConsumerCoordinator.ShouldNotConsumeException e) {
+      Assert.assertTrue(shouldNotConsumed);
+    }
   }
 
   private Thread getNewThread(FakeConsumerCoordinator consumerCoordinator, LLCSegmentName llcSegmentName) {

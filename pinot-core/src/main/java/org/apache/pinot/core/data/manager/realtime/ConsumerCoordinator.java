@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -71,39 +70,34 @@ public class ConsumerCoordinator {
     _serverMetrics = ServerMetrics.get();
   }
 
+  /**
+   * Acquires the consumer semaphore for the given LLC segment. When consumption order is enforced, it waits for the
+   * previous segment to be registered.
+   *
+   * TODO: Revisit if we want to handle the following corner case:
+   *   - Seg 100 (OFFLINE -> CONSUMING pending)
+   *   - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
+   *   - Seg 101 (CONSUMING -> ONLINE processed)
+   *   - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
+   *   It should be extremely rare because there has to be multiple CONSUMING state transitions pending, which means
+   *   state transition for Seg 100 has been delayed for at least the consumption time of Seg 101. Since we are not
+   *   blocking the state transition of OFFLINE -> CONSUMING, the chance of this happening is very low.
+   */
   public void acquire(LLCSegmentName llcSegmentName)
       throws InterruptedException, ShouldNotConsumeException {
     String segmentName = llcSegmentName.getSegmentName();
     if (_enforceConsumptionInOrder) {
       long startTimeMs = System.currentTimeMillis();
-      SegmentZKMetadata segmentZKMetadata = waitForPreviousSegment(llcSegmentName);
+      waitForPreviousSegment(llcSegmentName);
       _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(), ServerTimer.PREV_SEGMENT_WAIT_TIME_MS,
           System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-
-      // When consumption order is enforced, unless the segment is deleted, we wait until the previous segment is
-      // registered regardless of whether ZK metadata status has changed to guarantee the consumption ordering.
-      //
-      // Prevent the following scenario:
-      // - Seg 100 (OFFLINE -> CONSUMING pending)
-      //
-      // - Seg 101 (OFFLINE -> CONSUMING returned because of status change)
-      // - Seg 101 (CONSUMING -> ONLINE processed)
-      //
-      // - Seg 102 (OFFLINE -> CONSUMING started consuming while 100 is not registered)
-      if (segmentZKMetadata != null) {
-        checkSegmentStatus(segmentZKMetadata);
-      }
     }
 
     long startTimeMs = System.currentTimeMillis();
     while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
       LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
           System.currentTimeMillis() - startTimeMs);
-      SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadataNullable(segmentName);
-      if (segmentZKMetadata == null) {
-        throw new ShouldNotConsumeException("Segment: " + segmentName + " is deleted");
-      }
-      checkSegmentStatus(segmentZKMetadata);
+      checkSegmentStatus(segmentName);
     }
   }
 
@@ -117,6 +111,9 @@ public class ConsumerCoordinator {
   }
 
   public void register(LLCSegmentName llcSegmentName) {
+    if (!_enforceConsumptionInOrder) {
+      return;
+    }
     _lock.lock();
     try {
       int sequenceNumber = llcSegmentName.getSequenceNumber();
@@ -134,19 +131,17 @@ public class ConsumerCoordinator {
    * Waits for the previous segment to be registered to the server. Returns the segment ZK metadata fetched during the
    * wait to reduce unnecessary ZK read.
    */
-  @Nullable
-  private SegmentZKMetadata waitForPreviousSegment(LLCSegmentName currentSegment)
+  private void waitForPreviousSegment(LLCSegmentName currentSegment)
       throws InterruptedException, ShouldNotConsumeException {
     if (!_firstTransitionProcessed.get() || _useIdealStateToCalculatePreviousSegment) {
-      SegmentZKMetadata segmentZKMetadata = null;
+      // Perform a quick check before fetching ideal state to reduce overhead for happy path.
       if (_maxSequenceNumberRegistered < currentSegment.getSequenceNumber() - 1) {
         int previousSegmentSequenceNumber = getPreviousSegmentSequenceNumberFromIdealState(currentSegment);
-        segmentZKMetadata = waitForPreviousSegment(currentSegment, previousSegmentSequenceNumber);
+        waitForPreviousSegment(currentSegment, previousSegmentSequenceNumber);
       }
       _firstTransitionProcessed.set(true);
-      return segmentZKMetadata;
     } else {
-      return waitForPreviousSegment(currentSegment, currentSegment.getSequenceNumber() - 1);
+      waitForPreviousSegment(currentSegment, currentSegment.getSequenceNumber() - 1);
     }
   }
 
@@ -154,14 +149,12 @@ public class ConsumerCoordinator {
    * Waits for the previous segment with the sequence number to be registered to the server. Returns the segment ZK
    * metadata fetched during the wait to reduce unnecessary ZK read..
    */
-  @Nullable
   @VisibleForTesting
-  SegmentZKMetadata waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
+  void waitForPreviousSegment(LLCSegmentName currentSegment, int previousSegmentSequenceNumber)
       throws InterruptedException, ShouldNotConsumeException {
     if (previousSegmentSequenceNumber <= _maxSequenceNumberRegistered) {
-      return null;
+      return;
     }
-    SegmentZKMetadata segmentZKMetadata = null;
     long startTimeMs = System.currentTimeMillis();
     _lock.lock();
     try {
@@ -169,17 +162,13 @@ public class ConsumerCoordinator {
         // it means the previous segment is not loaded in the server. Wait until it's loaded.
         if (!_condition.await(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
           String segmentName = currentSegment.getSegmentName();
+          checkSegmentStatus(segmentName);
           LOGGER.warn("Waited on previous segment with sequence number: {} for: {}ms. "
                   + "Refreshing the previous segment sequence number for current segment: {}",
               previousSegmentSequenceNumber, System.currentTimeMillis() - startTimeMs, segmentName);
-          segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadataNullable(segmentName);
-          if (segmentZKMetadata == null) {
-            throw new ShouldNotConsumeException("Segment: " + segmentName + " is deleted");
-          }
           previousSegmentSequenceNumber = getPreviousSegmentSequenceNumberFromIdealState(currentSegment);
         }
       }
-      return segmentZKMetadata;
     } finally {
       _lock.unlock();
     }
@@ -254,12 +243,16 @@ public class ConsumerCoordinator {
     return _maxSequenceNumberRegistered;
   }
 
-  private static void checkSegmentStatus(SegmentZKMetadata segmentZKMetadata)
+  @VisibleForTesting
+  void checkSegmentStatus(String segmentName)
       throws ShouldNotConsumeException {
+    SegmentZKMetadata segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadataNullable(segmentName);
+    if (segmentZKMetadata == null) {
+      throw new ShouldNotConsumeException("Segment: " + segmentName + " is deleted");
+    }
     if (segmentZKMetadata.getStatus().isCompleted()) {
       throw new ShouldNotConsumeException(
-          "Segment: " + segmentZKMetadata.getSegmentName() + " is already completed with status: "
-              + segmentZKMetadata.getStatus());
+          "Segment: " + segmentName + " is already completed with status: " + segmentZKMetadata.getStatus());
     }
   }
 
