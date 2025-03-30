@@ -477,7 +477,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
       ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
       onConsumingToOnline(segmentName);
-    } else if (zkMetadata.getStatus() == Status.DONE) {
+    } else if (zkMetadata.getStatus().isCompleted()) {
       // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
       // call completes.
       // The server should replace the segment only after the CRC is set by COMMIT_END_METADATA and the segment is
