@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.workload.scheme;
 
 import java.util.ArrayList;
@@ -10,7 +28,6 @@ import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -18,7 +35,6 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -42,7 +58,12 @@ public class PropagationUtils {
    */
   public static Map<String, Map<NodeConfig.Type, Set<String>>> getTableToHelixTags(
       PinotHelixResourceManager pinotHelixResourceManager) {
+    long startTime = System.currentTimeMillis();
     List<TableConfig> tableConfigs = pinotHelixResourceManager.getAllTableConfigs();
+    long zkTableConfigsTime = System.currentTimeMillis();
+    // Log the time taken to get the table configs
+    String message = String.format("Time taken to get table configs: %d ms", zkTableConfigsTime - startTime);
+    System.out.println(message);
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = new HashMap<>();
     for (TableConfig tableConfig : tableConfigs) {
       String tableName = tableConfig.getTableName();
@@ -65,27 +86,67 @@ public class PropagationUtils {
         Optional.ofNullable(tagOverrideConfig.getRealtimeConsuming()).ifPresent(leafNodeTenants::add);
       }
     }
+    long endTime = System.currentTimeMillis();
+    // Log the time taken to get the table to helix tags
+    message = String.format("Time taken to compute table to helix tags: %d ms", endTime - zkTableConfigsTime);
+    System.out.println(message);
     return tableToHelixTags;
+  }
+
+  public static Set<String> getHelixTagsForTable(PinotHelixResourceManager pinotHelixResourceManager, String tableName) {
+    Set<String> helixTags = new HashSet<>();
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    List<String> tablesWithType = new ArrayList<>();
+    if (tableType == null) {
+      // If table name does not have type suffix, get both offline and realtime table names
+      tablesWithType.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      tablesWithType.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    } else {
+      tablesWithType.add(tableName);
+    }
+    for (String tableWithType : tablesWithType) {
+      TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(tableWithType);
+      assert tableConfig != null;
+      TenantConfig tenantConfig = tableConfig.getTenantConfig();
+      helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
+      String serverTag = null;
+      if (tableConfig.getTableType() == TableType.OFFLINE) {
+        serverTag = TagNameUtils.getOfflineTagForTenant(tenantConfig.getServer());
+      } else if (tableConfig.getTableType() == TableType.REALTIME) {
+        serverTag = TagNameUtils.getRealtimeTagForTenant(tenantConfig.getServer());
+      }
+      helixTags.add(serverTag);
+      TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
+      if (tagOverrideConfig != null) {
+        Optional.ofNullable(tagOverrideConfig.getRealtimeCompleted()).ifPresent(helixTags::add);
+        Optional.ofNullable(tagOverrideConfig.getRealtimeConsuming()).ifPresent(helixTags::add);
+      }
+    }
+    return helixTags;
   }
 
   /**
    * Get the mapping between helix tag -> instances
    */
   public static Map<String, Set<String>> getHelixTagToInstances(PinotHelixResourceManager pinotHelixResourceManager) {
+    long startTime = System.currentTimeMillis();
     List<InstanceConfig> instanceConfigs = pinotHelixResourceManager.getAllHelixInstanceConfigs();
+    long zkInstanceConfigsTime = System.currentTimeMillis();
+    // Log the time taken to get the instance configs
+    String message = String.format("Time taken to get instance configs: %d ms", zkInstanceConfigsTime - startTime);
+    System.out.println(message);
     Map<String, Set<String>> helixTagToInstances = new HashMap<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String instanceName = instanceConfig.getInstanceName();
-      org.apache.pinot.spi.config.instance.InstanceType instanceType = InstanceTypeUtils.getInstanceType(instanceName);
       List<String> tags = instanceConfig.getTags();
       for (String tag : tags) {
-        if (instanceType == InstanceType.SERVER) {
-          helixTagToInstances.computeIfAbsent(tag, k -> new HashSet<>()).add(instanceName);
-        } else if (instanceType == InstanceType.BROKER) {
-          helixTagToInstances.computeIfAbsent(tag, k -> new HashSet<>()).add(instanceName);
-        }
+        helixTagToInstances.computeIfAbsent(tag, k -> new HashSet<>()).add(instanceName);
       }
     }
+    long endTime = System.currentTimeMillis();
+    // Log the time taken to get the helix tag to instances
+    message = String.format("Time taken to compute helix tag to instances: %d ms", endTime - zkInstanceConfigsTime);
+    System.out.println(message);
     return helixTagToInstances;
   }
 
@@ -110,6 +171,7 @@ public class PropagationUtils {
    */
   public static Map<String, Set<QueryWorkloadConfig>> getHelixTagToWorkloadConfigs(
       PinotHelixResourceManager pinotHelixResourceManager) {
+    long startTime = System.currentTimeMillis();
     Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs = new HashMap<>();
     List<QueryWorkloadConfig> queryWorkloadConfigs = pinotHelixResourceManager.getQueryWorkloadConfigs();
     if (queryWorkloadConfigs == null) {
@@ -166,6 +228,10 @@ public class PropagationUtils {
         }
       });
     }
+    long endTime = System.currentTimeMillis();
+    // Log the time taken to get the helix tag to workload configs
+    String message = String.format("Time taken to get helix tag to workload configs: %d ms", endTime - startTime);
+    System.out.println(message);
     return helixTagsToWorkloadConfigs;
   }
 }

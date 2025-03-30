@@ -4641,11 +4641,11 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) throws Exception {
+  public QueryWorkloadConfig getQueryWorkloadConfig(String queryWorkloadName) {
     return ZKMetadataProvider.getQueryWorkloadConfig(_propertyStore, queryWorkloadName);
   }
 
-  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) throws Exception {
+  public void setQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig) {
     if (!ZKMetadataProvider.setQueryWorkloadConfig(_propertyStore, queryWorkloadConfig)) {
       throw new RuntimeException("Failed to set workload config for queryWorkloadName: "
           + queryWorkloadConfig.getQueryWorkloadName());

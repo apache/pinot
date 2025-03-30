@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.ws.rs.NotFoundException;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.DefaultPropagationScheme;
@@ -66,22 +65,30 @@ public class QueryWorkloadManager {
    * @param queryWorkloadConfig The query workload configuration to propagate
    */
   public void propagateWorkload(QueryWorkloadConfig queryWorkloadConfig) {
+    long startTime = System.currentTimeMillis();
     Map<NodeConfig.Type, NodeConfig> nodeConfigs = queryWorkloadConfig.getNodeConfigs();
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     nodeConfigs.forEach((nodeType, nodeConfig) -> {
       Set<String> instances = resolveInstances(nodeType, nodeConfig);
       if (instances.isEmpty()) {
-        String errorMsg = String.format("No instances found for Workload: %s nodeType: %s, nodeConfig: %s",
-            queryWorkloadName, nodeType.getJsonValue(), nodeConfig);
-        LOGGER.error(errorMsg);
-        throw new NotFoundException(errorMsg);
+        String errorMsg = String.format("No instances found for Workload: %s", queryWorkloadName);
+        LOGGER.warn(errorMsg);
+        System.out.println(errorMsg);
+        return;
       }
+      long startTimeForCost = System.currentTimeMillis();
       Map<String, InstanceCost> instanceCostMap = _costSplitter.getInstanceCostMap(nodeConfig,
           new InstancesInfo(instances));
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey,
               entry -> new QueryWorkloadRefreshMessage(queryWorkloadName, entry.getValue())));
+      long endTimeForCost = System.currentTimeMillis();
+      System.out.printf("Query workload cost calculation time %dms for workload: %s%n",
+          (endTimeForCost - startTimeForCost), queryWorkloadName);
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+      long endTime = System.currentTimeMillis();
+      System.out.printf("Query workload propagation time %dms for workload: %s%n", (endTime - startTime),
+          queryWorkloadName);
     });
   }
 
@@ -94,26 +101,20 @@ public class QueryWorkloadManager {
    * @param tableName The table name to propagate the workload for
    */
   public void propagateWorkloadFor(String tableName) {
+    long startTime = System.currentTimeMillis();
     try {
       // Get the helixTags associated with the table
-      Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags
-          = PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
-      Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableToHelixTags.get(tableName);
-      if (nodeToHelixTags == null) {
-        return;
-      }
+      Set<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
       Set<QueryWorkloadConfig> allqueryWorkloadConfigs = new HashSet<>();
       Map<String, Set<QueryWorkloadConfig>> helixTagsToWorkloadConfigs
           = PropagationUtils.getHelixTagToWorkloadConfigs(_pinotHelixResourceManager);
       // Find all workloads associated with the helix tags
-      nodeToHelixTags.forEach((nodeType, helixTags) -> {
-        for (String helix : helixTags) {
-          Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
-          if (queryWorkloadConfigs != null) {
-            allqueryWorkloadConfigs.addAll(queryWorkloadConfigs);
-          }
+      for (String helix : helixTags) {
+        Set<QueryWorkloadConfig> queryWorkloadConfigs = helixTagsToWorkloadConfigs.get(helix);
+        if (queryWorkloadConfigs != null) {
+          allqueryWorkloadConfigs.addAll(queryWorkloadConfigs);
         }
-      });
+      }
       for (QueryWorkloadConfig queryWorkloadConfig : allqueryWorkloadConfigs) {
         propagateWorkload(queryWorkloadConfig);
       }
@@ -122,6 +123,8 @@ public class QueryWorkloadManager {
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
+    long endTime = System.currentTimeMillis();
+    System.out.printf("Query workload propagation time %dms ", (endTime - startTime));
   }
 
   /**
