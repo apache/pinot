@@ -61,7 +61,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _allocationContext;
   private int _capacityInRows = 0;
-  
+
   // Dynamic buffer sizing parameters
   private static final int INITIAL_CHUNK_SIZE_MULTIPLIER = 1;
   private static final int MAX_CHUNK_SIZE_MULTIPLIER = 16;
@@ -277,23 +277,20 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     if (!_dynamicResizingEnabled) {
       return;
     }
-    
     _rowsObservedSinceLastResize++;
-    
     if (_rowsObservedSinceLastResize >= _maxRowsToObserveBeforeResize) {
       // If we've created multiple small buffers, increase the chunk size for future allocations
       if (_writers.size() > 1 && _currentChunkSizeMultiplier < MAX_CHUNK_SIZE_MULTIPLIER) {
         int newMultiplier = Math.min(_currentChunkSizeMultiplier * 2, MAX_CHUNK_SIZE_MULTIPLIER);
         int newNumRowsPerChunk = _initialNumRowsPerChunk * newMultiplier;
-        
-        LOGGER.info("Increasing buffer chunk size from {} to {} rows for: {}", 
+
+        LOGGER.info("Increasing buffer chunk size from {} to {} rows for: {}",
             _numRowsPerChunk, newNumRowsPerChunk, _allocationContext);
-        
+
         _numRowsPerChunk = newNumRowsPerChunk;
         _chunkSizeInBytes = (long) _numRowsPerChunk * _valueSizeInBytes;
         _currentChunkSizeMultiplier = newMultiplier;
       }
-      
       _rowsObservedSinceLastResize = 0;
     }
   }
