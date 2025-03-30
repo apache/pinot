@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client.grpc;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -43,6 +42,7 @@ import org.apache.pinot.client.PinotResultMetadata;
 import org.apache.pinot.client.base.AbstractBaseResultSet;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.common.proto.Broker;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +56,8 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   private final int _totalColumns;
   private final Map<String, Integer> _columns = new HashMap<>();
   private final Map<Integer, String> _columnDataTypes = new HashMap<>();
-
-  private ArrayNode _currentRowBatch;
+  private final DataSchema _dataSchema;
+  private ResultTable _currentRowBatch;
   private int _currentBatchSize;
 
   private int _currentBatchIndex = -1;
@@ -71,11 +71,11 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     _brokerResponseIterator = brokerResponseIterator;
     _closed = false;
     ObjectNode metadata = GrpcUtils.extractMetadataJson(_brokerResponseIterator.next());
-    DataSchema dataSchema = GrpcUtils.extractSchema(_brokerResponseIterator.next());
-    _totalColumns = dataSchema.size();
+    _dataSchema = GrpcUtils.extractSchema(_brokerResponseIterator.next());
+    _totalColumns = _dataSchema.size();
     for (int i = 0; i < _totalColumns; i++) {
-      _columns.put(dataSchema.getColumnName(i), i + 1);
-      _columnDataTypes.put(i + 1, dataSchema.getColumnDataType(i).name());
+      _columns.put(_dataSchema.getColumnName(i), i + 1);
+      _columnDataTypes.put(i + 1, _dataSchema.getColumnDataType(i).name());
     }
   }
 
@@ -83,6 +83,7 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     _brokerResponseIterator = null;
     _currentBatchSize = 0;
     _totalColumns = 0;
+    _dataSchema = null;
   }
 
   public static PinotGrpcResultSet empty() {
@@ -271,11 +272,10 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
   public String getString(int columnIndex)
       throws SQLException {
     validateColumn(columnIndex);
-    String val = _currentRowBatch.get(_currentBatchIndex).get(columnIndex - 1).asText();
+    String val = _currentRowBatch.getRows().get(_currentBatchIndex)[columnIndex - 1].toString();
     if (checkIsNull(val)) {
       return null;
     }
-
     return val;
   }
 
@@ -425,9 +425,9 @@ public class PinotGrpcResultSet extends AbstractBaseResultSet {
     if (_currentBatchIndex == _currentBatchSize - 1) {
       if (_brokerResponseIterator.hasNext()) {
         try {
-          _currentRowBatch = GrpcUtils.extractRowsJson(_brokerResponseIterator.next());
+          _currentRowBatch = GrpcUtils.extractResultTable(_brokerResponseIterator.next(), _dataSchema);
           _currentBatchIndex = 0;
-          _currentBatchSize = _currentRowBatch.size();
+          _currentBatchSize = _currentRowBatch.getRows().size();
           _currentRow++;
           return true;
         } catch (IOException e) {
