@@ -745,6 +745,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _consumerSemaphoreAcquired.set(true);
         _consumerCoordinator.register(_llcSegmentName);
 
+        _segmentLogger.info("Acquired consumer semaphore.");
+
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
         //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
