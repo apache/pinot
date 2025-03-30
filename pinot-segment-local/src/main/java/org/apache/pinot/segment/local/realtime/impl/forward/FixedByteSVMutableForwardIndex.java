@@ -35,7 +35,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * This class implements reader as well as writer interfaces for fixed-byte single column and single value data.
  * <ul>
@@ -56,12 +55,21 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private final boolean _dictionaryEncoded;
   private final DataType _storedType;
   private final int _valueSizeInBytes;
-  private final int _numRowsPerChunk;
-  private final long _chunkSizeInBytes;
+  private int _numRowsPerChunk;
+  private long _chunkSizeInBytes;
 
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _allocationContext;
   private int _capacityInRows = 0;
+  
+  // Dynamic buffer sizing parameters
+  private static final int INITIAL_CHUNK_SIZE_MULTIPLIER = 1;
+  private static final int MAX_CHUNK_SIZE_MULTIPLIER = 16;
+  private int _currentChunkSizeMultiplier = INITIAL_CHUNK_SIZE_MULTIPLIER;
+  private int _initialNumRowsPerChunk;
+  private int _maxRowsToObserveBeforeResize = 1000;
+  private int _rowsObservedSinceLastResize = 0;
+  private boolean _dynamicResizingEnabled = true;
 
   /**
    * @param storedType Data type of the values
@@ -81,6 +89,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
       _valueSizeInBytes = storedType.size();
     }
     _numRowsPerChunk = numRowsPerChunk;
+    _initialNumRowsPerChunk = numRowsPerChunk;
     _chunkSizeInBytes = (long) numRowsPerChunk * _valueSizeInBytes;
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
@@ -90,6 +99,22 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType valueType, int numRowsPerChunk,
       PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     this(dictionaryEncoded, valueType, -1, numRowsPerChunk, memoryManager, allocationContext);
+  }
+
+  /**
+   * Enables or disables dynamic buffer resizing.
+   * @param enabled If true, enables dynamic buffer resizing; if false, disables it
+   */
+  public void setDynamicResizingEnabled(boolean enabled) {
+    _dynamicResizingEnabled = enabled;
+  }
+
+  /**
+   * Sets the maximum number of rows to observe before considering a resize of the buffer.
+   * @param maxRows The maximum number of rows to observe
+   */
+  public void setMaxRowsToObserveBeforeResize(int maxRows) {
+    _maxRowsToObserveBeforeResize = maxRows;
   }
 
   @Override
@@ -182,30 +207,35 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   public void setDictId(int docId, int dictId) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, dictId);
+    maybeAdjustBufferSize();
   }
 
   @Override
   public void setInt(int docId, int value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, value);
+    maybeAdjustBufferSize();
   }
 
   @Override
   public void setLong(int docId, long value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setLong(docId, value);
+    maybeAdjustBufferSize();
   }
 
   @Override
   public void setFloat(int docId, float value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setFloat(docId, value);
+    maybeAdjustBufferSize();
   }
 
   @Override
   public void setDouble(int docId, double value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setDouble(docId, value);
+    maybeAdjustBufferSize();
   }
 
   @Override
@@ -221,6 +251,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);
+    maybeAdjustBufferSize();
   }
 
   private WriterWithOffset getWriterForRow(int row) {
@@ -235,6 +266,35 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     }
     for (ReaderWithOffset reader : _readers) {
       reader.close();
+    }
+  }
+
+  /**
+   * Checks if buffer size should be adjusted based on observed data patterns
+   * and adjusts the buffer size for future allocations if needed.
+   */
+  private void maybeAdjustBufferSize() {
+    if (!_dynamicResizingEnabled) {
+      return;
+    }
+    
+    _rowsObservedSinceLastResize++;
+    
+    if (_rowsObservedSinceLastResize >= _maxRowsToObserveBeforeResize) {
+      // If we've created multiple small buffers, increase the chunk size for future allocations
+      if (_writers.size() > 1 && _currentChunkSizeMultiplier < MAX_CHUNK_SIZE_MULTIPLIER) {
+        int newMultiplier = Math.min(_currentChunkSizeMultiplier * 2, MAX_CHUNK_SIZE_MULTIPLIER);
+        int newNumRowsPerChunk = _initialNumRowsPerChunk * newMultiplier;
+        
+        LOGGER.info("Increasing buffer chunk size from {} to {} rows for: {}", 
+            _numRowsPerChunk, newNumRowsPerChunk, _allocationContext);
+        
+        _numRowsPerChunk = newNumRowsPerChunk;
+        _chunkSizeInBytes = (long) _numRowsPerChunk * _valueSizeInBytes;
+        _currentChunkSizeMultiplier = newMultiplier;
+      }
+      
+      _rowsObservedSinceLastResize = 0;
     }
   }
 
