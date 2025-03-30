@@ -110,6 +110,11 @@ public class PinotSegmentRestletResourceTest {
       segmentsToInstanceState.put(segment, null);
     }
 
+    // Add segments for partition 2. None of the segments of this partition should be deleted.
+    for (String segment : getSegmentForPartition(tableName, 2, 0, 10, currentTime)) {
+      segmentsToInstanceState.put(segment, null);
+    }
+
     // Mock response for fetching segment to instance state map
     when(idealState.getRecord()).thenReturn(znRecord);
     when(znRecord.getMapFields()).thenReturn(segmentsToInstanceState);
