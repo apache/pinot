@@ -61,13 +61,15 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final String _allocationContext;
   private int _capacityInRows = 0;
-  
+
   // Dynamic buffer sizing parameters - these are used for adaptive sizing without changing the original behavior
   private static final String DYNAMIC_BUFFER_SIZING_ENABLED_KEY = "pinot.forward.index.dynamic.buffer.sizing.enabled";
   private static final boolean DYNAMIC_BUFFER_SIZING_ENABLED_DEFAULT = false;
-  private static final String DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_KEY = "pinot.forward.index.dynamic.buffer.sizing.max.multiplier";
+  private static final String DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_KEY =
+      "pinot.forward.index.dynamic.buffer.sizing.max.multiplier";
   private static final int DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_DEFAULT = 16;
-  private static final String DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_KEY = "pinot.forward.index.dynamic.buffer.sizing.observation.threshold";
+  private static final String DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_KEY =
+      "pinot.forward.index.dynamic.buffer.sizing.observation.threshold";
   private static final int DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_DEFAULT = 1000;
 
   private final boolean _dynamicBufferSizingEnabled;
@@ -98,19 +100,19 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     _chunkSizeInBytes = (long) numRowsPerChunk * _valueSizeInBytes;
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
-    
+
     // Initialize dynamic buffer sizing parameters from system properties
     _dynamicBufferSizingEnabled = Boolean.parseBoolean(
-        System.getProperty(DYNAMIC_BUFFER_SIZING_ENABLED_KEY, 
+        System.getProperty(DYNAMIC_BUFFER_SIZING_ENABLED_KEY,
                           Boolean.toString(DYNAMIC_BUFFER_SIZING_ENABLED_DEFAULT)));
     _maxBufferSizeMultiplier = Integer.parseInt(
-        System.getProperty(DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_KEY, 
+        System.getProperty(DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_KEY,
                           Integer.toString(DYNAMIC_BUFFER_SIZING_MAX_MULTIPLIER_DEFAULT)));
     _observationThreshold = Integer.parseInt(
-        System.getProperty(DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_KEY, 
+        System.getProperty(DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_KEY,
                           Integer.toString(DYNAMIC_BUFFER_SIZING_OBSERVATION_THRESHOLD_DEFAULT)));
     _initialNumRowsPerChunk = numRowsPerChunk;
-    
+
     addBuffer();
   }
 
@@ -209,35 +211,35 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   public void setDictId(int docId, int dictId) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, dictId);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setInt(int docId, int value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setLong(int docId, long value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setLong(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setFloat(int docId, float value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setFloat(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setDouble(int docId, double value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setDouble(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
@@ -253,7 +255,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   private WriterWithOffset getWriterForRow(int row) {
@@ -272,30 +274,30 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   /**
-   * Checks if buffer size should be adjusted based on observed data patterns
-   * and adjusts the buffer size for future allocations if needed.
+   * Checks if buffer size should be adjusted based on observed data patterns and adjusts the buffer size for future
+   * allocations if needed.
    * This is only enabled if the system property is set.
    */
-  private void maybeAdjustBufferSize() {
+  private void adjustBufferSizeIfNeeded() {
     if (!_dynamicBufferSizingEnabled) {
       return;
     }
-    
+
     _rowsObservedSinceLastResize++;
-    
+
     if (_rowsObservedSinceLastResize >= _observationThreshold) {
       // If we've created multiple small buffers, increase the chunk size for future allocations
       if (_writers.size() > 1 && _currentBufferSizeMultiplier < _maxBufferSizeMultiplier) {
         int newMultiplier = Math.min(_currentBufferSizeMultiplier * 2, _maxBufferSizeMultiplier);
         int newNumRowsPerChunk = _initialNumRowsPerChunk * newMultiplier;
-        
-        LOGGER.info("Increasing buffer chunk size from {} to {} rows for: {}", 
+
+        LOGGER.info("Increasing buffer chunk size from {} to {} rows for: {}",
             _numRowsPerChunk, newNumRowsPerChunk, _allocationContext);
-        
+
         // Store the new multiplier for next time
         _currentBufferSizeMultiplier = newMultiplier;
       }
-      
+
       _rowsObservedSinceLastResize = 0;
     }
   }
@@ -303,11 +305,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private void addBuffer() {
     // Calculate the actual number of rows per chunk based on the current multiplier
     // This only has an effect if dynamic buffer sizing is enabled
-    int rowsPerChunk = _dynamicBufferSizingEnabled ? 
-        _initialNumRowsPerChunk * _currentBufferSizeMultiplier : _numRowsPerChunk;
-    
+    int rowsPerChunk = _dynamicBufferSizingEnabled
+        ? _initialNumRowsPerChunk * _currentBufferSizeMultiplier : _numRowsPerChunk;
     long chunkSizeInBytes = (long) rowsPerChunk * _valueSizeInBytes;
-    
+
     LOGGER.info("Allocating {} bytes for: {}", chunkSizeInBytes, _allocationContext);
     // NOTE: PinotDataBuffer is tracked in the PinotDataBufferMemoryManager. No need to track it inside the class.
     PinotDataBuffer buffer = _memoryManager.allocate(chunkSizeInBytes, _allocationContext);
