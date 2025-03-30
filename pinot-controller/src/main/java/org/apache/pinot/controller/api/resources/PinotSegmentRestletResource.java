@@ -1310,6 +1310,7 @@ public class PinotSegmentRestletResource {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
       if (llcSegmentName == null) {
         LOGGER.warn("Skip segment: {} not in low-level consumer format", segment);
+        continue;
       }
 
       // ignore segments that are not present in the ideal state
