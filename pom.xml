@@ -136,6 +136,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
+    <arrow.version>18.2.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.1</parquet.version>
     <orc.version>1.9.5</orc.version>
@@ -787,6 +788,18 @@
         <artifactId>pinot-kafka-base</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
+      </dependency>
+
+      <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-memory-netty</artifactId>
+        <version>${arrow.version}</version>
       </dependency>
 
       <dependency>
