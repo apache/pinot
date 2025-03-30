@@ -117,6 +117,13 @@ public class ConsumerCoordinator {
     _lock.lock();
     try {
       int sequenceNumber = llcSegmentName.getSequenceNumber();
+
+      LOGGER.info(
+          "Registering segment: {} with sequence number: {}. maxSequenceNumberRegistered: {}, "
+              + "firstTransitionProcessed: {}, Difference in sequence more than one: {}",
+          llcSegmentName.getSegmentName(), sequenceNumber, _maxSequenceNumberRegistered,
+          _firstTransitionProcessed.get(), ((sequenceNumber - _maxSequenceNumberRegistered) > 1));
+
       if (sequenceNumber > _maxSequenceNumberRegistered) {
         _maxSequenceNumberRegistered = sequenceNumber;
         // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
