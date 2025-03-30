@@ -1274,11 +1274,19 @@ public class PinotSegmentRestletResource {
     Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
 
     for (String segmentName : idealStateSegmentsSet) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        LOGGER.info("Skip segment: {} not in low-level consumer format", segmentName);
+        continue;
+      }
       int partitionId = llcSegmentName.getPartitionGroupId();
 
       LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
-      if (oldestSegment != null && oldestSegment.getSequenceNumber() <= llcSegmentName.getSequenceNumber()) {
+      if (oldestSegment == null) {
+        continue;
+      }
+
+      if (oldestSegment.getSequenceNumber() <= llcSegmentName.getSequenceNumber()) {
         partitionToSegmentsToDelete
             .computeIfAbsent(partitionId, k -> new HashSet<>())
             .add(segmentName);
@@ -1300,7 +1308,10 @@ public class PinotSegmentRestletResource {
 
     for (String segment : segments) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
-      Preconditions.checkState(llcSegmentName != null, "Invalid LLC segment: " + segment);
+      if (llcSegmentName == null) {
+        LOGGER.warn("Skip segment: {} not in low-level consumer format", segment);
+        continue;
+      }
 
       // ignore segments that are not present in the ideal state
       if (!idealStateSegmentsSet.contains(segment)) {
