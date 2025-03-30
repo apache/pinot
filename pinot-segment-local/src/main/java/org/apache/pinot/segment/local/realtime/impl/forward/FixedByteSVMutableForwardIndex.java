@@ -207,35 +207,35 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   public void setDictId(int docId, int dictId) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, dictId);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setInt(int docId, int value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setInt(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setLong(int docId, long value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setLong(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setFloat(int docId, float value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setFloat(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
   public void setDouble(int docId, double value) {
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setDouble(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   @Override
@@ -251,7 +251,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);
-    maybeAdjustBufferSize();
+    adjustBufferSizeIfNeeded();
   }
 
   private WriterWithOffset getWriterForRow(int row) {
@@ -270,10 +270,10 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   /**
-   * Checks if buffer size should be adjusted based on observed data patterns
-   * and adjusts the buffer size for future allocations if needed.
+   * Checks if buffer size should be adjusted based on observed data patterns and adjusts the buffer size for future
+   * allocations if needed.
    */
-  private void maybeAdjustBufferSize() {
+  private void adjustBufferSizeIfNeeded() {
     if (!_dynamicResizingEnabled) {
       return;
     }
