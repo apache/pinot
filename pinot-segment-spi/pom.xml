@@ -57,10 +57,6 @@
       <artifactId>jts-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.xerial.larray</groupId>
-      <artifactId>larray-mmap</artifactId>
-    </dependency>
-    <dependency>
       <groupId>net.openhft</groupId>
       <artifactId>chronicle-core</artifactId>
     </dependency>

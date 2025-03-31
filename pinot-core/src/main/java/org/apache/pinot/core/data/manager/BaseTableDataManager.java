@@ -96,7 +96,6 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -345,6 +344,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doAddOnlineSegment(String segmentName)
       throws Exception;
 
+  @Nullable
+  public SegmentZKMetadata fetchZKMetadataNullable(String segmentName) {
+    return ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
+  }
+
   @Override
   public SegmentZKMetadata fetchZKMetadata(String segmentName) {
     SegmentZKMetadata zkMetadata =
@@ -358,16 +362,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public Pair<TableConfig, Schema> fetchTableConfigAndSchema() {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
-    // NOTE: Schema is mandatory for REALTIME table.
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    }
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
     return Pair.of(tableConfig, schema);
   }
 
   @Override
-  public IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
+  public IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     return indexLoadingConfig;

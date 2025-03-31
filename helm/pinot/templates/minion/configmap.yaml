@@ -25,7 +25,9 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
 data:
   pinot-minion.conf: |-
+{{- if .Values.minion.configureMinionPort }}
     pinot.minion.port={{ .Values.minion.service.port }}
+{{- end }}
     {{- if .Values.minion.dataDir }}
     dataDir={{ .Values.minion.dataDir }}
     {{- end }}

@@ -43,6 +43,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -79,6 +80,7 @@ import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
@@ -118,6 +120,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _hostname;
   protected int _port;
   protected int _tlsPort;
+  protected int _grpcPort;
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
@@ -147,6 +150,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
   protected AbstractResponseStore _responseStore;
+  protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
 
   @Override
@@ -180,6 +184,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _port = _listenerConfigs.get(0).getPort();
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
+    _grpcPort = _brokerConf.getProperty(CommonConstants.Broker.Grpc.KEY_OF_GRPC_PORT, -1);
 
     _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
     if (_instanceId == null) {
@@ -193,6 +198,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
 
     _brokerConf.setProperty(Broker.CONFIG_OF_BROKER_ID, _instanceId);
+
+    ContinuousJfrStarter.init(_brokerConf);
   }
 
   private void setupHelixSystemProperties() {
@@ -414,6 +421,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication = createBrokerAdminApp();
     _brokerAdminApplication.start(_listenerConfigs);
 
+    if (BrokerGrpcServer.isEnabled(_brokerConf)) {
+      LOGGER.info("Initializing BrokerGrpcServer");
+      _brokerGrpcServer = new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler);
+      _brokerGrpcServer.start();
+    } else {
+      LOGGER.info("BrokerGrpcServer is not enabled");
+    }
+
     LOGGER.info("Initializing cluster change mediator");
     for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
@@ -519,6 +534,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
     }
+    // Update GRPC query engine port
+    if (BrokerGrpcServer.isEnabled(_brokerConf)) {
+      int grpcPort = BrokerGrpcServer.getGrpcPort(_brokerConf);
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, grpcPort);
+    } else {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, -1);
+    }
+
     // Update multi-stage query engine ports
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
@@ -549,6 +572,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       instanceTags = instanceConfig.getTags();
       updated = true;
     }
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
     if (updated) {
       HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
     }
@@ -643,6 +667,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       Thread.sleep(delayShutdownTimeMs);
     } catch (Exception e) {
       LOGGER.error("Caught exception while waiting for shutdown delay of {}ms", delayShutdownTimeMs, e);
+    }
+
+    if (_brokerGrpcServer != null) {
+      LOGGER.info("Stopping broker grpc server");
+      _brokerGrpcServer.shutdown();
     }
 
     LOGGER.info("Shutting down request handler and broker admin application");

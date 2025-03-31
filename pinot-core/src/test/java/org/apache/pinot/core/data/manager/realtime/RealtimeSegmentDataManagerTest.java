@@ -28,10 +28,8 @@ import java.time.Instant;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -54,7 +52,12 @@ import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -65,7 +68,6 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -92,7 +94,8 @@ public class RealtimeSegmentDataManagerTest {
   private static final long START_OFFSET_VALUE = 198L;
   private static final LongMsgOffset START_OFFSET = new LongMsgOffset(START_OFFSET_VALUE);
 
-  private final Map<Integer, Semaphore> _partitionGroupIdToSemaphoreMap = new ConcurrentHashMap<>();
+  private final Map<Integer, ConsumerCoordinator> _partitionGroupIdToConsumerCoordinatorMap =
+      new ConcurrentHashMap<>();
 
   private static TableConfig createTableConfig()
       throws Exception {
@@ -112,6 +115,15 @@ public class RealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
     when(tableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+    if (tableConfig.isUpsertEnabled()) {
+      when(tableDataManager.isUpsertEnabled()).thenReturn(true);
+      if (tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL) {
+        when(tableDataManager.isPartialUpsertEnabled()).thenReturn(true);
+      }
+    }
+    if (tableConfig.isDedupEnabled()) {
+      when(tableDataManager.isDedupEnabled()).thenReturn(true);
+    }
     return tableDataManager;
   }
 
@@ -146,14 +158,19 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
+    if (tableConfig.getIngestionConfig() == null) {
+      tableConfig.setIngestionConfig(new IngestionConfig());
+    }
+    tableConfig.getIngestionConfig().setRetryOnSegmentBuildPrecheckFailure(true);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
-    _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, tableDataManager));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
         new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
-        _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
+        _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, timeSupplier);
   }
 
   @BeforeClass
@@ -248,6 +265,7 @@ public class RealtimeSegmentDataManagerTest {
 
     consumer.run();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    Assert.assertTrue(segmentDataManager._notifySegmentBuildFailedWithDeterministicErrorCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.ERROR);
     segmentDataManager.close();
   }
@@ -730,58 +748,6 @@ public class RealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
-      throws Exception {
-    long timeout = 10_000L;
-    FakeRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
-    Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
-    Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore.availablePermits(), 0);
-    Assert.assertFalse(firstSemaphore.hasQueuedThreads());
-
-    AtomicReference<FakeRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
-
-    // Construct the second segment manager, which will be blocked on the semaphore.
-    Thread constructSecondSegmentManager = new Thread(() -> {
-      try {
-        secondSegmentDataManager.set(createFakeSegmentManager());
-      } catch (Exception e) {
-        throw new RuntimeException("Exception when sleeping for " + timeout + "ms", e);
-      }
-    });
-    constructSecondSegmentManager.start();
-
-    // Wait until the second segment manager gets blocked on the semaphore.
-    TestUtils.waitForCondition(aVoid -> {
-      if (firstSemaphore.hasQueuedThreads()) {
-        // Once verified the second segment gets blocked, release the semaphore.
-        firstSegmentDataManager.close();
-        return true;
-      } else {
-        return false;
-      }
-    }, timeout, "Failed to wait for the second segment blocked on semaphore");
-
-    // Wait for the second segment manager finished the construction.
-    TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
-        "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
-
-    Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
-    Assert.assertEquals(firstSemaphore, secondSemaphore);
-    Assert.assertEquals(secondSemaphore.availablePermits(), 0);
-    Assert.assertFalse(secondSemaphore.hasQueuedThreads());
-
-    // Call offload method the 2nd time on the first segment manager, the permits in semaphore won't increase.
-    firstSegmentDataManager.close();
-    Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
-
-    // The permit finally gets released in the Semaphore.
-    secondSegmentDataManager.get().close();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
-  }
-
-  @Test
   public void testShutdownTableDataManagerWillNotShutdownLeaseExtenderExecutor()
       throws Exception {
     TableConfig tableConfig = createTableConfig();
@@ -881,6 +847,60 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test
+  public void testParallelSegmentConsumptionPolicy()
+      throws Exception {
+    // no partial upsert or dedup enabled.
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager()) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+
+    // enable dedup
+    TableConfig tableConfig = createTableConfig();
+    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE);
+    dedupConfig.setAllowDedupConsumptionDuringCommit(true);
+    tableConfig.setDedupConfig(dedupConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+    dedupConfig.setAllowDedupConsumptionDuringCommit(false);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+    }
+
+    // enable partial upsert
+    tableConfig = createTableConfig();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(true);
+    tableConfig.setUpsertConfig(upsertConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+    upsertConfig.setAllowPartialUpsertConsumptionDuringCommit(false);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.DISALLOW_ALWAYS);
+    }
+
+    // enable full upsert
+    tableConfig = createTableConfig();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    tableConfig.setUpsertConfig(upsertConfig);
+    try (FakeRealtimeSegmentDataManager realtimeSegmentDataManager = createFakeSegmentManager(false, new TimeSupplier(),
+        null, null, tableConfig)) {
+      Assert.assertEquals(realtimeSegmentDataManager.getParallelConsumptionPolicy(),
+          ParallelSegmentConsumptionPolicy.ALLOW_ALWAYS);
+    }
+  }
+
   private static class TimeSupplier implements Supplier<Long> {
     protected final AtomicInteger _timeCheckCounter = new AtomicInteger();
     protected long _timeNow = System.currentTimeMillis();
@@ -906,6 +926,7 @@ public class RealtimeSegmentDataManagerTest {
     public Field _state;
     public Field _shouldStop;
     public Field _stopReason;
+    public Field _segmentBuildFailedWithDeterministicError;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -915,9 +936,10 @@ public class RealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
+    private boolean _notifySegmentBuildFailedWithDeterministicErrorCalled = false;
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
-    public Map<Integer, Semaphore> _semaphoreMap;
+    public Map<Integer, ConsumerCoordinator> _consumerCoordinatorMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
     private boolean _indexCapacityThresholdBreached;
@@ -934,19 +956,23 @@ public class RealtimeSegmentDataManagerTest {
 
     public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
-        LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics,
-        TimeSupplier timeSupplier)
+        LLCSegmentName llcSegmentName, Map<Integer, ConsumerCoordinator> consumerCoordinatorMap,
+        ServerMetrics serverMetrics, TimeSupplier timeSupplier)
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
+          consumerCoordinatorMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null,
+          () -> true);
       _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
       _shouldStop.setAccessible(true);
       _stopReason = RealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
-      _semaphoreMap = semaphoreMap;
+      _segmentBuildFailedWithDeterministicError =
+          RealtimeSegmentDataManager.class.getDeclaredField("_segmentBuildFailedWithDeterministicError");
+      _segmentBuildFailedWithDeterministicError.setAccessible(true);
+      _consumerCoordinatorMap = consumerCoordinatorMap;
       _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
@@ -1022,6 +1048,12 @@ public class RealtimeSegmentDataManagerTest {
       _postConsumeStoppedCalled = true;
     }
 
+    @Override
+    protected void notifySegmentBuildFailedWithDeterministicError() {
+      _notifySegmentBuildFailedWithDeterministicErrorCalled = true;
+    }
+
+
     // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
     // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
     // Invoking now() in any part of RealtimeSegmentDataManager code will break the following tests:
@@ -1051,6 +1083,11 @@ public class RealtimeSegmentDataManagerTest {
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
+        try {
+          _segmentBuildFailedWithDeterministicError.set(this, true);
+        } catch (Exception e) {
+          Assert.fail();
+        }
         return null;
       }
       if (!forCommit) {

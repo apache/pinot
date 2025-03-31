@@ -53,10 +53,10 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This transformer transforms records with varying keys such that they can be stored in a table with a fixed schema.
- * Since these records have varying keys, it is impractical to store each field in its own table column. At the same
- * time, most (if not all) fields may be important to the user, so we should not drop any field unnecessarily. So this
- * transformer primarily takes record-fields that don't exist in the schema and stores them in a type of catchall field.
+ * This transformer transforms records with varied structures so that they can be stored in a Pinot table.
+ * Since the records do not have uniform structure, it is impractical to store each field in its own table column.
+ * In high level, if a field exists in the table schema, this transformer puts the value to the corresponding column.
+ * For those fields which do not exist in the table schema, it stores them in a type of catchall field in a json map.
  * For example, consider this record:
  * <pre>
  * {
@@ -64,40 +64,21 @@ import org.slf4j.LoggerFactory;
  *   "b": "2",
  *   "c": {
  *     "d": 3,
- *     "e_noindex": 4,
- *     "f_noindex": {
- *       "g": 5
- *      },
  *     "x": {
  *       "y": 9,
- *       "z_noindex": 10
  *     }
- *   }
- *   "h_noindex": "6",
- *   "i_noindex": {
- *     "j": 7,
- *     "k": 8
  *   }
  * }
  * </pre>
- * And let's say the table's schema contains these fields:
+ * And let's say the table's schema is:
  * <ul>
  *   <li>a</li>
  *   <li>c</li>
  *   <li>c.d</li>
  * </ul>
  * <p>
- * Notice that the transformer:
- * <ul>
- *   <li>Flattens nested fields which exist in the schema, like "tags.platform"</li>
- *   <li>Moves fields which don't exist in the schema and have the suffix "_noIndex" into the "unindexableExtras" field
- *   (the field name is configurable)</li>
- *   <li>Moves any remaining fields which don't exist in the schema into the "indexableExtras" field (the field name is
- *   configurable)</li>
- * </ul>
- * <p>
  * The record would be transformed into the following (refer to {@link SchemaConformingTransformerConfig} for
- * default constant values):
+ * default constant values) where json_data is the catch-all field:
  * <pre>
  * {
  *   "a": 1,
@@ -110,26 +91,12 @@ import org.slf4j.LoggerFactory;
  *       }
  *     }
  *   }
- *   "json_data_no_idx": {
- *     "c": {
- *       "e_noindex": 4,
- *       "f_noindex": {
- *         "g": 5
- *       },
- *       "x": {
- *         "z_noindex": 10
- *       }
- *     },
- *     "h_noindex": "6",
- *     "i_noindex": {
- *       "j": 7,
- *       "k": 8
- *     }
- *   },
- *   "__mergedTextIndex": [
- *     "1:a", "2:b", "3:c.d", "9:c.x.y"
- *   ]
  * }
+ * Apart from the basic transformation above, this transformer today also does the following additional tasks (which in
+ * future can be decoupled from this transformer):
+ *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate text indexing and search. This
+ *       extra step can be enabled via mergedTextIndexFieldSpec.
+ *    2. Allow users to tag certain fields in the input record not to be included in the catch-all field.
  * </pre>
  * <p>
  */

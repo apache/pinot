@@ -175,10 +175,10 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.6</aws.sdk.version>
-    <azure.sdk.version>1.2.32</azure.sdk.version>
+    <aws.sdk.version>2.31.11</aws.sdk.version>
+    <azure.sdk.version>1.2.33</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
-    <joda-time.version>2.13.1</joda-time.version>
+    <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
@@ -226,13 +226,13 @@
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <httpclient5.version>5.4.2</httpclient5.version>
+    <httpclient5.version>5.4.3</httpclient5.version>
     <httpcore5.version>5.3.4</httpcore5.version>
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.56.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.58.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.37.0</google.errorprone.version>
@@ -259,7 +259,7 @@
     <jna.version>5.17.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.7.1</asm.version>
+    <asm.version>9.8</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
@@ -280,6 +280,7 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
+    <assertj.version>3.27.3</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
@@ -996,11 +997,6 @@
         <version>2.4</version>
       </dependency>
       <dependency>
-        <groupId>org.xerial.larray</groupId>
-        <artifactId>larray-mmap</artifactId>
-        <version>0.4.1</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.zookeeper</groupId>
         <artifactId>zookeeper</artifactId>
         <version>${zookeeper.version}</version>
@@ -1380,7 +1376,7 @@
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
-        <version>1.3.0</version>
+        <version>1.4.0</version>
       </dependency>
 
       <!-- Metrics -->
@@ -2049,6 +2045,12 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2341,7 +2343,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.2</version>
+          <version>4.9.5</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -2447,7 +2449,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.4</version>
+            <version>10.22.0</version>
           </dependency>
         </dependencies>
         <executions>
