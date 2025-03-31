@@ -311,7 +311,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
   private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final long _consumeStartTime;
+  private long _consumeStartTime;
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamConfig _streamConfig;
 
@@ -332,7 +332,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
 
-  private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
+  private StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
   private final boolean _trackFilteredMessageOffsets;
@@ -723,6 +723,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public class PartitionConsumer implements Runnable {
     public void run() {
+      _segmentLogger.info("slow server");
       long initialConsumptionEnd = 0L;
       long lastCatchUpStart = 0L;
       long catchUpTimeMillis = 0L;
@@ -746,6 +747,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _consumerCoordinator.register(_llcSegmentName);
 
         _segmentLogger.info("Acquired consumer semaphore.");
+
+        // Refresh segment end criteria time. This is to avoid scenarios where consumer waits a longer period of time
+        // before acquiring semaphore. These scenarios can lead to creation of small segments because segment
+        // consumption is terminated early.
+        _consumeStartTime = now();
+        setConsumeEndTime(_segmentZKMetadata, _consumeStartTime);
 
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
