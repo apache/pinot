@@ -1833,7 +1833,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
         .stream()
-        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == null));
+        .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == -1));
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 

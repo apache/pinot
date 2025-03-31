@@ -297,7 +297,6 @@ public class RebalanceSummaryResult {
     }
   }
 
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ConsumingSegmentToBeMovedSummary {
     private final int _numConsumingSegmentsToBeMoved;
     private final int _numServerGettingConsumingSegmentsAdded;
@@ -359,18 +358,16 @@ public class RebalanceSummaryResult {
       return _serverConsumingSegmentSummary;
     }
 
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ConsumingSegmentSummaryPerServer {
       private final int _numConsumingSegmentToBeAdded;
       // How much offset this server would need to catch up to consume its newly added consuming segments from their
       // start offset to latest offset in the topic
-      private final Integer _totalOffsetsToCatchUpAcrossAllConsumingSegments;
+      private final int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
       @JsonCreator
       public ConsumingSegmentSummaryPerServer(
           @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
-          @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments") @Nullable
-          Integer totalOffsetsToCatchUpAcrossAllConsumingSegments) {
+          @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments") int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
         _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
         _totalOffsetsToCatchUpAcrossAllConsumingSegments = totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
@@ -381,7 +378,7 @@ public class RebalanceSummaryResult {
       }
 
       @JsonProperty
-      public Integer getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
+      public int getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
         return _totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
     }

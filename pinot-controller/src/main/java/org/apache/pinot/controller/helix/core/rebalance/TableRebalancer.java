@@ -51,6 +51,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -62,6 +63,7 @@ import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -898,11 +900,12 @@ public class TableRebalancer {
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         consumingSegmentSummaryPerServer.put(server,
             new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
-                segments.size(), null));
+                segments.size(), -1));
       });
     }
 
-    Map<String, Integer> consumingSegmentsOldestTopN = getTopNConsumingSegmentWithValue(consumingSegmentsAge);
+    Map<String, Integer> consumingSegmentsOldestTopN =
+        consumingSegmentsAge == null ? null : getTopNConsumingSegmentWithValue(consumingSegmentsAge);
 
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
         newServersToConsumingSegmentMap.size(), consumingSegmentsOffsetsToCatchUpTopN, consumingSegmentsOldestTopN,
@@ -921,24 +924,33 @@ public class TableRebalancer {
   }
 
   /**
-   * Fetches the age of each consuming segment.
+   * Fetches the age of each consuming segment in minutes.
    * The age of a consuming segment is the time since the segment was created in ZK, it could be different to when
    * the stream should start to be consumed for the segment.
    * consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata. Returns a map from
    * segment name to the age of that consuming segment. Return null if failed to obtain info for any consuming segment.
    */
+  @Nullable
   private Map<String, Integer> getConsumingSegmentsAge(String tableNameWithType,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
     Map<String, Integer> consumingSegmentsAge = new HashMap<>();
     long now = System.currentTimeMillis();
-    consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
-      long creationTime = segmentZKMetadata.getCreationTime();
-      if (creationTime < 0) {
-        LOGGER.warn("Creation time is not found for segment: {} in table: {}", s, tableNameWithType);
-        return;
-      }
-      consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
-    }));
+    try {
+      consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
+        if (segmentZKMetadata == null) {
+          LOGGER.warn("SegmentZKMetadata is null for segment: {} in table: {}", s, tableNameWithType);
+          throw new RuntimeException("SegmentZKMetadata is null");
+        }
+        long creationTime = segmentZKMetadata.getCreationTime();
+        if (creationTime < 0) {
+          LOGGER.warn("Creation time is not found for segment: {} in table: {}", s, tableNameWithType);
+          throw new RuntimeException("Creation time is not found");
+        }
+        consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
+      }));
+    } catch (Exception e) {
+      return null;
+    }
     return consumingSegmentsAge;
   }
 
@@ -956,12 +968,9 @@ public class TableRebalancer {
    * Returns a map from segment name to the number of offsets to catch up for that consuming
    * segment. Return null if failed to obtain info for any consuming segment.
    */
+  @Nullable
   private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(String tableNameWithType,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
-    if (consumingSegmentZKMetadata.isEmpty()) {
-      LOGGER.info("No consuming segments being moved for table: {}", tableNameWithType);
-      return new HashMap<>();
-    }
     ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
     if (consumingSegmentInfoReader == null) {
       LOGGER.warn("ConsumingSegmentInfoReader is null, cannot calculate consuming segments info for table: {}",
