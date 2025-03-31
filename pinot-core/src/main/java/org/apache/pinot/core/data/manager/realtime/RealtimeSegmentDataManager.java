@@ -332,7 +332,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
 
-  private StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
+  private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
   private final List<String> _filteredMessageOffsets = new ArrayList<>();
   private final boolean _trackFilteredMessageOffsets;
