@@ -42,8 +42,8 @@ public class SegmentStarTreePreprocessThrottler extends BaseSegmentOperationsThr
   public SegmentStarTreePreprocessThrottler(int maxStarTreePreprocessConcurrency,
       int maxStarTreePreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
     super(maxStarTreePreprocessConcurrency, maxStarTreePreprocessConcurrencyBeforeServingQueries, isServingQueries,
-        ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD,
-        ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT, LOGGER);
+        ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT,
+        LOGGER);
   }
 
   @Override

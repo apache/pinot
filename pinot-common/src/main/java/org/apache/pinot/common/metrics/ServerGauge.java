@@ -58,7 +58,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD("segmentTableDownloadThrottleThreshold", false),
   SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD("segmentDownloadThrottleThreshold", true),
   SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD("segmentAllPreprocessThrottleThreshold", true),
-  SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD("segmentStartreePreprocessDownloadThreshold", true),
+  SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD("segmentStartreePreprocessThreshold", true),
   // Segment operation metrics - count is the current number of segments undergoing the given operation.
   // Incremented when the semaphore is acquired and decremented when the semaphore is released
   SEGMENT_TABLE_DOWNLOAD_COUNT("segmentTableDownloadCount", false),

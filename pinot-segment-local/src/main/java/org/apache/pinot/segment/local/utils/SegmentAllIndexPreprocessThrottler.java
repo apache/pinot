@@ -41,8 +41,7 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThr
   public SegmentAllIndexPreprocessThrottler(int maxPreprocessConcurrency,
       int maxPreprocessConcurrencyBeforeServingQueries, boolean isServingQueries) {
     super(maxPreprocessConcurrency, maxPreprocessConcurrencyBeforeServingQueries, isServingQueries,
-        ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT,
-        LOGGER);
+        ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, LOGGER);
   }
 
   @Override
