@@ -42,6 +42,7 @@ import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.MapIndexFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
@@ -55,6 +56,7 @@ import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndex
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -190,6 +192,36 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
+   * Map filter can be applied iff:
+   * <ul>
+   *   <li>Predicate </li>
+   *   <li>Map has index like </li>
+   * </ul>
+   */
+  private boolean canApplyMapFilter(Predicate predicate, String column) {
+    // Get column name and key name from function arguments
+    List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
+    if (arguments.size() != 2) {
+      throw new IllegalStateException("Expected two arguments (column name and key name), found: " + arguments.size());
+    }
+
+    // First argument is column name
+    String columnName = arguments.get(0).getIdentifier();
+    // Second argument is key name
+    String keyName = arguments.get(1).getIdentifier();
+
+    DataSource dataSource = _indexSegment.getDataSource(columnName);
+
+    if (dataSource instanceof MapDataSource) {
+      MapDataSource mapDS = (MapDataSource) dataSource;
+      DataSource keyDS = mapDS.getKeyDataSource(keyName);
+      JsonIndexReader jsonIndex = keyDS.getJsonIndex();
+      return jsonIndex != null;
+    }
+    return false;
+  }
+
+  /**
    * Helper method to build the operator tree from the filter.
    */
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter, int numDocs) {
@@ -235,6 +267,8 @@ public class FilterPlanNode implements PlanNode {
             return new H3IndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
+          } else if (canApplyMapFilter(predicate, lhs.getIdentifier())) {
+            return new MapIndexFilterOperator(_indexSegment, predicate, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
