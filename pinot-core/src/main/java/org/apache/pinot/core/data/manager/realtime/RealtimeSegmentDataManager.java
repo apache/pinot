@@ -723,7 +723,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public class PartitionConsumer implements Runnable {
     public void run() {
-      _segmentLogger.info("slow server");
       long initialConsumptionEnd = 0L;
       long lastCatchUpStart = 0L;
       long catchUpTimeMillis = 0L;
