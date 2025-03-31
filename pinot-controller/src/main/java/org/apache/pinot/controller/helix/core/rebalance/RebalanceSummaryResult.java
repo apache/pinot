@@ -36,7 +36,6 @@ import javax.annotation.Nullable;
 public class RebalanceSummaryResult {
   private final ServerInfo _serverInfo;
   private final SegmentInfo _segmentInfo;
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final List<TagInfo> _tagsInfo;
 
   /**
@@ -68,6 +67,7 @@ public class RebalanceSummaryResult {
     return _tagsInfo;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerSegmentChangeInfo {
     private final ServerStatus _serverStatus;
     private final int _totalSegmentsAfterRebalance;
@@ -134,7 +134,6 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<String> getTagList() {
       return _tagList;
     }
@@ -360,6 +359,7 @@ public class RebalanceSummaryResult {
       return _serverConsumingSegmentSummary;
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ConsumingSegmentSummaryPerServer {
       private final int _numConsumingSegmentToBeAdded;
       // How much offset this server would need to catch up to consume its newly added consuming segments from their
@@ -381,7 +381,6 @@ public class RebalanceSummaryResult {
       }
 
       @JsonProperty
-      @JsonInclude(JsonInclude.Include.NON_NULL)
       public Integer getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
         return _totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
