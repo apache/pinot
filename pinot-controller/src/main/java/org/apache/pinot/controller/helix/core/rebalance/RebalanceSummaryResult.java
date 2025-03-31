@@ -300,21 +300,27 @@ public class RebalanceSummaryResult {
   public static class ConsumingSegmentToBeMovedSummary {
     private final int _numConsumingSegmentsToBeMoved;
     private final int _numServerGettingConsumingSegmentsAdded;
-    // the top N consuming segments with most offsets to be consumed by a server. this is essentially the difference
-    // between the latest offset of the stream and the segment's start offset of the stream
     private final Map<String, Integer> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
-    // top N oldest consuming segments. the age of a segment is determined by its creation time
     private final Map<String, Integer> _oldestConsumingSegmentsToBeMovedInMinutes;
     private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
 
     /**
-     * Constructor for ConsumingSegmentInfo
+     * Constructor for ConsumingSegmentToBeMovedSummary
      * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
      * @param numServerGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
-     * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up
-     * @param oldestConsumingSegmentsToBeMovedInMinutes oldest consuming segments to be moved to catch up
-     * @param serverConsumingSegmentSummary offsets of consuming segments to be moved to catch up per
-     *                                                   server
+     * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up.
+     *                                                           Map from segment name to its number of offsets to
+     *                                                           catch up on the new server. This is essentially the
+     *                                                           difference between the latest offset of the stream
+     *                                                           and the segment's start offset of the stream. Set to
+     *                                                           null if the number of offsets to catch up could not
+     *                                                           be determined for any consuming segment
+     * @param oldestConsumingSegmentsToBeMovedInMinutes oldest consuming segments to be moved to catch up. Map from
+     *                                                  segment name to its age in minutes. The age of a segment is
+     *                                                  determined by its creation time from ZK metadata. Set to null
+     *                                                  if ZK metadata is not available or the creation time is not
+     *                                                  found for any consuming segment
+     * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
      */
     @JsonCreator
     public ConsumingSegmentToBeMovedSummary(
@@ -360,14 +366,24 @@ public class RebalanceSummaryResult {
 
     public static class ConsumingSegmentSummaryPerServer {
       private final int _numConsumingSegmentToBeAdded;
-      // How much offset this server would need to catch up to consume its newly added consuming segments from their
-      // start offset to latest offset in the topic
       private final int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
+      /**
+       * Constructor for ConsumingSegmentSummaryPerServer
+       * @param numConsumingSegmentToBeAdded number of consuming segments to be added to this server
+       * @param totalOffsetsToCatchUpAcrossAllConsumingSegments total number of offsets to catch up across all consuming
+       *                                                         segments. The number of offsets to catch up for a
+       *                                                         consuming segment is essentially the difference
+       *                                                         between the latest offset of the stream and the
+       *                                                         segment's start offset of the stream. Set to -1 if
+       *                                                         the offsets to catch up could not be determined for
+       *                                                         any consuming segment
+       */
       @JsonCreator
       public ConsumingSegmentSummaryPerServer(
           @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
-          @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments") int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
+          @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments")
+          int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
         _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
         _totalOffsetsToCatchUpAcrossAllConsumingSegments = totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
@@ -405,6 +421,7 @@ public class RebalanceSummaryResult {
      * @param replicationFactor replication factor before and after this rebalance
      * @param numSegmentsInSingleReplica number of segments in single replica before and after this rebalance
      * @param numSegmentsAcrossAllReplicas total number of segments across all replicas before and after this rebalance
+     * @param consumingSegmentToBeMovedSummary consuming segment summary. Set to null if the table is an offline table
      */
     @JsonCreator
     public SegmentInfo(@JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
