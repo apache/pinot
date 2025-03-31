@@ -314,12 +314,12 @@ public class RebalanceSummaryResult {
      *                                                           difference between the latest offset of the stream
      *                                                           and the segment's start offset of the stream. Set to
      *                                                           null if the number of offsets to catch up could not
-     *                                                           be determined for any consuming segment
+     *                                                           be determined for at least one consuming segment
      * @param oldestConsumingSegmentsToBeMovedInMinutes oldest consuming segments to be moved to catch up. Map from
      *                                                  segment name to its age in minutes. The age of a segment is
      *                                                  determined by its creation time from ZK metadata. Set to null
      *                                                  if ZK metadata is not available or the creation time is not
-     *                                                  found for any consuming segment
+     *                                                  found for at least one consuming segment
      * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
      */
     @JsonCreator
@@ -377,7 +377,7 @@ public class RebalanceSummaryResult {
        *                                                         between the latest offset of the stream and the
        *                                                         segment's start offset of the stream. Set to -1 if
        *                                                         the offsets to catch up could not be determined for
-       *                                                         any consuming segment
+       *                                                         at least one consuming segment
        */
       @JsonCreator
       public ConsumingSegmentSummaryPerServer(
