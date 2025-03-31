@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -664,10 +665,10 @@ public class TableRebalancer {
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       existingReplicationFactor = entrySet.getValue().size();
       String segmentName = entrySet.getKey();
-      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && entrySet.getValue()
-          .values()
-          .stream()
-          .allMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+      Collection<String> segmentStates = entrySet.getValue().values();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && segmentStates.stream()
+          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && segmentStates.stream()
+          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING));
 
       for (String instanceName : entrySet.getValue().keySet()) {
         existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
