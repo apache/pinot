@@ -999,7 +999,7 @@ public class TableRebalancer {
           return null;
         }
       }
-    } catch (InvalidConfigException e) {
+    } catch (Exception e) {
       LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);
       return null;
     }
