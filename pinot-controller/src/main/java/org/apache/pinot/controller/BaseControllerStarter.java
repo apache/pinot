@@ -132,6 +132,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -809,10 +810,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     _taskManagerStatusCache = getTaskManagerStatusCache();
-    _taskManager =
-        new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager,
-            _resourceUtilizationManager);
+    // Create and add task manager
+    _taskManager = createTaskManager();
     periodicTasks.add(_taskManager);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
@@ -860,6 +859,27 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(resourceUtilizationChecker);
 
     return periodicTasks;
+  }
+
+  /**
+   * Creates a TaskManager instance  as specified in the configuration.
+   */
+  private PinotTaskManager createTaskManager() {
+    String taskManagerClass = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TASK_MANAGER_CLASS,
+        CommonConstants.Controller.DEFAULT_TASK_MANAGER_CLASS);
+    LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
+    try {
+      return PluginManager.get().createInstance(taskManagerClass,
+          new Class[]{PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
+              ControllerConf.class, ControllerMetrics.class, TaskManagerStatusCache.class,
+              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class},
+          new Object[]{_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+              _config, _controllerMetrics, _taskManagerStatusCache, _executorService,
+              _connectionManager, _resourceUtilizationManager});
+    } catch (Exception e) {
+      LOGGER.error("Failed to create task manager with class: {}", taskManagerClass, e);
+      throw new RuntimeException("Failed to create task manager with class: " + taskManagerClass, e);
+    }
   }
 
   @Override
