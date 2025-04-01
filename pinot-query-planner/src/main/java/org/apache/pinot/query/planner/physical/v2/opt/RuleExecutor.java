@@ -53,7 +53,7 @@ public abstract class RuleExecutor implements PRelNodeTransformer {
         PRelNode modifiedInput = execute(input);
         if (modifiedInput != input) {
           newInputs.set(index, modifiedInput);
-          currentNode = currentNode.copy(Collections.unmodifiableList(newInputs));
+          currentNode = currentNode.with(Collections.unmodifiableList(newInputs));
           _parents.removeLast();
           _parents.addLast(currentNode);
         }

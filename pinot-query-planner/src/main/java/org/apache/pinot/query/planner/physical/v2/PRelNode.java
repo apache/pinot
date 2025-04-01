@@ -81,13 +81,13 @@ public interface PRelNode {
     return null;
   }
 
-  PRelNode copy(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution);
+  PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution);
 
-  default PRelNode copy(List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
-    return copy(getNodeId(), newInputs, newDistribution);
+  default PRelNode with(List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
+    return with(getNodeId(), newInputs, newDistribution);
   }
 
-  default PRelNode copy(List<PRelNode> newInputs) {
-    return copy(getNodeId(), newInputs, getPinotDataDistributionOrThrow());
+  default PRelNode with(List<PRelNode> newInputs) {
+    return with(getNodeId(), newInputs, getPinotDataDistributionOrThrow());
   }
 }

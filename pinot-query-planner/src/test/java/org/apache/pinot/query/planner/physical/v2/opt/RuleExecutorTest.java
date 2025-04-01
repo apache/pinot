@@ -185,7 +185,7 @@ public class RuleExecutorTest {
     }
 
     @Override
-    public PRelNode copy(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
+    public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
       return new MockPRelNode(newNodeId, newInputs);
     }
   }

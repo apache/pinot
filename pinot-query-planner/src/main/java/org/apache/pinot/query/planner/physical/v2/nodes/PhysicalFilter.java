@@ -88,7 +88,7 @@ public class PhysicalFilter extends Filter implements PRelNode {
   }
 
   @Override
-  public PRelNode copy(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
+  public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalFilter(getCluster(), getTraitSet(), getHints(), condition, newNodeId, newInputs.get(0),
         newDistribution, _leafStage);
   }
