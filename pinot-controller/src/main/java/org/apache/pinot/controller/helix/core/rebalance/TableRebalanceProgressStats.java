@@ -27,7 +27,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
  * is 4 and _replicasToRebalance is 16.
  */
-@JsonPropertyOrder({"status", "startTimeMs", "timeToCompleteRebalanceInSeconds", "completionStatusMsg",
+@JsonPropertyOrder({"status", "startTimeMs", "timeToFinishInSeconds", "completionStatusMsg",
     "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
     "currentToTargetConvergence", "externalViewToIdealStateConvergence"})
 public class TableRebalanceProgressStats {
@@ -36,7 +36,7 @@ public class TableRebalanceProgressStats {
   private RebalanceResult.Status _status;
   // When did Rebalance start
   private long _startTimeMs;
-  // How long did rebalance take
+  // How long did rebalance take, this is only updated when rebalance completesg
   private long _timeToFinishInSeconds;
   // Success/failure message
   private String _completionStatusMsg;
