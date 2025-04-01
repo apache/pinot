@@ -55,6 +55,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskDriver;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
@@ -699,6 +700,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    // log zookeeper's JUTE_MAX_BUFFER value, default is 0xfffff bytes (just under 1MB)
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.ZK_JUTE_MAX_BUFFER,
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     ControllerMetrics.register(_controllerMetrics);
     _validationMetrics = new ValidationMetrics(_metricsRegistry);
   }
