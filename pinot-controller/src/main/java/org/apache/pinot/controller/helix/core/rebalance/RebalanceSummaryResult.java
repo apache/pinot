@@ -309,6 +309,7 @@ public class RebalanceSummaryResult {
   public static class SegmentInfo {
     // TODO: Add a metric to estimate the total time it will take to rebalance
     private final int _totalSegmentsToBeMoved;
+    private final int _totalSegmentsToBeDeleted;
     private final int _maxSegmentsAddedToASingleServer;
     private final long _estimatedAverageSegmentSizeInBytes;
     private final long _totalEstimatedDataToBeMovedInBytes;
@@ -322,6 +323,7 @@ public class RebalanceSummaryResult {
     /**
      * Constructor for SegmentInfo
      * @param totalSegmentsToBeMoved total number of segments to be moved as part of this rebalance
+     * @param totalSegmentsToBeDeleted total number of segments to be deleted from any server as part of this rebalance
      * @param maxSegmentsAddedToASingleServer maximum segments added to a single server as part of this rebalance
      * @param estimatedAverageSegmentSizeInBytes estimated average size of segments in bytes
      * @param totalEstimatedDataToBeMovedInBytes total estimated amount of data to be moved as part of this rebalance
@@ -331,6 +333,7 @@ public class RebalanceSummaryResult {
      */
     @JsonCreator
     public SegmentInfo(@JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
+        @JsonProperty("totalSegmentsToBeDeleted") int totalSegmentsToBeDeleted,
         @JsonProperty("maxSegmentsAddedToASingleServer") int maxSegmentsAddedToASingleServer,
         @JsonProperty("estimatedAverageSegmentSizeInBytes") long estimatedAverageSegmentSizeInBytes,
         @JsonProperty("totalEstimatedDataToBeMovedInBytes") long totalEstimatedDataToBeMovedInBytes,
@@ -338,6 +341,7 @@ public class RebalanceSummaryResult {
         @JsonProperty("numSegmentsInSingleReplica") @Nullable RebalanceChangeInfo numSegmentsInSingleReplica,
         @JsonProperty("numSegmentsAcrossAllReplicas") @Nullable RebalanceChangeInfo numSegmentsAcrossAllReplicas) {
       _totalSegmentsToBeMoved = totalSegmentsToBeMoved;
+      _totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
       _maxSegmentsAddedToASingleServer = maxSegmentsAddedToASingleServer;
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
       _totalEstimatedDataToBeMovedInBytes = totalEstimatedDataToBeMovedInBytes;
@@ -349,6 +353,11 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public int getTotalSegmentsToBeMoved() {
       return _totalSegmentsToBeMoved;
+    }
+
+    @JsonProperty
+    public int getTotalSegmentsToBeDeleted() {
+      return _totalSegmentsToBeDeleted;
     }
 
     @JsonProperty
