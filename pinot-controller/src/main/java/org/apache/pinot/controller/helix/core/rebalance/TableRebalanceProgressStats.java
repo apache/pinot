@@ -36,7 +36,7 @@ public class TableRebalanceProgressStats {
   private RebalanceResult.Status _status;
   // When did Rebalance start
   private long _startTimeMs;
-  // How long did rebalance take, this is only updated when rebalance completesg
+  // How long did rebalance take, this is only updated when rebalance completes
   private long _timeToFinishInSeconds;
   // Success/failure message
   private String _completionStatusMsg;
