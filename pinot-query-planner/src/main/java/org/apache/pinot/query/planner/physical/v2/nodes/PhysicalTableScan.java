@@ -55,6 +55,7 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
 
   @Override
   public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
+    Preconditions.checkState(inputs.isEmpty(), "No inputs expected for PhysicalTableScan. Found: %s", inputs);
     return new PhysicalTableScan(getCluster(), traitSet, getHints(), getTable(), _nodeId, _pinotDataDistribution,
         _tableScanMetadata);
   }
