@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -116,6 +117,59 @@ public class PriorityGroupInstanceSelectorTest {
     assertTrue(result.isPresent());
     assertEquals(result.get().getInstance(), "server4");
     assertEquals(result.get().getReplicaGroup(), 3);
+  }
+
+  @Test
+  public void testRankWithEmptyCandidates() {
+    List<String> result = _selector.rank(_context, Collections.emptyList());
+    assertTrue(result.isEmpty());
+  }
+
+  @Test
+  public void testRankWithNoPreferredGroups() {
+    // Setup
+    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+        createCandidate("server1", 1),
+        createCandidate("server2", 2),
+        createCandidate("server3", 3)
+    );
+    when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
+    when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
+        Pair.of("server2", 0.8),
+        Pair.of("server1", 0.6),
+        Pair.of("server3", 0.4)
+    ));
+
+    // Execute
+    List<String> result = _selector.rank(_context, candidates);
+
+    // Verify
+    assertEquals(result, Arrays.asList("server2", "server1", "server3"));
+  }
+
+  @Test
+  public void testRankWithPreferredGroups() {
+    // Setup
+    List<SegmentInstanceCandidate> candidates = Arrays.asList(
+        createCandidate("server1", 1),
+        createCandidate("server2", 2),
+        createCandidate("server3", 1),
+        createCandidate("server4", 3)
+    );
+    when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
+    when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
+        Pair.of("server4", 0.9),
+        Pair.of("server2", 0.8),
+        Pair.of("server1", 0.7),
+        Pair.of("server3", 0.6)
+    ));
+
+    // Execute
+    List<String> result = _selector.rank(_context, candidates);
+
+    // Verify
+    // Group 2 servers should come first, followed by group 1 servers, then others
+    assertEquals(result, Arrays.asList("server2", "server1", "server3", "server4"));
   }
 
   private SegmentInstanceCandidate createCandidate(String instance, int replicaGroup) {

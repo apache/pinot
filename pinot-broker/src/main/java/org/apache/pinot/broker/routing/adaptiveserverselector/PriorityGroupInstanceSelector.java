@@ -1,6 +1,7 @@
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -8,6 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate;
 
 
@@ -90,6 +93,67 @@ public class PriorityGroupInstanceSelector {
     }
     assert false;
     return Optional.empty();
+  }
+
+  /**
+   * Invoke adaptiveServerSelector to get the original ranking the servers. Reorder the servers based on
+   * the replica group preference. The head of the OrderedPreferredGroups list is the most preferred group.
+   * The servers in the same group are ranked by the original ranking.
+   *
+   * Example:
+   * Given:
+   *   - Server candidates:
+   *     - server1 (group 1, score 0.7)
+   *     - server2 (group 2, score 0.8)
+   *     - server3 (group 1, score 0.6)
+   *     - server4 (group 3, score 0.9)
+   *   - Ordered preferred groups: [2, 1]
+   *
+   * Original ranking by score would be: [server4, server2, server1, server3]
+   * Final ranking after group preference: [server2, server1, server3, server4]
+   * Because:
+   *   1. Group 2 servers come first (server2)
+   *   2. Group 1 servers come next, maintaining their relative order (server1, server3)
+   *   3. Remaining servers come last (server4)
+   *
+   * @param ctx the server selection context containing ordered preferred groups
+   * @param serverCandidates the server candidates to be ranked
+   * @return the ranked servers, ordered by group preference and then by original ranking within each group
+   */
+  public List<String> rank(ServerSelectionContext ctx, List<SegmentInstanceCandidate> serverCandidates) {
+    if (serverCandidates == null || serverCandidates.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    // TODO: return the pos of the selected server in the input array rather than the server instance id.
+    List<Pair<String, Double>> serverRankListWithScores = _adaptiveServerSelector.fetchServerRankingsWithScores(
+        serverCandidates.stream()
+        .map(SegmentInstanceCandidate::getInstance)
+        .collect(Collectors.toList()));
+
+    List<Integer> groups = new ArrayList<>(ctx.getOrderedPreferredGroups());
+    List<String> rankedServers = new ArrayList<>();
+    if (groups.isEmpty()) {
+      return serverRankListWithScores.stream().map(Pair::getLeft).collect(Collectors.toList());
+    }
+    Map<String, SegmentInstanceCandidate> idToCandidate = serverCandidates.stream()
+        .map(candidate -> new ImmutablePair<>(candidate.getInstance(), candidate))
+        .collect(Collectors.toMap(Pair::getLeft, Pair::getRight));
+    Set<Integer> preferredGroups = new HashSet<>(groups);
+    Map<Integer, List<String>> groupToRankedServers = new HashMap<>();
+    for (Pair<String, Double> entry : serverRankListWithScores) {
+      int group = idToCandidate.get(entry.getLeft()).getReplicaGroup();
+      group = preferredGroups.contains(group) ? group : Integer.MAX_VALUE;
+      groupToRankedServers.computeIfAbsent(group, k -> new ArrayList<>()).add(entry.getLeft());
+    }
+    groups.add(Integer.MAX_VALUE);
+    for (int group : groups) {
+      List<String> instancesInGroup = groupToRankedServers.get(group);
+      if (instancesInGroup != null) {
+        rankedServers.addAll(instancesInGroup);
+      }
+    }
+    return rankedServers;
   }
 
   private SegmentInstanceCandidate choose(List<SegmentInstanceCandidate> candidates) {
