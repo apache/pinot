@@ -144,7 +144,7 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.18.3</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
-    <async-http-client.version>3.0.1</async-http-client.version>
+    <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
