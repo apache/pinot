@@ -2197,6 +2197,9 @@
               --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
               -Dnet.bytebuddy.experimental=true
+              -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito-core.version}/mockito-core-${mockito-core.version}.jar
+              -Xshare:off
+              -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
           <!-- Explicitly select the test provider, instead of relying on the classpath -->
