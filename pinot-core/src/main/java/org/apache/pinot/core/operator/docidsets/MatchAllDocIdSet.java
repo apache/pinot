@@ -38,4 +38,9 @@ public final class MatchAllDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public boolean isAlwaysTrue() {
+    return true;
+  }
 }
