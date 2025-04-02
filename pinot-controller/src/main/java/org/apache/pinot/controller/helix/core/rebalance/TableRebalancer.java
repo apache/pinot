@@ -1030,7 +1030,8 @@ public class TableRebalancer {
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
-    return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, false, new TableRebalanceLogger(LOGGER));
+    return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, false,
+        new TableRebalanceLogger(LOGGER));
   }
 
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
@@ -1210,7 +1211,8 @@ public class TableRebalancer {
    * a boolean for whether the instance partition is unchanged.
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitionsForTier(TableConfig tableConfig, Tier tier,
-      boolean reassignInstances, boolean bootstrap, boolean dryRun, @Nullable Boolean minimizeDataMovement, TableRebalanceLogger tableRebalanceLogger) {
+      boolean reassignInstances, boolean bootstrap, boolean dryRun, @Nullable Boolean minimizeDataMovement,
+      TableRebalanceLogger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String tierName = tier.getName();
     String instancePartitionsName =
@@ -1265,7 +1267,8 @@ public class TableRebalancer {
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
-      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs, TableRebalanceLogger tableRebalanceLogger)
+      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
+      TableRebalanceLogger tableRebalanceLogger)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1311,7 +1314,6 @@ public class TableRebalancer {
     }
   }
 
-
   @VisibleForTesting
   static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
@@ -1320,6 +1322,7 @@ public class TableRebalancer {
     return isExternalViewConverged(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
         bestEfforts, segmentsToMonitor, new TableRebalanceLogger(LOGGER));
   }
+
   /**
    * NOTE:
    * Only check the segments in the IdealState and being monitored. Extra segments in ExternalView are ignored because
