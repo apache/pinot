@@ -456,6 +456,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+    public static final String CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN =
+            "pinot.broker.enable.dynamic.filtering.semijoin";
+    public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     public static class Request {
       public static final String SQL = "sql";
