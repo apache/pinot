@@ -299,15 +299,15 @@ public class RebalanceSummaryResult {
 
   public static class ConsumingSegmentToBeMovedSummary {
     private final int _numConsumingSegmentsToBeMoved;
-    private final int _numServerGettingConsumingSegmentsAdded;
+    private final int _numServersGettingConsumingSegmentsAdded;
     private final Map<String, Integer> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
-    private final Map<String, Integer> _oldestConsumingSegmentsToBeMovedInMinutes;
+    private final Map<String, Integer> _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
     private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
 
     /**
      * Constructor for ConsumingSegmentToBeMovedSummary
      * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
-     * @param numServerGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
+     * @param numServersGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
      * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up.
      *                                                           Map from segment name to its number of offsets to
      *                                                           catch up on the new server. This is essentially the
@@ -315,27 +315,28 @@ public class RebalanceSummaryResult {
      *                                                           and the segment's start offset of the stream. Set to
      *                                                           null if the number of offsets to catch up could not
      *                                                           be determined for at least one consuming segment
-     * @param oldestConsumingSegmentsToBeMovedInMinutes oldest consuming segments to be moved to catch up. Map from
-     *                                                  segment name to its age in minutes. The age of a segment is
-     *                                                  determined by its creation time from ZK metadata. Set to null
-     *                                                  if ZK metadata is not available or the creation time is not
-     *                                                  found for at least one consuming segment
+     * @param consumingSegmentsToBeMovedWithOldestAgeInMinutes oldest consuming segments to be moved to catch up. Map
+     *                                                         from segment name to its age in minutes. The age of a
+     *                                                         segment is determined by its creation time from ZK
+     *                                                         metadata. Set to null if ZK metadata is not available or
+     *                                                         the creation time is not found for at least one consuming
+     *                                                         segment
      * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
      */
     @JsonCreator
     public ConsumingSegmentToBeMovedSummary(
         @JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
-        @JsonProperty("numServerGettingConsumingSegmentsAdded") int numServerGettingConsumingSegmentsAdded,
+        @JsonProperty("numServersGettingConsumingSegmentsAdded") int numServersGettingConsumingSegmentsAdded,
         @JsonProperty("consumingSegmentsToBeMovedWithMostOffsetsToCatchUp") @Nullable
         Map<String, Integer> consumingSegmentsToBeMovedWithMostOffsetsToCatchUp,
-        @JsonProperty("oldestConsumingSegmentsToBeMovedInMinutes") @Nullable
-        Map<String, Integer> oldestConsumingSegmentsToBeMovedInMinutes,
+        @JsonProperty("consumingSegmentsToBeMovedWithOldestAgeInMinutes") @Nullable
+        Map<String, Integer> consumingSegmentsToBeMovedWithOldestAgeInMinutes,
         @JsonProperty("serverConsumingSegmentSummary") @Nullable
         Map<String, ConsumingSegmentSummaryPerServer> serverConsumingSegmentSummary) {
       _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
-      _numServerGettingConsumingSegmentsAdded = numServerGettingConsumingSegmentsAdded;
+      _numServersGettingConsumingSegmentsAdded = numServersGettingConsumingSegmentsAdded;
       _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp = consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
-      _oldestConsumingSegmentsToBeMovedInMinutes = oldestConsumingSegmentsToBeMovedInMinutes;
+      _consumingSegmentsToBeMovedWithOldestAgeInMinutes = consumingSegmentsToBeMovedWithOldestAgeInMinutes;
       _serverConsumingSegmentSummary = serverConsumingSegmentSummary;
     }
 
@@ -345,8 +346,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public int getNumServerGettingConsumingSegmentsAdded() {
-      return _numServerGettingConsumingSegmentsAdded;
+    public int getNumServersGettingConsumingSegmentsAdded() {
+      return _numServersGettingConsumingSegmentsAdded;
     }
 
     @JsonProperty
@@ -355,8 +356,8 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public Map<String, Integer> getOldestConsumingSegmentsToBeMovedInMinutes() {
-      return _oldestConsumingSegmentsToBeMovedInMinutes;
+    public Map<String, Integer> getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() {
+      return _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
     }
 
     @JsonProperty
@@ -365,12 +366,12 @@ public class RebalanceSummaryResult {
     }
 
     public static class ConsumingSegmentSummaryPerServer {
-      private final int _numConsumingSegmentToBeAdded;
+      private final int _numConsumingSegmentsToBeAdded;
       private final int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
       /**
        * Constructor for ConsumingSegmentSummaryPerServer
-       * @param numConsumingSegmentToBeAdded number of consuming segments to be added to this server
+       * @param numConsumingSegmentsToBeAdded number of consuming segments to be added to this server
        * @param totalOffsetsToCatchUpAcrossAllConsumingSegments total number of offsets to catch up across all consuming
        *                                                         segments. The number of offsets to catch up for a
        *                                                         consuming segment is essentially the difference
@@ -381,16 +382,16 @@ public class RebalanceSummaryResult {
        */
       @JsonCreator
       public ConsumingSegmentSummaryPerServer(
-          @JsonProperty("numConsumingSegmentToBeAdded") int numConsumingSegmentToBeAdded,
+          @JsonProperty("numConsumingSegmentsToBeAdded") int numConsumingSegmentsToBeAdded,
           @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments")
           int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
-        _numConsumingSegmentToBeAdded = numConsumingSegmentToBeAdded;
+        _numConsumingSegmentsToBeAdded = numConsumingSegmentsToBeAdded;
         _totalOffsetsToCatchUpAcrossAllConsumingSegments = totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
 
       @JsonProperty
-      public int getNumConsumingSegmentToBeAdded() {
-        return _numConsumingSegmentToBeAdded;
+      public int getNumConsumingSegmentsToBeAdded() {
+        return _numConsumingSegmentsToBeAdded;
       }
 
       @JsonProperty

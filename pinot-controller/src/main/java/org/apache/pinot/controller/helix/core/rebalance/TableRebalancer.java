@@ -671,10 +671,10 @@ public class TableRebalancer {
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
       newReplicationFactor = entrySet.getValue().size();
       String segmentName = entrySet.getKey();
-      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && entrySet.getValue()
-          .values()
-          .stream()
-          .allMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+      Collection<String> segmentStates = entrySet.getValue().values();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && segmentStates.stream()
+          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && segmentStates.stream()
+          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING));
       for (String instanceName : entrySet.getValue().keySet()) {
         newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
         if (isSegmentConsuming) {
@@ -981,18 +981,17 @@ public class TableRebalancer {
           LOGGER.warn("Start offset is null for segment: {} in table: {}", segmentName, tableNameWithType);
           return null;
         }
-        if (consumingSegmentInfoList != null && !consumingSegmentInfoList.isEmpty()) {
-          // this value should be the same regardless of which server the consuming segment info is from, use the
-          // first in the list here
-          int offsetsToCatchUp =
-              consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
-                  .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
-          segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
-        } else {
+        if (consumingSegmentInfoList == null || consumingSegmentInfoList.isEmpty()) {
           LOGGER.warn("No available consuming segment info from any server. Segment: {} in table: {}", segmentName,
               tableNameWithType);
           return null;
         }
+        // this value should be the same regardless of which server the consuming segment info is from, use the
+        // first in the list here
+        int offsetsToCatchUp =
+            consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
+                .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
+        segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);

@@ -62,7 +62,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -246,8 +245,6 @@ public class PinotHelixResourceManager {
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
   private ConsumingSegmentInfoReader _consumingSegmentInfoReader;
-  private final ExecutorService _executorService;
-  private HttpClientConnectionManager _connectionManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -275,7 +272,6 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _executorService = executorService;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
   }
