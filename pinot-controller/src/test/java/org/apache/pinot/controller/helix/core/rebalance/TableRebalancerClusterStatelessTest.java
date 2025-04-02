@@ -653,7 +653,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-        _helixResourceManager.getTableSizeReader());
+        _helixResourceManager.getTableSizeReader(), null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -753,7 +753,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-        _helixResourceManager.getTableSizeReader());
+        _helixResourceManager.getTableSizeReader(), null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(2)

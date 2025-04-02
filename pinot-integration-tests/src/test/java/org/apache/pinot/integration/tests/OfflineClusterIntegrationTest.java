@@ -299,7 +299,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
-        _resourceManager.getTableSizeReader());
+        _resourceManager.getTableSizeReader(), null);
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)

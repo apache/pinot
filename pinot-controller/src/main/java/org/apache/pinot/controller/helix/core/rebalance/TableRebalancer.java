@@ -153,12 +153,6 @@ public class TableRebalancer {
     _consumingSegmentInfoReader = consumingSegmentInfoReader;
   }
 
-  public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
-      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader) {
-    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader, null);
-  }
-
   public TableRebalancer(HelixManager helixManager) {
     this(helixManager, null, null, null, null, null);
   }
