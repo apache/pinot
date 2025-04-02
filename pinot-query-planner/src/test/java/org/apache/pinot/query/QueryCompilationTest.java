@@ -71,7 +71,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       _queryEnvironment.planQuery(query);
       fail("query plan should throw exception");
     } catch (RuntimeException e) {
-      assertTrue(e.getCause().getMessage().contains(exceptionSnippet));
+      if (!e.getCause().getMessage().contains(exceptionSnippet)) {
+        fail("Error message: " + e.getCause().getMessage() + " does not contain expected text: " + exceptionSnippet);
+      }
     }
   }
 
@@ -577,7 +579,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         // non-agg column not being grouped
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a", "'a.col1' is not being grouped"},
         // empty IN clause fails compilation
-        new Object[]{"SELECT a.col1 FROM a WHERE a.col1 IN ()", "Encountered \"\" at line"},
+        new Object[]{"SELECT a.col1 FROM a WHERE a.col1 IN ()", "Encountered \" \")\" \") \"\" at line 1, column 39"
+            + ".\n"},
         // AT TIME ZONE should fail
         new Object[]{"SELECT a.col1 AT TIME ZONE 'PST' FROM a", "No match found for function signature AT_TIME_ZONE"},
     };
