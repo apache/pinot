@@ -137,12 +137,12 @@ public class TableRebalanceProgressStats {
   }
 
   /**
-   * Updates the overall progress stats based on the current step's progress stats. This should be called
-   * during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
+   * Updates the overall and step progress stats based on the latest calculated step's progress stats. This should
+   * be called during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
    * @param latestStepStats latest step level stats calculated in this iteration
-   * @return the newly calculated overall progress stats
    */
-  public void updateOverallProgressStatsFromStep(TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
+  public void updateOverallAndStepStatsFromLatestStepStats(
+      TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
     TableRebalanceProgressStats.RebalanceProgressStats lastStepStats = getRebalanceProgressStatsCurrentStep();
     TableRebalanceProgressStats.RebalanceProgressStats overallProgressStats = getRebalanceProgressStatsOverall();
     int numAdditionalSegmentsAdded =
@@ -214,6 +214,7 @@ public class TableRebalanceProgressStats {
     newOverallProgressStats._startTimeMs = getStartTimeMs();
 
     setRebalanceProgressStatsOverall(newOverallProgressStats);
+    setRebalanceProgressStatsCurrentStep(latestStepStats);
   }
 
   public static double calculatePercentageChange(int totalSegmentsToChange, int remainingSegmentsToChange) {
