@@ -31,6 +31,21 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
  */
 public class TableScanMetadata {
   private final Set<String> _scannedTables;
+  /**
+   * Stores workerId, which is an integer, to the segment mapping. The segment mapping is a map from table-type to list
+   * of segments.
+   * <pre>
+   *   {
+   *     0: {
+   *       "OFFLINE": ["segment1", "segment2"],
+   *       "REALTIME": ["segment3"]
+   *     },
+   *     1: {
+   *       ...
+   *     }
+   *   }
+   * </pre>
+   */
   private final Map<Integer, Map<String, List<String>>> _workedIdToSegmentsMap;
   private final Map<String, String> _tableOptions;
   private final Map<String, Set<String>> _unavailableSegmentsMap;

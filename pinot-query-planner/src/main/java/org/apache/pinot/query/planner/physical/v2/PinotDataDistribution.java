@@ -162,12 +162,10 @@ public class PinotDataDistribution {
       return new PinotDataDistribution(RelDistribution.Type.ANY, _workers, _workerHash, null, null);
     }
     Set<HashDistributionDesc> newHashDesc = new HashSet<>();
-    if (_hashDistributionDesc != null) {
-      for (HashDistributionDesc desc : _hashDistributionDesc) {
-        HashDistributionDesc newDescs = desc.apply(targetMapping);
-        if (newDescs != null) {
-          newHashDesc.add(newDescs);
-        }
+    for (HashDistributionDesc desc : _hashDistributionDesc) {
+      HashDistributionDesc newDescs = desc.apply(targetMapping);
+      if (newDescs != null) {
+        newHashDesc.add(newDescs);
       }
     }
     RelDistribution.Type newType = _type;

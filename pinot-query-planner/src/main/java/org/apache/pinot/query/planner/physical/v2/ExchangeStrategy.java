@@ -37,10 +37,6 @@ public enum ExchangeStrategy {
    */
   PARTITIONING_EXCHANGE,
   /**
-   * 1-to-1 but the exchange is a permutation of stream-ids.
-   */
-  PERMUTATION_EXCHANGE,
-  /**
    * stream-ID X will sub-partition: i.e. divide the stream so that the data is sent to the streams
    * {@code X, X + F, X + 2*F, ...}. Here F is the sub-partitioning factor. Records are assigned based on a
    * hash function. This is useful when joining two tables which have different number of partitions, but one of the
