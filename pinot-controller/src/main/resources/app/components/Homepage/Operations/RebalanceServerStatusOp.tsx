@@ -22,13 +22,15 @@ import {
     Grid
 } from "@material-ui/core";
 import Dialog from "../../CustomDialog";
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import moment from "moment/moment";
 import {RebalanceServerSection} from "./RebalanceServer/RebalanceServerSection";
 import CustomCodemirror from "../../CustomCodemirror";
 import './RebalanceServer/RebalanceServerResponses/CustomCodeMirror.css';
 import {RebalanceServerResponseCard} from "./RebalanceServer/RebalanceServerResponses/RebalanceServerResponseCard";
 import CustomizedTables from "../../Table";
+import Utils from "../../../utils/Utils";
+import PinotMethodUtils from "../../../utils/PinotMethodUtils";
 
 export type RebalanceTableSegmentJobs = {
     [key: string]: {
@@ -43,19 +45,25 @@ export type RebalanceTableSegmentJobs = {
 }
 
 type RebalanceServerStatusOpProps = {
-    rebalanceServerStatus: RebalanceTableSegmentJobs;
+    tableName: string;
     hideModal: () => void;
 };
 
 export const RebalanceServerStatusOp = (
-    { rebalanceServerStatus, hideModal } : RebalanceServerStatusOpProps
+    { tableName, hideModal } : RebalanceServerStatusOpProps
 ) => {
+    const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJobs>({})
     const [jobSelected, setJobSelected] = useState<string | null>(null);
+    const [rebalanceContext, setRebalanceContext] = useState<{}>({});
+    const [rebalanceProgressStats, setRebalanceProgressStats] = useState<{}>({});
+
+    useEffect(() => {
+        PinotMethodUtils.fetchTableJobs(tableName, "TABLE_REBALANCE").then(jobs => setRebalanceServerJobs(jobs as RebalanceTableSegmentJobs));
+    }, []);
 
     const BackAction = () => {
         return (
             <Button
-                style={{ textTransform: 'none' }}
                 variant='outlined'
                 color='primary'
                 onClick={() => setJobSelected(null)}
@@ -64,6 +72,27 @@ export const RebalanceServerStatusOp = (
             </Button>
         );
     }
+
+    useEffect(() => {
+        try {
+            if (jobSelected !== null) {
+                setRebalanceContext(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_CONTEXT))
+                setRebalanceProgressStats(JSON.parse(rebalanceServerJobs[jobSelected].REBALANCE_PROGRESS_STATS))
+            }
+        } catch (e) {
+            setRebalanceContext(
+                {
+                    message: 'Failed to load rebalance context'
+                });
+            setRebalanceProgressStats(
+                {
+                    message: 'Failed to load rebalance progress stats'
+                });
+        }
+    }, [jobSelected]);
+
+
+
     return (
         <Dialog
             open={true}
@@ -84,13 +113,13 @@ export const RebalanceServerStatusOp = (
                                 setJobSelected(cell);
                             }}
                             data={{
-                                records: Object.keys(rebalanceServerStatus).map(jobId => {
-                                    const progressStats = JSON.parse(rebalanceServerStatus[jobId].REBALANCE_PROGRESS_STATS);
+                                records: Object.keys(rebalanceServerJobs).map(jobId => {
+                                    const progressStats = JSON.parse(rebalanceServerJobs[jobId].REBALANCE_PROGRESS_STATS);
                                     return [
-                                        rebalanceServerStatus[jobId].jobId,
-                                        rebalanceServerStatus[jobId].tableName,
+                                        rebalanceServerJobs[jobId].jobId,
+                                        rebalanceServerJobs[jobId].tableName,
                                         progressStats.status,
-                                        moment(+rebalanceServerStatus[jobId].submissionTimeMs).format("MMMM Do YYYY, HH:mm:ss")
+                                        Utils.formatTime(+rebalanceServerJobs[jobId].submissionTimeMs)
                                     ];
                                 }),
                                 columns: ['Job id', 'Table name', 'Status', 'Started at']
@@ -103,7 +132,7 @@ export const RebalanceServerStatusOp = (
                                     <RebalanceServerSection sectionTitle={"Progress Stats"} canHideSection showSectionByDefault={true}>
                                         <CustomCodemirror
                                             customClass='rebalance_server_response_section'
-                                            data={JSON.parse(rebalanceServerStatus[jobSelected].REBALANCE_PROGRESS_STATS)}
+                                            data={rebalanceProgressStats}
                                             isEditable={false}
                                         />
                                     </RebalanceServerSection>
@@ -114,7 +143,7 @@ export const RebalanceServerStatusOp = (
                                     <RebalanceServerSection sectionTitle={"Context"} canHideSection showSectionByDefault={true}>
                                         <CustomCodemirror
                                             customClass='rebalance_server_response_section'
-                                            data={JSON.parse(rebalanceServerStatus[jobSelected].REBALANCE_CONTEXT)}
+                                            data={rebalanceContext}
                                             isEditable={false}
                                         />
                                     </RebalanceServerSection>

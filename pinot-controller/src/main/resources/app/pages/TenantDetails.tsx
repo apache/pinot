@@ -155,7 +155,6 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showRebalanceServerModal, setShowRebalanceServerModal] = useState(false);
   const [schemaJSONFormat, setSchemaJSONFormat] = useState(false);
   const [showRebalanceServerStatus, setShowRebalanceServerStatus] = useState(false);
-  const [rebalanceTableJobsData, setRebalanceTableJobsData] = useState<RebalanceTableSegmentJobs>({});
 
   // This is quite hacky, but it's the only way to get this to work with the dialog.
   // The useState variables are simply for the dialog box to know what to render in
@@ -450,15 +449,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     }
   };
 
-  const handleRebalanceTableStatus = async () => {
-    try{
-      setShowRebalanceServerStatus(true);
-      const rebalanceServerJobs = await PinotMethodUtils.fetchTableJobs(tableName, "TABLE_REBALANCE");
-      setRebalanceTableJobsData(rebalanceServerJobs as RebalanceTableSegmentJobs);
-    } catch(error) {
-      dispatch({type: 'error', message: error, show: true});
-      setShowRebalanceServerStatus(false);
-    }
+  const handleRebalanceTableStatus = () => {
+    setShowRebalanceServerStatus(true);
   };
 
   const handleRebalanceBrokers = () => {
@@ -712,7 +704,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
         {showRebalanceServerStatus && (
             <RebalanceServerStatusOp
                 hideModal={() => setShowRebalanceServerStatus(false)}
-                rebalanceServerStatus={rebalanceTableJobsData} />
+                tableName={tableName} />
         )}
         {showRebalanceServerModal && (
           <RebalanceServerTableOp
