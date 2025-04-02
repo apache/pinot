@@ -271,6 +271,24 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
+    <checker-qual.version>3.49.2</checker-qual.version>
+    <groovy-all.version>2.4.21</groovy-all.version>
+    <xml-apis.version>2.0.2</xml-apis.version>
+    <RoaringBitmap.version>1.3.0</RoaringBitmap.version>
+    <jmx_prometheus_javaagent.version>0.19.0</jmx_prometheus_javaagent.version>
+    <fastutil.version>8.5.15</fastutil.version>
+    <disruptor.version>4.0.0</disruptor.version>
+    <snakeyaml.version>2.4</snakeyaml.version>
+    <hadoop-shaded-protobuf_3_25.version>1.4.0</hadoop-shaded-protobuf_3_25.version>
+    <stream.version>2.9.8</stream.version>
+    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <t-digest.version>3.2</t-digest.version>
+    <picocli.version>4.7.6</picocli.version>
+    <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
+    <jopt-simple.version>5.0.4</jopt-simple.version>
+    <ipaddress.version>5.5.1</ipaddress.version>
+    <posix.version>2.27ea1</posix.version>
+    <chronicle-core.version>2.27ea2</chronicle-core.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
@@ -792,22 +810,26 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.2</version>
+        <version>${checker-qual.version}</version>
+<!--        <version>3.49.2</version>-->
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>2.4.21</version>
+        <version>${groovy-all.version}</version>
+<!--        <version>2.4.21</version>-->
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>2.0.2</version>
+        <version>${xml-apis.version}</version>
+<!--        <version>2.0.2</version>-->
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.3.0</version>
+        <version>${RoaringBitmap.version}</version>
+<!--        <version>1.3.0</version>-->
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -829,7 +851,8 @@
       <dependency>
         <groupId>io.prometheus.jmx</groupId>
         <artifactId>jmx_prometheus_javaagent</artifactId>
-        <version>0.19.0</version>
+        <version>${jmx_prometheus_javaagent.version}</version>
+<!--        <version>0.19.0</version>-->
         <scope>test</scope>
       </dependency>
 
@@ -855,7 +878,8 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.15</version>
+        <version>${fastutil.version}</version>
+<!--        <version>8.5.15</version>-->
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -983,7 +1007,8 @@
       <dependency>
         <groupId>com.lmax</groupId>
         <artifactId>disruptor</artifactId>
-        <version>4.0.0</version>
+        <version>${disruptor.version}</version>
+<!--        <version>4.0.0</version>-->
       </dependency>
 
       <dependency>
@@ -994,7 +1019,8 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.4</version>
+        <version>${snakeyaml.version}</version>
+<!--        <version>2.4</version>-->
       </dependency>
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
@@ -1376,7 +1402,8 @@
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
-        <version>1.4.0</version>
+        <version>${hadoop-shaded-protobuf_3_25.version}</version>
+<!--        <version>1.4.0</version>-->
       </dependency>
 
       <!-- Metrics -->
@@ -1414,12 +1441,14 @@
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
-        <version>2.9.8</version>
+        <version>${stream.version}</version>
+<!--        <version>2.9.8</version>-->
       </dependency>
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>6.2.0</version>
+        <version>${datasketches-java.version}</version>
+<!--        <version>6.2.0</version>-->
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1429,7 +1458,8 @@
       <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
-        <version>3.2</version>
+        <version>${t-digest.version}</version>
+<!--        <version>3.2</version>-->
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1559,17 +1589,20 @@
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.6</version>
+        <version>${picocli.version}</version>
+<!--        <version>4.7.6</version>-->
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.2.0</version>
+        <version>${tyrus-standalone-client.version}</version>
+<!--        <version>2.2.0</version>-->
       </dependency>
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
-        <version>5.0.4</version>
+        <version>${jopt-simple.version}</version>
+<!--        <version>5.0.4</version>-->
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1590,18 +1623,21 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.5.1</version>
+        <version>${ipaddress.version}</version>
+<!--        <version>5.5.1</version>-->
       </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.27ea1</version>
+        <version>${posix.version}</version>
+<!--        <version>2.27ea1</version>-->
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.27ea2</version>
+        <version>${chronicle-core.version}</version>
+<!--        <version>2.27ea2</version>-->
       </dependency>
 
       <dependency>
@@ -2070,6 +2106,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
+<!--          <version>${spotless-maven-plugin.version}</version>-->
           <version>2.44.3</version>
           <executions>
             <execution>
@@ -2094,6 +2131,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
+<!--          <version>${appassembler-maven-plugin.version}</version>-->
           <version>2.1.0</version>
           <configuration>
             <binFileExtensions>
@@ -2137,6 +2175,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
+<!--          <version>${jacoco-maven-plugin.version}</version>-->
           <version>0.8.12</version>
         </plugin>
         <plugin>
@@ -2253,16 +2292,19 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
+<!--          <version>${license-maven-plugin.version}</version>-->
           <version>5.0.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>buildnumber-maven-plugin</artifactId>
+<!--          <version>${buildnumber-maven-plugin.version}</version>-->
           <version>3.2.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>versions-maven-plugin</artifactId>
+<!--          <version>${versions-maven-plugin.version}</version>-->
           <version>2.18.0</version>
         </plugin>
         <plugin>
@@ -2272,6 +2314,7 @@
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
               <artifactId>maven-scm-provider-gitexe</artifactId>
+<!--              <version>${maven-scm-provider-gitexe.version}</version>-->
               <version>2.1.0</version>
             </dependency>
           </dependencies>
@@ -2282,6 +2325,7 @@
         <plugin>
           <groupId>org.xolstice.maven.plugins</groupId>
           <artifactId>protobuf-maven-plugin</artifactId>
+<!--          <version>${protobuf-maven-plugin.version}</version>-->
           <version>0.6.1</version>
           <configuration>
             <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
@@ -2333,12 +2377,14 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>javacc-maven-plugin</artifactId>
+<!--          <version>${javacc-maven-plugin.version}</version>-->
           <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>net.java.dev.javacc</groupId>
               <artifactId>javacc</artifactId>
               <!-- Higher version JavaCC throws exception when generating custom Calcite parser -->
+<!--              <version>${javacc.version}</version>-->
               <version>5.0</version>
             </dependency>
           </dependencies>
@@ -2346,6 +2392,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
+<!--          <version>${scala-maven-plugin.version}</version>-->
           <version>4.9.5</version>
           <executions>
             <execution>
@@ -2402,6 +2449,7 @@
         <plugin>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest-maven-plugin</artifactId>
+<!--          <version>${scalatest-maven-plugin.version}</version>-->
           <version>2.2.0</version>
           <configuration>
             <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
@@ -2420,16 +2468,19 @@
         <plugin>
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>
+<!--          <version>${frontend-maven-plugin.version}</version>-->
           <version>1.15.1</version>
         </plugin>
         <plugin>
           <groupId>net.nicoulaj.maven.plugins</groupId>
           <artifactId>checksum-maven-plugin</artifactId>
+<!--          <version>${checksum-maven-plugin.version}</version>-->
           <version>1.11</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
+<!--          <version>${exec-maven-plugin.version}</version>-->
           <version>3.5.0</version>
         </plugin>
       </plugins>
@@ -2452,6 +2503,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
+<!--            <version>${checkstyle.version}</version>-->
             <version>10.22.0</version>
           </dependency>
         </dependencies>
@@ -2768,6 +2820,7 @@
           <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+<!--            <version>${log4j-transform-maven-shade-plugin-extensions.version}</version>-->
             <version>0.2.0</version>
           </dependency>
         </dependencies>
@@ -2842,6 +2895,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jxr-plugin</artifactId>
+<!--        <version>${maven-jxr-plugin.version}</version>-->
         <version>3.6.0</version>
         <configuration>
           <aggregate>true</aggregate>
