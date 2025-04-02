@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import javax.net.ssl.SSLHandshakeException;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -382,8 +383,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       try {
         client.execute(makeGetTables(_internalControllerPort));
         Assert.fail("Must not allow connection from untrusted client");
-      } catch (IOException ignore) {
-        // this should fail
+      } catch (IOException exception) {
+        Assert.assertEquals(exception.getClass(), SSLHandshakeException.class);
+        Assert.assertEquals(exception.getMessage(), "Remote host terminated the handshake");
       }
     }
   }
