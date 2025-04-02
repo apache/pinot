@@ -108,6 +108,7 @@ import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
@@ -201,6 +202,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
   protected TableSizeReader _tableSizeReader;
+  protected ConsumingSegmentInfoReader _consumingSegmentInfoReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected DiskUtilizationChecker _diskUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
@@ -515,8 +517,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _tableSizeReader =
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
             _leadControllerManager);
+    _consumingSegmentInfoReader =
+        new ConsumingSegmentInfoReader(_executorService, _connectionManager, _helixResourceManager);
     _helixResourceManager.registerTableSizeReader(_tableSizeReader);
-    _helixResourceManager.registerConnectionManager(_connectionManager);
+    _helixResourceManager.registerConsumingSegmentInfoReader(_consumingSegmentInfoReader);
     _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
         _helixResourceManager, _config);
 

@@ -122,7 +122,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preChecker.init(_helixResourceManager, executorService, 1);
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader(),
-            executorService, null, _helixResourceManager);
+            null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -1591,12 +1591,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
     }
 
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
-    TableRebalancer tableRebalancerOriginal = new TableRebalancer(_helixManager, null, null, null,
-        _helixResourceManager.getTableSizeReader(), executorService, null, _helixResourceManager);
-    // Spy the table rebalancer to mock the consuming segment info reader
-    TableRebalancer tableRebalancer = Mockito.spy(tableRebalancerOriginal);
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null,
+        _helixResourceManager.getTableSizeReader(), mockConsumingSegmentInfoReader);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -1637,7 +1634,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Mockito.when(
             mockConsumingSegmentInfoReader.getConsumingSegmentsInfo(Mockito.eq(REALTIME_TABLE_NAME), Mockito.anyInt()))
         .thenReturn(new ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap(mockSegmentToConsumingInfoMap, 0, 0));
-    Mockito.doReturn(mockConsumingSegmentInfoReader).when(tableRebalancer).getConsumingSegmentInfoReader();
 
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
@@ -1722,7 +1718,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers * 2; i++) {
       stopAndDropFakeInstance("consumingSegmentSummary_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
-    executorService.shutdown();
   }
 
   @Test
@@ -1736,12 +1731,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
     }
 
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
-    TableRebalancer tableRebalancerOriginal = new TableRebalancer(_helixManager, null, null, null,
-        _helixResourceManager.getTableSizeReader(), executorService, null, _helixResourceManager);
-    // Spy the table rebalancer to mock the consuming segment info reader
-    TableRebalancer tableRebalancer = Mockito.spy(tableRebalancerOriginal);
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null,
+        _helixResourceManager.getTableSizeReader(), mockConsumingSegmentInfoReader);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -1783,7 +1775,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     Mockito.when(
             mockConsumingSegmentInfoReader.getConsumingSegmentsInfo(Mockito.eq(REALTIME_TABLE_NAME), Mockito.anyInt()))
         .thenReturn(new ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap(mockSegmentToConsumingInfoMap, 0, 0));
-    Mockito.doReturn(mockConsumingSegmentInfoReader).when(tableRebalancer).getConsumingSegmentInfoReader();
 
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
@@ -1840,7 +1831,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers * 2; i++) {
       stopAndDropFakeInstance("consumingSegmentSummaryFailure_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
-    executorService.shutdown();
   }
 
   @AfterClass

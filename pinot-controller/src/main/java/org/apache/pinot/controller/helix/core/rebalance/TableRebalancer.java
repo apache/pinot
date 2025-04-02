@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
@@ -42,7 +41,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -66,7 +64,6 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
@@ -138,15 +135,11 @@ public class TableRebalancer {
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
-  private final ExecutorService _executorService;
-  private final HttpClientConnectionManager _connectionManager;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader, @Nullable ExecutorService executorService,
-      @Nullable HttpClientConnectionManager connectionManager,
-      @Nullable PinotHelixResourceManager pinotHelixResourceManager) {
+      @Nullable TableSizeReader tableSizeReader, @Nullable ConsumingSegmentInfoReader consumingSegmentInfoReader) {
     _helixManager = helixManager;
     if (tableRebalanceObserver != null) {
       _tableRebalanceObserver = tableRebalanceObserver;
@@ -157,20 +150,17 @@ public class TableRebalancer {
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
     _tableSizeReader = tableSizeReader;
-    _executorService = executorService;
-    _connectionManager = connectionManager;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    _consumingSegmentInfoReader = consumingSegmentInfoReader;
   }
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
       @Nullable TableSizeReader tableSizeReader) {
-    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader, null, null,
-        null);
+    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader, null);
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null, null, null, null, null);
+    this(helixManager, null, null, null, null, null);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -955,10 +945,7 @@ public class TableRebalancer {
 
   @VisibleForTesting
   ConsumingSegmentInfoReader getConsumingSegmentInfoReader() {
-    if (_executorService == null || _connectionManager == null || _pinotHelixResourceManager == null) {
-      return null;
-    }
-    return new ConsumingSegmentInfoReader(_executorService, _connectionManager, _pinotHelixResourceManager);
+    return _consumingSegmentInfoReader;
   }
 
   /**

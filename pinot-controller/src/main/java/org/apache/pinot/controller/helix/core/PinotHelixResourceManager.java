@@ -160,6 +160,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -244,6 +245,7 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private ConsumingSegmentInfoReader _consumingSegmentInfoReader;
   private final ExecutorService _executorService;
   private HttpClientConnectionManager _connectionManager;
 
@@ -1958,8 +1960,8 @@ public class PinotHelixResourceManager {
     _tableSizeReader = tableSizeReader;
   }
 
-  public void registerConnectionManager(HttpClientConnectionManager connectionManager) {
-    _connectionManager = connectionManager;
+  public void registerConsumingSegmentInfoReader(ConsumingSegmentInfoReader consumingSegmentInfoReader) {
+    _consumingSegmentInfoReader = consumingSegmentInfoReader;
   }
 
   private void assignInstances(TableConfig tableConfig, boolean override) {
@@ -3631,7 +3633,7 @@ public class PinotHelixResourceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker,
-            _tableSizeReader, _executorService, _connectionManager, this);
+            _tableSizeReader, _consumingSegmentInfoReader);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
