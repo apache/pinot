@@ -111,8 +111,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             _tableRebalanceProgressStats.setExternalViewToIdealStateConvergence(latest);
           }
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
-            _tableRebalanceProgressStats.updateOverallProgressStatsFromStep(latestProgress);
-            _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
+            _tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(latestProgress);
           }
           trackStatsInZk();
           updatedStatsInZk = true;
