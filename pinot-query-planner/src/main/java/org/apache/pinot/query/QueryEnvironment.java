@@ -491,7 +491,7 @@ public class QueryEnvironment {
 
   // This method is used to filter out post rules that are not eligible to run based on the config.
   private static boolean isEligibleQueryPostRule(RelOptRule relOptRule, Config config) {
-    if (relOptRule instanceof PinotJoinToDynamicBroadcastRule && !config.defaultEnableDynamicBroadcast()) {
+    if (relOptRule instanceof PinotJoinToDynamicBroadcastRule && !config.defaultEnableDynamicFilteringSemiJoin()) {
       return false;
     }
     return true;
@@ -550,8 +550,8 @@ public class QueryEnvironment {
     }
 
     @Value.Default
-    default boolean defaultEnableDynamicBroadcast() {
-      return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_BROADCAST;
+    default boolean defaultEnableDynamicFilteringSemiJoin() {
+      return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;
     }
 
     /**
