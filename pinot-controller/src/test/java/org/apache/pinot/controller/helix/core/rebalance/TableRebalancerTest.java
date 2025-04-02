@@ -1378,4 +1378,3 @@ public class TableRebalancerTest {
     }
   }
 }
-
