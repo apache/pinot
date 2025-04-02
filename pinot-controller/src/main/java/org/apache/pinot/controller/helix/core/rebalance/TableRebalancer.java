@@ -497,7 +497,7 @@ public class TableRebalancer {
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
       try {
-        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMonitor,
+        idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
             externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
             allOriginalSegmentsIdealState);
       } catch (Exception e) {
@@ -1301,7 +1301,7 @@ public class TableRebalancer {
     }
   }
 
-  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,
+  private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
       Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
       long estimateAverageSegmentSizeInBytes, Set<String> allOriginalSegmentsIdealState)
       throws InterruptedException, TimeoutException {
@@ -1332,7 +1332,7 @@ public class TableRebalancer {
                   _tableRebalanceObserver.getStopStatus()));
         }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-            idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
+            idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);
           return idealState;
         }
@@ -1357,8 +1357,7 @@ public class TableRebalancer {
    * they are not managed by the rebalancer.
    * For each segment checked:
    * - In regular mode, it is okay to have extra instances in ExternalView as long as the instance states in IdealState
-   *   are reached. We still check for this though it will take extra cycles to complete rebalance for a more correct
-   *   convergence check
+   *   are reached.
    * - In low disk mode, instance states in ExternalView must match IdealState to ensure the segments are deleted from
    *   server before moving to the next assignment.
    * For ERROR state in ExternalView, if using best-efforts, log a warning and treat it as good state; if not, throw an
@@ -1367,7 +1366,7 @@ public class TableRebalancer {
   @VisibleForTesting
   static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
-      Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts,
+      Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor) {
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
@@ -1401,8 +1400,8 @@ public class TableRebalancer {
         }
       }
 
-      // Check if there are extra instances in ExternalView that are not in IdealState
-      if (externalViewInstanceStateMap != null) {
+      // For low disk mode, check if there are extra instances in ExternalView that are not in IdealState
+      if (lowDiskMode && externalViewInstanceStateMap != null) {
         for (Map.Entry<String, String> instanceStateEntry : externalViewInstanceStateMap.entrySet()) {
           String instanceName = instanceStateEntry.getKey();
           if (idealStateInstanceStateMap.containsKey(instanceName)) {
@@ -1411,7 +1410,6 @@ public class TableRebalancer {
           if (SegmentStateModel.ERROR.equals(instanceStateEntry.getValue())) {
             handleErrorInstance(tableNameWithType, segmentName, instanceName, bestEfforts);
           } else {
-            LOGGER.info("EV-IS not yet converged due to pending deletions from EV for table: {}", tableNameWithType);
             return false;
           }
         }

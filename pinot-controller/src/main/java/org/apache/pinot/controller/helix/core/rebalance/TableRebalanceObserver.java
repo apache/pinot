@@ -55,13 +55,13 @@ public interface TableRebalanceObserver {
 
   class RebalanceContext {
     private final long _estimatedAverageSegmentSizeInBytes;
-    private final Set<String> _uniqueSegmentList;
+    private final Set<String> _uniqueSegments;
     private final Set<String> _segmentsToMonitor;
 
-    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegmentList,
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
         @Nullable Set<String> segmentsToMonitor) {
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
-      _uniqueSegmentList = uniqueSegmentList;
+      _uniqueSegments = uniqueSegments;
       _segmentsToMonitor = segmentsToMonitor;
     }
 
@@ -69,8 +69,8 @@ public interface TableRebalanceObserver {
       return _estimatedAverageSegmentSizeInBytes;
     }
 
-    public Set<String> getUniqueSegmentList() {
-      return _uniqueSegmentList;
+    public Set<String> getUniqueSegments() {
+      return _uniqueSegments;
     }
 
     public Set<String> getSegmentsToMonitor() {
