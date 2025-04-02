@@ -269,6 +269,7 @@ public class SegmentCompletionManager {
       return SegmentCompletionProtocol.RESP_DISCARD;
     }
     _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    _fsmMap.remove(segmentName);
     return SegmentCompletionProtocol.RESP_PROCESSED;
   }
 
