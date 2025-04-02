@@ -39,6 +39,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityGroupInstanceSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -93,6 +94,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
+  final PriorityGroupInstanceSelector _priorityGroupInstanceSelector;
   final Clock _clock;
   final boolean _useFixedReplica;
   final long _newSegmentExpirationTimeInSeconds;
@@ -116,6 +118,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
+    _priorityGroupInstanceSelector = new PriorityGroupInstanceSelector(_adaptiveServerSelector);
     _clock = clock;
     _useFixedReplica = useFixedReplica;
     _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
