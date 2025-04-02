@@ -53,6 +53,22 @@ public class IngestionJobLauncherTest {
   }
 
   @Test
+  public void testIngestionJobLauncherWithMissingJobRunner() {
+
+    SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
+            GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_missing_jobrunner.yaml").getFile(),
+            null, null, _defaultEnvironmentValues);
+    try {
+      IngestionJobLauncher.runIngestionJob(spec);
+    } catch (RuntimeException e) {
+      Assert.assertEquals(e.getMessage(), "Failed to create IngestionJobRunner instance for class - null");
+      Throwable cause = e.getCause();
+      Assert.assertTrue(cause instanceof IllegalStateException);
+      Assert.assertEquals(cause.getMessage(), "segmentGenerationJobRunnerClassName in job spec was null");
+    }
+  }
+
+  @Test
   public void testIngestionJobLauncherWithUnicodeCharForMultivalueFieldDelimiter() {
     SegmentGenerationJobSpec spec = IngestionJobLauncher.getSegmentGenerationJobSpec(
         GroovyTemplateUtils.class.getClassLoader().getResource("ingestion_job_spec_unicode.yaml").getFile(), null,
