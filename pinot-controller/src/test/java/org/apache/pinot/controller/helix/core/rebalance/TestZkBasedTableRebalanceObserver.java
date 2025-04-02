@@ -149,7 +149,7 @@ public class TestZkBasedTableRebalanceObserver {
       TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
           estimatedAverageSegmentSize, segmentSet, segmentSet);
       TableRebalanceProgressStats.RebalanceProgressStats stats =
-          ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, target, rebalanceContext, trigger,
+          ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, target, rebalanceContext, trigger,
               new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 0);
       assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -171,7 +171,7 @@ public class TestZkBasedTableRebalanceObserver {
       segmentSet.remove("segment2");
       rebalanceContext =
           new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-      stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, target, rebalanceContext, trigger,
+      stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, target, rebalanceContext, trigger,
           new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 0);
       assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -190,7 +190,7 @@ public class TestZkBasedTableRebalanceObserver {
 
       // Pass null segmentsToMonitor
       rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, null);
-      stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, target, rebalanceContext, trigger,
+      stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, target, rebalanceContext, trigger,
           new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 0);
       assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -212,7 +212,7 @@ public class TestZkBasedTableRebalanceObserver {
       segmentSet = new HashSet<>(target.keySet());
       rebalanceContext =
           new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-      stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext, trigger,
+      stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext, trigger,
           new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 4);
       assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -234,7 +234,7 @@ public class TestZkBasedTableRebalanceObserver {
       segmentSet.remove("segment2");
       rebalanceContext =
           new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-      stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext, trigger,
+      stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext, trigger,
           new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 2);
       assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -258,7 +258,7 @@ public class TestZkBasedTableRebalanceObserver {
         current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), state));
         rebalanceContext =
             new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-        stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext, trigger,
+        stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext, trigger,
             new TableRebalanceProgressStats());
         assertEquals(stats._totalSegmentsToBeAdded, 4);
         assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -279,7 +279,7 @@ public class TestZkBasedTableRebalanceObserver {
       // Test delete and partial add convergence
       current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host2"), ONLINE));
       current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host6"), ONLINE));
-      stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext, trigger,
+      stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext, trigger,
           new TableRebalanceProgressStats());
       assertEquals(stats._totalSegmentsToBeAdded, 3);
       assertEquals(stats._totalSegmentsToBeDeleted, 1);
@@ -319,7 +319,7 @@ public class TestZkBasedTableRebalanceObserver {
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
         estimatedAverageSegmentSize, segmentSet, segmentSet);
     TableRebalanceProgressStats.RebalanceProgressStats stats =
-        ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+        ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
             TableRebalanceObserver.Trigger.START_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -340,7 +340,7 @@ public class TestZkBasedTableRebalanceObserver {
     // Next call EV-IS convergence (assume here that the IS is not yet updated like happens in actual rebalance)
     segmentSet = new HashSet<>(target.keySet());
     rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(current, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(current, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
         tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 0);
@@ -357,9 +357,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(stats._estimatedTimeToCompleteDeletesInSeconds, 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, 0);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, 0);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
     TableRebalanceProgressStats.RebalanceProgressStats overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+        tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 8);
@@ -375,10 +375,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Calculate IS change (no new changes)
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -401,7 +400,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -423,7 +422,7 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -439,9 +438,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 7);
@@ -457,13 +455,12 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check second round of EV-IS convergence with the next assignment, but not yet converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), OFFLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -479,9 +476,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 6);
@@ -497,13 +493,12 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check third round of EV-IS convergence with the next assignment, finally converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -519,9 +514,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 6);
@@ -537,12 +531,11 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Another IS update, let's add one more segment, but untracked (added externally from rebalance)
     target.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -568,7 +561,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -596,7 +589,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -612,9 +605,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 4);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 3);
@@ -630,7 +622,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check second round of EV-IS convergence with the next assignment, converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(
@@ -640,7 +631,7 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -656,9 +647,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 4);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 2);
@@ -674,10 +664,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Another IS update, no new change
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -703,7 +692,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -731,7 +720,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -747,9 +736,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 1);
@@ -765,7 +753,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check second round of EV-IS convergence with the next assignment, converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(
@@ -777,7 +764,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -793,9 +780,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 0);
@@ -811,7 +797,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     assertEquals(current, target);
   }
@@ -837,7 +822,7 @@ public class TestZkBasedTableRebalanceObserver {
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
         estimatedAverageSegmentSize, segmentSet, segmentSet);
     TableRebalanceProgressStats.RebalanceProgressStats stats =
-        ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+        ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
             TableRebalanceObserver.Trigger.START_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -858,7 +843,7 @@ public class TestZkBasedTableRebalanceObserver {
     // Next call EV-IS convergence (assume here that the IS is not yet updated like happens in actual rebalance)
     segmentSet = new HashSet<>(target.keySet());
     rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, segmentSet, segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(current, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(current, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
         tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 0);
@@ -875,9 +860,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(stats._estimatedTimeToCompleteDeletesInSeconds, 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, 0);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, 0);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
     TableRebalanceProgressStats.RebalanceProgressStats overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+        tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 8);
@@ -893,10 +878,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Calculate IS change (no new changes)
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -919,7 +903,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -941,7 +925,7 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1", "host3"), ONLINE));
     current.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -957,9 +941,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 7);
@@ -975,7 +958,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Don't wait for full convergence to complete before moving to next step (to simulate bestEffort=true)
     // Use the last nextAssignment as the current IS for calculation (current hasn't converged yet so can't use that)
@@ -984,7 +966,7 @@ public class TestZkBasedTableRebalanceObserver {
     // Another IS update, let's add one more segment, but untracked (added externally from rebalance)
     target.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, oldNextAssignment, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, oldNextAssignment, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -1010,7 +992,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, oldNextAssignment,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, oldNextAssignment,
         rebalanceContext, TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
         tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
@@ -1035,7 +1017,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -1051,9 +1033,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 4);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 6);
@@ -1069,7 +1050,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check second round of EV-IS convergence with the next assignment, this time carry over is taken care of and
     // some segments added this step are processed too
@@ -1082,7 +1062,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -1098,9 +1078,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 4);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 3);
@@ -1116,7 +1095,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check third round of EV-IS convergence with the next assignment, converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(
@@ -1126,7 +1104,7 @@ public class TestZkBasedTableRebalanceObserver {
     current.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -1142,9 +1120,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 4);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 2);
@@ -1160,10 +1137,9 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Another IS update, no new change
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(target, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(target, current, rebalanceContext,
         TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 8);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -1189,7 +1165,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment3", SegmentAssignmentUtils.getInstanceStateMap(
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -1217,7 +1193,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -1233,9 +1209,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 1);
@@ -1251,7 +1226,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     // Check second round of EV-IS convergence with the next assignment, converged
     current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(
@@ -1263,7 +1237,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     rebalanceContext =
         new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSize, target.keySet(), segmentSet);
-    stats = ZkBasedTableRebalanceObserver.calculateOverallProgressStats(nextAssignment, current, rebalanceContext,
+    stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContext,
         TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
@@ -1279,9 +1253,8 @@ public class TestZkBasedTableRebalanceObserver {
     assertTrue(stats._estimatedTimeToCompleteDeletesInSeconds >= 0.0);
     assertEquals(stats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(stats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 2);
-    overallStats =
-        ZkBasedTableRebalanceObserver.updateOverallProgressStatsFromStep(tableRebalanceProgressStats,
-            tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep(), stats);
+    tableRebalanceProgressStats.updateOverallProgressStatsFromStep(stats);
+    overallStats = tableRebalanceProgressStats.getRebalanceProgressStatsOverall();
     assertEquals(overallStats._totalSegmentsToBeAdded, 8);
     assertEquals(overallStats._totalSegmentsToBeDeleted, 2);
     assertEquals(overallStats._totalRemainingSegmentsToBeAdded, 0);
@@ -1297,7 +1270,6 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(overallStats._averageSegmentSizeInBytes, estimatedAverageSegmentSize);
     assertEquals(overallStats._totalEstimatedDataToBeMovedInBytes, estimatedAverageSegmentSize * 8);
     tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(stats);
-    tableRebalanceProgressStats.setRebalanceProgressStatsOverall(overallStats);
 
     assertEquals(current, target);
   }
