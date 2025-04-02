@@ -79,6 +79,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private long _brokerReduceTimeMs;
   private Set<String> _tablesQueried = Set.of();
 
+  private Set<Integer> _replicaGroups = Set.of();
+
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   @Override
@@ -367,6 +369,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public Map<String, String> getTraceInfo() {
     return Map.of();
+  }
+
+  @Override
+  public void setReplicaGroups(@NotNull Set<Integer> replicaGroups) {
+    _replicaGroups = replicaGroups;
+  }
+
+  @Override
+  @NotNull
+  public Set<Integer> getReplicaGroups() {
+    return _replicaGroups;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {

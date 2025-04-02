@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -781,6 +783,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
+    brokerResponse.setReplicaGroups(Stream.concat(
+            offlineRoutingTable != null ? offlineRoutingTable.keySet().stream() : Stream.empty(),
+            realtimeRoutingTable != null ? realtimeRoutingTable.keySet().stream() : Stream.empty())
+        .map(ServerInstance::getGroup)
+        .collect(Collectors.toSet()));
 
     for (QueryProcessingException errorMsg : errorMsgs) {
       brokerResponse.addException(errorMsg);
