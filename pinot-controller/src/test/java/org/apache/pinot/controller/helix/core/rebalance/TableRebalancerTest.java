@@ -1264,96 +1264,118 @@ public class TableRebalancerTest {
     boolean[] falseAndTrue = new boolean[]{false, true};
 
     // Empty segment states should match
-    for (boolean bestEfforts : falseAndTrue) {
-      assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Do not check segment that does not exist in IdealState
     Map<String, String> instanceStateMap = new TreeMap<>();
     instanceStateMap.put("instance1", ONLINE);
     externalViewSegmentStates.put("segment1", instanceStateMap);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Do not check segment that is OFFLINE in IdealState
     instanceStateMap = new TreeMap<>();
     instanceStateMap.put("instance1", OFFLINE);
     idealStateSegmentStates.put("segment2", instanceStateMap);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Should fail when a segment has CONSUMING instance in IdealState but does not exist in ExternalView
     instanceStateMap.put("instance2", CONSUMING);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Should fail when instance state does not exist
     instanceStateMap = new TreeMap<>();
     externalViewSegmentStates.put("segment2", instanceStateMap);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Should fail when instance state does not match
     instanceStateMap.put("instance2", OFFLINE);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertFalse(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
     // Should pass when instance state matches
     instanceStateMap.put("instance2", CONSUMING);
-    for (boolean bestEfforts : falseAndTrue) {
-      assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-          idealStateSegmentStates, bestEfforts, null));
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+            idealStateSegmentStates, lowDiskMode, bestEfforts, null));
+      }
     }
 
-    // When there are extra instances in ExternalView, should fail (always wait for extra instances to be removed)
+    // When there are extra instances in ExternalView, should pass in regular mode but fail in low disk mode
     instanceStateMap.put("instance3", CONSUMING);
     for (boolean bestEfforts : falseAndTrue) {
+      assertTrue(
+          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
+              false, bestEfforts, null));
       assertFalse(
           TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-              bestEfforts, null));
+              true, bestEfforts, null));
     }
 
     // When instance state is ERROR in ExternalView, should fail in regular mode but pass in best-efforts mode
     instanceStateMap.put("instance2", ERROR);
     instanceStateMap.remove("instance3");
-    try {
-      TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-          false, null);
-      fail();
-    } catch (Exception e) {
-      // Expected
-    }
-    assertTrue(
+    for (boolean lowDiskMode : falseAndTrue) {
+      try {
         TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
-            true, null));
+            lowDiskMode, false, null);
+        fail();
+      } catch (Exception e) {
+        // Expected
+      }
+      assertTrue(
+          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates, idealStateSegmentStates,
+              lowDiskMode, true, null));
+    }
 
-    // When the extra instance is in ERROR state, should throw exception when best-efforts is disabled
+    // When the extra instance is in ERROR state, should throw exception in low disk mode when best-efforts is disabled
     instanceStateMap.put("instance2", CONSUMING);
     instanceStateMap.put("instance3", ERROR);
-    for (boolean bestEfforts : falseAndTrue) {
-      if (!bestEfforts) {
-        try {
-          TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-              idealStateSegmentStates, false, null);
-          fail();
-        } catch (Exception e) {
-          // Expected
+    for (boolean lowDiskMode : falseAndTrue) {
+      for (boolean bestEfforts : falseAndTrue) {
+        if (lowDiskMode && !bestEfforts) {
+          try {
+            TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+                idealStateSegmentStates, true, false, null);
+            fail();
+          } catch (Exception e) {
+            // Expected
+          }
+        } else {
+          assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
+              idealStateSegmentStates, lowDiskMode, bestEfforts, null));
         }
-      } else {
-        assertTrue(TableRebalancer.isExternalViewConverged(offlineTableName, externalViewSegmentStates,
-            idealStateSegmentStates, bestEfforts, null));
       }
     }
   }
 }
+

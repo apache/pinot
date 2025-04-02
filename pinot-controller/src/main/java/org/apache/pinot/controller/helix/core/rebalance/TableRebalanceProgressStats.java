@@ -147,8 +147,8 @@ public class TableRebalanceProgressStats {
         || base._totalCarryOverSegmentsToBeDeleted != compare._totalCarryOverSegmentsToBeDeleted
         || base._totalUniqueNewUntrackedSegmentsDuringRebalance
         != compare._totalUniqueNewUntrackedSegmentsDuringRebalance
-        || base._percentageTotalSegmentsAddsRemaining != compare._percentageTotalSegmentsAddsRemaining
-        || base._percentageTotalSegmentDeletesRemaining != compare._percentageTotalSegmentDeletesRemaining
+        || base._percentageRemainingSegmentsToBeAdded != compare._percentageRemainingSegmentsToBeAdded
+        || base._percentageRemainingSegmentsToBeDeleted != compare._percentageRemainingSegmentsToBeDeleted
         || base._averageSegmentSizeInBytes != compare._averageSegmentSizeInBytes
         || base._totalEstimatedDataToBeMovedInBytes != compare._totalEstimatedDataToBeMovedInBytes
         || base._startTimeMs != compare._startTimeMs;
@@ -202,10 +202,10 @@ public class TableRebalanceProgressStats {
     @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
     public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
     // Derived stats
-    @JsonProperty("percentageTotalSegmentsAddsRemaining")
-    public double _percentageTotalSegmentsAddsRemaining;
-    @JsonProperty("percentageTotalSegmentDeletesRemaining")
-    public double _percentageTotalSegmentDeletesRemaining;
+    @JsonProperty("percentageRemainingSegmentsToBeAdded")
+    public double _percentageRemainingSegmentsToBeAdded;
+    @JsonProperty("percentageRemainingSegmentsToBeDeleted")
+    public double _percentageRemainingSegmentsToBeDeleted;
     @JsonProperty("estimatedTimeToCompleteAddsInSeconds")
     public double _estimatedTimeToCompleteAddsInSeconds;
     @JsonProperty("estimatedTimeToCompleteDeletesInSeconds")
@@ -227,8 +227,8 @@ public class TableRebalanceProgressStats {
       _totalCarryOverSegmentsToBeAdded = 0;
       _totalCarryOverSegmentsToBeDeleted = 0;
       _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
-      _percentageTotalSegmentsAddsRemaining = 0.0;
-      _percentageTotalSegmentDeletesRemaining = 0.0;
+      _percentageRemainingSegmentsToBeAdded = 0.0;
+      _percentageRemainingSegmentsToBeDeleted = 0.0;
       _estimatedTimeToCompleteAddsInSeconds = 0;
       _estimatedTimeToCompleteDeletesInSeconds = 0;
       _averageSegmentSizeInBytes = 0;
