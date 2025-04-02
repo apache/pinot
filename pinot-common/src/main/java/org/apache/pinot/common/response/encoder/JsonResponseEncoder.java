@@ -68,11 +68,11 @@ public class JsonResponseEncoder implements ResponseEncoder {
         DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(columnIdx);
         JsonNode jsonValue = jsonRow.get(columnIdx);
         if (columnDataType.isArray()) {
-          row[columnIdx] = extractArray(jsonValue);
+          row[columnIdx] = extractArray(columnDataType, jsonValue);
         } else if (columnDataType == DataSchema.ColumnDataType.MAP) {
           row[columnIdx] = extractMap(jsonValue);
         } else {
-          row[columnIdx] = extractValue(jsonValue);
+          row[columnIdx] = extractValue(columnDataType, jsonValue);
         }
       }
       rows.add(row);
@@ -156,5 +156,80 @@ public class JsonResponseEncoder implements ResponseEncoder {
       map.put(key, value);
     });
     return map;
+  }
+
+  private static Object extractArray(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
+    switch (columnDataType) {
+      case BOOLEAN_ARRAY:
+        boolean[] booleanArray = new boolean[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          booleanArray[k] = jsonValue.get(k).asBoolean();
+        }
+        return booleanArray;
+      case INT_ARRAY:
+        int[] intArray = new int[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          intArray[k] = jsonValue.get(k).asInt();
+        }
+        return intArray;
+      case LONG_ARRAY:
+        long[] longArray = new long[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          longArray[k] = jsonValue.get(k).asLong();
+        }
+        return longArray;
+      case FLOAT_ARRAY:
+        float[] floatArray = new float[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          floatArray[k] = jsonValue.get(k).floatValue();
+        }
+        return floatArray;
+      case DOUBLE_ARRAY:
+        double[] doubleArray = new double[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          doubleArray[k] = jsonValue.get(k).asDouble();
+        }
+        return doubleArray;
+      case STRING_ARRAY:
+      case TIMESTAMP_ARRAY:
+      case BYTES_ARRAY:
+        String[] stringArray = new String[jsonValue.size()];
+        for (int k = 0; k < jsonValue.size(); k++) {
+          stringArray[k] = jsonValue.get(k).textValue();
+        }
+        return stringArray;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + columnDataType);
+    }
+  }
+
+  private static Object extractValue(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue)
+      throws IOException {
+    if (jsonValue.isNull()) {
+      return null;
+    }
+    switch (columnDataType) {
+      case BOOLEAN:
+        return jsonValue.asBoolean();
+      case INT:
+        return jsonValue.asInt();
+      case LONG:
+        return jsonValue.asLong();
+      case FLOAT:
+        return Double.valueOf(jsonValue.asDouble()).floatValue();
+      case DOUBLE:
+        return jsonValue.asDouble();
+      case STRING:
+      case BYTES:
+      case TIMESTAMP:
+      case JSON:
+      case BIG_DECIMAL:
+      case OBJECT:
+        return jsonValue.textValue();
+      case UNKNOWN:
+        return null;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + columnDataType);
+    }
   }
 }
