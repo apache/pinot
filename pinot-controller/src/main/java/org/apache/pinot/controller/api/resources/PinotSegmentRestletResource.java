@@ -1181,8 +1181,8 @@ public class PinotSegmentRestletResource {
 
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/deletePauselessSegments/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
+  @Path("/deleteSegmentsFromSequenceNum/{tableNameWithType}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete segments from a pauseless enabled table", notes =
       "Deletes segments from a pauseless-enabled table based on the provided segment names. "
@@ -1192,7 +1192,7 @@ public class PinotSegmentRestletResource {
           + "The retention period controls how long deleted segments are retained before permanent removal. "
           + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
           + "Use 0d or -1d for immediate deletion without retention.")
-  public SuccessResponse deletePauselessSegments(
+  public SuccessResponse deleteSegmentsFromSequenceNum(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "List of segment names. For each segment, all segments with higher sequence IDs in the same "
