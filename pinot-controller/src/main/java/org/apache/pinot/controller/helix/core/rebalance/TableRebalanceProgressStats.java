@@ -144,7 +144,7 @@ public class TableRebalanceProgressStats {
   public void updateOverallAndStepStatsFromLatestStepStats(
       TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
     TableRebalanceProgressStats.RebalanceProgressStats lastStepStats = getRebalanceProgressStatsCurrentStep();
-    TableRebalanceProgressStats.RebalanceProgressStats overallProgressStats = getRebalanceProgressStatsOverall();
+    TableRebalanceProgressStats.RebalanceProgressStats lastOverallStats = getRebalanceProgressStatsOverall();
     int numAdditionalSegmentsAdded =
         latestStepStats._totalSegmentsToBeAdded - lastStepStats._totalSegmentsToBeAdded;
     int numAdditionalSegmentsDeleted =
@@ -165,32 +165,32 @@ public class TableRebalanceProgressStats {
     TableRebalanceProgressStats.RebalanceProgressStats newOverallProgressStats =
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
-    newOverallProgressStats._totalSegmentsToBeAdded = overallProgressStats._totalSegmentsToBeAdded
+    newOverallProgressStats._totalSegmentsToBeAdded = lastOverallStats._totalSegmentsToBeAdded
         + numAdditionalSegmentsAdded;
-    newOverallProgressStats._totalSegmentsToBeDeleted = overallProgressStats._totalSegmentsToBeDeleted
+    newOverallProgressStats._totalSegmentsToBeDeleted = lastOverallStats._totalSegmentsToBeDeleted
         + numAdditionalSegmentsDeleted;
     if (latestStepStats._totalCarryOverSegmentsToBeAdded > 0) {
-      newOverallProgressStats._totalRemainingSegmentsToBeAdded = overallProgressStats._totalRemainingSegmentsToBeAdded;
+      newOverallProgressStats._totalRemainingSegmentsToBeAdded = lastOverallStats._totalRemainingSegmentsToBeAdded;
     } else {
       newOverallProgressStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
-          ? overallProgressStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
-          : overallProgressStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+          ? lastOverallStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
+          : lastOverallStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
     }
     newOverallProgressStats._totalCarryOverSegmentsToBeAdded =
         latestStepStats._totalCarryOverSegmentsToBeAdded;
     if (latestStepStats._totalCarryOverSegmentsToBeDeleted > 0) {
       newOverallProgressStats._totalRemainingSegmentsToBeDeleted =
-          overallProgressStats._totalRemainingSegmentsToBeDeleted;
+          lastOverallStats._totalRemainingSegmentsToBeDeleted;
     } else {
       newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
-          ? overallProgressStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
-          : overallProgressStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
+          ? lastOverallStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
+          : lastOverallStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
     }
     newOverallProgressStats._totalCarryOverSegmentsToBeDeleted =
         latestStepStats._totalCarryOverSegmentsToBeDeleted;
     newOverallProgressStats._totalRemainingSegmentsToConverge = latestStepStats._totalRemainingSegmentsToConverge;
     newOverallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
-        overallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
+        lastOverallStats._totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
     newOverallProgressStats._percentageRemainingSegmentsToBeAdded =
         calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeAdded,
             newOverallProgressStats._totalRemainingSegmentsToBeAdded
@@ -202,15 +202,17 @@ public class TableRebalanceProgressStats {
     // Calculate elapsed time based on start of rebalance (global)
     newOverallProgressStats._estimatedTimeToCompleteAddsInSeconds =
         calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
-            newOverallProgressStats._totalSegmentsToBeAdded, newOverallProgressStats._totalRemainingSegmentsToBeAdded);
+            newOverallProgressStats._totalSegmentsToBeAdded, newOverallProgressStats._totalRemainingSegmentsToBeAdded
+                + newOverallProgressStats._totalCarryOverSegmentsToBeAdded);
     newOverallProgressStats._estimatedTimeToCompleteDeletesInSeconds =
         calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
             newOverallProgressStats._totalSegmentsToBeDeleted,
-            newOverallProgressStats._totalRemainingSegmentsToBeDeleted);
-    newOverallProgressStats._averageSegmentSizeInBytes = overallProgressStats._averageSegmentSizeInBytes;
+            newOverallProgressStats._totalRemainingSegmentsToBeDeleted
+                + newOverallProgressStats._totalCarryOverSegmentsToBeDeleted);
+    newOverallProgressStats._averageSegmentSizeInBytes = lastOverallStats._averageSegmentSizeInBytes;
     newOverallProgressStats._totalEstimatedDataToBeMovedInBytes =
-        overallProgressStats._totalEstimatedDataToBeMovedInBytes
-            + (numAdditionalSegmentsAdded * overallProgressStats._averageSegmentSizeInBytes);
+        lastOverallStats._totalEstimatedDataToBeMovedInBytes
+            + (numAdditionalSegmentsAdded * lastOverallStats._averageSegmentSizeInBytes);
     newOverallProgressStats._startTimeMs = getStartTimeMs();
 
     setRebalanceProgressStatsOverall(newOverallProgressStats);
