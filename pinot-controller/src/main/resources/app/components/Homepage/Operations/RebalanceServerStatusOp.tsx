@@ -17,13 +17,10 @@
  * under the License.
  */
 import {
-    Button,
-    DialogContent,
-    Grid
+    Box, Button, CircularProgress, DialogContent, Grid
 } from "@material-ui/core";
 import Dialog from "../../CustomDialog";
 import React, {useEffect, useState} from "react";
-import moment from "moment/moment";
 import {RebalanceServerSection} from "./RebalanceServer/RebalanceServerSection";
 import CustomCodemirror from "../../CustomCodemirror";
 import './RebalanceServer/RebalanceServerResponses/CustomCodeMirror.css';
@@ -56,9 +53,19 @@ export const RebalanceServerStatusOp = (
     const [jobSelected, setJobSelected] = useState<string | null>(null);
     const [rebalanceContext, setRebalanceContext] = useState<{}>({});
     const [rebalanceProgressStats, setRebalanceProgressStats] = useState<{}>({});
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        PinotMethodUtils.fetchTableJobs(tableName, "TABLE_REBALANCE").then(jobs => setRebalanceServerJobs(jobs as RebalanceTableSegmentJobs));
+        setLoading(true);
+        PinotMethodUtils
+            .fetchTableJobs(tableName, "TABLE_REBALANCE")
+            .then(jobs => {
+                if (jobs.error) {
+                    return;
+                }
+                setRebalanceServerJobs(jobs as RebalanceTableSegmentJobs)
+            })
+            .finally(() => setLoading(false));
     }, []);
 
     const BackAction = () => {
@@ -91,7 +98,24 @@ export const RebalanceServerStatusOp = (
         }
     }, [jobSelected]);
 
-
+    if (loading) {
+        return (
+            <Dialog
+                open={true}
+                handleClose={hideModal}
+                title="Rebalance Table Status"
+                showOkBtn={false}
+                size='lg'
+                moreActions={jobSelected ? <BackAction /> : null}
+            >
+                <DialogContent>
+                    <Box alignItems='center' display='flex' justifyContent='center'>
+                        <CircularProgress />
+                    </Box>
+                </DialogContent>
+            </Dialog>
+        )
+    }
 
     return (
         <Dialog
