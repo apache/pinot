@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -37,12 +38,20 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
- * This rule converts Calcite's Aggregate into {@link PinotLogicalAggregate}. Additionally, if a Sort exists above
- * the aggregate, then we push it down to the aggregate to enable group trim.
+ * Same as {@link PinotAggregateExchangeNodeInsertRule}, with the following differences:
+ * <ol>
+ *   <li>We don't generate project under the aggregate.</li>
+ *   <li>We don't generate exchange and merely generate a PinotLogicalAggregate.</li>
+ *   <li>We don't convert Agg Calls.</li>
+ * </ol>
+ * All of these will be done in the Physical Planning phase instead, since that is when we will know whether the
+ * aggregate has been split or not. (e.g. project under aggregate is required when you skip partial aggregate).
  */
 public class PinotLogicalAggregateRule {
   public static class SortProjectAggregate extends RelOptRule {
@@ -62,8 +71,7 @@ public class PinotLogicalAggregateRule {
       }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
+      if (!isGroupTrimmingEnabled(call, hintOptions)) {
         return;
       }
       Sort sortRel = call.rel(0);
@@ -111,8 +119,7 @@ public class PinotLogicalAggregateRule {
       }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
+      if (!isGroupTrimmingEnabled(call, hintOptions)) {
         return;
       }
 
@@ -165,8 +172,27 @@ public class PinotLogicalAggregateRule {
     boolean leafReturnFinalResult =
         Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
     RelNode input = aggRel.getInput();
-    // TODO: Remove AggType from logical aggregate. For now use DIRECT.
+    // TODO(mse-physical): Remove AggType from logical aggregate. For now use DIRECT.
     return new PinotLogicalAggregate(aggRel, input, aggRel.getAggCallList(), AggType.DIRECT,
         leafReturnFinalResult, collations, limit);
+  }
+
+  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, @Nullable Map<String, String> hintOptions) {
+    if (hintOptions != null) {
+      String option = hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM);
+      if (option != null) {
+        return Boolean.parseBoolean(option);
+      }
+    }
+
+    Context genericContext = call.getPlanner().getContext();
+    if (genericContext != null) {
+      QueryEnvironment.Config context = genericContext.unwrap(QueryEnvironment.Config.class);
+      if (context != null) {
+        return context.defaultEnableGroupTrim();
+      }
+    }
+
+    return CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM;
   }
 }

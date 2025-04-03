@@ -45,8 +45,9 @@ import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
 
 
 /**
- * Assign trait constraints to the plan emitted by the Logical Planning phase run in Calcite.
- * This operates with Physical RelNodes because Calcite emits Logical RelNodes, many of which drop traits on copy.
+ * Assign trait constraints to the plan. The Physical Planner should ensure that these constraints are met by
+ * inserting Exchange wherever required. This operates with Physical RelNodes because Calcite emits Logical RelNodes,
+ * many of which drop traits on copy.
  */
 public class TraitAssignment {
   private final Supplier<Integer> _planIdGenerator;
@@ -81,7 +82,7 @@ public class TraitAssignment {
   }
 
   /**
-   * Always converge to a single stream for Sort. So we add the SINGLETON trait to the input.
+   * Sort is always computed by coalescing to a single stream. Hence, we add a SINGLETON trait to the sort input.
    */
   @VisibleForTesting
   RelNode assignSort(PhysicalSort sort) {
@@ -91,6 +92,16 @@ public class TraitAssignment {
     return sort.copy(sort.getTraitSet(), ImmutableList.of(input));
   }
 
+  /**
+   * Handles lookup and dynamic filter for semi-join case separately.
+   * <p>
+   *   TODO(mse-physical): Support colocated join hint. See
+   *   <a href="https://github.com/apache/pinot/issues/15455">F2</a>).
+   *   <br />
+   *   TODO(mse-physical): Instead of random exchange on the left, we should simply skip exchange.
+   *     See <a href="https://github.com/apache/pinot/issues/15455">F3</a>.
+   * </p>
+   */
   @VisibleForTesting
   RelNode assignJoin(PhysicalJoin join) {
     // Case-1: Handle lookup joins.
@@ -105,19 +116,16 @@ public class TraitAssignment {
       }
     }
     // Case-3: Default case.
-    // TODO(mse-physical): Support colocated join hint (see F2: https://github.com/apache/pinot/issues/15455).
-    // TODO(mse-physical): Consider random exchange on left input. We skip exchange on the left by default because
-    //   it is uncommon for joins to have a huge skew across workers, and it doesn't make a lot of sense to add the
-    //   overhead of a full shuffle by default. (see F3: https://github.com/apache/pinot/issues/15455).
-    RelDistribution leftDistribution = joinInfo.leftKeys.isEmpty() ? null : RelDistributions.hash(joinInfo.leftKeys);
+    RelDistribution leftDistribution = joinInfo.leftKeys.isEmpty() ? RelDistributions.RANDOM_DISTRIBUTED
+        : RelDistributions.hash(joinInfo.leftKeys);
     RelDistribution rightDistribution = joinInfo.rightKeys.isEmpty() ? RelDistributions.BROADCAST_DISTRIBUTED
         : RelDistributions.hash(joinInfo.rightKeys);
+    // left-input
     RelNode leftInput = join.getInput(0);
+    RelTraitSet leftTraitSet = leftInput.getTraitSet().plus(leftDistribution);
+    leftInput = leftInput.copy(leftTraitSet, leftInput.getInputs());
+    // right-input
     RelNode rightInput = join.getInput(1);
-    if (leftDistribution != null) {
-      RelTraitSet leftTraitSet = leftInput.getTraitSet().plus(leftDistribution);
-      leftInput = leftInput.copy(leftTraitSet, leftInput.getInputs());
-    }
     RelTraitSet rightTraitSet = rightInput.getTraitSet().plus(rightDistribution);
     rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
     return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, rightInput));
@@ -127,6 +135,7 @@ public class TraitAssignment {
    * When group-by keys are empty, we can use SINGLETON distribution. Otherwise, we use hash distribution on the
    * group-by keys.
    */
+  @VisibleForTesting
   RelNode assignAggregate(PhysicalAggregate aggregate) {
     RelNode input = aggregate.getInput(0);
     if (aggregate.getGroupCount() == 0) {
@@ -139,10 +148,15 @@ public class TraitAssignment {
     return aggregate.copy(aggregate.getTraitSet(), ImmutableList.of(input));
   }
 
+  /**
+   * Assigns traits to the input of window, accounting for partition-by and order-by clauses.
+   */
+  @VisibleForTesting
   RelNode assignWindow(PhysicalWindow window) {
     Preconditions.checkState(window.groups.size() <= 1,
         "Different partition-by clause not allowed in window functions yet");
-    RelCollation windowGroupCollation = getCollation(window);
+    RelCollation windowGroupCollation = window.groups.isEmpty() ? RelCollations.EMPTY
+        : window.groups.get(0).collation();
     RelNode input = window.getInput(0);
     if (window.groups.isEmpty() || window.groups.get(0).keys.isEmpty()) {
       // Case-1: No partition by clause in Window function.
@@ -234,9 +248,5 @@ public class TraitAssignment {
         .plus(PinotExecStrategyTrait.PIPELINE_BREAKER);
     rightInput = rightInput.copy(rightTraitSet, rightInput.getInputs());
     return join.copy(join.getTraitSet(), ImmutableList.of(leftInput, rightInput));
-  }
-
-  private RelCollation getCollation(PhysicalWindow window) {
-    return window.groups.isEmpty() ? RelCollations.EMPTY : window.groups.get(0).collation();
   }
 }

@@ -25,17 +25,17 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 
 
 /**
- * Execution strategy defines how a fragment of the plan tree will be executed by Pinot. There are three types of
- * strategies:
+ * Execution strategy defines how a sub-tree of the plan will be executed by Pinot. There are three strategies:
  * <ol>
  *   <li>Streaming: This is the default strategy that indicates the operator will emit data in chunks until EOS.</li>
  *   <li>
  *     Pipeline Breaker: This indicates that Pinot Server will consume the entire output of this operator, before
- *     it compiles the Physical plan for the rest of the corresponding Plan Fragment.
+ *     it compiles the plan for the rest of the Plan Fragment.
  *   </li>
  *   <li>
  *     Sub Plan: This indicates that Pinot Broker should execute the entire plan under this operator first, and then
- *     continue with planning the rest of the plan tree.
+ *     continue with planning the rest of the plan tree. Usually, you would get a constant out of the Sub-Plan, which
+ *     can be put back in the original plan tree.
  *   </li>
  * </ol>
  */
