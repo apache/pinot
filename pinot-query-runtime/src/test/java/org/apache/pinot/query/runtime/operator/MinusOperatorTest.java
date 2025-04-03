@@ -21,11 +21,10 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -67,20 +66,20 @@ public class MinusOperatorTest {
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     MinusOperator minusOperator =
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    TransferableBlock result = minusOperator.nextBlock();
-    while (result.getType() != DataBlock.Type.ROW) {
+    MseBlock result = minusOperator.nextBlock();
+    while (result.isEos()) {
       result = minusOperator.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{3, "CC"}, new Object[]{4, "DD"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
@@ -97,21 +96,21 @@ public class MinusOperatorTest {
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"},
                 new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     MinusOperator minusOperator =
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    TransferableBlock result = minusOperator.nextBlock();
-    while (result.getType() != DataBlock.Type.ROW) {
+    MseBlock result = minusOperator.nextBlock();
+    while (result.isEos()) {
       result = minusOperator.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{3, "CC"}, new Object[]{4, "DD"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {

@@ -53,7 +53,7 @@ public class MultiStageStatsTreeBuilder {
       ObjectNode jsonNodes = JsonUtils.newObjectNode();
       jsonNodes.put("type", "EMPTY_MAILBOX_SEND");
       jsonNodes.put("stage", stage);
-      jsonNodes.put("description", "No stats available for this stage. It may have been pruned.");
+      jsonNodes.put("description", "No stats available for this stage. They may have been pruned.");
       String tableName = _planFragments.get(stage).getTableName();
       if (tableName != null) {
         jsonNodes.put("table", tableName);

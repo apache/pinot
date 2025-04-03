@@ -26,12 +26,12 @@ import java.util.concurrent.Executors;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.slf4j.Logger;
@@ -42,15 +42,15 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class OpChainTest {
-  private final List<TransferableBlock> _blockList = new ArrayList<>();
+  private final List<MseBlock> _blockList = new ArrayList<>();
   private final ExecutorService _executor = Executors.newCachedThreadPool();
 
   private AutoCloseable _mocks;
@@ -64,22 +64,32 @@ public class OpChainTest {
   private ReceivingMailbox _mailbox2;
   @Mock
   private BlockExchange _exchange;
+  private MultiStageQueryStats _stats;
 
   @BeforeMethod
   public void setUpMethod() {
+    _stats = MultiStageQueryStats.emptyStats(0);
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
     when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
 
     try {
       doAnswer(invocation -> {
-        TransferableBlock arg = invocation.getArgument(0);
+        MseBlock.Data arg = invocation.getArgument(0);
         _blockList.add(arg);
         return true;
-      }).when(_exchange).send(any(TransferableBlock.class));
+      }).when(_exchange).send(any(MseBlock.Data.class));
+      doAnswer(invocation -> {
+        MseBlock arg = invocation.getArgument(0);
+        _blockList.add(arg);
+
+        List<DataBuffer> serializedStats = invocation.getArgument(1);
+        _stats.mergeUpstream(serializedStats);
+        return true;
+      }).when(_exchange).send(any(MseBlock.Eos.class), anyList());
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
+          return SuccessMseBlock.INSTANCE;
         }
         return _blockList.remove(0);
       });
@@ -106,15 +116,15 @@ public class OpChainTest {
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
-    TransferableBlock eosBlock = drainOpChain(opChain);
+    MseBlock.Eos eosBlock = drainOpChain(opChain);
 
-    assertTrue(eosBlock.isSuccessfulEndOfStreamBlock(), "Expected end of stream block to be successful");
-    MultiStageQueryStats queryStats = eosBlock.getQueryStats();
-    assertNotNull(queryStats, "Expected query stats to be non-null");
+    assertTrue(eosBlock.isSuccess(), "Expected end of stream block to be successful");
 
     @SuppressWarnings("unchecked")
-    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
-        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats = (StatMap<LiteralValueOperator.StatKey>) opChain.getRoot()
+        .calculateStats()
+        .getCurrentStats()
+        .getLastOperatorStats();
     assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
         "Expected execution time to be non-zero");
   }
@@ -125,25 +135,25 @@ public class OpChainTest {
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
-    TransferableBlock eosBlock = drainOpChain(opChain);
+    MseBlock.Eos eosBlock = drainOpChain(opChain);
 
-    assertTrue(eosBlock.isSuccessfulEndOfStreamBlock(), "Expected end of stream block to be successful");
-    MultiStageQueryStats queryStats = eosBlock.getQueryStats();
-    assertNotNull(queryStats, "Expected query stats to be non-null");
+    assertTrue(eosBlock.isSuccess(), "Expected end of stream block to be successful");
 
     @SuppressWarnings("unchecked")
-    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
-        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats = (StatMap<LiteralValueOperator.StatKey>) opChain.getRoot()
+        .calculateStats()
+        .getCurrentStats()
+        .getLastOperatorStats();
     assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
         "Expected execution time to be collected");
   }
 
-  private TransferableBlock drainOpChain(OpChain opChain) {
-    TransferableBlock resultBlock = opChain.getRoot().nextBlock();
-    while (!resultBlock.isEndOfStreamBlock()) {
+  private MseBlock.Eos drainOpChain(OpChain opChain) {
+    MseBlock resultBlock = opChain.getRoot().nextBlock();
+    while (!resultBlock.isEos()) {
       resultBlock = opChain.getRoot().nextBlock();
     }
-    return resultBlock;
+    return (MseBlock.Eos) resultBlock;
   }
 
   static class DummyMultiStageOperator extends MultiStageOperator {
@@ -166,13 +176,18 @@ public class OpChainTest {
     }
 
     @Override
-    protected TransferableBlock getNextBlock() {
+    protected MseBlock getNextBlock() {
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         // IGNORE
       }
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.createLiteral(0, _statMap));
+      return SuccessMseBlock.INSTANCE;
+    }
+
+    @Override
+    protected StatMap<?> copyStatMaps() {
+      return new StatMap<>(_statMap);
     }
 
     @Override

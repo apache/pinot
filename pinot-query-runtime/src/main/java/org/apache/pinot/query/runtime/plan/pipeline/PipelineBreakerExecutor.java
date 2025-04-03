@@ -25,15 +25,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
@@ -62,7 +62,7 @@ public class PipelineBreakerExecutor {
    * @param opChainMetadata request metadata, including query options
    * @param parentContext Parent thread metadata
    * @return pipeline breaker result;
-   *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.
+   *   - If exception occurs, exception block will be wrapped in {@link MseBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
    */
   @Nullable
@@ -85,7 +85,7 @@ public class PipelineBreakerExecutor {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
             stagePlan.getStageMetadata().getStageId(), e);
         return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Collections.emptyMap(),
-            TransferableBlockUtils.getErrorTransferableBlock(e), null);
+            ErrorMseBlock.fromException(e), null);
       }
     } else {
       return null;
@@ -101,7 +101,7 @@ public class PipelineBreakerExecutor {
   private static PipelineBreakerResult execute(OpChainSchedulerService scheduler,
       PipelineBreakerContext pipelineBreakerContext, OpChainExecutionContext opChainExecutionContext)
       throws Exception {
-    Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap = new HashMap<>();
+    Map<Integer, MultiStageOperator> pipelineWorkerMap = new HashMap<>();
     for (Map.Entry<Integer, PlanNode> e : pipelineBreakerContext.getPipelineBreakerMap().entrySet()) {
       int key = e.getKey();
       PlanNode planNode = e.getValue();
@@ -116,7 +116,7 @@ public class PipelineBreakerExecutor {
   }
 
   private static PipelineBreakerResult runMailboxReceivePipelineBreaker(OpChainSchedulerService scheduler,
-      PipelineBreakerContext pipelineBreakerContext, Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap,
+      PipelineBreakerContext pipelineBreakerContext, Map<Integer, MultiStageOperator> pipelineWorkerMap,
       OpChainExecutionContext opChainExecutionContext)
       throws Exception {
     PipelineBreakerOperator pipelineBreakerOperator =
@@ -128,7 +128,7 @@ public class PipelineBreakerExecutor {
     long timeoutMs = opChainExecutionContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
       return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), pipelineBreakerOperator.getResultMap(),
-          pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOperator.getQueryStats());
+          pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOperator.calculateStats());
     } else {
       throw new TimeoutException(
           String.format("Timed out waiting for pipeline breaker results after: %dms", timeoutMs));

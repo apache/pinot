@@ -18,15 +18,20 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +59,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    * Therefore {@link #_lastRead} must be in the range {@code [-1, mailbox.size() - 1]}
    */
   protected int _lastRead;
+  @Nullable
   private E _errorBlock = null;
 
   public BlockingMultiStreamConsumer(Object id, long deadlineMs, List<? extends AsyncStream<E>> asyncProducers) {
@@ -77,16 +83,17 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    *
    * This method is called by the consumer thread.
    */
-  protected abstract boolean isEos(E element);
+  protected abstract boolean isSuccess(E element);
 
   /**
-   * This method is called whenever a {@link #isEos(Object) successful EOS} is read from one of the mailboxes.
+   * This method is called whenever a {@link #isSuccess(Object) successful EOS} is read from one of the mailboxes.
    *
-   * It is guaranteed that the received element is an EOS as defined by {@link #isEos(Object)}.
+   * It is guaranteed that the received element is an EOS as defined by {@link #isSuccess(Object)}.
+   * No more messages are going to be read from that mailbox.
    *
    * This method is called by the consumer thread.
    */
-  protected abstract void onMailboxEnd(E element);
+  protected abstract void onMailboxSuccess(E element);
 
   /**
    * This method is called whenever a timeout is reached while reading an element.
@@ -96,7 +103,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   protected abstract E onTimeout();
 
   /**
-   * This method is called whenever an exception is thrown while reading an element.
+   * This method is called whenever an exception (other than timeout) is thrown while reading an element.
    *
    * This method is called by the consumer thread.
    */
@@ -107,7 +114,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    *
    * This method is called by the consumer thread.
    */
-  protected abstract E onEos();
+  protected abstract E onSuccess();
+
+  /**
+   * This method is called when an error is found in any of the mailboxes.
+   *
+   * After this method is called no more messages are going to be read from the mailboxes.
+   */
+  protected abstract void onError(E element);
 
   /**
    * This method must be called when the consumer is not going to read anymore from the mailboxes.
@@ -237,13 +251,16 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    */
   @Nullable
   private E readDroppingSuccessEos() {
+    if (_errorBlock != null) {
+      return _errorBlock;
+    }
     if (System.currentTimeMillis() > _deadlineMs) {
       _errorBlock = onTimeout();
       return _errorBlock;
     }
 
     E block = readBlockOrNull();
-    while (block != null && isEos(block)) {
+    while (block != null && isSuccess(block)) {
       // we have read an EOS
       assert !_mailboxes.isEmpty() : "readBlockOrNull should return null when there are no mailboxes";
       AsyncStream<E> removed = _mailboxes.remove(_lastRead);
@@ -257,7 +274,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
             + " (mailboxes alive: " + ids + ")");
       }
-      onMailboxEnd(block);
+      onMailboxSuccess(block);
 
       block = readBlockOrNull();
     }
@@ -265,7 +282,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("==[RECEIVE]== Finished : " + _id);
       }
-      return onEos();
+      return onSuccess();
     }
     if (block != null) {
       if (LOGGER.isTraceEnabled()) {
@@ -276,6 +293,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         AsyncStream<E> mailbox = _mailboxes.get(_lastRead);
         LOGGER.info("==[RECEIVE]== Error block found from : " + _id + " in mailbox " + mailbox.getId());
         _errorBlock = block;
+        onError(block);
       }
     }
     return block;
@@ -307,39 +325,55 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     return null;
   }
 
-  public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
+  /// A [BlockingMultiStreamConsumer] that reads [ReceivingMailbox.MseBlockWithStats]s.
+  ///
+  /// This class is also the entry point for
+  /// [BaseMailboxReceiveOperator][org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator]s to read the
+  /// blocks from the mailboxes.
+  /// Remember that in mailboxes blocks also contain stats from upstream (aka children) stages while
+  /// [MultiStageOperators][org.apache.pinot.query.runtime.operator.MultiStageOperator] communicate using [MseBlock]s,
+  /// which do not contain stats.
+  /// This class receives the [ReceivingMailbox.MseBlockWithStats]s, extracts the [MseBlock] and accumulates the stats.
+  /// This is why it is recommended to call [#readMseBlockBlocking()] instead of [#readBlockBlocking()] to get the next
+  /// block and then call [#calculateStats()] to get the stats once the stream finishes.
+  public static class OfMseBlock extends BlockingMultiStreamConsumer<ReceivingMailbox.MseBlockWithStats> {
 
     private final int _stageId;
     @Nullable
     private MultiStageQueryStats _stats;
 
-    public OfTransferableBlock(OpChainExecutionContext context,
-        List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
+    public OfMseBlock(OpChainExecutionContext context,
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers) {
       super(context.getId(), context.getDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
     @Override
-    protected boolean isError(TransferableBlock element) {
-      return element.isErrorBlock();
+    protected boolean isError(ReceivingMailbox.MseBlockWithStats element) {
+      return element.getBlock().isError();
     }
 
     @Override
-    protected boolean isEos(TransferableBlock element) {
-      return element.isSuccessfulEndOfStreamBlock();
+    protected boolean isSuccess(ReceivingMailbox.MseBlockWithStats element) {
+      return element.getBlock().isSuccess();
     }
 
     @Override
-    protected void onMailboxEnd(TransferableBlock element) {
+    protected void onMailboxSuccess(ReceivingMailbox.MseBlockWithStats element) {
+      mergeStats(element);
+    }
+
+    @Override
+    protected void onError(ReceivingMailbox.MseBlockWithStats element) {
+      mergeStats(element);
+    }
+
+    private void mergeStats(ReceivingMailbox.MseBlockWithStats element) {
       try {
         MultiStageQueryStats stats = _stats;
-        if (stats != null) {
-          if (element.getQueryStats() != null) {
-            stats.mergeUpstream(element.getQueryStats(), true);
-          } else {
-            stats.mergeUpstream(element.getSerializedStatsByStage(), true);
-          }
+        if (_stats != null) {
+          stats.mergeUpstream(element.getSerializedStats(), true);
         }
       } catch (Exception e) {
         // If there is any error merging stats, continue without them
@@ -349,7 +383,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
 
     @Override
-    protected TransferableBlock onTimeout() {
+    protected ReceivingMailbox.MseBlockWithStats onTimeout() {
       // TODO: Add the sender stage id to the error message
       String errMsg = "Timed out on stage " + _stageId + " waiting for data sent by a child stage";
       // We log this case as debug because:
@@ -358,26 +392,53 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       // - We may fail for timeout reasons often and in case there is an execution error this log will be noisy and
       //   will make it more difficult to find the real error in the log.
       LOGGER.debug(errMsg);
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.EXECUTION_TIMEOUT.asException(errMsg));
+      return onException(QueryErrorCode.EXECUTION_TIMEOUT, errMsg);
     }
 
     @Override
-    protected TransferableBlock onException(Exception e) {
+    protected ReceivingMailbox.MseBlockWithStats onException(Exception e) {
       // TODO: Add the sender stage id to the error message
       String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);
-      return TransferableBlockUtils.getErrorTransferableBlock(QueryErrorCode.INTERNAL.asException(errMsg));
+      return onException(QueryErrorCode.INTERNAL, errMsg);
+    }
+
+    private ReceivingMailbox.MseBlockWithStats onException(QueryErrorCode code, String errMsg) {
+      List<DataBuffer> serializedStats;
+      try {
+        if (_stats != null) {
+          serializedStats = _stats.serialize();
+        } else {
+          serializedStats = Collections.emptyList();
+        }
+      } catch (IOException ioEx) {
+        LOGGER.warn("Could not serialize stats", ioEx);
+        serializedStats = Collections.emptyList();
+      }
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(code.asException(errMsg));
+      return new ReceivingMailbox.MseBlockWithStats(errorBlock, serializedStats);
     }
 
     @Override
-    protected TransferableBlock onEos() {
+    protected ReceivingMailbox.MseBlockWithStats onSuccess() {
+      return new ReceivingMailbox.MseBlockWithStats(SuccessMseBlock.INSTANCE, Collections.emptyList());
+    }
+
+    public MultiStageQueryStats calculateStats() {
       MultiStageQueryStats stats = _stats;
-      if (stats == null) { // possible in case of error
+      if (_stats == null) { // possible in case of error
         stats = MultiStageQueryStats.emptyStats(_stageId);
       }
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(stats);
+      return MultiStageQueryStats.copy(stats);
+    }
+
+    /// Reads the next block for any ready mailbox or blocks until some of them is ready.
+    /// Operators should call this method instead of [#readBlockBlocking()] to get the next block, given stats are not
+    /// useful for them while reading the blocks.
+    public MseBlock readMseBlockBlocking() {
+      return readBlockBlocking().getBlock();
     }
   }
 }
