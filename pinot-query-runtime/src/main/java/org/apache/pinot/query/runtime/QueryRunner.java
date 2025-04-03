@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
@@ -257,54 +258,57 @@ public class QueryRunner {
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult =
+    CompletableFuture<PipelineBreakerResult> pipelineBreakerResultFuture = CompletableFuture.supplyAsync(() ->
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
+            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean()),
+        _executorService);
 
-    // Send error block to all the receivers if pipeline breaker fails
-    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-      TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-      int stageId = stageMetadata.getStageId();
-      LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-          stageId, errorBlock.getExceptions());
-      MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
-      List<RoutingInfo> routingInfos = new ArrayList<>();
-      for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
-        List<MailboxInfo> receiverMailboxInfos =
-            workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-        List<RoutingInfo> stageRoutingInfos =
-            MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-                receiverMailboxInfos);
-        routingInfos.addAll(stageRoutingInfos);
-      }
-      for (RoutingInfo routingInfo : routingInfos) {
-        try {
-          StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-          _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-              routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
-        } catch (TimeoutException e) {
-          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-              routingInfo.getMailboxId(), requestId, stageId, e);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-              routingInfo.getMailboxId(), requestId, stageId, e);
+    pipelineBreakerResultFuture.thenAcceptAsync(pipelineBreakerResult -> {
+      // Send error block to all the receivers if pipeline breaker fails
+      if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+        TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+        int stageId = stageMetadata.getStageId();
+        LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
+            stageId, errorBlock.getExceptions());
+        MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+        List<RoutingInfo> routingInfos = new ArrayList<>();
+        for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+          List<MailboxInfo> receiverMailboxInfos =
+              workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+          List<RoutingInfo> stageRoutingInfos =
+              MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+                  receiverMailboxInfos);
+          routingInfos.addAll(stageRoutingInfos);
         }
+        for (RoutingInfo routingInfo : routingInfos) {
+          try {
+            StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+            _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
+                routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
+          } catch (TimeoutException e) {
+            LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
+                routingInfo.getMailboxId(), requestId, stageId, e);
+          } catch (Exception e) {
+            LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+                routingInfo.getMailboxId(), requestId, stageId, e);
+          }
+        }
+        return;
       }
-      return;
-    }
 
-    // run OpChain
-    OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
-    OpChain opChain;
-    if (workerMetadata.isLeafStageWorker()) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
-          _leafQueryExecutor, _executorService);
-    } else {
-      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-    }
-    _opChainScheduler.register(opChain);
+      // run OpChain
+      OpChainExecutionContext executionContext =
+          new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+              workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+      OpChain opChain;
+      if (workerMetadata.isLeafStageWorker()) {
+        opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
+            _leafQueryExecutor, _executorService);
+      } else {
+        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+      }
+      _opChainScheduler.register(opChain);
+    }, _executorService);
   }
 
   /**
