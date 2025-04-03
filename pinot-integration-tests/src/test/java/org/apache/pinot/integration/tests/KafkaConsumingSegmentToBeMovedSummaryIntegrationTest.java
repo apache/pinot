@@ -157,7 +157,7 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
     Assert.assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(),
         0);
 
-    stopServer();
+    stopKafka();
     response = sendPostRequest(
         getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
     RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);

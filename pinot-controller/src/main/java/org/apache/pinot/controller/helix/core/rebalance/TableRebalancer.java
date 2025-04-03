@@ -139,7 +139,7 @@ public class TableRebalancer {
   private static final int TOP_N_IN_CONSUMING_SEGMENT_SUMMARY = 10;
   // TODO: Consider making the timeoutMs below table rebalancer configurable
   private static final int TABLE_SIZE_READER_TIMEOUT_MS = 30_000;
-  private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 30_000;
+  private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 10_000;
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
