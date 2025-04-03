@@ -1066,11 +1066,12 @@ public class PinotLLCRealtimeSegmentManager {
 
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
-
+    LOGGER.info("Attempting to mark segment: {} OFFLINE on instance: {} if segment is CONSUMING", segmentName, instanceName);
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+        assert stateMap != null;
         String state = stateMap.get(instanceName);
         if (SegmentStateModel.CONSUMING.equals(state)) {
           LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
