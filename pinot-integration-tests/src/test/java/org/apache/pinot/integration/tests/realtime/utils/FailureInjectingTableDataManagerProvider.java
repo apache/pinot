@@ -34,6 +34,7 @@ import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -61,7 +62,8 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
   }
 
   @Override
-  public TableDataManager getTableDataManager(TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
+  public TableDataManager getTableDataManager(TableConfig tableConfig, SegmentReloadSemaphore segmentReloadSemaphore,
+      ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
@@ -87,7 +89,8 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, segmentPreloadExecutor,
+    tableDataManager.init(_instanceDataManagerConfig, _helixManager, _segmentLocks, tableConfig, segmentReloadSemaphore,
+        segmentReloadExecutor, segmentPreloadExecutor,
         errorCache, null);
     return tableDataManager;
   }

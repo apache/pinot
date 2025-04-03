@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
@@ -43,6 +44,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -201,8 +203,8 @@ public abstract class BaseResourceTest {
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
-        null, null);
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

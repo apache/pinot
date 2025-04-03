@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
@@ -44,6 +45,7 @@ import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -182,8 +184,8 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
 
     String tableName = TABLE_NAME + "_" + _iteration;
     _tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableName);
-    _tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, null, null,
-        SEGMENT_OPERATIONS_THROTTLER);
+    _tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER);
     _tableDataManager.start();
 
     for (int i = 0; i < _indexSegments.size(); i++) {

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -39,6 +40,7 @@ import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -125,8 +127,8 @@ public class BaseTableDataManagerAcquireSegmentTest {
         new SegmentAllIndexPreprocessThrottler(8, 10, true), new SegmentStarTreePreprocessThrottler(4, 8, true),
         new SegmentDownloadThrottler(10, 20, true));
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
-        null, segmentOperationsThrottler);
+    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottler);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
