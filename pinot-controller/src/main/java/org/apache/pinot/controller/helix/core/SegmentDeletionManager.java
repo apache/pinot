@@ -215,6 +215,55 @@ public class SegmentDeletionManager {
     }
   }
 
+  public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
+      @Nullable Long deletedSegmentsRetentionMs) {
+    if (_dataDir == null) {
+      LOGGER.info("dataDir is not configured, won't delete segment from disk for table: {}", tableNameWithType);
+      return;
+    }
+
+    long retentionMs =
+        (deletedSegmentsRetentionMs == null) ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+
+    List<URI> filesToDelete = new ArrayList<>();
+    List<URI> metadataFilesToDelete = new ArrayList<>();
+
+    PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_dataDir).getScheme());
+
+    for (String segmentId : segments) {
+      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
+      if (fileToDeleteURI == null) {
+        continue;
+      }
+      try {
+        URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(fileToDeleteURI.toString(), segmentId);
+        metadataFilesToDelete.add(segmentMetadataUri);
+      } catch (URISyntaxException e) {
+        LOGGER.warn("Could not generate segment metadata URI for segment: {}", segmentId, e);
+      }
+
+      if (retentionMs <= 0) {
+        filesToDelete.add(fileToDeleteURI);
+      } else {
+        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
+      }
+    }
+
+    try {
+      if (!filesToDelete.isEmpty()) {
+        LOGGER.info("Deleting {} segment files.", filesToDelete.size());
+        pinotFS.deleteBatch(filesToDelete, true);
+      }
+      if (!metadataFilesToDelete.isEmpty()) {
+        LOGGER.info("Deleting {} segment metadata files.", metadataFilesToDelete.size());
+        pinotFS.deleteBatch(metadataFilesToDelete, true);
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Could not delete segment/metadata files", e);
+    }
+  }
+
   private void deleteSegmentMetadataFromStore(PinotFS pinotFS, URI segmentFileUri, String segmentId) {
     // Check if segment metadata exists in remote store and delete it.
     // URI is generated from segment's location and segment name
@@ -241,7 +290,6 @@ public class SegmentDeletionManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
       if (fileToDeleteURI == null) {
-        LOGGER.warn("No segment file found for segment: {} in deep store, skipping deletion", segmentId);
         return;
       }
       PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
@@ -249,44 +297,54 @@ public class SegmentDeletionManager {
       // This is catch all clean up to ensure that metadata is removed from deep store.
       deleteSegmentMetadataFromStore(pinotFS, fileToDeleteURI, segmentId);
       if (retentionMs <= 0) {
-        // delete the segment file instantly if retention is set to zero
-        try {
-          if (pinotFS.delete(fileToDeleteURI, true)) {
-            LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
-          } else {
-            LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
-          }
-        } catch (IOException e) {
-          LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
-        }
+        segmentDeletion(segmentId, pinotFS, fileToDeleteURI);
       } else {
-        // move the segment file to deleted segments first and let retention manager handler the deletion
-        String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
-            : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
-        URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
-        try {
-          if (pinotFS.exists(fileToDeleteURI)) {
-            // Overwrites the file if it already exists in the target directory.
-            if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
-              // Updates last modified.
-              // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-              pinotFS.touch(deletedSegmentMoveDestURI);
-              LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-                  deletedSegmentMoveDestURI.toString());
-            } else {
-              LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-                  deletedSegmentMoveDestURI.toString());
-            }
-          } else {
-            LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
-          }
-        } catch (IOException e) {
-          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
-              deletedSegmentMoveDestURI.toString(), e);
-        }
+        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
+    }
+  }
+
+  private void moveSegmentsToDeletedDir(String segmentId, Long deletedSegmentsRetentionMs, String rawTableName,
+      PinotFS pinotFS,
+      URI fileToDeleteURI) {
+    // move the segment file to deleted segments first and let retention manager handler the deletion
+    String deletedFileName = deletedSegmentsRetentionMs == null ? URIUtils.encode(segmentId)
+        : getDeletedSegmentFileName(URIUtils.encode(segmentId), deletedSegmentsRetentionMs);
+    URI deletedSegmentMoveDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, deletedFileName);
+    try {
+      if (pinotFS.exists(fileToDeleteURI)) {
+        // Overwrites the file if it already exists in the target directory.
+        if (pinotFS.move(fileToDeleteURI, deletedSegmentMoveDestURI, true)) {
+          // Updates last modified.
+          // Touch is needed here so that removeAgedDeletedSegments() works correctly.
+          pinotFS.touch(deletedSegmentMoveDestURI);
+          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+              deletedSegmentMoveDestURI.toString());
+        } else {
+          LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+              deletedSegmentMoveDestURI.toString());
+        }
+      } else {
+        LOGGER.warn("Failed to find local segment file for segment {}", fileToDeleteURI.toString());
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToDeleteURI.toString(),
+          deletedSegmentMoveDestURI.toString(), e);
+    }
+  }
+
+  private static void segmentDeletion(String segmentId, PinotFS pinotFS, URI fileToDeleteURI) {
+    // delete the segment file instantly if retention is set to zero
+    try {
+      if (pinotFS.delete(fileToDeleteURI, true)) {
+        LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
+      } else {
+        LOGGER.warn("Failed to delete segment {} from {}", segmentId, fileToDeleteURI.toString());
+      }
+    } catch (IOException e) {
+      LOGGER.warn("Could not delete segment {} from {}", segmentId, fileToDeleteURI.toString(), e);
     }
   }
 
