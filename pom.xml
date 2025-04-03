@@ -838,7 +838,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>${roaring-bitmap.versionitmap.version}</version>
+        <version>${roaring-bitmap.version}</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
