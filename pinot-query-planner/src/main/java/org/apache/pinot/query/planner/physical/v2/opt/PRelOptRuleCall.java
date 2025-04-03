@@ -16,41 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.query.planner.physical.v2.opt;
 
-import org.apache.pinot.common.Utils;
+import java.util.Deque;
+import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
 
 
-public enum MinionGauge implements AbstractMetrics.Gauge {
-  VERSION("version", true),
-  /**
-   * The ZooKeeper jute.maxbuffer size in bytes.
-   */
-  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
-  NUMBER_OF_TASKS("tasks", true);
+public class PRelOptRuleCall {
+  public final PhysicalPlannerContext _physicalPlannerContext;
+  public final PRelNode _currentNode;
+  public final Deque<PRelNode> _parents;
 
-  private final String _gaugeName;
-  private final String _unit;
-  private final boolean _global;
-
-  MinionGauge(String unit, boolean global) {
-    _gaugeName = Utils.toCamelCase(name().toLowerCase());
-    _unit = unit;
-    _global = global;
-  }
-
-  @Override
-  public String getGaugeName() {
-    return _gaugeName;
-  }
-
-  @Override
-  public String getUnit() {
-    return _unit;
-  }
-
-  @Override
-  public boolean isGlobal() {
-    return _global;
+  public PRelOptRuleCall(PRelNode currentNode, Deque<PRelNode> parents, PhysicalPlannerContext physicalPlannerContext) {
+    _currentNode = currentNode;
+    _parents = parents;
+    _physicalPlannerContext = physicalPlannerContext;
   }
 }

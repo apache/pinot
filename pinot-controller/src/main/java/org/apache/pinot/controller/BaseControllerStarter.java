@@ -55,6 +55,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskDriver;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
@@ -132,6 +133,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -699,6 +701,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    // log zookeeper's JUTE_MAX_BUFFER value, default is 0xfffff bytes (just under 1MB)
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.ZK_JUTE_MAX_BUFFER,
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     ControllerMetrics.register(_controllerMetrics);
     _validationMetrics = new ValidationMetrics(_metricsRegistry);
   }
@@ -809,10 +814,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     _taskManagerStatusCache = getTaskManagerStatusCache();
-    _taskManager =
-        new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager,
-            _resourceUtilizationManager);
+    // Create and add task manager
+    _taskManager = createTaskManager();
     periodicTasks.add(_taskManager);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
@@ -860,6 +863,27 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(resourceUtilizationChecker);
 
     return periodicTasks;
+  }
+
+  /**
+   * Creates a TaskManager instance  as specified in the configuration.
+   */
+  private PinotTaskManager createTaskManager() {
+    String taskManagerClass = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TASK_MANAGER_CLASS,
+        CommonConstants.Controller.DEFAULT_TASK_MANAGER_CLASS);
+    LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
+    try {
+      return PluginManager.get().createInstance(taskManagerClass,
+          new Class[]{PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
+              ControllerConf.class, ControllerMetrics.class, TaskManagerStatusCache.class,
+              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class},
+          new Object[]{_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+              _config, _controllerMetrics, _taskManagerStatusCache, _executorService,
+              _connectionManager, _resourceUtilizationManager});
+    } catch (Exception e) {
+      LOGGER.error("Failed to create task manager with class: {}", taskManagerClass, e);
+      throw new RuntimeException("Failed to create task manager with class: " + taskManagerClass, e);
+    }
   }
 
   @Override

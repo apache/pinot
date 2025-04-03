@@ -16,41 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.query.planner.physical.v2.opt;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.query.planner.physical.v2.PRelNode;
 
 
-public enum MinionGauge implements AbstractMetrics.Gauge {
-  VERSION("version", true),
+/**
+ * Optimization rule for a {@link PRelNode}.
+ */
+public abstract class PRelOptRule {
   /**
-   * The ZooKeeper jute.maxbuffer size in bytes.
+   * Whether an optimization rule should be called for the given {@link PRelNode}.
    */
-  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
-  NUMBER_OF_TASKS("tasks", true);
-
-  private final String _gaugeName;
-  private final String _unit;
-  private final boolean _global;
-
-  MinionGauge(String unit, boolean global) {
-    _gaugeName = Utils.toCamelCase(name().toLowerCase());
-    _unit = unit;
-    _global = global;
+  public boolean matches(PRelOptRuleCall call) {
+    return true;
   }
 
-  @Override
-  public String getGaugeName() {
-    return _gaugeName;
-  }
+  /**
+   * Allows transforming a {@link PRelNode} into another {@link PRelNode}.
+   */
+  public abstract PRelNode onMatch(PRelOptRuleCall call);
 
-  @Override
-  public String getUnit() {
-    return _unit;
-  }
-
-  @Override
-  public boolean isGlobal() {
-    return _global;
+  /**
+   * Called after the subtree rooted at the given {@link PRelNode} is processed completely.
+   */
+  public PRelNode onDone(PRelNode currentNode) {
+    return currentNode;
   }
 }

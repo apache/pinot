@@ -22,7 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.slf4j.Logger;
 
@@ -33,6 +36,8 @@ import org.slf4j.Logger;
  */
 public abstract class BaseSegmentOperationsThrottler implements PinotClusterConfigChangeListener {
 
+  protected final ServerMetrics _serverMetrics = ServerMetrics.get();
+
   protected AdjustableSemaphore _semaphore;
   /**
    * _maxConcurrency and _maxConcurrencyBeforeServingQueries must be > 0. To effectively disable throttling, this can
@@ -41,6 +46,9 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   protected int _maxConcurrency;
   protected int _maxConcurrencyBeforeServingQueries;
   protected boolean _isServingQueries;
+  protected ServerGauge _thresholdGauge;
+  protected ServerGauge _countGauge;
+  private AtomicInteger _numSegmentsAcquiredSemaphore;
   private final Logger _logger;
 
   /**
@@ -48,10 +56,12 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
    * @param maxConcurrency configured concurrency
    * @param maxConcurrencyBeforeServingQueries configured concurrency before serving queries
    * @param isServingQueries whether the server is ready to serve queries or not
+   * @param thresholdGauge gauge metric to track the throttle thresholds
+   * @param countGauge gauge metric to track the number of segments undergoing the given operation
    * @param logger logger to use
    */
   public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
-      boolean isServingQueries, Logger logger) {
+      boolean isServingQueries, ServerGauge thresholdGauge, ServerGauge countGauge, Logger logger) {
     _logger = logger;
     _logger.info("Initializing SegmentOperationsThrottler, maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}, "
             + "isServingQueries: {}",
@@ -63,6 +73,8 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
     _maxConcurrency = maxConcurrency;
     _maxConcurrencyBeforeServingQueries = maxConcurrencyBeforeServingQueries;
     _isServingQueries = isServingQueries;
+    _thresholdGauge = thresholdGauge;
+    _countGauge = countGauge;
 
     // maxConcurrencyBeforeServingQueries is only used prior to serving queries and once the server is
     // ready to serve queries this is not used again. This too is configurable via ZK CLUSTER config updates while the
@@ -71,8 +83,11 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
       logger.info("Serving queries is disabled, using concurrency as: {}", _maxConcurrencyBeforeServingQueries);
     }
 
-    _semaphore = new AdjustableSemaphore(
-        _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries, true);
+    int concurrency = _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries;
+    _semaphore = new AdjustableSemaphore(concurrency, true);
+    _numSegmentsAcquiredSemaphore = new AtomicInteger(0);
+    _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, concurrency);
+    _serverMetrics.setValueOfGlobalGauge(_countGauge, 0);
     _logger.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
         availablePermits());
   }
@@ -82,6 +97,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
         + "total permits: {}, available permits: {}", totalPermits(), availablePermits());
     _isServingQueries = true;
     _semaphore.setPermits(_maxConcurrency);
+    _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, _maxConcurrency);
     _logger.info("Reset throttling completed, new concurrency: {}, total permits: {}, available permits: {}",
         _maxConcurrency, totalPermits(), availablePermits());
   }
@@ -125,6 +141,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
       return;
     }
     _semaphore.setPermits(_maxConcurrency);
+    _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, _maxConcurrency);
     _logger.info("Updated total permits: {}", totalPermits());
   }
 
@@ -165,12 +182,13 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
     if (!_isServingQueries) {
       _logger.info("config: {} was updated before serving queries was enabled, updating the permits", configName);
       _semaphore.setPermits(_maxConcurrencyBeforeServingQueries);
+      _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, _maxConcurrencyBeforeServingQueries);
       _logger.info("Updated total permits: {}", totalPermits());
     }
   }
 
   /**
-   * Block trying to acquire the semaphore to perform the segment StarTree index rebuild steps unless interrupted.
+   * Block trying to acquire the semaphore to perform the segment operation steps unless interrupted.
    * <p>
    * {@link #release()} should be called after the segment operation completes. It is the responsibility of the caller
    * to ensure that {@link #release()} is called exactly once for each call to this method.
@@ -180,14 +198,16 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
   public void acquire()
       throws InterruptedException {
     _semaphore.acquire();
+    _serverMetrics.setValueOfGlobalGauge(_countGauge, _numSegmentsAcquiredSemaphore.incrementAndGet());
   }
 
   /**
-   * Should be called after the segment StarTree index build completes. It is the responsibility of the caller to
+   * Should be called after the segment operation completes. It is the responsibility of the caller to
    * ensure that this method is called exactly once for each call to {@link #acquire()}.
    */
   public void release() {
     _semaphore.release();
+    _serverMetrics.setValueOfGlobalGauge(_countGauge, _numSegmentsAcquiredSemaphore.decrementAndGet());
   }
 
   /**

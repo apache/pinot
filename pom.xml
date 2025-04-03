@@ -136,6 +136,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <shade.phase.prop>none</shade.phase.prop>
 
+    <arrow.version>18.2.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.1</parquet.version>
     <orc.version>1.9.5</orc.version>
@@ -144,7 +145,7 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.18.3</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
-    <async-http-client.version>3.0.1</async-http-client.version>
+    <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
@@ -157,7 +158,7 @@
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.20.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.21.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.30</dropwizard-metrics.version>
@@ -175,10 +176,10 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.10</aws.sdk.version>
+    <aws.sdk.version>2.31.11</aws.sdk.version>
     <azure.sdk.version>1.2.33</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
-    <joda-time.version>2.13.1</joda-time.version>
+    <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
@@ -232,7 +233,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.71.0</grpc.version>
-    <google.cloud.libraries.version>26.58.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.59.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.37.0</google.errorprone.version>
@@ -259,7 +260,7 @@
     <jna.version>5.17.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.7.1</asm.version>
+    <asm.version>9.8</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
@@ -789,10 +790,22 @@
         <type>test-jar</type>
       </dependency>
 
+      <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-memory-netty</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.1</version>
+        <version>3.49.2</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -2197,6 +2210,9 @@
               --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
               -Dnet.bytebuddy.experimental=true
+              -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito-core.version}/mockito-core-${mockito-core.version}.jar
+              -Xshare:off
+              -XX:+EnableDynamicAgentLoading
             </argLine>
           </configuration>
           <!-- Explicitly select the test provider, instead of relying on the classpath -->
@@ -2330,7 +2346,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>javacc-maven-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.1.1</version>
           <dependencies>
             <dependency>
               <groupId>net.java.dev.javacc</groupId>
@@ -2343,7 +2359,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.2</version>
+          <version>4.9.5</version>
           <executions>
             <execution>
               <id>add-source</id>
@@ -2449,7 +2465,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.21.4</version>
+            <version>10.22.0</version>
           </dependency>
         </dependencies>
         <executions>
