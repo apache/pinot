@@ -73,7 +73,7 @@ public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccount
    */
   public static class AggregateByQueryIdAccountant
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-    Map<String, QueryResourceTrackerImpl> _queryMemUsage = new ConcurrentHashMap<>();
+    Map<String, QueryResourceTracker> _queryMemUsage = new ConcurrentHashMap<>();
 
     public AggregateByQueryIdAccountant(PinotConfiguration config, String instanceId) {
       super(config, instanceId);
@@ -84,13 +84,14 @@ public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccount
       super.sampleThreadBytesAllocated();
       ThreadExecutionContext context = getThreadExecutionContext();
       QueryResourceTrackerImpl queryResourceTracker =
-          _queryMemUsage.computeIfAbsent(context.getQueryId(), s -> new QueryResourceTrackerImpl(context.getQueryId()));
+          (QueryResourceTrackerImpl) _queryMemUsage.computeIfAbsent(context.getQueryId(),
+              s -> new QueryResourceTrackerImpl(context.getQueryId()));
       queryResourceTracker.setAllocatedBytes(
           queryResourceTracker.getAllocatedBytes() + getThreadEntry().getAllocatedBytes());
     }
 
     @Override
-    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+    public Map<String, QueryResourceTracker> getQueryResources() {
       return _queryMemUsage;
     }
   }

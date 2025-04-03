@@ -27,7 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -289,7 +289,7 @@ public class PinotBrokerDebug {
   @Path("/debug/threads/resourceUsage")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get resource usage of threads")
-  public Collection<? extends ThreadResourceTracker> getThreadResourceUsage() {
+  public List<ThreadResourceTracker> getThreadResourceUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     return threadAccountant.getThreadResources();
   }
@@ -300,9 +300,9 @@ public class PinotBrokerDebug {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
       + "and won't maintain backward compatibility")
-  public Collection<? extends QueryResourceTracker> getQueryUsage() {
+  public List<QueryResourceTracker> getQueryUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getQueryResources().values();
+    return new ArrayList<>(threadAccountant.getQueryResources().values());
   }
 
   @GET

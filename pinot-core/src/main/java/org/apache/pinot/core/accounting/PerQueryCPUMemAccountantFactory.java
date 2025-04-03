@@ -21,11 +21,12 @@ package org.apache.pinot.core.accounting;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -175,8 +176,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public Collection<? extends ThreadResourceTracker> getThreadResources() {
-      return _threadEntriesMap.values();
+    public List<ThreadResourceTracker> getThreadResources() {
+      return new ArrayList<>(_threadEntriesMap.values());
     }
 
     /**
@@ -186,8 +187,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      * @return A map of query id, QueryResourceTracker.
      */
     @Override
-    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
-      HashMap<String, AggregatedStats> ret = new HashMap<>();
+    public Map<String, QueryResourceTracker> getQueryResources() {
+      HashMap<String, QueryResourceTracker> ret = new HashMap<>();
 
       // for each {pqr, pqw}
       for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
@@ -208,16 +209,22 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (queryId != null) {
             Thread anchorThread = currentTaskStatus.getAnchorThread();
             boolean isAnchorThread = currentTaskStatus.isAnchorThread();
-            ret.compute(queryId,
-                (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
-                    isAnchorThread, threadEntry._errorStatus, queryId)
-                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+            ret.compute(queryId, (k, v) -> {
+              if (v == null) {
+                return new AggregatedStats(currentCPUSample, currentMemSample, anchorThread, isAnchorThread,
+                    threadEntry._errorStatus, queryId);
+              } else {
+                // We need to cast v to AggregatedStats to call the merge method
+                return ((AggregatedStats) v).merge(currentCPUSample, currentMemSample, isAnchorThread,
+                    threadEntry._errorStatus);
+              }
+            });
           }
         }
       }
 
       // if triggered, accumulate stats of finished tasks of each active query
-      for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
+      for (Map.Entry<String, QueryResourceTracker> queryIdResult : ret.entrySet()) {
         String activeQueryId = queryIdResult.getKey();
         long accumulatedCPUValue =
             _isThreadCPUSamplingEnabled ? _finishedTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
@@ -227,7 +234,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             _isThreadMemorySamplingEnabled ? _finishedTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
         long concurrentMemValue =
             _isThreadMemorySamplingEnabled ? _concurrentTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-        queryIdResult.getValue()
+        ((AggregatedStats) queryIdResult.getValue())
             .merge(accumulatedCPUValue + concurrentCPUValue, accumulatedMemValue + concurrentMemValue, false, null);
       }
       return ret;

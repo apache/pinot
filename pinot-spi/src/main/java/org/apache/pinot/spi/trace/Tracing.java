@@ -20,8 +20,8 @@ package org.apache.pinot.spi.trace;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
@@ -246,12 +246,12 @@ public class Tracing {
     }
 
     @Override
-    public Collection<? extends ThreadResourceTracker> getThreadResources() {
+    public List<ThreadResourceTracker> getThreadResources() {
       return Collections.emptyList();
     }
 
     @Override
-    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+    public Map<String, QueryResourceTracker> getQueryResources() {
       return Collections.emptyMap();
     }
   }
