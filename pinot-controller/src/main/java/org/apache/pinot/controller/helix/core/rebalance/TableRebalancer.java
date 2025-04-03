@@ -426,9 +426,9 @@ public class TableRebalancer {
     Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
 
     long estimatedAverageSegmentSizeInBytes = summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes();
-    Set<String> allOriginalSegmentsIdealState = currentAssignment.keySet();
+    Set<String> allSegmentsFromIdealState = currentAssignment.keySet();
     TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
-        estimatedAverageSegmentSizeInBytes, allOriginalSegmentsIdealState, segmentsToMonitor);
+        estimatedAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
 
     // Record the beginning of rebalance
     _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
@@ -499,7 +499,7 @@ public class TableRebalancer {
       try {
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
             externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
-            allOriginalSegmentsIdealState);
+            allSegmentsFromIdealState);
       } catch (Exception e) {
         String errorMsg = String.format(
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
@@ -593,11 +593,11 @@ public class TableRebalancer {
 
       // Record change of current ideal state and the new target
       rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
-          allOriginalSegmentsIdealState, null);
+          allSegmentsFromIdealState, null);
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
           targetAssignment, rebalanceContext);
       // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
-      allOriginalSegmentsIdealState = currentAssignment.keySet();
+      allSegmentsFromIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
@@ -1303,7 +1303,7 @@ public class TableRebalancer {
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
       Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
-      long estimateAverageSegmentSizeInBytes, Set<String> allOriginalSegmentsIdealState)
+      long estimateAverageSegmentSizeInBytes, Set<String> allSegmentsFromIdealState)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1320,12 +1320,12 @@ public class TableRebalancer {
       if (externalView != null) {
         // Record external view and ideal state convergence status
         TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
-            estimateAverageSegmentSizeInBytes, allOriginalSegmentsIdealState, segmentsToMonitor);
+            estimateAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
         // Update unique segment list as IS-EV trigger must have processed these
-        allOriginalSegmentsIdealState = idealState.getRecord().getMapFields().keySet();
+        allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
         if (_tableRebalanceObserver.isStopped()) {
           throw new RuntimeException(
               String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
