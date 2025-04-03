@@ -61,6 +61,7 @@ import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -69,7 +70,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -78,7 +78,15 @@ import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,17 +137,19 @@ import org.slf4j.LoggerFactory;
 public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
   private static final int TOP_N_IN_CONSUMING_SEGMENT_SUMMARY = 10;
+  // TODO: Consider making the timeoutMs below table rebalancer configurable
+  private static final int TABLE_SIZE_READER_TIMEOUT_MS = 30_000;
+  private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 30_000;
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
   private final ControllerMetrics _controllerMetrics;
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
-  private final ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
-      @Nullable TableSizeReader tableSizeReader, @Nullable ConsumingSegmentInfoReader consumingSegmentInfoReader) {
+      @Nullable TableSizeReader tableSizeReader) {
     _helixManager = helixManager;
     if (tableRebalanceObserver != null) {
       _tableRebalanceObserver = tableRebalanceObserver;
@@ -150,11 +160,10 @@ public class TableRebalancer {
     _controllerMetrics = controllerMetrics;
     _rebalancePreChecker = rebalancePreChecker;
     _tableSizeReader = tableSizeReader;
-    _consumingSegmentInfoReader = consumingSegmentInfoReader;
   }
 
   public TableRebalancer(HelixManager helixManager) {
-    this(helixManager, null, null, null, null, null);
+    this(helixManager, null, null, null, null);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -618,9 +627,8 @@ public class TableRebalancer {
     }
     LOGGER.info("Fetching the table size for table: {}", tableNameWithType);
     try {
-      // TODO: Consider making the timeoutMs for fetching table size via table rebalancer configurable
       TableSizeReader.TableSubTypeSizeDetails sizeDetails =
-          _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
+          _tableSizeReader.getTableSubtypeSize(tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS);
       LOGGER.info("Fetched the table size details for table: {}", tableNameWithType);
       return sizeDetails;
     } catch (InvalidConfigException e) {
@@ -832,7 +840,7 @@ public class TableRebalancer {
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
     RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary =
-        isOfflineTable ? null : getConsumingSegmentSummary(tableNameWithType, newServersToConsumingSegmentMap);
+        isOfflineTable ? null : getConsumingSegmentSummary(tableConfig, newServersToConsumingSegmentMap);
     RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
         maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
         replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentToBeMovedSummary);
@@ -848,8 +856,9 @@ public class TableRebalancer {
     return instanceConfig.getTags();
   }
 
-  private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(String tableNameWithType,
+  private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(TableConfig tableConfig,
       Map<String, Set<String>> newServersToConsumingSegmentMap) {
+    String tableNameWithType = tableConfig.getTableName();
     if (newServersToConsumingSegmentMap.isEmpty()) {
       return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(0, 0, new HashMap<>(), new HashMap<>(),
           new HashMap<>());
@@ -862,15 +871,15 @@ public class TableRebalancer {
     uniqueConsumingSegments.forEach(segment -> consumingSegmentZKmetadata.put(segment,
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
     Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
-        getConsumingSegmentsOffsetsToCatchUp(tableNameWithType, consumingSegmentZKmetadata);
+        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKmetadata);
     Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
 
     Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
     Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
-        consumingSegmentSummaryPerServer =
-        new HashMap<>();
+        consumingSegmentSummaryPerServer = new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
-      consumingSegmentsOffsetsToCatchUpTopN = getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp);
+      consumingSegmentsOffsetsToCatchUpTopN =
+          getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
         int totalOffsetsToCatchUp =
             segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
@@ -888,7 +897,8 @@ public class TableRebalancer {
     }
 
     Map<String, Integer> consumingSegmentsOldestTopN =
-        consumingSegmentsAge == null ? null : getTopNConsumingSegmentWithValue(consumingSegmentsAge);
+        consumingSegmentsAge == null ? null
+            : getTopNConsumingSegmentWithValue(consumingSegmentsAge, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
 
     return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
         newServersToConsumingSegmentMap.size(), consumingSegmentsOffsetsToCatchUpTopN, consumingSegmentsOldestTopN,
@@ -896,12 +906,12 @@ public class TableRebalancer {
   }
 
   private static Map<String, Integer> getTopNConsumingSegmentWithValue(
-      Map<String, Integer> consumingSegmentsWithValue) {
+      Map<String, Integer> consumingSegmentsWithValue, @Nullable Integer topN) {
     Map<String, Integer> topNConsumingSegments = new LinkedHashMap<>();
     consumingSegmentsWithValue.entrySet()
         .stream()
         .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-        .limit(TOP_N_IN_CONSUMING_SEGMENT_SUMMARY)
+        .limit(topN == null ? consumingSegmentsWithValue.size() : topN)
         .forEach(entry -> topNConsumingSegments.put(entry.getKey(), entry.getValue()));
     return topNConsumingSegments;
   }
@@ -937,11 +947,6 @@ public class TableRebalancer {
     return consumingSegmentsAge;
   }
 
-  @VisibleForTesting
-  ConsumingSegmentInfoReader getConsumingSegmentInfoReader() {
-    return _consumingSegmentInfoReader;
-  }
-
   /**
    * Fetches the consuming segment info for the table and calculates the number of offsets to catch up for each
    * consuming segment. consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata.
@@ -949,22 +954,13 @@ public class TableRebalancer {
    * segment. Return null if failed to obtain info for any consuming segment.
    */
   @Nullable
-  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(String tableNameWithType,
+  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
-    ConsumingSegmentInfoReader consumingSegmentInfoReader = getConsumingSegmentInfoReader();
-    if (consumingSegmentInfoReader == null) {
-      LOGGER.warn("ConsumingSegmentInfoReader is null, cannot calculate consuming segments info for table: {}",
-          tableNameWithType);
-      return null;
-    }
+    String tableNameWithType = tableConfig.getTableName();
     Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
     try {
-      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentsInfoMap =
-          consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType, 30_000);
       for (Map.Entry<String, SegmentZKMetadata> entry : consumingSegmentZKMetadata.entrySet()) {
         String segmentName = entry.getKey();
-        List<ConsumingSegmentInfoReader.ConsumingSegmentInfo> consumingSegmentInfoList =
-            consumingSegmentsInfoMap._segmentToConsumingInfoMap.getOrDefault(segmentName, null);
         SegmentZKMetadata segmentZKMetadata = entry.getValue();
         if (segmentZKMetadata == null) {
           LOGGER.warn("Cannot find SegmentZKMetadata for segment: {} in table: {}", segmentName, tableNameWithType);
@@ -975,16 +971,18 @@ public class TableRebalancer {
           LOGGER.warn("Start offset is null for segment: {} in table: {}", segmentName, tableNameWithType);
           return null;
         }
-        if (consumingSegmentInfoList == null || consumingSegmentInfoList.isEmpty()) {
-          LOGGER.warn("No available consuming segment info from any server. Segment: {} in table: {}", segmentName,
+        Integer partitionId = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+        // for simplicity here we disable consuming segment info if they do not have partitionId in segmentName
+        if (partitionId == null) {
+          LOGGER.warn("Cannot determine partition id for realtime segment: {} in table: {}", segmentName,
               tableNameWithType);
           return null;
         }
-        // this value should be the same regardless of which server the consuming segment info is from, use the
-        // first in the list here
-        int offsetsToCatchUp =
-            consumingSegmentInfoList.get(0)._partitionOffsetInfo._latestUpstreamOffsetMap.values()
-                .stream().mapToInt(offset -> Integer.parseInt(offset) - Integer.parseInt(startOffset)).sum();
+        Integer latestOffset = getLatestOffsetOfStream(tableConfig, partitionId);
+        if (latestOffset == null) {
+          return null;
+        }
+        int offsetsToCatchUp = latestOffset - Integer.parseInt(startOffset);
         segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
       }
     } catch (Exception e) {
@@ -993,6 +991,35 @@ public class TableRebalancer {
     }
     LOGGER.info("Successfully fetched consuming segments info for table: {}", tableNameWithType);
     return segmentToOffsetsToCatchUp;
+  }
+
+  @VisibleForTesting
+  StreamPartitionMsgOffset fetchStreamPartitionOffset(TableConfig tableConfig, int partitionId)
+      throws Exception {
+    StreamConsumerFactory streamConsumerFactory =
+        StreamConsumerFactoryProvider.create(new StreamConfig(tableConfig.getTableName(),
+            IngestionConfigUtils.getStreamConfigMap(tableConfig, partitionId)));
+    try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(
+        TableRebalancer.class.getCanonicalName(), partitionId)) {
+      return streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
+          STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS);
+    }
+  }
+
+  @Nullable
+  private Integer getLatestOffsetOfStream(TableConfig tableConfig, int partitionId) {
+    try {
+      StreamPartitionMsgOffset partitionMsgOffset = fetchStreamPartitionOffset(tableConfig, partitionId);
+      if (!(partitionMsgOffset instanceof LongMsgOffset)) {
+        LOGGER.warn("Unsupported stream partition message offset type: {}", partitionMsgOffset);
+        return null;
+      }
+      return (int) ((LongMsgOffset) partitionMsgOffset).getOffset();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while trying to fetch stream partition of partitionId: {}",
+          partitionId, e);
+      return null;
+    }
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {

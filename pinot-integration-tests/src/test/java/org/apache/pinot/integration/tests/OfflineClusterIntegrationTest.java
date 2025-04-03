@@ -302,7 +302,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ConsumingSegmentInfoReader consumingSegmentInfoReader =
         new ConsumingSegmentInfoReader(_executorService, null, _helixResourceManager);
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
-        _resourceManager.getTableSizeReader(), consumingSegmentInfoReader);
+        _resourceManager.getTableSizeReader());
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
