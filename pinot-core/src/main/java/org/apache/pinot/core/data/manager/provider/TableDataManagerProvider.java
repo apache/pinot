@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.data.manager.provider;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -28,6 +30,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -42,11 +45,14 @@ public interface TableDataManagerProvider {
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
-  default TableDataManager getTableDataManager(TableConfig tableConfig) {
-    return getTableDataManager(tableConfig, null, null, () -> true);
-  }
-
-  TableDataManager getTableDataManager(TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
+  TableDataManager getTableDataManager(TableConfig tableConfig, SegmentReloadSemaphore segmentRefreshSemaphore,
+      ExecutorService segmentRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries);
+
+  @VisibleForTesting
+  default TableDataManager getTableDataManager(TableConfig tableConfig) {
+    return getTableDataManager(tableConfig, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null,
+        null, () -> true);
+  }
 }

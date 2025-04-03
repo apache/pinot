@@ -164,11 +164,11 @@ public class LoaderTest {
     // in follow checks, whether it needs reprocess or not depends on segment format.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
       // The segmentVersionToLoad is null, not leading to reprocess.
-      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, new IndexLoadingConfig(), null));
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, new IndexLoadingConfig()));
       // The segmentVersionToLoad is v1, not leading to reprocess.
-      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v1IndexLoadingConfig, null));
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v1IndexLoadingConfig));
       // The segmentVersionToLoad is v3, leading to reprocess.
-      assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig, null));
+      assertTrue(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig));
     }
 
     // The segment is in v3 format now, not leading to reprocess.
@@ -177,7 +177,7 @@ public class LoaderTest {
     // Need to reset `segmentDirectory` to point to the correct index directory after the above load since the path
     // changes
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(_indexDir, ReadMode.mmap)) {
-      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig, null));
+      assertFalse(ImmutableSegmentLoader.needPreprocess(segmentDirectory, _v3IndexLoadingConfig));
     }
   }
 
