@@ -397,6 +397,10 @@ public class ArrowResponseEncoder implements ResponseEncoder {
         Object[] row = new Object[numColumns];
         for (int col = 0; col < numColumns; col++) {
           FieldVector vector = root.getVector(col);
+          if (vector.isNull(i)) {
+            row[col] = null;
+            continue;
+          }
           switch (schema.getColumnDataType(col)) {
             case BOOLEAN:
               row[col] = ((BitVector) vector).get(i) == 1;
