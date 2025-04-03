@@ -19,10 +19,7 @@
 
 import React from 'react';
 import {
-  Grid,
-  Box,
-  Typography,
-  Divider, Button
+  Grid, Box, Typography, Divider, Button, CircularProgress
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
@@ -112,6 +109,23 @@ export default function RebalanceServerTableOp({
     });
   }
 
+  if (pending) {
+    return (
+        <Dialog
+            showTitleDivider
+            showFooterDivider
+            size='md'
+            open={true}
+            handleClose={hideModal}
+            title={<RebalanceServerDialogHeader />}
+            showOkBtn={false}
+        >
+          <Box alignItems='center' display='flex' justifyContent='center'>
+            <CircularProgress />
+          </Box>
+        </Dialog>
+    )
+  }
 
   return (
     <Dialog
