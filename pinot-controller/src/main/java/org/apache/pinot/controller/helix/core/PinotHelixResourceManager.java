@@ -159,7 +159,6 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
-import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -244,7 +243,6 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
-  private ConsumingSegmentInfoReader _consumingSegmentInfoReader;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -1954,10 +1952,6 @@ public class PinotHelixResourceManager {
 
   public void registerTableSizeReader(TableSizeReader tableSizeReader) {
     _tableSizeReader = tableSizeReader;
-  }
-
-  public void registerConsumingSegmentInfoReader(ConsumingSegmentInfoReader consumingSegmentInfoReader) {
-    _consumingSegmentInfoReader = consumingSegmentInfoReader;
   }
 
   private void assignInstances(TableConfig tableConfig, boolean override) {
