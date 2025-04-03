@@ -119,7 +119,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected HelixManager _helixManager;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected SegmentLocks _segmentLocks;
-  protected TableConfig _tableConfig;
   protected String _tableNameWithType;
   protected String _tableDataDir;
   protected File _indexDir;
@@ -136,9 +135,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected boolean _isStreamSegmentDownloadUntar;
   @Nullable
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
+
   // Semaphore to restrict the maximum number of parallel segment downloads from deep store for a table
-  private Semaphore _segmentDownloadSemaphore;
-  private AtomicInteger _numSegmentsAcquiredDownloadSemaphore;
+  protected Semaphore _segmentDownloadSemaphore;
+  protected AtomicInteger _numSegmentsAcquiredDownloadSemaphore;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
   @Nullable
@@ -146,11 +146,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
+  // Caches the latest IndexLoadingConfig. The cached IndexLoadingConfig should not be modified.
+  protected volatile IndexLoadingConfig _indexLoadingConfig;
+
   protected volatile boolean _shutDown;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks, TableConfig tableConfig, SegmentReloadSemaphore segmentReloadSemaphore,
+      SegmentLocks segmentLocks, TableConfig tableConfig, Schema schema, SegmentReloadSemaphore segmentReloadSemaphore,
       ExecutorService segmentReloadExecutor, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
@@ -161,14 +164,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _helixManager = helixManager;
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
-    _tableConfig = tableConfig;
     _segmentReloadSemaphore = segmentReloadSemaphore;
     _segmentReloadExecutor = segmentReloadExecutor;
     _segmentPreloadExecutor = segmentPreloadExecutor;
-    _authProvider = AuthProviderUtils.extractAuthProvider(_instanceDataManagerConfig.getAuthConfig(), null);
+    _authProvider = AuthProviderUtils.extractAuthProvider(instanceDataManagerConfig.getAuthConfig(), null);
 
     _tableNameWithType = tableConfig.getTableName();
-    _tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableNameWithType;
+    _tableDataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableNameWithType;
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(), "Unable to create index directory at %s. "
@@ -224,6 +226,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
+    createAndCacheIndexLoadingConfig(tableConfig, schema);
 
     doInit();
 
@@ -379,19 +382,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public Pair<TableConfig, Schema> fetchTableConfigAndSchema() {
+  public IndexLoadingConfig fetchIndexLoadingConfig() {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-    return Pair.of(tableConfig, schema);
+    return createAndCacheIndexLoadingConfig(tableConfig, schema);
+  }
+
+  private IndexLoadingConfig createAndCacheIndexLoadingConfig(TableConfig tableConfig, Schema schema) {
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+    indexLoadingConfig.setTableDataDir(_tableDataDir);
+    _indexLoadingConfig = indexLoadingConfig;
+    return indexLoadingConfig;
   }
 
   @Override
-  public IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, Schema schema) {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
-    indexLoadingConfig.setTableDataDir(_tableDataDir);
-    return indexLoadingConfig;
+  public IndexLoadingConfig getIndexLoadingConfig() {
+    return _indexLoadingConfig;
   }
 
   @Override
@@ -1258,13 +1266,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema) {
+  public List<StaleSegment> getStaleSegments() {
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     List<StaleSegment> staleSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    final long startTime = System.currentTimeMillis();
+    long startTimeMs = System.currentTimeMillis();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        StaleSegment response = isSegmentStale(tableConfig, schema, segmentDataManager);
+        StaleSegment response = isSegmentStale(indexLoadingConfig, segmentDataManager);
         if (response.isStale()) {
           staleSegments.add(response);
         }
@@ -1273,13 +1282,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         releaseSegment(segmentDataManager);
       }
-      LOGGER.info("Time Taken to get stale segments: {} ms", System.currentTimeMillis() - startTime);
+      LOGGER.info("Time Taken to get stale segments: {} ms", System.currentTimeMillis() - startTimeMs);
     }
 
     return staleSegments;
   }
 
-  protected StaleSegment isSegmentStale(TableConfig tableConfig, Schema schema, SegmentDataManager segmentDataManager) {
+  @VisibleForTesting
+  StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    Schema schema = indexLoadingConfig.getSchema();
+    assert tableConfig != null && schema != null;
+
     String tableNameWithType = tableConfig.getTableName();
     Map<String, FieldIndexConfigs> indexConfigsMap =
         FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);

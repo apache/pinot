@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -45,14 +46,15 @@ public interface TableDataManagerProvider {
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
-  TableDataManager getTableDataManager(TableConfig tableConfig, SegmentReloadSemaphore segmentRefreshSemaphore,
-      ExecutorService segmentRefreshExecutor, @Nullable ExecutorService segmentPreloadExecutor,
+  TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema,
+      SegmentReloadSemaphore segmentRefreshSemaphore, ExecutorService segmentRefreshExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries);
 
   @VisibleForTesting
-  default TableDataManager getTableDataManager(TableConfig tableConfig) {
-    return getTableDataManager(tableConfig, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null,
-        null, () -> true);
+  default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
+    return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
+        null, null, () -> true);
   }
 }

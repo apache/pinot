@@ -89,7 +89,6 @@ public class DimensionTableDataManagerTest {
       new SegmentDownloadThrottler(1, 2, true));
 
   private File _indexDir;
-  private SegmentMetadata _segmentMetadata;
   private SegmentZKMetadata _segmentZKMetadata;
 
   @BeforeClass
@@ -120,9 +119,9 @@ public class DimensionTableDataManagerTest {
 
     String segmentName = driver.getSegmentName();
     _indexDir = new File(tableDataDir, segmentName);
-    _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    _segmentZKMetadata.setCrc(Long.parseLong(_segmentMetadata.getCrc()));
+    _segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
   }
 
   @AfterClass
@@ -174,7 +173,7 @@ public class DimensionTableDataManagerTest {
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
-    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig,
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER);
     tableDataManager.start();
     return tableDataManager;
@@ -294,8 +293,9 @@ public class DimensionTableDataManagerTest {
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(schemaWithExtraColumn));
-    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(),
-        new IndexLoadingConfig(tableConfig, schemaWithExtraColumn), _segmentZKMetadata, _segmentMetadata, false);
+    when(propertyStore.get("/SEGMENTS/dimBaseballTeams_OFFLINE/" + _segmentZKMetadata.getSegmentName(), null,
+        AccessOption.PERSISTENT)).thenReturn(_segmentZKMetadata.toZNRecord());
+    tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), false);
 
     // Confirm the new column is available for lookup
     teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
