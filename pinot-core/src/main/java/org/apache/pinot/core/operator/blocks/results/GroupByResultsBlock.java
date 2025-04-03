@@ -243,8 +243,9 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         Object[] values = iterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {
           Object value = values[i];
-          assert value != null;
-          if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
+          if (value == null) {
+            dataTableBuilder.setNull(i);
+          } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
             dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
           } else {
             setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
