@@ -139,84 +139,133 @@ public class TableRebalanceProgressStats {
   /**
    * Updates the overall and step progress stats based on the latest calculated step's progress stats. This should
    * be called during the EV-IS convergence trigger to ensure the overall stats reflect the changes as they are made.
-   * @param latestStepStats latest step level stats calculated in this iteration
+   * @param currentStepStats latest step level stats calculated in this iteration
    */
   public void updateOverallAndStepStatsFromLatestStepStats(
-      TableRebalanceProgressStats.RebalanceProgressStats latestStepStats) {
-    TableRebalanceProgressStats.RebalanceProgressStats lastStepStats = getRebalanceProgressStatsCurrentStep();
-    TableRebalanceProgressStats.RebalanceProgressStats lastOverallStats = getRebalanceProgressStatsOverall();
-    int numAdditionalSegmentsAdded =
-        latestStepStats._totalSegmentsToBeAdded - lastStepStats._totalSegmentsToBeAdded;
-    int numAdditionalSegmentsDeleted =
-        latestStepStats._totalSegmentsToBeDeleted - lastStepStats._totalSegmentsToBeDeleted;
-    int upperBoundOnSegmentsAdded =
-        lastStepStats._totalRemainingSegmentsToBeAdded > lastStepStats._totalSegmentsToBeAdded
-            ? lastStepStats._totalSegmentsToBeAdded : lastStepStats._totalRemainingSegmentsToBeAdded;
-    int numSegmentAddsProcessedInLastStep = Math.abs(upperBoundOnSegmentsAdded
-        - latestStepStats._totalRemainingSegmentsToBeAdded);
-    int upperBoundOnSegmentsDeleted =
-        lastStepStats._totalRemainingSegmentsToBeDeleted > lastStepStats._totalSegmentsToBeDeleted
-            ? lastStepStats._totalSegmentsToBeDeleted : lastStepStats._totalRemainingSegmentsToBeDeleted;
-    int numSegmentDeletesProcessedInLastStep = Math.abs(upperBoundOnSegmentsDeleted
-        - latestStepStats._totalRemainingSegmentsToBeDeleted);
-    int numberNewUntrackedSegmentsAdded = latestStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance
-        - lastStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance;
+      TableRebalanceProgressStats.RebalanceProgressStats currentStepStats) {
+    // Fetch the step level and overall stats that were calculated in the last convergence check. These will be used
+    // to calculate the overall stats in the current convergence check
+    TableRebalanceProgressStats.RebalanceProgressStats previousStepStats = getRebalanceProgressStatsCurrentStep();
+    TableRebalanceProgressStats.RebalanceProgressStats previousOverallStats = getRebalanceProgressStatsOverall();
 
-    TableRebalanceProgressStats.RebalanceProgressStats newOverallProgressStats =
+    // Calculate the new segments added / deleted since the last step to track overall change in segments. These are
+    // only new segments tracked by table rebalance (segments that aren't tracked by rebalance convergence check are
+    // ignored because the convergence check does not wait for them to complete)
+    int numAdditionalSegmentsAdded =
+        currentStepStats._totalSegmentsToBeAdded - previousStepStats._totalSegmentsToBeAdded;
+    int numAdditionalSegmentsDeleted =
+        currentStepStats._totalSegmentsToBeDeleted - previousStepStats._totalSegmentsToBeDeleted;
+
+    // Calculate the carry-over segment adds / deletes from the previous rebalance step if any (can happen if
+    // bestEfforts=true or if there are deletions left over from the last step) and the difference in the number of
+    // segments processed since the previous stats update.
+    // Example of what carry-over will look like:
+    //     previousStepStats: totalSegmentsToBeAdded = 10
+    //     previousStepStats: totalRemainingSegmentsToBeAdded = 15 (this can only be larger than totalSegmentsToBeAdded
+    //                                                              if carry-over segments exist)
+    //     Carry-over: 15 - 10 = 5 segments -> which were added in the last IS update by rebalance, but which didn't
+    //                 finish getting added before making the next assignment IS update
+    // Using the above, we calculate the 'upperBoundOnSegmentsAdded/Deleted' as the maximum segments to use when
+    // calculating the number of segments processed (number of segments that got added / deleted in EV based on expected
+    // IS) since the last step. We want to skip including the carry-over segments if any as they are tracked separately.
+    int upperBoundOnSegmentsAdded =
+        previousStepStats._totalRemainingSegmentsToBeAdded > previousStepStats._totalSegmentsToBeAdded
+            ? previousStepStats._totalSegmentsToBeAdded : previousStepStats._totalRemainingSegmentsToBeAdded;
+    int upperBoundOnSegmentsDeleted =
+        previousStepStats._totalRemainingSegmentsToBeDeleted > previousStepStats._totalSegmentsToBeDeleted
+            ? previousStepStats._totalSegmentsToBeDeleted : previousStepStats._totalRemainingSegmentsToBeDeleted;
+
+    // Number of adds / deletes processed in the last step. Take the absolute here since if new segments were added /
+    // deleted in the current step that are being tracking, we need to treat those as new segments that remain to
+    // be processed.
+    int numSegmentAddsProcessedInLastStep = Math.abs(upperBoundOnSegmentsAdded
+        - currentStepStats._totalRemainingSegmentsToBeAdded);
+    int numSegmentDeletesProcessedInLastStep = Math.abs(upperBoundOnSegmentsDeleted
+        - currentStepStats._totalRemainingSegmentsToBeDeleted);
+
+    // Number of untracked segments that were added
+    int numberNewUntrackedSegmentsAdded = currentStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance
+        - previousStepStats._totalUniqueNewUntrackedSegmentsDuringRebalance;
+
+    TableRebalanceProgressStats.RebalanceProgressStats currentOverallStats =
         new TableRebalanceProgressStats.RebalanceProgressStats();
 
-    newOverallProgressStats._totalSegmentsToBeAdded = lastOverallStats._totalSegmentsToBeAdded
+    // New number of total segment adds / deletes should include any new segments added from the previous stats
+    currentOverallStats._totalSegmentsToBeAdded = previousOverallStats._totalSegmentsToBeAdded
         + numAdditionalSegmentsAdded;
-    newOverallProgressStats._totalSegmentsToBeDeleted = lastOverallStats._totalSegmentsToBeDeleted
+    currentOverallStats._totalSegmentsToBeDeleted = previousOverallStats._totalSegmentsToBeDeleted
         + numAdditionalSegmentsDeleted;
-    if (latestStepStats._totalCarryOverSegmentsToBeAdded > 0) {
-      newOverallProgressStats._totalRemainingSegmentsToBeAdded = lastOverallStats._totalRemainingSegmentsToBeAdded;
-    } else {
-      newOverallProgressStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
-          ? lastOverallStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
-          : lastOverallStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
-    }
-    newOverallProgressStats._totalCarryOverSegmentsToBeAdded =
-        latestStepStats._totalCarryOverSegmentsToBeAdded;
-    if (latestStepStats._totalCarryOverSegmentsToBeDeleted > 0) {
-      newOverallProgressStats._totalRemainingSegmentsToBeDeleted =
-          lastOverallStats._totalRemainingSegmentsToBeDeleted;
-    } else {
-      newOverallProgressStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
-          ? lastOverallStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
-          : lastOverallStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
-    }
-    newOverallProgressStats._totalCarryOverSegmentsToBeDeleted =
-        latestStepStats._totalCarryOverSegmentsToBeDeleted;
-    newOverallProgressStats._totalRemainingSegmentsToConverge = latestStepStats._totalRemainingSegmentsToConverge;
-    newOverallProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
-        lastOverallStats._totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
-    newOverallProgressStats._percentageRemainingSegmentsToBeAdded =
-        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeAdded,
-            newOverallProgressStats._totalRemainingSegmentsToBeAdded
-                + newOverallProgressStats._totalCarryOverSegmentsToBeAdded);
-    newOverallProgressStats._percentageRemainingSegmentsToBeDeleted =
-        calculatePercentageChange(newOverallProgressStats._totalSegmentsToBeDeleted,
-            newOverallProgressStats._totalRemainingSegmentsToBeDeleted
-                + newOverallProgressStats._totalCarryOverSegmentsToBeDeleted);
-    // Calculate elapsed time based on start of rebalance (global)
-    newOverallProgressStats._estimatedTimeToCompleteAddsInSeconds =
-        calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
-            newOverallProgressStats._totalSegmentsToBeAdded, newOverallProgressStats._totalRemainingSegmentsToBeAdded
-                + newOverallProgressStats._totalCarryOverSegmentsToBeAdded);
-    newOverallProgressStats._estimatedTimeToCompleteDeletesInSeconds =
-        calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
-            newOverallProgressStats._totalSegmentsToBeDeleted,
-            newOverallProgressStats._totalRemainingSegmentsToBeDeleted
-                + newOverallProgressStats._totalCarryOverSegmentsToBeDeleted);
-    newOverallProgressStats._averageSegmentSizeInBytes = lastOverallStats._averageSegmentSizeInBytes;
-    newOverallProgressStats._totalEstimatedDataToBeMovedInBytes =
-        lastOverallStats._totalEstimatedDataToBeMovedInBytes
-            + (numAdditionalSegmentsAdded * lastOverallStats._averageSegmentSizeInBytes);
-    newOverallProgressStats._startTimeMs = getStartTimeMs();
 
-    setRebalanceProgressStatsOverall(newOverallProgressStats);
-    setRebalanceProgressStatsCurrentStep(latestStepStats);
+    // If carry-over segments are present, keep the upper bound of remaining segments to be added / deleted at the same
+    // level as the previous stats. This is so we track progress to handle the carry-over segments before we start
+    // tracking progress against the segments that need to be handled as part of the current rebalance step.
+    if (currentStepStats._totalCarryOverSegmentsToBeAdded > 0) {
+      currentOverallStats._totalRemainingSegmentsToBeAdded = previousOverallStats._totalRemainingSegmentsToBeAdded;
+    } else {
+      // If additional segments were added in the previous step, these need to be added to the remaining to be added
+      // number as they are new segments that should be tracked for completion
+      // Example:
+      //     currentStepStats: totalSegmentsToBeAdded = 20
+      //     previousStepStats: totalSegmentsToBeAdded = 10
+      //     numAdditionalSegmentsAdded = 20 - 10 = 10
+      // In the above scenario, the new 'numAdditionalSegmentsAdded' also need to be tracked as
+      // 'totalRemainingSegmentsToBeAdded' for the current step, thus we need to add the number of segments processed
+      // If 'numAdditionalSegmentsAdded' = 0, that means no new segments were added in the previous step, and if there
+      // was a change in the segments processed in the last step, they completed processing
+      currentOverallStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
+          ? previousOverallStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
+          : previousOverallStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+    }
+    currentOverallStats._totalCarryOverSegmentsToBeAdded = currentStepStats._totalCarryOverSegmentsToBeAdded;
+    if (currentStepStats._totalCarryOverSegmentsToBeDeleted > 0) {
+      currentOverallStats._totalRemainingSegmentsToBeDeleted = previousOverallStats._totalRemainingSegmentsToBeDeleted;
+    } else {
+      // If additional segments were deleted in the previous step, these need to be added to the remaining to be deleted
+      // number as they are new segments that should be tracked for completion
+      // A similar example as for the add scenario can be applied here as well
+      currentOverallStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
+          ? previousOverallStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
+          : previousOverallStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
+    }
+    currentOverallStats._totalCarryOverSegmentsToBeDeleted = currentStepStats._totalCarryOverSegmentsToBeDeleted;
+
+    // Segments that need to converge (i.e. the expected state differs from the current state)
+    currentOverallStats._totalRemainingSegmentsToConverge = currentStepStats._totalRemainingSegmentsToConverge;
+
+    // New segments that were added during the rebalance but that aren't actively tracked by table rebalance
+    currentOverallStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
+        previousOverallStats._totalUniqueNewUntrackedSegmentsDuringRebalance + numberNewUntrackedSegmentsAdded;
+
+    // Calculate the percentage segments that still need to complete processing. This is calculated based on the
+    // total segments remaining and the carry-over segments from the last rebalance next assignment IS update
+    currentOverallStats._percentageRemainingSegmentsToBeAdded =
+        calculatePercentageChange(currentOverallStats._totalSegmentsToBeAdded,
+            currentOverallStats._totalRemainingSegmentsToBeAdded
+                + currentOverallStats._totalCarryOverSegmentsToBeAdded);
+    currentOverallStats._percentageRemainingSegmentsToBeDeleted =
+        calculatePercentageChange(currentOverallStats._totalSegmentsToBeDeleted,
+            currentOverallStats._totalRemainingSegmentsToBeDeleted
+                + currentOverallStats._totalCarryOverSegmentsToBeDeleted);
+
+    // Calculate elapsed time based on start of rebalance (global)
+    currentOverallStats._estimatedTimeToCompleteAddsInSeconds =
+        calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
+            currentOverallStats._totalSegmentsToBeAdded, currentOverallStats._totalRemainingSegmentsToBeAdded
+                + currentOverallStats._totalCarryOverSegmentsToBeAdded);
+    currentOverallStats._estimatedTimeToCompleteDeletesInSeconds =
+        calculateEstimatedTimeToCompleteChange(getStartTimeMs(),
+            currentOverallStats._totalSegmentsToBeDeleted, currentOverallStats._totalRemainingSegmentsToBeDeleted
+                + currentOverallStats._totalCarryOverSegmentsToBeDeleted);
+
+    // Estimates bytes calculations
+    currentOverallStats._averageSegmentSizeInBytes = previousOverallStats._averageSegmentSizeInBytes;
+    currentOverallStats._totalEstimatedDataToBeMovedInBytes = previousOverallStats._totalEstimatedDataToBeMovedInBytes
+        + (numAdditionalSegmentsAdded * previousOverallStats._averageSegmentSizeInBytes);
+    currentOverallStats._startTimeMs = getStartTimeMs();
+
+    // Update the progress stats with the current calculated stats
+    setRebalanceProgressStatsOverall(currentOverallStats);
+    setRebalanceProgressStatsCurrentStep(currentStepStats);
   }
 
   public static double calculatePercentageChange(int totalSegmentsToChange, int remainingSegmentsToChange) {
