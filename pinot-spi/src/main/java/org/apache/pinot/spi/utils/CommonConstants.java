@@ -460,6 +460,10 @@ public class CommonConstants {
             "pinot.broker.enable.dynamic.filtering.semijoin";
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
+    // When the server instance's pool field is null or the pool contains multi distinguished group value, set the group
+    // to -1.
+    public static final int DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW = -1;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String SQL_V1 = "sqlV1";
@@ -506,6 +510,8 @@ public class CommonConstants {
         public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+
+        public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";

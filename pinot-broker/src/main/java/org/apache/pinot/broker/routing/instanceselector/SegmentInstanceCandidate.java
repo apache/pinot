@@ -20,6 +20,8 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import javax.annotation.concurrent.Immutable;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+
 
 /**
  * Represents an instance candidate for a segment.
@@ -28,10 +30,19 @@ import javax.annotation.concurrent.Immutable;
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
+  private final int _group;
 
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
     _online = online;
+    // no group
+    _group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+  }
+
+  public SegmentInstanceCandidate(String instance, boolean online, int group) {
+    _instance = instance;
+    _online = online;
+    _group = group;
   }
 
   public String getInstance() {
@@ -40,5 +51,9 @@ public class SegmentInstanceCandidate {
 
   public boolean isOnline() {
     return _online;
+  }
+
+  public int getReplicaGroup() {
+    return _group;
   }
 }

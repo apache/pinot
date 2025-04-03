@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -46,10 +48,13 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
 
 
 /**
@@ -102,6 +107,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   private volatile SegmentStates _segmentStates;
+  private BrokerRoutingManager.EnabledServerInstanceStore _enabledServerStore;
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
@@ -126,9 +132,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
+  public void init(Set<String> enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore enabledServerManager,
+                   IdealState idealState, ExternalView externalView,
+                   Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
+    _enabledServerStore = enabledServerManager;
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
@@ -259,7 +267,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
-              candidates.add(new SegmentInstanceCandidate(entry.getKey(), false));
+              String instance = entry.getKey();
+              candidates.add(new SegmentInstanceCandidate(instance, false, getGroup(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -275,7 +284,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
+              candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance),
+                      getGroup(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -283,7 +293,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
           for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true));
+            candidates.add(new SegmentInstanceCandidate(instance, true, getGroup(instance)));
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
@@ -456,6 +466,19 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public Set<String> getServingInstances() {
     return _segmentStates.getServingInstances();
+  }
+
+  @VisibleForTesting
+  int getGroup(String instanceID) {
+    int group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
+    ServerInstance server = _enabledServerStore.getServers().get(instanceID);
+    if (server == null) {
+      LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
+              instanceID, _tableNameWithType);
+    } else {
+      group = server.getGroup();
+    }
+    return group;
   }
 
   /**
