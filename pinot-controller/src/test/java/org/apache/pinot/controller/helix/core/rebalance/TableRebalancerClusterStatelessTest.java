@@ -40,6 +40,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.controller.validation.ResourceUtilizationInfo;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -620,6 +621,91 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     for (int i = 0; i < numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+    }
+    executorService.shutdown();
+  }
+
+  @Test(timeOut = 60000)
+  public void testRebalanceStrictReplicaGroup()
+      throws Exception {
+    int numServers = 3;
+    // Mock disk usage
+    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      DiskUsageInfo diskUsageInfo1 =
+          new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+      diskUsageInfoMap.put(instanceId, diskUsageInfo1);
+    }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+    preChecker.init(_helixResourceManager, executorService, 1);
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
+        _helixResourceManager.getTableSizeReader());
+    // Set up the table with 1 replication factor and strict replica group enabled
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+                false)).build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegments = 10;
+    for (int i = 0; i < numSegments; i++) {
+      _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
+    }
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
+    for (Map.Entry<String, Map<String, String>> entry : oldSegmentAssignment.entrySet()) {
+      assertEquals(entry.getValue().size(), 1);
+    }
+
+    // Rebalance should return NO_OP status since there has been no change
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+    // All servers should be assigned to the table
+    Map<InstancePartitionsType, InstancePartitions> instanceAssignment = rebalanceResult.getInstanceAssignment();
+    assertEquals(instanceAssignment.size(), 1);
+    InstancePartitions instancePartitions = instanceAssignment.get(InstancePartitionsType.OFFLINE);
+    assertEquals(instancePartitions.getNumReplicaGroups(), 1);
+    assertEquals(instancePartitions.getNumPartitions(), 1);
+    // Math.abs("testTable_OFFLINE".hashCode()) % 3 = 2
+    assertEquals(instancePartitions.getInstances(0, 0),
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
+
+    // Segment assignment should not change
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    // Increase the replication factor to 3
+    tableConfig.getValidationConfig().setReplication("3");
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(false);
+    rebalanceConfig.setPreChecks(false);
+    rebalanceConfig.setReassignInstances(true);
+    // minAvailableReplicas = -1 results in minAvailableReplicas = target replication - 1 = 2 in this case
+    rebalanceConfig.setMinAvailableReplicas(-1);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    Map<String, Map<String, String>> newSegmentAssignment = rebalanceResult.getSegmentAssignment();
+    assertNotEquals(oldSegmentAssignment, newSegmentAssignment);
+    for (Map.Entry<String, Map<String, String>> entry : newSegmentAssignment.entrySet()) {
+      assertTrue(oldSegmentAssignment.containsKey(entry.getKey()));
+      assertEquals(entry.getValue().size(), 3);
+    }
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
     }
     executorService.shutdown();
   }
