@@ -699,6 +699,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getRebalanceCheckerFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.REBALANCE_CHECKER_FREQUENCY_PERIOD, period))
         .map(period -> (int) convertPeriodToSeconds(period))
         .orElse(ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
   }
@@ -754,6 +756,8 @@ public class ControllerConf extends PinotConfiguration {
    */
   public int getSegmentRelocatorFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD, period))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> {
           Integer segmentRelocatorFreqSeconds =
               getProperty(ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS, Integer.class);
@@ -868,6 +872,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getTaskManagerFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.TASK_MANAGER_FREQUENCY_PERIOD, period))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(
             () -> getProperty(ControllerPeriodicTasksConf.DEPRECATED_TASK_MANAGER_FREQUENCY_IN_SECONDS,
                 ControllerPeriodicTasksConf.DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS));
