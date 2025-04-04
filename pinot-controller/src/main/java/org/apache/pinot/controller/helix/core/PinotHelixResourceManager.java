@@ -62,6 +62,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -159,6 +160,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -243,6 +245,9 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
   private final RebalancePreChecker _rebalancePreChecker;
   private TableSizeReader _tableSizeReader;
+  private ConsumingSegmentInfoReader _consumingSegmentInfoReader;
+  private final ExecutorService _executorService;
+  private HttpClientConnectionManager _connectionManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
@@ -270,6 +275,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
+    _executorService = executorService;
     _rebalancePreChecker = rebalancePreChecker;
     _rebalancePreChecker.init(this, executorService, diskUtilizationThreshold);
   }
@@ -1954,6 +1960,10 @@ public class PinotHelixResourceManager {
     _tableSizeReader = tableSizeReader;
   }
 
+  public void registerConsumingSegmentInfoReader(ConsumingSegmentInfoReader consumingSegmentInfoReader) {
+    _consumingSegmentInfoReader = consumingSegmentInfoReader;
+  }
+
   private void assignInstances(TableConfig tableConfig, boolean override) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -3623,7 +3633,7 @@ public class PinotHelixResourceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics, _rebalancePreChecker,
-            _tableSizeReader);
+            _tableSizeReader, _consumingSegmentInfoReader);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
