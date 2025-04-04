@@ -40,11 +40,11 @@ public class PhysicalSort extends Sort implements PRelNode {
 
   public PhysicalSort(RelOptCluster cluster, RelTraitSet traits, List<RelHint> hints,
       RelCollation collation, @Nullable RexNode offset, @Nullable RexNode fetch,
-      PRelNode input, int nodeId, List<PRelNode> pRelInputs, @Nullable PinotDataDistribution pinotDataDistribution,
+      PRelNode input, int nodeId, @Nullable PinotDataDistribution pinotDataDistribution,
       boolean leafStage) {
     super(cluster, traits, hints, input.unwrap(), collation, offset, fetch);
     _nodeId = nodeId;
-    _pRelInputs = pRelInputs;
+    _pRelInputs = List.of(input);
     _pinotDataDistribution = pinotDataDistribution;
     _leafStage = leafStage;
   }
@@ -53,7 +53,7 @@ public class PhysicalSort extends Sort implements PRelNode {
   public Sort copy(RelTraitSet traitSet, RelNode newInput, RelCollation newCollation, @Nullable RexNode offset,
       @Nullable RexNode fetch) {
     return new PhysicalSort(getCluster(), traitSet, getHints(), newCollation, offset, fetch, (PRelNode) newInput,
-        _nodeId, _pRelInputs, _pinotDataDistribution, _leafStage);
+        _nodeId, _pinotDataDistribution, _leafStage);
   }
 
   @Override
@@ -85,6 +85,6 @@ public class PhysicalSort extends Sort implements PRelNode {
   @Override
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalSort(getCluster(), getTraitSet(), getHints(), getCollation(), offset, fetch, newInputs.get(0),
-        newNodeId, newInputs, newDistribution, _leafStage);
+        newNodeId, newDistribution, _leafStage);
   }
 }

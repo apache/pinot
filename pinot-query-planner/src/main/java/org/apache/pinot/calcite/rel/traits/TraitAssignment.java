@@ -170,7 +170,7 @@ public class TraitAssignment {
                 .plus(RelDistributions.SINGLETON);
             input = new PhysicalSort(sort.getCluster(), traitSetOfNewSort, List.of() /* hints */,
                 windowGroupCollation, null /* offset */, null /* fetch */, sort, _planIdGenerator.get(),
-                ImmutableList.of(sort), null /* pinot data distribution */, false /* leaf stage */);
+                null /* pinot data distribution */, false /* leaf stage */);
           } else {
             input = input.copy(input.getTraitSet().plus(RelDistributions.SINGLETON), input.getInputs());
           }
@@ -195,7 +195,7 @@ public class TraitAssignment {
               .plus(newHashDistTrait);
           input = new PhysicalSort(sort.getCluster(), traitSetOfNewSort, List.of() /* hints */,
               windowGroupCollation, null /* offset */, null /* fetch */, sort, _planIdGenerator.get(),
-              ImmutableList.of(sort), null /* pinot data distribution */, false /* leaf stage */);
+              null /* pinot data distribution */, false /* leaf stage */);
         } else {
           RelTraitSet newTraitSet = input.getTraitSet().plus(newHashDistTrait).plus(windowGroupCollation);
           input = input.copy(newTraitSet, input.getInputs());
