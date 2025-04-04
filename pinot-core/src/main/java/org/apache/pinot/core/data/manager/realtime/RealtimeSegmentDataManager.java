@@ -743,7 +743,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return;
         }
         _consumerSemaphoreAcquired.set(true);
-        _consumerCoordinator.register(_llcSegmentName);
+        _consumerCoordinator.registerConsumingSegment(_llcSegmentName);
 
         _segmentLogger.info("Acquired consumer semaphore.");
 

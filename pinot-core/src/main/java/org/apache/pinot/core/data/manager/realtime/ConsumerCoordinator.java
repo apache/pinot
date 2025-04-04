@@ -115,10 +115,11 @@ public class ConsumerCoordinator {
     return _semaphore;
   }
 
-  public void register(LLCSegmentName llcSegmentName) {
+  public void registerOnlineSegment(LLCSegmentName llcSegmentName) {
     if (!_enforceConsumptionInOrder) {
       return;
     }
+
     _lock.lock();
     try {
       int sequenceNumber = llcSegmentName.getSequenceNumber();
@@ -129,14 +130,64 @@ public class ConsumerCoordinator {
           llcSegmentName.getSegmentName(), sequenceNumber, _maxSequenceNumberRegistered,
           _firstTransitionProcessed.get(), ((sequenceNumber - _maxSequenceNumberRegistered) > 1));
 
-      if (sequenceNumber > (_maxSequenceNumberRegistered + 1)) {
-        _sequenceNumberPriorityQueue.add(sequenceNumber);
-      } else if (sequenceNumber == (_maxSequenceNumberRegistered + 1)) {
+      if (sequenceNumber <= _maxSequenceNumberRegistered) {
+        return;
+      }
+
+      if (!_firstTransitionProcessed.get()) {
+        // if first transition has not been processed, it means there might be consumer threads waiting and server is
+        // loading previous segments (offline -> online transitions on server start).
+        _maxSequenceNumberRegistered = sequenceNumber;
+        // notify all consumer threads waiting for their prev segment to be loaded
+        _condition.signalAll();
+        return;
+      }
+
+      if (sequenceNumber == (_maxSequenceNumberRegistered + 1)) {
         _maxSequenceNumberRegistered = sequenceNumber;
         // notify all consumer threads waiting for their prev segment to be loaded
         _condition.signalAll();
         if (_sequenceNumberPriorityQueue != null) {
-          flushSequenceNumberQueue(_maxSequenceNumberRegistered);
+          // if next consecutive segments attempted to register before, increase the _maxSequenceNumberRegistered.
+          flushSequenceNumberQueue();
+        }
+      } else {
+        // consumer threads waiting on prev segments should not wake up since all previous segments to them have not
+        // been registered.
+        _sequenceNumberPriorityQueue.add(sequenceNumber);
+      }
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  public void registerConsumingSegment(LLCSegmentName llcSegmentName) {
+    if (!_enforceConsumptionInOrder) {
+      return;
+    }
+
+    _lock.lock();
+    try {
+      int sequenceNumber = llcSegmentName.getSequenceNumber();
+
+      LOGGER.info(
+          "Registering segment: {} with sequence number: {}. maxSequenceNumberRegistered: {}, "
+              + "firstTransitionProcessed: {}, Difference in sequence more than one: {}",
+          llcSegmentName.getSegmentName(), sequenceNumber, _maxSequenceNumberRegistered,
+          _firstTransitionProcessed.get(), ((sequenceNumber - _maxSequenceNumberRegistered) > 1));
+
+      if (sequenceNumber <= _maxSequenceNumberRegistered) {
+        return;
+      }
+
+      assert _firstTransitionProcessed.get();
+
+      if (sequenceNumber > _maxSequenceNumberRegistered) {
+        _maxSequenceNumberRegistered = sequenceNumber;
+        _condition.signalAll();
+        if (_sequenceNumberPriorityQueue != null) {
+          // if next consecutive segments attempted to register before, increase the _maxSequenceNumberRegistered.
+          flushSequenceNumberQueue();
         }
       }
     } finally {
@@ -144,8 +195,9 @@ public class ConsumerCoordinator {
     }
   }
 
-  private void flushSequenceNumberQueue(int sequenceNumber) {
-    while (!_sequenceNumberPriorityQueue.isEmpty() && (_sequenceNumberPriorityQueue.peek() <= (sequenceNumber + 1))) {
+  private void flushSequenceNumberQueue() {
+    while (!_sequenceNumberPriorityQueue.isEmpty() && (_sequenceNumberPriorityQueue.peek() <= (
+        _maxSequenceNumberRegistered + 1))) {
       int polledSequenceNumber = _sequenceNumberPriorityQueue.poll();
       if (polledSequenceNumber <= _maxSequenceNumberRegistered) {
         continue;
@@ -194,9 +246,6 @@ public class ConsumerCoordinator {
                   + "Refreshing the previous segment sequence number for current segment: {}",
               previousSegmentSequenceNumber, System.currentTimeMillis() - startTimeMs, segmentName);
           previousSegmentSequenceNumber = getPreviousSegmentSequenceNumberFromIdealState(currentSegment);
-          if (_sequenceNumberPriorityQueue != null && (previousSegmentSequenceNumber <= _maxSequenceNumberRegistered)) {
-            flushSequenceNumberQueue(currentSegment.getSequenceNumber());
-          }
         }
       }
     } finally {

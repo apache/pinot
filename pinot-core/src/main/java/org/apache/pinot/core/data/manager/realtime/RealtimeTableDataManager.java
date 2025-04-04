@@ -490,7 +490,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_enforceConsumptionInOrder) {
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName != null) {
-        getConsumerCoordinator(llcSegmentName.getPartitionGroupId()).register(llcSegmentName);
+        getConsumerCoordinator(llcSegmentName.getPartitionGroupId()).registerOnlineSegment(llcSegmentName);
       }
     }
   }
