@@ -226,11 +226,6 @@ public class QueryRunner {
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
-  @VisibleForTesting
-  public ExecutorService getExecutorService() {
-    return _executorService;
-  }
-
   public void start() {
     _mailboxService.start();
     _leafQueryExecutor.start();
@@ -248,14 +243,15 @@ public class QueryRunner {
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata,
-      @Nullable ThreadExecutionContext parentContext) {
+  public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     // run pre-stage execution for all pipeline breakers
-    CompletableFuture.runAsync(() -> processQueryInternal(workerMetadata, stagePlan, requestMetadata, parentContext),
+    return CompletableFuture.runAsync(
+        () -> processQueryInternal(workerMetadata, stagePlan, requestMetadata, parentContext),
         _executorService);
   }
 
-  private void processQueryInternal(WorkerMetadata workerMetadata, StagePlan stagePlan,
+  protected void processQueryInternal(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
