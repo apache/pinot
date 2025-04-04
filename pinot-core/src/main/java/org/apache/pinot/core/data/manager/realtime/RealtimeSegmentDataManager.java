@@ -311,7 +311,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
   private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private final long _consumeStartTime;
+  private long _consumeStartTime;
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamConfig _streamConfig;
 
@@ -746,6 +746,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _consumerCoordinator.register(_llcSegmentName);
 
         _segmentLogger.info("Acquired consumer semaphore.");
+
+        // Refresh segment end criteria time. This is to avoid scenarios where consumer waits a longer period of time
+        // before acquiring semaphore. These scenarios can lead to creation of small segments because segment
+        // consumption is terminated early.
+        _consumeStartTime = now();
+        setConsumeEndTime(_segmentZKMetadata, _consumeStartTime);
+        _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+            _llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
 
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
@@ -1715,13 +1723,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
-      _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
-          llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
     } catch (Throwable t) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
       // Hence releasing the semaphore here to unblock reset operation via Helix Admin.
-      releaseConsumerSemaphore();
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
