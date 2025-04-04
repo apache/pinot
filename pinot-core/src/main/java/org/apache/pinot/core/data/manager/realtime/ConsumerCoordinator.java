@@ -135,7 +135,9 @@ public class ConsumerCoordinator {
         _maxSequenceNumberRegistered = sequenceNumber;
         // notify all consumer threads waiting for their prev segment to be loaded
         _condition.signalAll();
-        flushSequenceNumberQueue(_maxSequenceNumberRegistered);
+        if (_sequenceNumberPriorityQueue != null) {
+          flushSequenceNumberQueue(_maxSequenceNumberRegistered);
+        }
       }
     } finally {
       _lock.unlock();
@@ -193,7 +195,7 @@ public class ConsumerCoordinator {
                   + "Refreshing the previous segment sequence number for current segment: {}",
               previousSegmentSequenceNumber, System.currentTimeMillis() - startTimeMs, segmentName);
           previousSegmentSequenceNumber = getPreviousSegmentSequenceNumberFromIdealState(currentSegment);
-          if (previousSegmentSequenceNumber <= _maxSequenceNumberRegistered) {
+          if (_sequenceNumberPriorityQueue != null && (previousSegmentSequenceNumber <= _maxSequenceNumberRegistered)) {
             flushSequenceNumberQueue(currentSegment.getSequenceNumber());
           }
         }
