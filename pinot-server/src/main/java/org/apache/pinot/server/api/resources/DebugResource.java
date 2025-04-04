@@ -26,7 +26,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -133,7 +132,7 @@ public class DebugResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get current resource usage of threads",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
-  public Collection<? extends ThreadResourceTracker> getThreadUsage() {
+  public List<ThreadResourceTracker> getThreadUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     return threadAccountant.getThreadResources();
   }
@@ -143,10 +142,9 @@ public class DebugResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get current resource usage of queries in this service",
       notes = "This is a debug endpoint, and won't maintain backward compatibility")
-  public Collection<? extends QueryResourceTracker> getQueryUsage() {
+  public List<QueryResourceTracker> getQueryUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    Collection<? extends QueryResourceTracker> resources = threadAccountant.getQueryResources().values();
-    return resources;
+    return new ArrayList<>(threadAccountant.getQueryResources().values());
   }
 
   private List<SegmentServerDebugInfo> getSegmentServerDebugInfo(String tableNameWithType, TableType tableType) {
