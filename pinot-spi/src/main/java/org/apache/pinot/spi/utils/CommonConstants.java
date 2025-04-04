@@ -72,6 +72,8 @@ public class CommonConstants {
 
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
 
+  public static final String JFR = "pinot.jfr";
+
   /**
    * The state of the consumer for a given segment
    */
@@ -454,6 +456,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+    public static final String CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN =
+            "pinot.broker.enable.dynamic.filtering.semijoin";
+    public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -540,6 +545,8 @@ public class CommonConstants {
         public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
 
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
+        // Not actually accepted as Query Option but faked as one during MSE
+        public static final String NUM_GROUPS_WARNING_LIMIT = "numGroupsWarningLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
@@ -725,6 +732,20 @@ public class CommonConstants {
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
 
+    public static class Grpc {
+      public static final String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
+      public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
+      public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
+      public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
+
+      public static final String BLOCK_ROW_SIZE = "blockRowSize";
+      public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
+      public static final String COMPRESSION = "compression";
+      public static final String DEFAULT_COMPRESSION = "ZSTD";
+      public static final String ENCODING = "encoding";
+      public static final String DEFAULT_ENCODING = "JSON";
+    }
+
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
 
     public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA =
@@ -829,6 +850,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_LIMIT;
     public static final int DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT = 100_000;
+    public static final String NUM_GROUPS_WARN_LIMIT = "num.groups.warn.limit";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + NUM_GROUPS_WARN_LIMIT;
+    public static final int DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT = 150_000;
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_INITIAL_RESULT_HOLDER_CAPACITY;
@@ -1094,6 +1119,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
     public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
         "pinot.controller.query.rewriter.class.names";
+
+    // Task Manager configuration
+    public static final String CONFIG_OF_TASK_MANAGER_CLASS = "pinot.controller.task.manager.class";
+    public static final String DEFAULT_TASK_MANAGER_CLASS =
+        "org.apache.pinot.controller.helix.core.minion.PinotTaskManager";
+
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
@@ -1283,6 +1314,7 @@ public class CommonConstants {
       public static final String END_OFFSET = "segment.realtime.endOffset";
       public static final String NUM_REPLICAS = "segment.realtime.numReplicas";
       public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
+      @Deprecated
       public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
 
       // Deprecated, but kept for backward-compatibility of reading old segments' ZK metadata

@@ -232,6 +232,11 @@ public class AggregateOperator extends MultiStageOperator {
             _input.earlyTerminate();
           }
         }
+        if (_groupByExecutor.getNumGroups() >= _groupByExecutor.getNumGroupsWarningLimit()) {
+          LOGGER.warn("numGroups reached warning limit: {} (actual: {})",
+              _groupByExecutor.getNumGroupsWarningLimit(), _groupByExecutor.getNumGroups());
+          _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, true);
+        }
         return dataBlock;
       }
     }
@@ -448,7 +453,8 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
     },
-    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
     //@formatter:on
 
     private final StatMap.Type _type;

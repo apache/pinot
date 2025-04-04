@@ -30,7 +30,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
-import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -199,8 +198,6 @@ public abstract class BlockExchange {
    * data to all the stages (the first BlockExchange). Then for each stage, we need to send the data to the
    * corresponding workers (the inner BlockExchange). The inner BlockExchange may send data using a different
    * distribution strategy.
-   *
-   * @see MailboxSendNode#isMultiSend()}
    */
   private class BlockExchangeSendingMailbox implements SendingMailbox {
     private final String _id;

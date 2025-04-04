@@ -204,6 +204,16 @@ public class ServerSegmentCompletionProtocolHandler {
     return sendRequest(url);
   }
 
+  public SegmentCompletionProtocol.Response segmentCannotBuild(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.SegmentCannotBuildRequest request =
+        new SegmentCompletionProtocol.SegmentCannotBuildRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return sendRequest(url);
+  }
+
   private String createSegmentCompletionUrl(SegmentCompletionProtocol.Request request) {
     ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
     final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader(_rawTableName);

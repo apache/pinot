@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -37,6 +37,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -245,6 +246,21 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+    if (propertyStore != null) {
+      String segmentsPath = ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType);
+      List<String> segmentNames = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
+      long segmentNamesBytesSize = 0;
+      if (segmentNames != null) {
+        for (String segmentName : segmentNames) {
+          segmentNamesBytesSize += segmentName.getBytes().length;
+        }
+      }
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+          ControllerGauge.PROPERTYSTORE_SEGMENT_CHILDREN_BYTE_SIZE,
+          segmentNamesBytesSize);
+    }
+
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
       segments = Set.of();
@@ -435,9 +451,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
-          streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
-      ).collect(Collectors.toList());
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
           streamConfigs).findAndEmitMetrics(idealState);
     }

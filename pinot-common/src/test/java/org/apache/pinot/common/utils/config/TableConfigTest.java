@@ -87,6 +87,7 @@ public class TableConfigTest {
   public void testCopyConstructor() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setContinueOnError(true);
+    ingestionConfig.setRetryOnSegmentBuildPrecheckFailure(true);
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setSegmentTimeValueCheck(false);
 

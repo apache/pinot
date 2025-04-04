@@ -34,10 +34,10 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -53,7 +53,8 @@ public interface TableDataManager {
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
+      TableConfig tableConfig, SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadExecutor,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
@@ -169,23 +170,24 @@ public interface TableDataManager {
 
   /**
    * Reloads an existing immutable segment for the table, which can be an OFFLINE or REALTIME table.
-   * A new segment may be downloaded if the local one has a different CRC; or can be forced to download
-   * if forceDownload flag is true. This operation is conducted within a failure handling framework
-   * and made transparent to ongoing queries, because the segment is in online serving state.
-   *
-   * TODO: Clean up this method to use the schema from the IndexLoadingConfig
-   *
-   * @param segmentName the segment to reload
-   * @param indexLoadingConfig the latest table config to load segment
-   * @param zkMetadata the segment metadata from zookeeper
-   * @param localMetadata the segment metadata object held by server right now,
-   *                      which must not be null to reload the segment
-   * @param schema the latest table schema to load segment
-   * @param forceDownload whether to force to download raw segment to reload
-   * @throws Exception thrown upon failure when to reload the segment
+   * A new segment may be downloaded if the local one has a different CRC; or can be forced to download if
+   * {@code forceDownload} flag is true.
+   * This operation is conducted within a failure handling framework and made transparent to ongoing queries, because
+   * the segment is in online serving state.
    */
-  void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
-      SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
+  void reloadSegment(String segmentName, boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Reloads all segments.
+   */
+  void reloadAllSegments(boolean forceDownload)
+      throws Exception;
+
+  /**
+   * Reloads a list of segments.
+   */
+  void reloadSegments(List<String> segmentNames, boolean forceDownload)
       throws Exception;
 
   /**
@@ -308,7 +310,7 @@ public interface TableDataManager {
   /**
    * Constructs the index loading config for the table with the given table config and schema.
    */
-  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema);
+  IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, Schema schema);
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED

@@ -51,6 +51,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
@@ -78,6 +79,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
@@ -255,6 +257,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+
+    ContinuousJfrStarter.init(_serverConf);
   }
 
   /**
@@ -768,6 +772,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+
+    // Add ZK buffer size metric
+    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.ZK_JUTE_MAX_BUFFER,
+        () -> Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
 
     // Track metric for queries disabled
     _serverQueriesDisabledTracker =
