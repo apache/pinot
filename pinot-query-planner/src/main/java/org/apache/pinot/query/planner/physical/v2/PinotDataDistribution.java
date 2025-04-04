@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.util.mapping.Mappings;
+import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 
 
 /**
@@ -157,13 +157,13 @@ public class PinotDataDistribution {
     return _collation.satisfies(relCollation);
   }
 
-  public PinotDataDistribution apply(@Nullable Mappings.TargetMapping targetMapping) {
-    if (targetMapping == null) {
+  public PinotDataDistribution apply(@Nullable PinotDistMapping mapping) {
+    if (mapping == null) {
       return new PinotDataDistribution(RelDistribution.Type.ANY, _workers, _workerHash, null, null);
     }
     Set<HashDistributionDesc> newHashDesc = new HashSet<>();
     for (HashDistributionDesc desc : _hashDistributionDesc) {
-      HashDistributionDesc newDescs = desc.apply(targetMapping);
+      HashDistributionDesc newDescs = desc.apply(mapping);
       if (newDescs != null) {
         newHashDesc.add(newDescs);
       }

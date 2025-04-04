@@ -84,4 +84,9 @@ public class PhysicalValues extends Values implements PRelNode {
     return new PhysicalValues(getCluster(), getHints(), getRowType(), getTuples(), getTraitSet(), newNodeId,
         newDistribution);
   }
+
+  @Override
+  public PhysicalValues asLeafStage() {
+    throw new UnsupportedOperationException("Values cannot be in the leaf stage");
+  }
 }

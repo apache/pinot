@@ -99,4 +99,14 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
     return new PhysicalTableScan(getCluster(), getTraitSet(), getHints(), getTable(), newNodeId,
         newDistribution, _tableScanMetadata);
   }
+
+  @Override
+  public PRelNode asLeafStage() {
+    return this;
+  }
+
+  public PhysicalTableScan with(PinotDataDistribution pinotDataDistribution, TableScanMetadata metadata) {
+    return new PhysicalTableScan(getCluster(), getTraitSet(), getHints(), getTable(), _nodeId,
+        pinotDataDistribution, metadata);
+  }
 }

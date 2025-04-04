@@ -124,4 +124,9 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     return new PhysicalExchange(getCluster(), getDistribution(), newNodeId, newInputs.get(0), newDistribution,
         _distributionKeys, _exchangeStrategy, _relCollation);
   }
+
+  @Override
+  public PhysicalExchange asLeafStage() {
+    throw new UnsupportedOperationException("Exchange cannot be marked as leaf stage");
+  }
 }

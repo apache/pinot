@@ -21,8 +21,12 @@ package org.apache.pinot.query.planner.physical.v2;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
+import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 /**
@@ -81,6 +85,21 @@ public interface PRelNode {
     return null;
   }
 
+  /**
+   * TODO(mse-physical): This does not check PinotExecStrategyTrait. We should revisit whether exec strategy should be
+   *   a trait or not.
+   */
+  default boolean areTraitsSatisfied() {
+    RelNode relNode = unwrap();
+    RelDistribution distribution = relNode.getTraitSet().getDistribution();
+    PinotDataDistribution dataDistribution = getPinotDataDistributionOrThrow();
+    if (dataDistribution.satisfies(distribution)) {
+      RelCollation collation = relNode.getTraitSet().getCollation();
+      return dataDistribution.satisfies(collation);
+    }
+    return false;
+  }
+
   PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution);
 
   default PRelNode with(List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
@@ -90,4 +109,6 @@ public interface PRelNode {
   default PRelNode with(List<PRelNode> newInputs) {
     return with(getNodeId(), newInputs, getPinotDataDistributionOrThrow());
   }
+
+  PRelNode asLeafStage();
 }
