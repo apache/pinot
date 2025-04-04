@@ -250,65 +250,67 @@ public class QueryRunner {
    */
   public void processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata,
       @Nullable ThreadExecutionContext parentContext) {
+    // run pre-stage execution for all pipeline breakers
+    CompletableFuture.runAsync(() -> processQueryInternal(workerMetadata, stagePlan, requestMetadata, parentContext),
+        _executorService);
+  }
+
+  private void processQueryInternal(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     long requestId = Long.parseLong(requestMetadata.get(MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
-
-    // run pre-stage execution for all pipeline breakers
-    CompletableFuture<PipelineBreakerResult> pipelineBreakerResultFuture = CompletableFuture.supplyAsync(() ->
+    PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean()),
-        _executorService);
+            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
 
-    pipelineBreakerResultFuture.thenAcceptAsync(pipelineBreakerResult -> {
-      // Send error block to all the receivers if pipeline breaker fails
-      if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
-        TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
-        int stageId = stageMetadata.getStageId();
-        LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-            stageId, errorBlock.getExceptions());
-        MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
-        List<RoutingInfo> routingInfos = new ArrayList<>();
-        for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
-          List<MailboxInfo> receiverMailboxInfos =
-              workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-          List<RoutingInfo> stageRoutingInfos =
-              MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-                  receiverMailboxInfos);
-          routingInfos.addAll(stageRoutingInfos);
-        }
-        for (RoutingInfo routingInfo : routingInfos) {
-          try {
-            StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-            _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
-                routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
-          } catch (TimeoutException e) {
-            LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
-                routingInfo.getMailboxId(), requestId, stageId, e);
-          } catch (Exception e) {
-            LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-                routingInfo.getMailboxId(), requestId, stageId, e);
-          }
-        }
-        return;
+    // Send error block to all the receivers if pipeline breaker fails
+    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+      TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      int stageId = stageMetadata.getStageId();
+      LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
+          stageId, errorBlock.getExceptions());
+      MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+      List<RoutingInfo> routingInfos = new ArrayList<>();
+      for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+        List<MailboxInfo> receiverMailboxInfos =
+            workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+        List<RoutingInfo> stageRoutingInfos =
+            MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+                receiverMailboxInfos);
+        routingInfos.addAll(stageRoutingInfos);
       }
+      for (RoutingInfo routingInfo : routingInfos) {
+        try {
+          StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
+          _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
+              routingInfo.getMailboxId(), deadlineMs, statMap).send(errorBlock);
+        } catch (TimeoutException e) {
+          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
+              routingInfo.getMailboxId(), requestId, stageId, e);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+              routingInfo.getMailboxId(), requestId, stageId, e);
+        }
+      }
+      return;
+    }
 
-      // run OpChain
-      OpChainExecutionContext executionContext =
-          new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-              workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
-      OpChain opChain;
-      if (workerMetadata.isLeafStageWorker()) {
-        opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
-            _leafQueryExecutor, _executorService);
-      } else {
-        opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
-      }
-      _opChainScheduler.register(opChain);
-    }, _executorService);
+    // run OpChain
+    OpChainExecutionContext executionContext =
+        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+    OpChain opChain;
+    if (workerMetadata.isLeafStageWorker()) {
+      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
+          _leafQueryExecutor, _executorService);
+    } else {
+      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
+    }
+    _opChainScheduler.register(opChain);
   }
 
   /**
