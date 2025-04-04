@@ -412,7 +412,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
-        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId);
+        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
+        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {
