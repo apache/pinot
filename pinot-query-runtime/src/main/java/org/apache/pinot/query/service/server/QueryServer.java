@@ -164,8 +164,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       return;
     }
 
-    try (QueryThreadContext.CloseableContext qTlClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
-        QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
+    try (QueryThreadContext.CloseableContext qClosable = QueryThreadContext.openFromRequestMetadata(reqMetadata);
+        QueryThreadContext.CloseableContext mseCloseable = MseWorkerThreadContext.open()) {
 
       long requestId = QueryThreadContext.getRequestId();
       QueryThreadContext.setQueryEngine("mse");
