@@ -88,9 +88,10 @@ public class ControllerConfTest {
    * are thrown when invalid new configurations are read (there is no fall-back to the corresponding
    * valid deprecated configuration). For all valid new configurations, they override the
    * corresponding deprecated configuration.
+   * Added fallback logic to use valid deprecated config when new config is invalid.
    */
   @Test
-  public void invalidNewConfigShouldThrowExceptionOnReadWithoutFallbackToCorrespondingValidDeprecatedConfig() {
+  public void invalidNewConfigShouldNotThrowExceptionOnReadWithFallbackToCorrespondingValidDeprecatedConfig() {
     //setup
     Map<String, Object> controllerConfig = new HashMap<>();
     int durationInSeconds = getRandomDurationInSeconds();
@@ -101,7 +102,11 @@ public class ControllerConfTest {
     //put some invalid new configs
     controllerConfig.put(RETENTION_MANAGER_FREQUENCY_PERIOD, getRandomString());
     ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertThrows(IllegalArgumentException.class, conf::getRetentionControllerFrequencyInSeconds);
+    Assert.assertEquals(
+        conf.getRetentionControllerFrequencyInSeconds(),
+        durationInSeconds, // expected fallback value
+        "Should fallback to deprecated config value"
+    );
   }
 
   /**
