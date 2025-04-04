@@ -90,18 +90,30 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        if (Double.NEGATIVE_INFINITY == leftValues[i]) {
+          _doubleValuesSV[i] = Double.NaN;
+        } else {
+          _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+                  .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        }
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        if (Double.NEGATIVE_INFINITY == leftValues[i]) {
+          _doubleValuesSV[i] = Double.NaN;
+        } else {
+          _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+                  .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        }
       }
     } else {
       for (int i = 0; i < length; i++) {
+        if (Double.NEGATIVE_INFINITY == leftValues[i]) {
+          _doubleValuesSV[i] = Double.NaN;
+        } else {
         _doubleValuesSV[i] = (double) Math.round(leftValues[i]);
+        }
       }
     }
     return _doubleValuesSV;
