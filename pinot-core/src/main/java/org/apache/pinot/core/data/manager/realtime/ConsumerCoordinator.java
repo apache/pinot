@@ -145,8 +145,7 @@ public class ConsumerCoordinator {
   }
 
   private void flushSequenceNumberQueue(int sequenceNumber) {
-    while (!_sequenceNumberPriorityQueue.isEmpty() &&
-        (_sequenceNumberPriorityQueue.peek() <= (sequenceNumber + 1))) {
+    while (!_sequenceNumberPriorityQueue.isEmpty() && (_sequenceNumberPriorityQueue.peek() <= (sequenceNumber + 1))) {
       int polledSequenceNumber = _sequenceNumberPriorityQueue.poll();
       if (polledSequenceNumber <= _maxSequenceNumberRegistered) {
         continue;
