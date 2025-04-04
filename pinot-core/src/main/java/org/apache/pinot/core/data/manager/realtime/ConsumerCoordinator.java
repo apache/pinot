@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +61,7 @@ public class ConsumerCoordinator {
   private final AtomicBoolean _firstTransitionProcessed = new AtomicBoolean(false);
 
   private volatile int _maxSequenceNumberRegistered = -1;
+  private PriorityQueue<Integer> _sequenceNumberPriorityQueue;
 
   public ConsumerCoordinator(boolean enforceConsumptionInOrder, RealtimeTableDataManager realtimeTableDataManager) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
@@ -67,6 +69,9 @@ public class ConsumerCoordinator {
     StreamIngestionConfig streamIngestionConfig = realtimeTableDataManager.getStreamIngestionConfig();
     _useIdealStateToCalculatePreviousSegment =
         streamIngestionConfig != null && streamIngestionConfig.isUseIdealStateToCalculatePreviousSegment();
+    if (!_useIdealStateToCalculatePreviousSegment) {
+      _sequenceNumberPriorityQueue = new PriorityQueue<>();
+    }
     _serverMetrics = ServerMetrics.get();
   }
 
@@ -124,13 +129,27 @@ public class ConsumerCoordinator {
           llcSegmentName.getSegmentName(), sequenceNumber, _maxSequenceNumberRegistered,
           _firstTransitionProcessed.get(), ((sequenceNumber - _maxSequenceNumberRegistered) > 1));
 
-      if (sequenceNumber > _maxSequenceNumberRegistered) {
+      if (sequenceNumber > (_maxSequenceNumberRegistered + 1)) {
+        _sequenceNumberPriorityQueue.add(sequenceNumber);
+      } else if (sequenceNumber == (_maxSequenceNumberRegistered + 1)) {
         _maxSequenceNumberRegistered = sequenceNumber;
-        // notify all helix threads waiting for their offline -> consuming segment's prev segment to be loaded
+        // notify all consumer threads waiting for their prev segment to be loaded
         _condition.signalAll();
+        flushSequenceNumberQueue(_maxSequenceNumberRegistered);
       }
     } finally {
       _lock.unlock();
+    }
+  }
+
+  private void flushSequenceNumberQueue(int sequenceNumber) {
+    while (!_sequenceNumberPriorityQueue.isEmpty() &&
+        (_sequenceNumberPriorityQueue.peek() <= (sequenceNumber + 1))) {
+      int polledSequenceNumber = _sequenceNumberPriorityQueue.poll();
+      if (polledSequenceNumber <= _maxSequenceNumberRegistered) {
+        continue;
+      }
+      _maxSequenceNumberRegistered = polledSequenceNumber;
     }
   }
 
@@ -174,6 +193,9 @@ public class ConsumerCoordinator {
                   + "Refreshing the previous segment sequence number for current segment: {}",
               previousSegmentSequenceNumber, System.currentTimeMillis() - startTimeMs, segmentName);
           previousSegmentSequenceNumber = getPreviousSegmentSequenceNumberFromIdealState(currentSegment);
+          if (previousSegmentSequenceNumber <= _maxSequenceNumberRegistered) {
+            flushSequenceNumberQueue(currentSegment.getSequenceNumber());
+          }
         }
       }
     } finally {
