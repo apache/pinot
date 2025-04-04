@@ -51,6 +51,18 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter QUERIES_GLOBAL = create("QUERIES_GLOBAL", "queries", true);
   /**
+   * Number of queries executed, this metric is not global and is attached to a particular replica group.
+   * <p>
+   * At this moment, this counter include single stage queries only.
+   */
+  public static final BrokerMeter REPLICA_QUERIES = create("REPLICA_QUERIES", "routing", false);
+  /**
+   * Number of segment queries executed, this metric is not global and is attached to a particular replica group.
+   * <p>
+   * At this moment, this counter include single stage queries only.
+   */
+  public static final BrokerMeter REPLICA_SEG_QUERIES = create("REPLICA_SEG_QUERIES", "routing", false);
+  /**
    * Number of multi-stage queries that have been started.
    * <p>
    * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.

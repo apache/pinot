@@ -30,6 +30,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -85,7 +86,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (int idx = 0; idx < serverRankList.size(); idx++) {
         serverRankMap.put(serverRankList.get(idx), idx);
       }
-      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankMap);
+      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankMap, queryOptions);
     } else {
       // Adaptive Server Selection is NOT enabled.
       return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions);
@@ -119,6 +120,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
 
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
+      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(selectedInstance.getReplicaGroup()));
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
@@ -135,7 +138,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   }
 
   private Pair<Map<String, String>, Map<String, String>> selectServersUsingAdaptiveServerSelector(List<String> segments,
-      int requestId, SegmentStates segmentStates, Map<String, Integer> serverRankMap) {
+      int requestId, SegmentStates segmentStates, Map<String, Integer> serverRankMap,
+      Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -161,6 +165,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
                 .min(Comparator.comparingInt(candidate -> serverRankMap.get(candidate.getInstance())))
                 .orElse(candidates.get(roundRobinInstanceIdx));
       }
+      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(selectedInstance.getReplicaGroup()));
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {

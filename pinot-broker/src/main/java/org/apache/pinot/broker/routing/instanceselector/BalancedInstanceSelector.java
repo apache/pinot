@@ -29,6 +29,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
+import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 
@@ -77,6 +78,8 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         // are placed in segmentStates.getUnavailableSegments()
         assert candidateOpt.isPresent();
         SegmentInstanceCandidate candidate = candidateOpt.get();
+        _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, 1,
+            BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(candidate.getReplicaGroup()));
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
         // broker or server can skip it upon any issue to process it.
         if (candidate.isOnline()) {
@@ -101,6 +104,8 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           selectedIdx = requestId++ % candidates.size();
         }
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
+        _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_SEG_QUERIES, 1,
+            BrokerMetrics.getTagForPreferredGroup(queryOptions), String.valueOf(selectedCandidate.getReplicaGroup()));
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
         // broker or server can skip it upon any issue to process it.
         if (selectedCandidate.isOnline()) {

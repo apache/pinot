@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.ArrayList;
@@ -17,6 +35,8 @@ import org.apache.pinot.broker.routing.instanceselector.SegmentInstanceCandidate
 public class PriorityGroupInstanceSelector {
 
   private final AdaptiveServerSelector _adaptiveServerSelector;
+
+  private static final int SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS = Integer.MAX_VALUE;
 
   public PriorityGroupInstanceSelector(AdaptiveServerSelector adaptiveServerSelector) {
     _adaptiveServerSelector = adaptiveServerSelector;
@@ -79,12 +99,12 @@ public class PriorityGroupInstanceSelector {
     // 3. Avoid complex conditional logic for handling non-preferred servers
     for (int i = 0; i < candidates.size(); i++) {
       int group = candidates.get(i).getReplicaGroup();
-      group = groupSet.contains(group) ? group : Integer.MAX_VALUE;
+      group = groupSet.contains(group) ? group : SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS;
       groupToServerPos.computeIfAbsent(group, k -> new ArrayList<>()).add(i);
     }
     // Add Integer.MAX_VALUE to the end of preferred groups to ensure non-preferred servers
     // are processed after all preferred groups
-    groups.add(Integer.MAX_VALUE);
+    groups.add(SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS);
     for (int group : groups) {
       List<Integer> instancesInGroup = groupToServerPos.get(group);
       if (instancesInGroup != null) {
@@ -96,17 +116,17 @@ public class PriorityGroupInstanceSelector {
   }
 
   /**
-   * Invoke adaptiveServerSelector to get the original ranking the servers. Reorder the servers based on
+   * Invoke adaptiveServerSelector to get the original ranking the servers (min first). Reorder the servers based on
    * the replica group preference. The head of the OrderedPreferredGroups list is the most preferred group.
    * The servers in the same group are ranked by the original ranking.
    *
    * Example:
    * Given:
    *   - Server candidates:
-   *     - server1 (group 1, score 0.7)
-   *     - server2 (group 2, score 0.8)
-   *     - server3 (group 1, score 0.6)
-   *     - server4 (group 3, score 0.9)
+   *     - server1 (group 1, score 80)
+   *     - server2 (group 2, score 70)
+   *     - server3 (group 1, score 90)
+   *     - server4 (group 3, score 60)
    *   - Ordered preferred groups: [2, 1]
    *
    * Original ranking by score would be: [server4, server2, server1, server3]
@@ -130,23 +150,29 @@ public class PriorityGroupInstanceSelector {
         serverCandidates.stream()
         .map(SegmentInstanceCandidate::getInstance)
         .collect(Collectors.toList()));
-
     List<Integer> groups = new ArrayList<>(ctx.getOrderedPreferredGroups());
-    List<String> rankedServers = new ArrayList<>();
     if (groups.isEmpty()) {
       return serverRankListWithScores.stream().map(Pair::getLeft).collect(Collectors.toList());
     }
     Map<String, SegmentInstanceCandidate> idToCandidate = serverCandidates.stream()
         .map(candidate -> new ImmutablePair<>(candidate.getInstance(), candidate))
         .collect(Collectors.toMap(Pair::getLeft, Pair::getRight));
+
+    // Create a set of preferred groups for efficient lookup
     Set<Integer> preferredGroups = new HashSet<>(groups);
     Map<Integer, List<String>> groupToRankedServers = new HashMap<>();
     for (Pair<String, Double> entry : serverRankListWithScores) {
       int group = idToCandidate.get(entry.getLeft()).getReplicaGroup();
-      group = preferredGroups.contains(group) ? group : Integer.MAX_VALUE;
+      // If the group is not in the preferred groups list, assign it the sentinel group
+      group = preferredGroups.contains(group) ? group : SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS;
       groupToRankedServers.computeIfAbsent(group, k -> new ArrayList<>()).add(entry.getLeft());
     }
-    groups.add(Integer.MAX_VALUE);
+
+    // Add the sentinel group to the end of the groups list to ensure its group members are included in the tail
+    groups.add(SENTINEL_GROUP_OF_NON_PREFERRED_SERVERS);
+
+    // Build the final ranked list by processing groups in order
+    List<String> rankedServers = new ArrayList<>();
     for (int group : groups) {
       List<String> instancesInGroup = groupToRankedServers.get(group);
       if (instancesInGroup != null) {

@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import java.util.Arrays;
@@ -104,8 +122,8 @@ public class PriorityGroupInstanceSelectorTest {
   public void testSelectWithFallbackToNonPreferredGroup() {
     // Setup - Example 3 from Javadoc
     List<SegmentInstanceCandidate> candidates = Arrays.asList(
-        createCandidate("server4", 3),
-        createCandidate("server5", 3)
+        createCandidate("server4", -1),
+        createCandidate("server5", -1)
     );
     when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.select(any())).thenReturn("server4");
@@ -116,7 +134,7 @@ public class PriorityGroupInstanceSelectorTest {
     // Verify
     assertTrue(result.isPresent());
     assertEquals(result.get().getInstance(), "server4");
-    assertEquals(result.get().getReplicaGroup(), 3);
+    assertEquals(result.get().getReplicaGroup(), -1);
   }
 
   @Test
@@ -129,14 +147,16 @@ public class PriorityGroupInstanceSelectorTest {
   public void testRankWithNoPreferredGroups() {
     // Setup
     List<SegmentInstanceCandidate> candidates = Arrays.asList(
-        createCandidate("server1", 1),
         createCandidate("server2", 2),
-        createCandidate("server3", 3)
+        createCandidate("server1", 1),
+        createCandidate("server3", 1),
+        createCandidate("server4", -1)
     );
     when(_context.getOrderedPreferredGroups()).thenReturn(Collections.emptyList());
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        Pair.of("server2", 0.8),
-        Pair.of("server1", 0.6),
+        Pair.of("server1", 0.1),
+        Pair.of("server2", 0.2),
+        Pair.of("server4", 0.3),
         Pair.of("server3", 0.4)
     ));
 
@@ -144,24 +164,24 @@ public class PriorityGroupInstanceSelectorTest {
     List<String> result = _selector.rank(_context, candidates);
 
     // Verify
-    assertEquals(result, Arrays.asList("server2", "server1", "server3"));
+    assertEquals(result, Arrays.asList("server1", "server2", "server4", "server3"));
   }
 
   @Test
   public void testRankWithPreferredGroups() {
     // Setup
     List<SegmentInstanceCandidate> candidates = Arrays.asList(
-        createCandidate("server1", 1),
         createCandidate("server2", 2),
+        createCandidate("server1", 1),
         createCandidate("server3", 1),
-        createCandidate("server4", 3)
+        createCandidate("server4", -1)
     );
     when(_context.getOrderedPreferredGroups()).thenReturn(Arrays.asList(2, 1));
     when(_adaptiveServerSelector.fetchServerRankingsWithScores(any())).thenReturn(Arrays.asList(
-        Pair.of("server4", 0.9),
-        Pair.of("server2", 0.8),
-        Pair.of("server1", 0.7),
-        Pair.of("server3", 0.6)
+        Pair.of("server1", 0.1),
+        Pair.of("server2", 0.2),
+        Pair.of("server4", 0.3),
+        Pair.of("server3", 0.4)
     ));
 
     // Execute
