@@ -312,15 +312,27 @@ public class RebalanceSummaryResult {
      *                                                           Map from segment name to its number of offsets to
      *                                                           catch up on the new server. This is essentially the
      *                                                           difference between the latest offset of the stream
-     *                                                           and the segment's start offset of the stream. Set to
-     *                                                           null if the number of offsets to catch up could not
-     *                                                           be determined for at least one consuming segment
+     *                                                           and the segment's start offset of the stream. The
+     *                                                           map is set to null if the number of offsets to catch
+     *                                                           up could not be determined for at least one
+     *                                                           consuming segment
      * @param consumingSegmentsToBeMovedWithOldestAgeInMinutes oldest consuming segments to be moved to catch up. Map
-     *                                                         from segment name to its age in minutes. The age of a
-     *                                                         segment is determined by its creation time from ZK
-     *                                                         metadata. Set to null if ZK metadata is not available or
-     *                                                         the creation time is not found for at least one consuming
-     *                                                         segment
+     *                                                         from segment name to its age in minutes. The map is
+     *                                                         set to null if ZK metadata is not available or the
+     *                                                         creation time is not found for at least one consuming
+     *                                                         segment.
+     *                                                         The age of a segment is determined by its creation
+     *                                                         time from ZK metadata. Segment age is an approximation
+     *                                                         to data age for a consuming segment. It may not reflect
+     *                                                         the actual oldest age of data in the consuming segment.
+     *                                                         For reasons, a segment could consume events which date
+     *                                                         before the segment created. We collect segment age
+     *                                                         here as there is no obvious way to get the age of the
+     *                                                         oldest data in the stream for a specific consuming
+     *                                                         segment.
+     *                                                         consumingSegmentsToBeMovedWithMostOffsetsToCatchUp
+     *                                                         is a better indicator to the cost of moving a consuming
+     *                                                         segment if it presents.
      * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
      */
     @JsonCreator
