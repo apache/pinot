@@ -71,25 +71,42 @@ data:
         "segmentPushType": "APPEND",
         "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
         "schemaName": "airlineStatsAvro",
-        "replication": "1",
-        "replicasPerPartition": "1"
+        "replication": "2"
       },
+      "routing": {
+        "instanceSelectorType": "strictReplicaGroup"
+      },
+      "dedupConfig": { 
+        "dedupEnabled": true, 
+        "hashFunction": "NONE" 
+      }, 
       "tenants": {},
-      "tableIndexConfig": {
-        "loadMode": "MMAP",
-        "streamConfigs": {
-          "streamType": "kafka",
-          "stream.kafka.topic.name": "flights-realtime-avro",
-          "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
-          "stream.kafka.decoder.prop.schema": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"pinot\",\"fields\":[{\"name\":\"DaysSinceEpoch\",\"type\":[\"int\"]},{\"name\":\"Year\",\"type\":[\"int\"]},{\"name\":\"Quarter\",\"type\":[\"int\"]},{\"name\":\"Month\",\"type\":[\"int\"]},{\"name\":\"DayofMonth\",\"type\":[\"int\"]},{\"name\":\"DayOfWeek\",\"type\":[\"int\"]},{\"name\":\"FlightDate\",\"type\":[\"string\"]},{\"name\":\"UniqueCarrier\",\"type\":[\"string\"]},{\"name\":\"AirlineID\",\"type\":[\"int\"]},{\"name\":\"Carrier\",\"type\":[\"string\"]},{\"name\":\"TailNum\",\"type\":[\"string\",\"null\"]},{\"name\":\"FlightNum\",\"type\":[\"int\"]},{\"name\":\"OriginAirportID\",\"type\":[\"int\"]},{\"name\":\"OriginAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"OriginCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Origin\",\"type\":[\"string\"]},{\"name\":\"OriginCityName\",\"type\":[\"string\"]},{\"name\":\"OriginState\",\"type\":[\"string\"]},{\"name\":\"OriginStateFips\",\"type\":[\"int\"]},{\"name\":\"OriginStateName\",\"type\":[\"string\"]},{\"name\":\"OriginWac\",\"type\":[\"int\"]},{\"name\":\"DestAirportID\",\"type\":[\"int\"]},{\"name\":\"DestAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"DestCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Dest\",\"type\":[\"string\"]},{\"name\":\"DestCityName\",\"type\":[\"string\"]},{\"name\":\"DestState\",\"type\":[\"string\"]},{\"name\":\"DestStateFips\",\"type\":[\"int\"]},{\"name\":\"DestStateName\",\"type\":[\"string\"]},{\"name\":\"DestWac\",\"type\":[\"int\"]},{\"name\":\"CRSDepTime\",\"type\":[\"int\"]},{\"name\":\"DepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepartureDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepTimeBlk\",\"type\":[\"string\"]},{\"name\":\"TaxiOut\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOff\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOn\",\"type\":[\"int\",\"null\"]},{\"name\":\"TaxiIn\",\"type\":[\"int\",\"null\"]},{\"name\":\"CRSArrTime\",\"type\":[\"int\"]},{\"name\":\"ArrTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrivalDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrTimeBlk\",\"type\":[\"string\"]},{\"name\":\"Cancelled\",\"type\":[\"int\"]},{\"name\":\"CancellationCode\",\"type\":[\"string\",\"null\"]},{\"name\":\"Diverted\",\"type\":[\"int\"]},{\"name\":\"CRSElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"AirTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"Flights\",\"type\":[\"int\"]},{\"name\":\"Distance\",\"type\":[\"int\"]},{\"name\":\"DistanceGroup\",\"type\":[\"int\"]},{\"name\":\"CarrierDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"WeatherDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"NASDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"SecurityDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"LateAircraftDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"FirstDepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"TotalAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"LongestAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirportLandings\",\"type\":[\"int\"]},{\"name\":\"DivReachedDest\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivDistance\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"DivAirportIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivAirportSeqIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOns\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTotalGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivLongestGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOffs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTailNums\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"RandomAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}",
-          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-          "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
-          "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
-          "stream.kafka.broker.list": "kafka:9092",
-          "realtime.segment.flush.threshold.time": "3600000",
-          "realtime.segment.flush.threshold.size": "50000",
-          "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
+      "ingestionConfig": {
+        "streamIngestionConfig": {
+          "streamConfigMaps": [
+            {
+              "streamType": "kafka",
+              "stream.kafka.topic.name": "flights-realtime-avro",
+              "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.stream.SimpleAvroMessageDecoder",
+              "stream.kafka.decoder.prop.schema": "{\"type\":\"record\",\"name\":\"Flight\",\"namespace\":\"pinot\",\"fields\":[{\"name\":\"DaysSinceEpoch\",\"type\":[\"int\"]},{\"name\":\"Year\",\"type\":[\"int\"]},{\"name\":\"Quarter\",\"type\":[\"int\"]},{\"name\":\"Month\",\"type\":[\"int\"]},{\"name\":\"DayofMonth\",\"type\":[\"int\"]},{\"name\":\"DayOfWeek\",\"type\":[\"int\"]},{\"name\":\"FlightDate\",\"type\":[\"string\"]},{\"name\":\"UniqueCarrier\",\"type\":[\"string\"]},{\"name\":\"AirlineID\",\"type\":[\"int\"]},{\"name\":\"Carrier\",\"type\":[\"string\"]},{\"name\":\"TailNum\",\"type\":[\"string\",\"null\"]},{\"name\":\"FlightNum\",\"type\":[\"int\"]},{\"name\":\"OriginAirportID\",\"type\":[\"int\"]},{\"name\":\"OriginAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"OriginCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Origin\",\"type\":[\"string\"]},{\"name\":\"OriginCityName\",\"type\":[\"string\"]},{\"name\":\"OriginState\",\"type\":[\"string\"]},{\"name\":\"OriginStateFips\",\"type\":[\"int\"]},{\"name\":\"OriginStateName\",\"type\":[\"string\"]},{\"name\":\"OriginWac\",\"type\":[\"int\"]},{\"name\":\"DestAirportID\",\"type\":[\"int\"]},{\"name\":\"DestAirportSeqID\",\"type\":[\"int\"]},{\"name\":\"DestCityMarketID\",\"type\":[\"int\"]},{\"name\":\"Dest\",\"type\":[\"string\"]},{\"name\":\"DestCityName\",\"type\":[\"string\"]},{\"name\":\"DestState\",\"type\":[\"string\"]},{\"name\":\"DestStateFips\",\"type\":[\"int\"]},{\"name\":\"DestStateName\",\"type\":[\"string\"]},{\"name\":\"DestWac\",\"type\":[\"int\"]},{\"name\":\"CRSDepTime\",\"type\":[\"int\"]},{\"name\":\"DepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepartureDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"DepTimeBlk\",\"type\":[\"string\"]},{\"name\":\"TaxiOut\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOff\",\"type\":[\"int\",\"null\"]},{\"name\":\"WheelsOn\",\"type\":[\"int\",\"null\"]},{\"name\":\"TaxiIn\",\"type\":[\"int\",\"null\"]},{\"name\":\"CRSArrTime\",\"type\":[\"int\"]},{\"name\":\"ArrTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDelayMinutes\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrDel15\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrivalDelayGroups\",\"type\":[\"int\",\"null\"]},{\"name\":\"ArrTimeBlk\",\"type\":[\"string\"]},{\"name\":\"Cancelled\",\"type\":[\"int\"]},{\"name\":\"CancellationCode\",\"type\":[\"string\",\"null\"]},{\"name\":\"Diverted\",\"type\":[\"int\"]},{\"name\":\"CRSElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"ActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"AirTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"Flights\",\"type\":[\"int\"]},{\"name\":\"Distance\",\"type\":[\"int\"]},{\"name\":\"DistanceGroup\",\"type\":[\"int\"]},{\"name\":\"CarrierDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"WeatherDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"NASDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"SecurityDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"LateAircraftDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"FirstDepTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"TotalAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"LongestAddGTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirportLandings\",\"type\":[\"int\"]},{\"name\":\"DivReachedDest\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivActualElapsedTime\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivArrDelay\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivDistance\",\"type\":[\"int\",\"null\"]},{\"name\":\"DivAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"DivAirportIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivAirportSeqIDs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOns\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTotalGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivLongestGTimes\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivWheelsOffs\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"DivTailNums\",\"type\":{\"type\":\"array\",\"items\":\"string\"}},{\"name\":\"RandomAirports\",\"type\":{\"type\":\"array\",\"items\":\"string\"}}]}",
+              "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+              "stream.kafka.hlc.zk.connect.string": "kafka-zookeeper:2181",
+              "stream.kafka.zk.broker.url": "kafka-zookeeper:2181",
+              "stream.kafka.broker.list": "kafka:9092",
+              "realtime.segment.flush.threshold.time": "36000",
+              "realtime.segment.flush.threshold.size": "40",
+              "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+              "failureProbability": "0",
+              "server_names": "Server_pinot-server-2-0.pinot-server-headless.pinot-quickstart.svc.cluster.local_8098"
+            }
+          ],
+          "pauselessConsumptionEnabled": "true",
+          "parallelSegmentConsumptionPolicy": "ALLOW_DURING_BUILD_ONLY",
+          "enforceConsumptionInOrder" : "true"
         }
+      },
+      "tableIndexConfig": {
+        "loadMode": "MMAP"
       },
       "metadata": {
         "customConfigs": {}
@@ -436,341 +453,343 @@ data:
 
   airlineStatsAvro_schema.json: |-
     {
-    "metricFieldSpecs": [
-    ],
-    "dimensionFieldSpecs": [
-      {
-        "dataType": "INT",
-        "name": "ActualElapsedTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "AirTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "AirlineID"
-      },
-      {
-        "dataType": "INT",
-        "name": "ArrDel15"
-      },
-      {
-        "dataType": "INT",
-        "name": "ArrDelay"
-      },
-      {
-        "dataType": "INT",
-        "name": "ArrDelayMinutes"
-      },
-      {
-        "dataType": "INT",
-        "name": "ArrTime"
-      },
-      {
-        "dataType": "STRING",
-        "name": "ArrTimeBlk"
-      },
-      {
-        "dataType": "INT",
-        "name": "ArrivalDelayGroups"
-      },
-      {
-        "dataType": "INT",
-        "name": "CRSArrTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "CRSDepTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "CRSElapsedTime"
-      },
-      {
-        "dataType": "STRING",
-        "name": "CancellationCode"
-      },
-      {
-        "dataType": "INT",
-        "name": "Cancelled"
-      },
-      {
-        "dataType": "STRING",
-        "name": "Carrier"
-      },
-      {
-        "dataType": "INT",
-        "name": "CarrierDelay"
-      },
-      {
-        "dataType": "INT",
-        "name": "DayOfWeek"
-      },
-      {
-        "dataType": "INT",
-        "name": "DayofMonth"
-      },
-      {
-        "dataType": "INT",
-        "name": "DepDel15"
-      },
-      {
-        "dataType": "INT",
-        "name": "DepDelay"
-      },
-      {
-        "dataType": "INT",
-        "name": "DepDelayMinutes"
-      },
-      {
-        "dataType": "INT",
-        "name": "DepTime"
-      },
-      {
-        "dataType": "STRING",
-        "name": "DepTimeBlk"
-      },
-      {
-        "dataType": "INT",
-        "name": "DepartureDelayGroups"
-      },
-      {
-        "dataType": "STRING",
-        "name": "Dest"
-      },
-      {
-        "dataType": "INT",
-        "name": "DestAirportID"
-      },
-      {
-        "dataType": "INT",
-        "name": "DestAirportSeqID"
-      },
-      {
-        "dataType": "INT",
-        "name": "DestCityMarketID"
-      },
-      {
-        "dataType": "STRING",
-        "name": "DestCityName"
-      },
-      {
-        "dataType": "STRING",
-        "name": "DestState"
-      },
-      {
-        "dataType": "INT",
-        "name": "DestStateFips"
-      },
-      {
-        "dataType": "STRING",
-        "name": "DestStateName"
-      },
-      {
-        "dataType": "INT",
-        "name": "DestWac"
-      },
-      {
-        "dataType": "INT",
-        "name": "Distance"
-      },
-      {
-        "dataType": "INT",
-        "name": "DistanceGroup"
-      },
-      {
-        "dataType": "INT",
-        "name": "DivActualElapsedTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "DivAirportIDs",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivAirportLandings"
-      },
-      {
-        "dataType": "INT",
-        "name": "DivAirportSeqIDs",
-        "singleValueField": false
-      },
-      {
-        "dataType": "STRING",
-        "name": "DivAirports",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivArrDelay"
-      },
-      {
-        "dataType": "INT",
-        "name": "DivDistance"
-      },
-      {
-        "dataType": "INT",
-        "name": "DivLongestGTimes",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivReachedDest"
-      },
-      {
-        "dataType": "STRING",
-        "name": "DivTailNums",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivTotalGTimes",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivWheelsOffs",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "DivWheelsOns",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "Diverted"
-      },
-      {
-        "dataType": "INT",
-        "name": "FirstDepTime"
-      },
-      {
-        "dataType": "STRING",
-        "name": "FlightDate"
-      },
-      {
-        "dataType": "INT",
-        "name": "FlightNum"
-      },
-      {
-        "dataType": "INT",
-        "name": "Flights"
-      },
-      {
-        "dataType": "INT",
-        "name": "LateAircraftDelay"
-      },
-      {
-        "dataType": "INT",
-        "name": "LongestAddGTime"
-      },
-      {
-        "dataType": "INT",
-        "name": "Month"
-      },
-      {
-        "dataType": "INT",
-        "name": "NASDelay"
-      },
-      {
-        "dataType": "STRING",
-        "name": "Origin"
-      },
-      {
-        "dataType": "INT",
-        "name": "OriginAirportID"
-      },
-      {
-        "dataType": "INT",
-        "name": "OriginAirportSeqID"
-      },
-      {
-        "dataType": "INT",
-        "name": "OriginCityMarketID"
-      },
-      {
-        "dataType": "STRING",
-        "name": "OriginCityName"
-      },
-      {
-        "dataType": "STRING",
-        "name": "OriginState"
-      },
-      {
-        "dataType": "INT",
-        "name": "OriginStateFips"
-      },
-      {
-        "dataType": "STRING",
-        "name": "OriginStateName"
-      },
-      {
-        "dataType": "INT",
-        "name": "OriginWac"
-      },
-      {
-        "dataType": "INT",
-        "name": "Quarter"
-      },
-      {
-        "dataType": "STRING",
-        "name": "RandomAirports",
-        "singleValueField": false
-      },
-      {
-        "dataType": "INT",
-        "name": "SecurityDelay"
-      },
-      {
-        "dataType": "STRING",
-        "name": "TailNum"
-      },
-      {
-        "dataType": "INT",
-        "name": "TaxiIn"
-      },
-      {
-        "dataType": "INT",
-        "name": "TaxiOut"
-      },
-      {
-        "dataType": "INT",
-        "name": "Year"
-      },
-      {
-        "dataType": "INT",
-        "name": "WheelsOn"
-      },
-      {
-        "dataType": "INT",
-        "name": "WheelsOff"
-      },
-      {
-        "dataType": "INT",
-        "name": "WeatherDelay"
-      },
-      {
-        "dataType": "STRING",
-        "name": "UniqueCarrier"
-      },
-      {
-        "dataType": "INT",
-        "name": "TotalAddGTime"
-      }
-    ],
-    "dateTimeFieldSpecs": [
-      {
-        "name": "DaysSinceEpoch",
-        "dataType": "INT",
-        "format": "1:DAYS:EPOCH",
-        "granularity": "1:DAYS"
-      }
-    ],
-    "schemaName": "airlineStatsAvro"
-    }    
+      "metricFieldSpecs": [],
+      "dimensionFieldSpecs": [
+        {
+          "dataType": "INT",
+          "name": "ActualElapsedTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "AirTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "AirlineID"
+        },
+        {
+          "dataType": "INT",
+          "name": "ArrDel15"
+        },
+        {
+          "dataType": "INT",
+          "name": "ArrDelay"
+        },
+        {
+          "dataType": "INT",
+          "name": "ArrDelayMinutes"
+        },
+        {
+          "dataType": "INT",
+          "name": "ArrTime"
+        },
+        {
+          "dataType": "STRING",
+          "name": "ArrTimeBlk"
+        },
+        {
+          "dataType": "INT",
+          "name": "ArrivalDelayGroups"
+        },
+        {
+          "dataType": "INT",
+          "name": "CRSArrTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "CRSDepTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "CRSElapsedTime"
+        },
+        {
+          "dataType": "STRING",
+          "name": "CancellationCode"
+        },
+        {
+          "dataType": "INT",
+          "name": "Cancelled"
+        },
+        {
+          "dataType": "STRING",
+          "name": "Carrier"
+        },
+        {
+          "dataType": "INT",
+          "name": "CarrierDelay"
+        },
+        {
+          "dataType": "INT",
+          "name": "DayOfWeek"
+        },
+        {
+          "dataType": "INT",
+          "name": "DayofMonth"
+        },
+        {
+          "dataType": "INT",
+          "name": "DepDel15"
+        },
+        {
+          "dataType": "INT",
+          "name": "DepDelay"
+        },
+        {
+          "dataType": "INT",
+          "name": "DepDelayMinutes"
+        },
+        {
+          "dataType": "INT",
+          "name": "DepTime"
+        },
+        {
+          "dataType": "STRING",
+          "name": "DepTimeBlk"
+        },
+        {
+          "dataType": "INT",
+          "name": "DepartureDelayGroups"
+        },
+        {
+          "dataType": "STRING",
+          "name": "Dest"
+        },
+        {
+          "dataType": "INT",
+          "name": "DestAirportID"
+        },
+        {
+          "dataType": "INT",
+          "name": "DestAirportSeqID"
+        },
+        {
+          "dataType": "INT",
+          "name": "DestCityMarketID"
+        },
+        {
+          "dataType": "STRING",
+          "name": "DestCityName"
+        },
+        {
+          "dataType": "STRING",
+          "name": "DestState"
+        },
+        {
+          "dataType": "INT",
+          "name": "DestStateFips"
+        },
+        {
+          "dataType": "STRING",
+          "name": "DestStateName"
+        },
+        {
+          "dataType": "INT",
+          "name": "DestWac"
+        },
+        {
+          "dataType": "INT",
+          "name": "Distance"
+        },
+        {
+          "dataType": "INT",
+          "name": "DistanceGroup"
+        },
+        {
+          "dataType": "INT",
+          "name": "DivActualElapsedTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "DivAirportIDs",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivAirportLandings"
+        },
+        {
+          "dataType": "INT",
+          "name": "DivAirportSeqIDs",
+          "singleValueField": false
+        },
+        {
+          "dataType": "STRING",
+          "name": "DivAirports",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivArrDelay"
+        },
+        {
+          "dataType": "INT",
+          "name": "DivDistance"
+        },
+        {
+          "dataType": "INT",
+          "name": "DivLongestGTimes",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivReachedDest"
+        },
+        {
+          "dataType": "STRING",
+          "name": "DivTailNums",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivTotalGTimes",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivWheelsOffs",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "DivWheelsOns",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "Diverted"
+        },
+        {
+          "dataType": "INT",
+          "name": "FirstDepTime"
+        },
+        {
+          "dataType": "STRING",
+          "name": "FlightDate"
+        },
+        {
+          "dataType": "INT",
+          "name": "FlightNum"
+        },
+        {
+          "dataType": "INT",
+          "name": "Flights"
+        },
+        {
+          "dataType": "INT",
+          "name": "LateAircraftDelay"
+        },
+        {
+          "dataType": "INT",
+          "name": "LongestAddGTime"
+        },
+        {
+          "dataType": "INT",
+          "name": "Month"
+        },
+        {
+          "dataType": "INT",
+          "name": "NASDelay"
+        },
+        {
+          "dataType": "STRING",
+          "name": "Origin"
+        },
+        {
+          "dataType": "INT",
+          "name": "OriginAirportID"
+        },
+        {
+          "dataType": "INT",
+          "name": "OriginAirportSeqID"
+        },
+        {
+          "dataType": "INT",
+          "name": "OriginCityMarketID"
+        },
+        {
+          "dataType": "STRING",
+          "name": "OriginCityName"
+        },
+        {
+          "dataType": "STRING",
+          "name": "OriginState"
+        },
+        {
+          "dataType": "INT",
+          "name": "OriginStateFips"
+        },
+        {
+          "dataType": "STRING",
+          "name": "OriginStateName"
+        },
+        {
+          "dataType": "INT",
+          "name": "OriginWac"
+        },
+        {
+          "dataType": "INT",
+          "name": "Quarter"
+        },
+        {
+          "dataType": "STRING",
+          "name": "RandomAirports",
+          "singleValueField": false
+        },
+        {
+          "dataType": "INT",
+          "name": "SecurityDelay"
+        },
+        {
+          "dataType": "STRING",
+          "name": "TailNum"
+        },
+        {
+          "dataType": "INT",
+          "name": "TaxiIn"
+        },
+        {
+          "dataType": "INT",
+          "name": "TaxiOut"
+        },
+        {
+          "dataType": "INT",
+          "name": "Year"
+        },
+        {
+          "dataType": "INT",
+          "name": "WheelsOn"
+        },
+        {
+          "dataType": "INT",
+          "name": "WheelsOff"
+        },
+        {
+          "dataType": "INT",
+          "name": "WeatherDelay"
+        },
+        {
+          "dataType": "STRING",
+          "name": "UniqueCarrier"
+        },
+        {
+          "dataType": "INT",
+          "name": "TotalAddGTime"
+        }
+      ],
+      "dateTimeFieldSpecs": [
+        {
+          "name": "DaysSinceEpoch",
+          "dataType": "INT",
+          "format": "1:DAYS:EPOCH",
+          "granularity": "1:DAYS"
+        }
+      ],
+      "schemaName": "airlineStatsAvro",
+      "primaryKeyColumns": [
+        "Distance"
+      ]
+    }
 ---
 apiVersion: batch/v1
 kind: Job
@@ -782,7 +801,7 @@ spec:
     spec:
       containers:
         - name: pinot-add-example-realtime-table-json
-          image: apachepinot/pinot:latest
+          image: pinot:inject_fail_2
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/airlineStats_schema.json", "-tableConfigFile", "/var/pinot/examples/airlineStats_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -791,7 +810,7 @@ spec:
             - name: examples
               mountPath: /var/pinot/examples
         - name: pinot-add-example-realtime-table-avro
-          image: apachepinot/pinot:latest
+          image: pinot:inject_fail_2
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/airlineStatsAvro_schema.json", "-tableConfigFile", "/var/pinot/examples/airlineStatsAvro_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -816,10 +835,10 @@ spec:
     spec:
       containers:
         - name: loading-json-data-to-kafka
-          image: apachepinot/pinot:latest
+          image: pinot:inject_fail_2
           args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/rawdata/airlineStats_data.avro", "-kafkaTopic", "flights-realtime", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181" ]
         - name: loading-avro-data-to-kafka
-          image: apachepinot/pinot:latest
+          image: pinot:inject_fail_2
           args: [ "StreamAvroIntoKafka", "-avroFile", "examples/stream/airlineStats/rawdata/airlineStats_data.avro", "-kafkaTopic", "flights-realtime-avro", "-kafkaBrokerList", "kafka:9092", "-zkAddress", "kafka-zookeeper:2181", "-outputFormat", "avro" ]
       restartPolicy: OnFailure
   backoffLimit: 3

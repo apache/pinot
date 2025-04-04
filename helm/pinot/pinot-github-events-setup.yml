@@ -224,7 +224,7 @@ spec:
     spec:
       containers:
         - name: pinot-add-github-events-realtime-table-json
-          image: apachepinot/pinot:latest
+          image: harn379/pinot:consume_in_order_1700e896dc19cc7976a5377474934164a9021c26_v2
           args: [ "AddTable", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json", "-tableConfigFile", "/var/pinot/examples/pullRequestMergedEvents_realtime_table_config.json", "-controllerHost", "pinot-controller", "-controllerPort", "9000", "-exec" ]
           env:
             - name: JAVA_OPTS
@@ -258,7 +258,7 @@ spec:
         app: pinot-github-events-data-into-kafka
     spec:
       containers:
-        - image: apachepinot/pinot:latest
+        - image: harn379/pinot:consume_in_order_1700e896dc19cc7976a5377474934164a9021c26_v2
           imagePullPolicy: Always
           name: pinot-github-events-data-into-kafka
           args: [ "StreamGitHubEvents", "-topic", "pullRequestMergedEvents", "-personalAccessToken", "token_value", "-kafkaBrokerList", "kafka:9092", "-schemaFile", "/var/pinot/examples/pullRequestMergedEvents_schema.json" ]

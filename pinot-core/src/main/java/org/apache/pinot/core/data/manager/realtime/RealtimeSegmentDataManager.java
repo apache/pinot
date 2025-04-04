@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -981,6 +982,53 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
   }
 
+
+  private void injectFailureDuringBuild() {
+
+    _segmentLogger.info("latest");
+
+    String servers =
+        _tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0).get("server_names");
+
+    if (servers == null) {
+      return;
+    }
+
+    String[] serverArr = servers.split(":");
+    _segmentLogger.info("serverArr: {}, instanceId: {}", serverArr, _instanceId);
+
+    boolean shouldInject = false;
+
+    for (String server : serverArr) {
+      if (_instanceId.contains(server)) {
+        shouldInject = true;
+        break;
+      }
+    }
+
+    if (!shouldInject) {
+      return;
+    }
+
+    double failureProbability =
+        Optional.ofNullable(_tableConfig)
+            .map(TableConfig::getIngestionConfig)
+            .map(IngestionConfig::getStreamIngestionConfig)
+            .map(org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig::getStreamConfigMaps)
+            .map(maps -> maps.isEmpty() ? null : maps.get(0))
+            .map(map -> map.get("failureProbability"))
+            .map(String::valueOf)
+            .map(Double::parseDouble)
+            .orElse(0.0);
+
+    if (Math.random() < failureProbability) {
+      if (Boolean.parseBoolean(_tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps()
+          .get(0).get("injectFailureDuringBuild"))) {
+        throw new RuntimeException("Failure during building the segment: injectFailureDuringBuild");
+      }
+    }
+  }
+
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
   // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs) {
@@ -1097,6 +1145,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.info("Trying to acquire semaphore for building segment");
         Instant acquireStart = Instant.now();
         int timeoutSeconds = 5;
+        injectFailureDuringBuild();
         while (!_segBuildSemaphore.tryAcquire(timeoutSeconds, TimeUnit.SECONDS)) {
           _segmentLogger.warn("Could not acquire semaphore for building segment in {}",
               Duration.between(acquireStart, Instant.now()));
@@ -1450,9 +1499,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
                 buildSegmentAndReplace();
               } else {
-                _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-                boolean success = catchupToFinalOffset(endOffset,
-                    TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                boolean success = false;
+                if (_consumerSemaphoreAcquired.get()) {
+                  _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+                  success = catchupToFinalOffset(endOffset,
+                      TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                }
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
                   buildSegmentAndReplace();
@@ -1644,6 +1696,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
+    _segmentLogger.info("injecting failures");
+
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1666,7 +1720,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList());
+            .setFieldConfigList(tableConfig.getFieldConfigList())
+            .setTableConfig(_tableConfig)
+            .setInstanceId(_instanceId);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);

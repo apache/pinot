@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    meta.helm.sh/release-name: pinot
+    meta.helm.sh/release-namespace: pinot-quickstart
+  creationTimestamp: "2025-01-06T12:02:21Z"
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    kubernetes.io/metadata.name: pinot-quickstart
+  name: pinot-quickstart
+  resourceVersion: "29610"
+  uid: 937e142f-0cf5-417b-a986-22be27564c40
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active

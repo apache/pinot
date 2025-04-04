@@ -73,12 +73,16 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   private final List<FieldConfig> _fieldConfigList;
   private final List<AggregationConfig> _ingestionAggregationConfigs;
+  private final TableConfig _tableConfig;
+  private final String _instanceId;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
   /**
    * @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
-   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   *                            {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   * @param tableConfig
+   * @param instanceId
    */
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Map<String, FieldIndexConfigs> indexConfigByCol,
@@ -89,7 +93,8 @@ public class RealtimeSegmentConfig {
       List<String> upsertComparisonColumns, String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn,
       boolean upsertDropOutOfOrderRecord, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       String dedupTimeColumn, PartitionDedupMetadataManager partitionDedupMetadataManager,
-      List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs) {
+      List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs, TableConfig tableConfig,
+      String instanceId) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -119,6 +124,8 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
+    _tableConfig = tableConfig;
+    _instanceId = instanceId;
   }
 
   public String getTableNameWithType() {
@@ -241,6 +248,14 @@ public class RealtimeSegmentConfig {
     return _ingestionAggregationConfigs;
   }
 
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -275,6 +290,8 @@ public class RealtimeSegmentConfig {
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
     private List<AggregationConfig> _ingestionAggregationConfigs;
+    private TableConfig _tableConfig;
+    private String _instanceId;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -475,6 +492,16 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setTableConfig(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      return this;
+    }
+
+    public Builder setInstanceId(String instanceId) {
+      _instanceId = instanceId;
+      return this;
+    }
+
     public RealtimeSegmentConfig build() {
       Map<String, FieldIndexConfigs> indexConfigByCol = Maps.newHashMapWithExpectedSize(_indexConfigByCol.size());
       for (Map.Entry<String, FieldIndexConfigs.Builder> entry : _indexConfigByCol.entrySet()) {
@@ -487,7 +514,7 @@ public class RealtimeSegmentConfig {
           _defaultNullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
           _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
-          _ingestionAggregationConfigs);
+          _ingestionAggregationConfigs, _tableConfig, _instanceId);
     }
   }
 }

@@ -95,8 +95,10 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -150,6 +152,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
+  private final TableConfig _tableConfig;
+  private final String _instanceId;
   private boolean _indexCapacityThresholdBreached;
 
   private final IdMap<FixedIntArray> _recordIdMap;
@@ -195,6 +199,8 @@ public class MutableSegmentImpl implements MutableSegment {
     _schema = config.getSchema();
     _timeColumnName = config.getTimeColumnName();
     _capacity = config.getCapacity();
+    _tableConfig = config.getTableConfig();
+    _instanceId = config.getInstanceId();
     SegmentZKMetadata segmentZKMetadata = config.getSegmentZKMetadata();
     _segmentMetadata = new SegmentMetadataImpl(TableNameBuilder.extractRawTableName(_realtimeTableName),
         segmentZKMetadata.getSegmentName(), _schema, segmentZKMetadata.getCreationTime()) {
@@ -707,8 +713,54 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  private boolean makeConsumptionSlow() {
+
+    String servers =
+        _tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps().get(0).get("server_names");
+
+    if (servers == null) {
+      return false;
+    }
+
+    String[] serverArr = servers.split(":");
+    _logger.info("serverArr: {}, instanceId: {}", serverArr, _instanceId);
+
+    boolean shouldInject = false;
+
+    for (String server : serverArr) {
+      if (_instanceId.contains(server)) {
+        shouldInject = true;
+        break;
+      }
+    }
+
+    if (!shouldInject) {
+      return false;
+    }
+
+    double failureProbability =
+        Optional.ofNullable(_tableConfig)
+            .map(TableConfig::getIngestionConfig)
+            .map(IngestionConfig::getStreamIngestionConfig)
+            .map(org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig::getStreamConfigMaps)
+            .map(maps -> maps.isEmpty() ? null : maps.get(0))
+            .map(map -> map.get("makeConsumptionSlowProbability"))
+            .map(String::valueOf)
+            .map(Double::parseDouble)
+            .orElse(0.0);
+
+    return Math.random() < failureProbability;
+  }
+
   private void addNewRow(int docId, GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      if (makeConsumptionSlow()) {
+        _logger.info("making slow");
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException ignored) {
+        }
+      }
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
 

@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    meta.helm.sh/release-name: pinot
+    meta.helm.sh/release-namespace: pinot-quickstart
+  creationTimestamp: "2025-01-04T19:49:32Z"
+  generation: 2
+  labels:
+    app: pinot
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 1.0.0
+    component: server
+    helm.sh/chart: pinot-0.3.1-SNAPSHOT
+    heritage: Helm
+    release: pinot
+  name: pinot-server-2
+  namespace: pinot-quickstart
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: Parallel
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pinot
+      component: server
+      release: pinot
+  serviceName: pinot-server-headless
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: pinot
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: 1.0.0
+        component: server
+        helm.sh/chart: pinot-0.3.1-SNAPSHOT
+        heritage: Helm
+        release: pinot
+    spec:
+      affinity: {}
+      containers:
+      - args:
+        - StartServer
+        - -clusterName
+        - pinot-quickstart
+        - -zkAddress
+        - pinot-zookeeper:2181
+        - -configFileName
+        - /var/pinot/server/config/pinot-server.conf
+        env:
+        - name: JAVA_OPTS
+          value: -Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log
+            -Dlog4j2.configurationFile=/opt/pinot/etc/conf/pinot-server-log4j2.xml
+            -Dplugins.dir=/opt/pinot/plugins
+        - name: LOG4J_CONSOLE_LEVEL
+          value: info
+        image: harn379/pinot:consume_in_order_1700e896dc19cc7976a5377474934164a9021c26_v2_slow_server
+        imagePullPolicy: Always
+        name: server
+        ports:
+        - containerPort: 8098
+          name: netty
+          protocol: TCP
+        - containerPort: 8097
+          name: admin
+          protocol: TCP
+        resources:
+          requests:
+            memory: 1280Mi
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/pinot/server/config
+          name: config
+        - mountPath: /var/pinot/server/data
+          name: data
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: pinot
+      serviceAccountName: pinot
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: pinot-server-config
+        name: config
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      creationTimestamp: null
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 4G
+      volumeMode: Filesystem
+    status:
+      phase: Pending

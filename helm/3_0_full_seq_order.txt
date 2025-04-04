@@ -1,0 +1,904 @@
+2025/03/27 20:52:11.931 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__0__20250327T2052Z
+2025/03/27 20:52:23.411 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__0__20250327T2052Z] [airlineStatsAvro__0__0__20250327T2052Z] Releasing the consumer semaphore
+2025/03/27 20:52:23.499 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__1__20250327T2052Z
+2025/03/27 20:52:33.807 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__1__20250327T2052Z] [airlineStatsAvro__0__1__20250327T2052Z] Releasing the consumer semaphore
+2025/03/27 20:52:33.937 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__2__20250327T2052Z
+2025/03/27 20:52:45.006 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__2__20250327T2052Z] [airlineStatsAvro__0__2__20250327T2052Z] Releasing the consumer semaphore
+2025/03/27 20:52:45.107 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__3__20250327T2052Z
+2025/03/27 20:52:55.799 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__3__20250327T2052Z] [airlineStatsAvro__0__3__20250327T2052Z] Releasing the consumer semaphore
+2025/03/27 20:52:55.904 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__4__20250327T2052Z
+2025/03/27 20:53:05.798 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__4__20250327T2052Z] [airlineStatsAvro__0__4__20250327T2052Z] Releasing the consumer semaphore
+2025/03/27 20:53:05.905 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__5__20250327T2053Z
+2025/03/27 20:53:15.955 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__5__20250327T2053Z] [airlineStatsAvro__0__5__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:53:16.012 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__6__20250327T2053Z
+2025/03/27 20:53:25.854 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__6__20250327T2053Z] [airlineStatsAvro__0__6__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:53:25.949 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__7__20250327T2053Z
+2025/03/27 20:53:35.918 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__7__20250327T2053Z] [airlineStatsAvro__0__7__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:53:36.012 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__8__20250327T2053Z
+2025/03/27 20:53:45.961 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__8__20250327T2053Z] [airlineStatsAvro__0__8__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:53:46.105 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__9__20250327T2053Z
+2025/03/27 20:53:56.026 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__9__20250327T2053Z] [airlineStatsAvro__0__9__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:53:56.104 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__10__20250327T2053Z
+2025/03/27 20:54:06.059 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__10__20250327T2053Z] [airlineStatsAvro__0__10__20250327T2053Z] Releasing the consumer semaphore
+2025/03/27 20:54:06.154 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__11__20250327T2054Z
+2025/03/27 20:54:16.249 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__11__20250327T2054Z] [airlineStatsAvro__0__11__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:54:16.303 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__12__20250327T2054Z
+2025/03/27 20:54:26.243 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__12__20250327T2054Z] [airlineStatsAvro__0__12__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:54:26.318 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__13__20250327T2054Z
+2025/03/27 20:54:36.352 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__13__20250327T2054Z] [airlineStatsAvro__0__13__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:54:36.403 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__14__20250327T2054Z
+2025/03/27 20:54:46.373 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__14__20250327T2054Z] [airlineStatsAvro__0__14__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:54:46.411 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__15__20250327T2054Z
+2025/03/27 20:54:56.514 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__15__20250327T2054Z] [airlineStatsAvro__0__15__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:54:56.522 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_32] Added new CONSUMING segment: airlineStatsAvro__0__16__20250327T2054Z
+2025/03/27 20:55:06.533 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__16__20250327T2054Z] [airlineStatsAvro__0__16__20250327T2054Z] Releasing the consumer semaphore
+2025/03/27 20:55:06.546 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__17__20250327T2055Z
+2025/03/27 20:55:16.563 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__17__20250327T2055Z] [airlineStatsAvro__0__17__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:55:16.629 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__18__20250327T2055Z
+2025/03/27 20:55:26.491 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__18__20250327T2055Z] [airlineStatsAvro__0__18__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:55:26.537 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__19__20250327T2055Z
+2025/03/27 20:55:36.571 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__19__20250327T2055Z] [airlineStatsAvro__0__19__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:55:36.635 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__20__20250327T2055Z
+2025/03/27 20:55:46.633 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__20__20250327T2055Z] [airlineStatsAvro__0__20__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:55:46.724 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__21__20250327T2055Z
+2025/03/27 20:55:56.650 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__21__20250327T2055Z] [airlineStatsAvro__0__21__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:55:56.713 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__22__20250327T2055Z
+2025/03/27 20:56:06.678 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__22__20250327T2055Z] [airlineStatsAvro__0__22__20250327T2055Z] Releasing the consumer semaphore
+2025/03/27 20:56:06.747 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__23__20250327T2056Z
+2025/03/27 20:56:16.731 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__23__20250327T2056Z] [airlineStatsAvro__0__23__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:56:16.810 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__24__20250327T2056Z
+2025/03/27 20:56:26.911 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__24__20250327T2056Z] [airlineStatsAvro__0__24__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:56:26.925 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__25__20250327T2056Z
+2025/03/27 20:56:36.811 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__25__20250327T2056Z] [airlineStatsAvro__0__25__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:56:36.857 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__26__20250327T2056Z
+2025/03/27 20:56:46.879 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__26__20250327T2056Z] [airlineStatsAvro__0__26__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:56:46.939 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__27__20250327T2056Z
+2025/03/27 20:56:56.926 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__27__20250327T2056Z] [airlineStatsAvro__0__27__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:56:57.021 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__28__20250327T2056Z
+2025/03/27 20:57:06.998 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__28__20250327T2056Z] [airlineStatsAvro__0__28__20250327T2056Z] Releasing the consumer semaphore
+2025/03/27 20:57:07.030 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__29__20250327T2057Z
+2025/03/27 20:57:17.030 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__29__20250327T2057Z] [airlineStatsAvro__0__29__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:57:17.067 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__30__20250327T2057Z
+2025/03/27 20:57:27.082 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__30__20250327T2057Z] [airlineStatsAvro__0__30__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:57:27.133 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__31__20250327T2057Z
+2025/03/27 20:57:37.132 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__31__20250327T2057Z] [airlineStatsAvro__0__31__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:57:37.218 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__32__20250327T2057Z
+2025/03/27 20:57:47.168 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__32__20250327T2057Z] [airlineStatsAvro__0__32__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:57:47.246 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__33__20250327T2057Z
+2025/03/27 20:57:57.229 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__33__20250327T2057Z] [airlineStatsAvro__0__33__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:57:57.311 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__34__20250327T2057Z
+2025/03/27 20:58:07.260 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__34__20250327T2057Z] [airlineStatsAvro__0__34__20250327T2057Z] Releasing the consumer semaphore
+2025/03/27 20:58:07.314 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__35__20250327T2058Z
+2025/03/27 20:58:17.292 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__35__20250327T2058Z] [airlineStatsAvro__0__35__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:58:17.347 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__36__20250327T2058Z
+2025/03/27 20:58:27.330 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__36__20250327T2058Z] [airlineStatsAvro__0__36__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:58:27.404 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__37__20250327T2058Z
+2025/03/27 20:58:37.574 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__37__20250327T2058Z] [airlineStatsAvro__0__37__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:58:37.608 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__38__20250327T2058Z
+2025/03/27 20:58:47.454 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__38__20250327T2058Z] [airlineStatsAvro__0__38__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:58:47.475 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__39__20250327T2058Z
+2025/03/27 20:58:57.503 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__39__20250327T2058Z] [airlineStatsAvro__0__39__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:58:57.534 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__40__20250327T2058Z
+2025/03/27 20:59:07.503 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__40__20250327T2058Z] [airlineStatsAvro__0__40__20250327T2058Z] Releasing the consumer semaphore
+2025/03/27 20:59:07.524 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__41__20250327T2059Z
+2025/03/27 20:59:17.583 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__41__20250327T2059Z] [airlineStatsAvro__0__41__20250327T2059Z] Releasing the consumer semaphore
+2025/03/27 20:59:17.620 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__42__20250327T2059Z
+2025/03/27 20:59:27.609 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__42__20250327T2059Z] [airlineStatsAvro__0__42__20250327T2059Z] Releasing the consumer semaphore
+2025/03/27 20:59:27.701 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__43__20250327T2059Z
+2025/03/27 20:59:34.812 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__43__20250327T2059Z] [HelixTaskExecutor-message_handle_thread_7] Releasing the consumer semaphore
+2025/03/27 20:59:34.828 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__44__20250327T2059Z
+2025/03/27 20:59:38.839 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__44__20250327T2059Z] [HelixTaskExecutor-message_handle_thread_10] Releasing the consumer semaphore
+2025/03/27 20:59:38.904 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__45__20250327T2059Z
+2025/03/27 20:59:48.856 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__45__20250327T2059Z] [airlineStatsAvro__0__45__20250327T2059Z] Releasing the consumer semaphore
+2025/03/27 20:59:48.913 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__46__20250327T2059Z
+2025/03/27 20:59:52.737 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__46__20250327T2059Z] [airlineStatsAvro__0__46__20250327T2059Z] Releasing the consumer semaphore
+2025/03/27 20:59:52.813 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__47__20250327T2059Z
+2025/03/27 20:59:56.724 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__47__20250327T2059Z] [airlineStatsAvro__0__47__20250327T2059Z] Releasing the consumer semaphore
+2025/03/27 20:59:56.799 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__48__20250327T2059Z
+2025/03/27 21:00:00.819 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__48__20250327T2059Z] [HelixTaskExecutor-message_handle_thread_18] Releasing the consumer semaphore
+2025/03/27 21:00:00.826 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__49__20250327T2100Z
+2025/03/27 21:00:04.817 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__49__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_20] Releasing the consumer semaphore
+2025/03/27 21:00:04.836 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__50__20250327T2100Z
+2025/03/27 21:00:08.784 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__50__20250327T2100Z] [airlineStatsAvro__0__50__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:08.831 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__51__20250327T2100Z
+2025/03/27 21:00:12.902 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__51__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_23] Releasing the consumer semaphore
+2025/03/27 21:00:12.909 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__52__20250327T2100Z
+2025/03/27 21:00:16.816 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__52__20250327T2100Z] [airlineStatsAvro__0__52__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:16.854 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__53__20250327T2100Z
+2025/03/27 21:00:20.907 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__53__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_28] Releasing the consumer semaphore
+2025/03/27 21:00:20.915 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__54__20250327T2100Z
+2025/03/27 21:00:24.870 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__54__20250327T2100Z] [airlineStatsAvro__0__54__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:24.906 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__55__20250327T2100Z
+2025/03/27 21:00:28.935 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__55__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_32] Releasing the consumer semaphore
+2025/03/27 21:00:28.946 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__56__20250327T2100Z
+2025/03/27 21:00:32.910 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__56__20250327T2100Z] [airlineStatsAvro__0__56__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:32.998 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__57__20250327T2100Z
+2025/03/27 21:00:36.928 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__57__20250327T2100Z] [airlineStatsAvro__0__57__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:36.968 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__58__20250327T2100Z
+2025/03/27 21:00:41.042 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__58__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_38] Releasing the consumer semaphore
+2025/03/27 21:00:41.056 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__59__20250327T2100Z
+2025/03/27 21:00:44.944 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__59__20250327T2100Z] [airlineStatsAvro__0__59__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:45.005 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__60__20250327T2100Z
+2025/03/27 21:00:49.058 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__60__20250327T2100Z] [HelixTaskExecutor-message_handle_thread_1] Releasing the consumer semaphore
+2025/03/27 21:00:49.101 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__61__20250327T2100Z
+2025/03/27 21:00:53.004 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__61__20250327T2100Z] [airlineStatsAvro__0__61__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:00:53.106 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__62__20250327T2100Z
+2025/03/27 21:01:03.208 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__62__20250327T2100Z] [airlineStatsAvro__0__62__20250327T2100Z] Releasing the consumer semaphore
+2025/03/27 21:01:03.223 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__63__20250327T2101Z
+2025/03/27 21:01:07.138 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__63__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_8] Releasing the consumer semaphore
+2025/03/27 21:01:07.203 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__64__20250327T2101Z
+2025/03/27 21:01:11.124 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__64__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:01:11.146 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__65__20250327T2101Z
+2025/03/27 21:01:15.119 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__65__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_12] Releasing the consumer semaphore
+2025/03/27 21:01:15.126 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__66__20250327T2101Z
+2025/03/27 21:01:19.149 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__66__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:01:19.156 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__67__20250327T2101Z
+2025/03/27 21:01:23.204 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__67__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_16] Releasing the consumer semaphore
+2025/03/27 21:01:23.218 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__68__20250327T2101Z
+2025/03/27 21:01:27.199 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__68__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_18] Releasing the consumer semaphore
+2025/03/27 21:01:27.211 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__69__20250327T2101Z
+2025/03/27 21:01:31.302 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__69__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_20] Releasing the consumer semaphore
+2025/03/27 21:01:31.323 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__70__20250327T2101Z
+2025/03/27 21:01:41.349 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__70__20250327T2101Z] [airlineStatsAvro__0__70__20250327T2101Z] Releasing the consumer semaphore
+2025/03/27 21:01:41.413 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__71__20250327T2101Z
+2025/03/27 21:01:45.227 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__71__20250327T2101Z] [airlineStatsAvro__0__71__20250327T2101Z] Releasing the consumer semaphore
+2025/03/27 21:01:45.307 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__72__20250327T2101Z
+2025/03/27 21:01:49.327 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__72__20250327T2101Z] [HelixTaskExecutor-message_handle_thread_26] Releasing the consumer semaphore
+2025/03/27 21:01:49.340 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__73__20250327T2101Z
+2025/03/27 21:01:59.408 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__73__20250327T2101Z] [airlineStatsAvro__0__73__20250327T2101Z] Releasing the consumer semaphore
+2025/03/27 21:01:59.419 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__74__20250327T2101Z
+2025/03/27 21:02:09.502 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__74__20250327T2101Z] [airlineStatsAvro__0__74__20250327T2101Z] Releasing the consumer semaphore
+2025/03/27 21:02:09.516 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__75__20250327T2102Z
+2025/03/27 21:02:19.500 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__75__20250327T2102Z] [airlineStatsAvro__0__75__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:02:19.526 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__76__20250327T2102Z
+2025/03/27 21:02:23.421 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__76__20250327T2102Z] [HelixTaskExecutor-message_handle_thread_34] Releasing the consumer semaphore
+2025/03/27 21:02:23.435 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__77__20250327T2102Z
+2025/03/27 21:02:27.422 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__77__20250327T2102Z] [airlineStatsAvro__0__77__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:02:27.459 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__78__20250327T2102Z
+2025/03/27 21:02:31.413 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__78__20250327T2102Z] [airlineStatsAvro__0__78__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:02:31.514 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__79__20250327T2102Z
+2025/03/27 21:02:35.464 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__79__20250327T2102Z] [HelixTaskExecutor-message_handle_thread_39] Releasing the consumer semaphore
+2025/03/27 21:02:35.502 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__80__20250327T2102Z
+2025/03/27 21:02:39.528 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__80__20250327T2102Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:02:39.538 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__81__20250327T2102Z
+2025/03/27 21:02:43.462 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__81__20250327T2102Z] [HelixTaskExecutor-message_handle_thread_4] Releasing the consumer semaphore
+2025/03/27 21:02:43.505 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__82__20250327T2102Z
+2025/03/27 21:02:47.487 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__82__20250327T2102Z] [airlineStatsAvro__0__82__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:02:47.544 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__83__20250327T2102Z
+2025/03/27 21:02:51.496 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__83__20250327T2102Z] [airlineStatsAvro__0__83__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:02:51.531 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__84__20250327T2102Z
+2025/03/27 21:03:01.653 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__84__20250327T2102Z] [airlineStatsAvro__0__84__20250327T2102Z] Releasing the consumer semaphore
+2025/03/27 21:03:01.709 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__85__20250327T2103Z
+2025/03/27 21:03:05.603 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__85__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_11] Releasing the consumer semaphore
+2025/03/27 21:03:05.613 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__86__20250327T2103Z
+2025/03/27 21:03:09.612 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__86__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:03:09.621 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__87__20250327T2103Z
+2025/03/27 21:03:13.658 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__87__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_15] Releasing the consumer semaphore
+2025/03/27 21:03:13.705 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__88__20250327T2103Z
+2025/03/27 21:03:17.624 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__88__20250327T2103Z] [airlineStatsAvro__0__88__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:03:17.709 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__89__20250327T2103Z
+2025/03/27 21:03:21.707 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__89__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_20] Releasing the consumer semaphore
+2025/03/27 21:03:21.713 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__90__20250327T2103Z
+2025/03/27 21:03:25.646 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__90__20250327T2103Z] [airlineStatsAvro__0__90__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:03:25.708 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__91__20250327T2103Z
+2025/03/27 21:03:29.706 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__91__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_24] Releasing the consumer semaphore
+2025/03/27 21:03:29.716 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__92__20250327T2103Z
+2025/03/27 21:03:33.689 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__92__20250327T2103Z] [airlineStatsAvro__0__92__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:03:33.736 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__93__20250327T2103Z
+2025/03/27 21:03:43.816 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__93__20250327T2103Z] [airlineStatsAvro__0__93__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:03:43.827 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__94__20250327T2103Z
+2025/03/27 21:03:47.709 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__94__20250327T2103Z] [airlineStatsAvro__0__94__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:03:47.734 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__95__20250327T2103Z
+2025/03/27 21:03:51.774 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__95__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_32] Releasing the consumer semaphore
+2025/03/27 21:03:51.800 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__96__20250327T2103Z
+2025/03/27 21:03:55.841 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__96__20250327T2103Z] [HelixTaskExecutor-message_handle_thread_33] Releasing the consumer semaphore
+2025/03/27 21:03:55.898 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__97__20250327T2103Z
+2025/03/27 21:04:05.891 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__97__20250327T2103Z] [airlineStatsAvro__0__97__20250327T2103Z] Releasing the consumer semaphore
+2025/03/27 21:04:05.905 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__98__20250327T2104Z
+2025/03/27 21:04:09.873 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__98__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_37] Releasing the consumer semaphore
+2025/03/27 21:04:09.902 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__99__20250327T2104Z
+2025/03/27 21:04:13.866 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__99__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_39] Releasing the consumer semaphore
+2025/03/27 21:04:13.872 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__100__20250327T2104Z
+2025/03/27 21:04:17.905 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__100__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:04:17.919 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__101__20250327T2104Z
+2025/03/27 21:04:21.909 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__101__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_3] Releasing the consumer semaphore
+2025/03/27 21:04:21.915 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__102__20250327T2104Z
+2025/03/27 21:04:25.852 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__102__20250327T2104Z] [airlineStatsAvro__0__102__20250327T2104Z] Releasing the consumer semaphore
+2025/03/27 21:04:25.879 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__103__20250327T2104Z
+2025/03/27 21:04:29.902 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__103__20250327T2104Z] [airlineStatsAvro__0__103__20250327T2104Z] Releasing the consumer semaphore
+2025/03/27 21:04:29.928 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__104__20250327T2104Z
+2025/03/27 21:04:33.953 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__104__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:04:33.963 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__105__20250327T2104Z
+2025/03/27 21:04:37.933 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__105__20250327T2104Z] [airlineStatsAvro__0__105__20250327T2104Z] Releasing the consumer semaphore
+2025/03/27 21:04:37.962 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__106__20250327T2104Z
+2025/03/27 21:04:42.016 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__106__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:04:42.029 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__107__20250327T2104Z
+2025/03/27 21:04:45.995 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__107__20250327T2104Z] [airlineStatsAvro__0__107__20250327T2104Z] Releasing the consumer semaphore
+2025/03/27 21:04:46.023 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__108__20250327T2104Z
+2025/03/27 21:04:50.036 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__108__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_17] Releasing the consumer semaphore
+2025/03/27 21:04:50.047 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__109__20250327T2104Z
+2025/03/27 21:04:54.055 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__109__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_20] Releasing the consumer semaphore
+2025/03/27 21:04:54.061 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__110__20250327T2104Z
+2025/03/27 21:04:58.065 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__110__20250327T2104Z] [HelixTaskExecutor-message_handle_thread_22] Releasing the consumer semaphore
+2025/03/27 21:04:58.105 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__111__20250327T2104Z
+2025/03/27 21:05:02.047 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__111__20250327T2104Z] [airlineStatsAvro__0__111__20250327T2104Z] Releasing the consumer semaphore
+2025/03/27 21:05:02.072 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__112__20250327T2105Z
+2025/03/27 21:05:06.120 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__112__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_25] Releasing the consumer semaphore
+2025/03/27 21:05:06.128 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__113__20250327T2105Z
+2025/03/27 21:05:10.077 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__113__20250327T2105Z] [airlineStatsAvro__0__113__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:10.119 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__114__20250327T2105Z
+2025/03/27 21:05:14.080 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__114__20250327T2105Z] [airlineStatsAvro__0__114__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:14.102 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__115__20250327T2105Z
+2025/03/27 21:05:18.156 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__115__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_31] Releasing the consumer semaphore
+2025/03/27 21:05:18.200 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_32] Added new CONSUMING segment: airlineStatsAvro__0__116__20250327T2105Z
+2025/03/27 21:05:22.088 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__116__20250327T2105Z] [airlineStatsAvro__0__116__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:22.133 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__117__20250327T2105Z
+2025/03/27 21:05:26.213 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__117__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_36] Releasing the consumer semaphore
+2025/03/27 21:05:26.221 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__118__20250327T2105Z
+2025/03/27 21:05:30.158 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__118__20250327T2105Z] [airlineStatsAvro__0__118__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:30.184 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__119__20250327T2105Z
+2025/03/27 21:05:34.183 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__119__20250327T2105Z] [airlineStatsAvro__0__119__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:34.206 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__120__20250327T2105Z
+2025/03/27 21:05:38.172 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__120__20250327T2105Z] [airlineStatsAvro__0__120__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:38.200 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__121__20250327T2105Z
+2025/03/27 21:05:42.200 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__121__20250327T2105Z] [airlineStatsAvro__0__121__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:42.247 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__122__20250327T2105Z
+2025/03/27 21:05:46.232 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__122__20250327T2105Z] [airlineStatsAvro__0__122__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:46.265 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__123__20250327T2105Z
+2025/03/27 21:05:50.257 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__123__20250327T2105Z] [airlineStatsAvro__0__123__20250327T2105Z] Releasing the consumer semaphore
+2025/03/27 21:05:50.306 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__124__20250327T2105Z
+2025/03/27 21:05:54.351 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__124__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:05:54.360 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__125__20250327T2105Z
+2025/03/27 21:05:58.399 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__125__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_12] Releasing the consumer semaphore
+2025/03/27 21:05:58.409 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__126__20250327T2105Z
+2025/03/27 21:06:02.407 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__126__20250327T2105Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:06:02.425 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__127__20250327T2106Z
+2025/03/27 21:06:06.346 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__127__20250327T2106Z] [airlineStatsAvro__0__127__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:06:06.407 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__128__20250327T2106Z
+2025/03/27 21:06:10.368 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__128__20250327T2106Z] [HelixTaskExecutor-message_handle_thread_17] Releasing the consumer semaphore
+2025/03/27 21:06:10.408 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__129__20250327T2106Z
+2025/03/27 21:06:14.447 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__129__20250327T2106Z] [HelixTaskExecutor-message_handle_thread_19] Releasing the consumer semaphore
+2025/03/27 21:06:14.499 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__130__20250327T2106Z
+2025/03/27 21:06:24.505 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__130__20250327T2106Z] [airlineStatsAvro__0__130__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:06:24.514 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__131__20250327T2106Z
+2025/03/27 21:06:28.415 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__131__20250327T2106Z] [airlineStatsAvro__0__131__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:06:28.446 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__132__20250327T2106Z
+2025/03/27 21:06:32.530 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__132__20250327T2106Z] [HelixTaskExecutor-message_handle_thread_25] Releasing the consumer semaphore
+2025/03/27 21:06:32.541 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__133__20250327T2106Z
+2025/03/27 21:06:42.559 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__133__20250327T2106Z] [airlineStatsAvro__0__133__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:06:42.565 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__134__20250327T2106Z
+2025/03/27 21:06:52.484 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__134__20250327T2106Z] [airlineStatsAvro__0__134__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:06:52.507 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__135__20250327T2106Z
+2025/03/27 21:07:02.618 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__135__20250327T2106Z] [airlineStatsAvro__0__135__20250327T2106Z] Releasing the consumer semaphore
+2025/03/27 21:07:02.624 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__136__20250327T2107Z
+2025/03/27 21:07:12.598 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__136__20250327T2107Z] [airlineStatsAvro__0__136__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:07:12.643 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__137__20250327T2107Z
+2025/03/27 21:07:22.663 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__137__20250327T2107Z] [airlineStatsAvro__0__137__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:07:22.702 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__138__20250327T2107Z
+2025/03/27 21:07:32.706 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__138__20250327T2107Z] [airlineStatsAvro__0__138__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:07:32.742 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__139__20250327T2107Z
+2025/03/27 21:07:42.716 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__139__20250327T2107Z] [airlineStatsAvro__0__139__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:07:42.739 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__140__20250327T2107Z
+2025/03/27 21:07:52.768 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__140__20250327T2107Z] [airlineStatsAvro__0__140__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:07:52.822 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__141__20250327T2107Z
+2025/03/27 21:08:02.806 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__141__20250327T2107Z] [airlineStatsAvro__0__141__20250327T2107Z] Releasing the consumer semaphore
+2025/03/27 21:08:02.833 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__142__20250327T2108Z
+2025/03/27 21:08:12.823 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__142__20250327T2108Z] [airlineStatsAvro__0__142__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:08:12.844 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__143__20250327T2108Z
+2025/03/27 21:08:22.869 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__143__20250327T2108Z] [airlineStatsAvro__0__143__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:08:22.889 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__144__20250327T2108Z
+2025/03/27 21:08:32.919 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__144__20250327T2108Z] [airlineStatsAvro__0__144__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:08:32.950 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__145__20250327T2108Z
+2025/03/27 21:08:42.950 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__145__20250327T2108Z] [airlineStatsAvro__0__145__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:08:42.999 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__146__20250327T2108Z
+2025/03/27 21:08:53.007 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__146__20250327T2108Z] [airlineStatsAvro__0__146__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:08:53.034 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__147__20250327T2108Z
+2025/03/27 21:09:03.029 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__147__20250327T2108Z] [airlineStatsAvro__0__147__20250327T2108Z] Releasing the consumer semaphore
+2025/03/27 21:09:03.048 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__148__20250327T2109Z
+2025/03/27 21:09:13.159 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__148__20250327T2109Z] [airlineStatsAvro__0__148__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:09:13.164 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__149__20250327T2109Z
+2025/03/27 21:09:23.113 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__149__20250327T2109Z] [airlineStatsAvro__0__149__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:09:23.134 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__150__20250327T2109Z
+2025/03/27 21:09:33.174 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__150__20250327T2109Z] [airlineStatsAvro__0__150__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:09:33.192 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__151__20250327T2109Z
+2025/03/27 21:09:43.212 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__151__20250327T2109Z] [airlineStatsAvro__0__151__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:09:43.233 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__152__20250327T2109Z
+2025/03/27 21:09:53.282 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__152__20250327T2109Z] [airlineStatsAvro__0__152__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:09:53.306 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__153__20250327T2109Z
+2025/03/27 21:10:03.309 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__153__20250327T2109Z] [airlineStatsAvro__0__153__20250327T2109Z] Releasing the consumer semaphore
+2025/03/27 21:10:03.337 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__154__20250327T2110Z
+2025/03/27 21:10:13.331 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__154__20250327T2110Z] [airlineStatsAvro__0__154__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:10:13.368 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__155__20250327T2110Z
+2025/03/27 21:10:23.363 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__155__20250327T2110Z] [airlineStatsAvro__0__155__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:10:23.387 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__156__20250327T2110Z
+2025/03/27 21:10:33.420 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__156__20250327T2110Z] [airlineStatsAvro__0__156__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:10:33.458 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__157__20250327T2110Z
+2025/03/27 21:10:43.447 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__157__20250327T2110Z] [airlineStatsAvro__0__157__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:10:43.475 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__158__20250327T2110Z
+2025/03/27 21:10:53.488 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__158__20250327T2110Z] [airlineStatsAvro__0__158__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:10:53.517 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__159__20250327T2110Z
+2025/03/27 21:11:03.519 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__159__20250327T2110Z] [airlineStatsAvro__0__159__20250327T2110Z] Releasing the consumer semaphore
+2025/03/27 21:11:03.542 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__160__20250327T2111Z
+2025/03/27 21:11:13.554 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__160__20250327T2111Z] [airlineStatsAvro__0__160__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:11:13.597 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__161__20250327T2111Z
+2025/03/27 21:11:23.580 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__161__20250327T2111Z] [airlineStatsAvro__0__161__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:11:23.618 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__162__20250327T2111Z
+2025/03/27 21:11:33.627 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__162__20250327T2111Z] [airlineStatsAvro__0__162__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:11:33.656 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__163__20250327T2111Z
+2025/03/27 21:11:43.655 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__163__20250327T2111Z] [airlineStatsAvro__0__163__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:11:43.689 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__164__20250327T2111Z
+2025/03/27 21:11:53.775 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__164__20250327T2111Z] [airlineStatsAvro__0__164__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:11:53.780 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__165__20250327T2111Z
+2025/03/27 21:12:03.729 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__165__20250327T2111Z] [airlineStatsAvro__0__165__20250327T2111Z] Releasing the consumer semaphore
+2025/03/27 21:12:03.751 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__166__20250327T2112Z
+2025/03/27 21:12:13.745 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__166__20250327T2112Z] [airlineStatsAvro__0__166__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:12:13.770 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__167__20250327T2112Z
+2025/03/27 21:12:23.756 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__167__20250327T2112Z] [airlineStatsAvro__0__167__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:12:23.800 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__168__20250327T2112Z
+2025/03/27 21:12:33.799 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__168__20250327T2112Z] [airlineStatsAvro__0__168__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:12:33.834 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__169__20250327T2112Z
+2025/03/27 21:12:43.833 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__169__20250327T2112Z] [airlineStatsAvro__0__169__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:12:43.855 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__170__20250327T2112Z
+2025/03/27 21:12:53.843 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__170__20250327T2112Z] [airlineStatsAvro__0__170__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:12:53.874 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__171__20250327T2112Z
+2025/03/27 21:13:03.917 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__171__20250327T2112Z] [airlineStatsAvro__0__171__20250327T2112Z] Releasing the consumer semaphore
+2025/03/27 21:13:03.943 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__172__20250327T2113Z
+2025/03/27 21:13:13.966 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__172__20250327T2113Z] [airlineStatsAvro__0__172__20250327T2113Z] Releasing the consumer semaphore
+2025/03/27 21:13:14.031 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__173__20250327T2113Z
+2025/03/27 21:13:23.994 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__173__20250327T2113Z] [airlineStatsAvro__0__173__20250327T2113Z] Releasing the consumer semaphore
+2025/03/27 21:13:24.014 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__174__20250327T2113Z
+2025/03/27 21:13:34.043 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__174__20250327T2113Z] [airlineStatsAvro__0__174__20250327T2113Z] Releasing the consumer semaphore
+2025/03/27 21:13:34.073 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__175__20250327T2113Z
+2025/03/27 21:13:44.065 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__175__20250327T2113Z] [airlineStatsAvro__0__175__20250327T2113Z] Releasing the consumer semaphore
+2025/03/27 21:13:44.084 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__176__20250327T2113Z
+2025/03/27 21:13:54.100 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__176__20250327T2113Z] [airlineStatsAvro__0__176__20250327T2113Z] Releasing the consumer semaphore
+2025/03/27 21:13:54.129 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__177__20250327T2113Z
+2025/03/27 21:14:03.148 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__177__20250327T2113Z] [HelixTaskExecutor-message_handle_thread_36] Releasing the consumer semaphore
+2025/03/27 21:14:03.156 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__178__20250327T2114Z
+2025/03/27 21:14:07.211 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__178__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_38] Releasing the consumer semaphore
+2025/03/27 21:14:07.222 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__179__20250327T2114Z
+2025/03/27 21:14:11.142 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__179__20250327T2114Z] [airlineStatsAvro__0__179__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:11.170 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__180__20250327T2114Z
+2025/03/27 21:14:15.163 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__180__20250327T2114Z] [airlineStatsAvro__0__180__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:15.186 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__181__20250327T2114Z
+2025/03/27 21:14:19.181 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__181__20250327T2114Z] [airlineStatsAvro__0__181__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:19.209 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__182__20250327T2114Z
+2025/03/27 21:14:23.201 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__182__20250327T2114Z] [airlineStatsAvro__0__182__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:23.233 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__183__20250327T2114Z
+2025/03/27 21:14:27.209 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__183__20250327T2114Z] [airlineStatsAvro__0__183__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:27.237 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__184__20250327T2114Z
+2025/03/27 21:14:31.219 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__184__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:14:31.224 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__185__20250327T2114Z
+2025/03/27 21:14:35.243 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__185__20250327T2114Z] [airlineStatsAvro__0__185__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:35.299 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__186__20250327T2114Z
+2025/03/27 21:14:39.298 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__186__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_14] Releasing the consumer semaphore
+2025/03/27 21:14:39.306 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__187__20250327T2114Z
+2025/03/27 21:14:43.322 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__187__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_15] Releasing the consumer semaphore
+2025/03/27 21:14:43.333 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__188__20250327T2114Z
+2025/03/27 21:14:47.314 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__188__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_17] Releasing the consumer semaphore
+2025/03/27 21:14:47.321 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__189__20250327T2114Z
+2025/03/27 21:14:57.426 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__189__20250327T2114Z] [airlineStatsAvro__0__189__20250327T2114Z] Releasing the consumer semaphore
+2025/03/27 21:14:57.440 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__190__20250327T2114Z
+2025/03/27 21:15:01.373 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__190__20250327T2114Z] [HelixTaskExecutor-message_handle_thread_21] Releasing the consumer semaphore
+2025/03/27 21:15:01.402 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__191__20250327T2115Z
+2025/03/27 21:15:05.414 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__191__20250327T2115Z] [HelixTaskExecutor-message_handle_thread_23] Releasing the consumer semaphore
+2025/03/27 21:15:05.425 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__192__20250327T2115Z
+2025/03/27 21:15:09.369 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__192__20250327T2115Z] [airlineStatsAvro__0__192__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:09.415 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__193__20250327T2115Z
+2025/03/27 21:15:13.375 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__193__20250327T2115Z] [airlineStatsAvro__0__193__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:13.413 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__194__20250327T2115Z
+2025/03/27 21:15:17.410 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__194__20250327T2115Z] [HelixTaskExecutor-message_handle_thread_29] Releasing the consumer semaphore
+2025/03/27 21:15:17.417 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__195__20250327T2115Z
+2025/03/27 21:15:27.601 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__195__20250327T2115Z] [airlineStatsAvro__0__195__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:27.615 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__196__20250327T2115Z
+2025/03/27 21:15:37.559 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__196__20250327T2115Z] [airlineStatsAvro__0__196__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:37.568 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__197__20250327T2115Z
+2025/03/27 21:15:41.524 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__197__20250327T2115Z] [HelixTaskExecutor-message_handle_thread_36] Releasing the consumer semaphore
+2025/03/27 21:15:41.538 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__198__20250327T2115Z
+2025/03/27 21:15:45.486 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__198__20250327T2115Z] [airlineStatsAvro__0__198__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:45.513 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__199__20250327T2115Z
+2025/03/27 21:15:49.470 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__199__20250327T2115Z] [airlineStatsAvro__0__199__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:49.503 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__200__20250327T2115Z
+2025/03/27 21:15:53.547 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__200__20250327T2115Z] [HelixTaskExecutor-message_handle_thread_1] Releasing the consumer semaphore
+2025/03/27 21:15:53.603 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__201__20250327T2115Z
+2025/03/27 21:15:57.509 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__201__20250327T2115Z] [airlineStatsAvro__0__201__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:15:57.539 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__202__20250327T2115Z
+2025/03/27 21:16:01.532 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__202__20250327T2115Z] [airlineStatsAvro__0__202__20250327T2115Z] Releasing the consumer semaphore
+2025/03/27 21:16:01.550 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__203__20250327T2116Z
+2025/03/27 21:16:05.583 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__203__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_7] Releasing the consumer semaphore
+2025/03/27 21:16:05.591 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__204__20250327T2116Z
+2025/03/27 21:16:09.601 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__204__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:16:09.608 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__205__20250327T2116Z
+2025/03/27 21:16:13.640 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__205__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_11] Releasing the consumer semaphore
+2025/03/27 21:16:13.652 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__206__20250327T2116Z
+2025/03/27 21:16:17.593 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__206__20250327T2116Z] [airlineStatsAvro__0__206__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:17.630 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__207__20250327T2116Z
+2025/03/27 21:16:21.599 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__207__20250327T2116Z] [airlineStatsAvro__0__207__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:21.619 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__208__20250327T2116Z
+2025/03/27 21:16:25.627 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__208__20250327T2116Z] [airlineStatsAvro__0__208__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:25.655 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__209__20250327T2116Z
+2025/03/27 21:16:29.643 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__209__20250327T2116Z] [airlineStatsAvro__0__209__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:29.666 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__210__20250327T2116Z
+2025/03/27 21:16:33.672 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__210__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_22] Releasing the consumer semaphore
+2025/03/27 21:16:33.705 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__211__20250327T2116Z
+2025/03/27 21:16:37.720 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__211__20250327T2116Z] [airlineStatsAvro__0__211__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:37.750 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__212__20250327T2116Z
+2025/03/27 21:16:41.695 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__212__20250327T2116Z] [airlineStatsAvro__0__212__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:41.722 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__213__20250327T2116Z
+2025/03/27 21:16:45.748 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__213__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_28] Releasing the consumer semaphore
+2025/03/27 21:16:45.756 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__214__20250327T2116Z
+2025/03/27 21:16:49.688 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__214__20250327T2116Z] [airlineStatsAvro__0__214__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:49.722 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__215__20250327T2116Z
+2025/03/27 21:16:53.758 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__215__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_32] Releasing the consumer semaphore
+2025/03/27 21:16:53.768 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__216__20250327T2116Z
+2025/03/27 21:16:57.711 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__216__20250327T2116Z] [airlineStatsAvro__0__216__20250327T2116Z] Releasing the consumer semaphore
+2025/03/27 21:16:57.729 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__217__20250327T2116Z
+2025/03/27 21:17:01.798 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__217__20250327T2116Z] [HelixTaskExecutor-message_handle_thread_36] Releasing the consumer semaphore
+2025/03/27 21:17:01.807 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__218__20250327T2117Z
+2025/03/27 21:17:05.757 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__218__20250327T2117Z] [airlineStatsAvro__0__218__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:05.785 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__219__20250327T2117Z
+2025/03/27 21:17:09.759 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__219__20250327T2117Z] [airlineStatsAvro__0__219__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:09.781 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__220__20250327T2117Z
+2025/03/27 21:17:13.811 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__220__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:17:13.820 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__221__20250327T2117Z
+2025/03/27 21:17:17.804 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__221__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_3] Releasing the consumer semaphore
+2025/03/27 21:17:17.810 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__222__20250327T2117Z
+2025/03/27 21:17:21.800 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__222__20250327T2117Z] [airlineStatsAvro__0__222__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:21.822 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__223__20250327T2117Z
+2025/03/27 21:17:25.847 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__223__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_7] Releasing the consumer semaphore
+2025/03/27 21:17:25.853 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__224__20250327T2117Z
+2025/03/27 21:17:29.857 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__224__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_10] Releasing the consumer semaphore
+2025/03/27 21:17:29.863 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__225__20250327T2117Z
+2025/03/27 21:17:33.867 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__225__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_11] Releasing the consumer semaphore
+2025/03/27 21:17:33.873 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__226__20250327T2117Z
+2025/03/27 21:17:37.836 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__226__20250327T2117Z] [airlineStatsAvro__0__226__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:37.858 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__227__20250327T2117Z
+2025/03/27 21:17:41.850 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__227__20250327T2117Z] [airlineStatsAvro__0__227__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:41.876 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__228__20250327T2117Z
+2025/03/27 21:17:45.908 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__228__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_18] Releasing the consumer semaphore
+2025/03/27 21:17:45.916 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__229__20250327T2117Z
+2025/03/27 21:17:49.955 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__229__20250327T2117Z] [HelixTaskExecutor-message_handle_thread_20] Releasing the consumer semaphore
+2025/03/27 21:17:49.964 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__230__20250327T2117Z
+2025/03/27 21:17:53.906 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__230__20250327T2117Z] [airlineStatsAvro__0__230__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:17:53.954 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__231__20250327T2117Z
+2025/03/27 21:18:04.032 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__231__20250327T2117Z] [airlineStatsAvro__0__231__20250327T2117Z] Releasing the consumer semaphore
+2025/03/27 21:18:04.041 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__232__20250327T2118Z
+2025/03/27 21:18:07.966 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__232__20250327T2118Z] [airlineStatsAvro__0__232__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:08.005 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__233__20250327T2118Z
+2025/03/27 21:18:11.981 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__233__20250327T2118Z] [airlineStatsAvro__0__233__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:12.041 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__234__20250327T2118Z
+2025/03/27 21:18:16.047 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__234__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_30] Releasing the consumer semaphore
+2025/03/27 21:18:16.054 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__235__20250327T2118Z
+2025/03/27 21:18:20.001 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__235__20250327T2118Z] [airlineStatsAvro__0__235__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:20.030 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_32] Added new CONSUMING segment: airlineStatsAvro__0__236__20250327T2118Z
+2025/03/27 21:18:30.150 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__236__20250327T2118Z] [airlineStatsAvro__0__236__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:30.159 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__237__20250327T2118Z
+2025/03/27 21:18:34.099 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__237__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_35] Releasing the consumer semaphore
+2025/03/27 21:18:34.106 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__238__20250327T2118Z
+2025/03/27 21:18:38.103 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__238__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_38] Releasing the consumer semaphore
+2025/03/27 21:18:38.112 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__239__20250327T2118Z
+2025/03/27 21:18:42.107 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__239__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_39] Releasing the consumer semaphore
+2025/03/27 21:18:42.114 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__240__20250327T2118Z
+2025/03/27 21:18:46.099 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__240__20250327T2118Z] [airlineStatsAvro__0__240__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:46.133 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__241__20250327T2118Z
+2025/03/27 21:18:50.104 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__241__20250327T2118Z] [airlineStatsAvro__0__241__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:18:50.126 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__242__20250327T2118Z
+2025/03/27 21:18:54.212 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__242__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_5] Releasing the consumer semaphore
+2025/03/27 21:18:54.221 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__243__20250327T2118Z
+2025/03/27 21:18:58.161 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__243__20250327T2118Z] [HelixTaskExecutor-message_handle_thread_8] Releasing the consumer semaphore
+2025/03/27 21:18:58.171 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__244__20250327T2118Z
+2025/03/27 21:19:02.150 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__244__20250327T2118Z] [airlineStatsAvro__0__244__20250327T2118Z] Releasing the consumer semaphore
+2025/03/27 21:19:02.177 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__245__20250327T2119Z
+2025/03/27 21:19:12.279 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__245__20250327T2119Z] [airlineStatsAvro__0__245__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:12.298 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__246__20250327T2119Z
+2025/03/27 21:19:22.309 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__246__20250327T2119Z] [airlineStatsAvro__0__246__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:22.314 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__247__20250327T2119Z
+2025/03/27 21:19:26.211 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__247__20250327T2119Z] [airlineStatsAvro__0__247__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:26.232 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__248__20250327T2119Z
+2025/03/27 21:19:30.266 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__248__20250327T2119Z] [HelixTaskExecutor-message_handle_thread_18] Releasing the consumer semaphore
+2025/03/27 21:19:30.273 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__249__20250327T2119Z
+2025/03/27 21:19:34.250 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__249__20250327T2119Z] [airlineStatsAvro__0__249__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:34.272 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__250__20250327T2119Z
+2025/03/27 21:19:38.269 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__250__20250327T2119Z] [airlineStatsAvro__0__250__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:38.291 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__251__20250327T2119Z
+2025/03/27 21:19:42.293 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__251__20250327T2119Z] [airlineStatsAvro__0__251__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:42.315 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__252__20250327T2119Z
+2025/03/27 21:19:46.372 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__252__20250327T2119Z] [airlineStatsAvro__0__252__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:46.414 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__253__20250327T2119Z
+2025/03/27 21:19:50.337 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__253__20250327T2119Z] [airlineStatsAvro__0__253__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:50.415 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__254__20250327T2119Z
+2025/03/27 21:19:54.312 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__254__20250327T2119Z] [airlineStatsAvro__0__254__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:54.335 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__255__20250327T2119Z
+2025/03/27 21:19:58.356 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__255__20250327T2119Z] [airlineStatsAvro__0__255__20250327T2119Z] Releasing the consumer semaphore
+2025/03/27 21:19:58.401 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_32] Added new CONSUMING segment: airlineStatsAvro__0__256__20250327T2119Z
+2025/03/27 21:20:02.425 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__256__20250327T2119Z] [HelixTaskExecutor-message_handle_thread_34] Releasing the consumer semaphore
+2025/03/27 21:20:02.431 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__257__20250327T2120Z
+2025/03/27 21:20:06.370 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__257__20250327T2120Z] [airlineStatsAvro__0__257__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:06.419 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__258__20250327T2120Z
+2025/03/27 21:20:10.429 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__258__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_37] Releasing the consumer semaphore
+2025/03/27 21:20:10.435 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__259__20250327T2120Z
+2025/03/27 21:20:14.403 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__259__20250327T2120Z] [airlineStatsAvro__0__259__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:14.424 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__260__20250327T2120Z
+2025/03/27 21:20:18.457 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__260__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:20:18.466 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__261__20250327T2120Z
+2025/03/27 21:20:22.437 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__261__20250327T2120Z] [airlineStatsAvro__0__261__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:22.456 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__262__20250327T2120Z
+2025/03/27 21:20:26.462 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__262__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_6] Releasing the consumer semaphore
+2025/03/27 21:20:26.469 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__263__20250327T2120Z
+2025/03/27 21:20:30.499 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__263__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_7] Releasing the consumer semaphore
+2025/03/27 21:20:30.505 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__264__20250327T2120Z
+2025/03/27 21:20:34.515 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__264__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_10] Releasing the consumer semaphore
+2025/03/27 21:20:34.522 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__265__20250327T2120Z
+2025/03/27 21:20:38.494 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__265__20250327T2120Z] [airlineStatsAvro__0__265__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:38.515 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__266__20250327T2120Z
+2025/03/27 21:20:42.511 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__266__20250327T2120Z] [airlineStatsAvro__0__266__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:42.534 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__267__20250327T2120Z
+2025/03/27 21:20:46.542 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__267__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_16] Releasing the consumer semaphore
+2025/03/27 21:20:46.547 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__268__20250327T2120Z
+2025/03/27 21:20:50.524 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__268__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_18] Releasing the consumer semaphore
+2025/03/27 21:20:50.532 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__269__20250327T2120Z
+2025/03/27 21:20:54.582 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__269__20250327T2120Z] [HelixTaskExecutor-message_handle_thread_19] Releasing the consumer semaphore
+2025/03/27 21:20:54.588 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__270__20250327T2120Z
+2025/03/27 21:20:58.554 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__270__20250327T2120Z] [airlineStatsAvro__0__270__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:20:58.569 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__271__20250327T2120Z
+2025/03/27 21:21:02.564 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__271__20250327T2120Z] [airlineStatsAvro__0__271__20250327T2120Z] Releasing the consumer semaphore
+2025/03/27 21:21:02.587 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__272__20250327T2121Z
+2025/03/27 21:21:06.637 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__272__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_25] Releasing the consumer semaphore
+2025/03/27 21:21:06.645 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__273__20250327T2121Z
+2025/03/27 21:21:10.595 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__273__20250327T2121Z] [airlineStatsAvro__0__273__20250327T2121Z] Releasing the consumer semaphore
+2025/03/27 21:21:10.627 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__274__20250327T2121Z
+2025/03/27 21:21:14.642 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__274__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_29] Releasing the consumer semaphore
+2025/03/27 21:21:14.647 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__275__20250327T2121Z
+2025/03/27 21:21:18.653 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__275__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_32] Releasing the consumer semaphore
+2025/03/27 21:21:18.659 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__276__20250327T2121Z
+2025/03/27 21:21:22.671 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__276__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_34] Releasing the consumer semaphore
+2025/03/27 21:21:22.677 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__277__20250327T2121Z
+2025/03/27 21:21:26.640 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__277__20250327T2121Z] [airlineStatsAvro__0__277__20250327T2121Z] Releasing the consumer semaphore
+2025/03/27 21:21:26.699 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__278__20250327T2121Z
+2025/03/27 21:21:30.672 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__278__20250327T2121Z] [airlineStatsAvro__0__278__20250327T2121Z] Releasing the consumer semaphore
+2025/03/27 21:21:30.696 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__279__20250327T2121Z
+2025/03/27 21:21:34.732 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__279__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_0] Releasing the consumer semaphore
+2025/03/27 21:21:34.737 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__280__20250327T2121Z
+2025/03/27 21:21:38.735 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__280__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:21:38.741 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__281__20250327T2121Z
+2025/03/27 21:21:42.741 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__281__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_3] Releasing the consumer semaphore
+2025/03/27 21:21:42.746 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__282__20250327T2121Z
+2025/03/27 21:21:46.695 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__282__20250327T2121Z] [airlineStatsAvro__0__282__20250327T2121Z] Releasing the consumer semaphore
+2025/03/27 21:21:46.717 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__283__20250327T2121Z
+2025/03/27 21:21:50.776 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__283__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_8] Releasing the consumer semaphore
+2025/03/27 21:21:50.801 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__284__20250327T2121Z
+2025/03/27 21:21:54.777 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__284__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_10] Releasing the consumer semaphore
+2025/03/27 21:21:54.784 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__285__20250327T2121Z
+2025/03/27 21:21:58.784 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__285__20250327T2121Z] [airlineStatsAvro__0__285__20250327T2121Z] Releasing the consumer semaphore
+2025/03/27 21:21:58.821 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__286__20250327T2121Z
+2025/03/27 21:22:02.861 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__286__20250327T2121Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:22:02.900 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__287__20250327T2122Z
+2025/03/27 21:22:06.870 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__287__20250327T2122Z] [HelixTaskExecutor-message_handle_thread_16] Releasing the consumer semaphore
+2025/03/27 21:22:06.905 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__288__20250327T2122Z
+2025/03/27 21:22:10.805 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__288__20250327T2122Z] [airlineStatsAvro__0__288__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:10.833 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__289__20250327T2122Z
+2025/03/27 21:22:14.846 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__289__20250327T2122Z] [airlineStatsAvro__0__289__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:14.902 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__290__20250327T2122Z
+2025/03/27 21:22:18.854 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__290__20250327T2122Z] [airlineStatsAvro__0__290__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:18.878 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__291__20250327T2122Z
+2025/03/27 21:22:22.920 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__291__20250327T2122Z] [HelixTaskExecutor-message_handle_thread_24] Releasing the consumer semaphore
+2025/03/27 21:22:22.929 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__292__20250327T2122Z
+2025/03/27 21:22:26.928 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__292__20250327T2122Z] [HelixTaskExecutor-message_handle_thread_26] Releasing the consumer semaphore
+2025/03/27 21:22:26.941 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__293__20250327T2122Z
+2025/03/27 21:22:30.907 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__293__20250327T2122Z] [HelixTaskExecutor-message_handle_thread_27] Releasing the consumer semaphore
+2025/03/27 21:22:30.917 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__294__20250327T2122Z
+2025/03/27 21:22:34.879 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__294__20250327T2122Z] [airlineStatsAvro__0__294__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:34.905 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__295__20250327T2122Z
+2025/03/27 21:22:38.918 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__295__20250327T2122Z] [airlineStatsAvro__0__295__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:38.950 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__296__20250327T2122Z
+2025/03/27 21:22:42.904 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__296__20250327T2122Z] [airlineStatsAvro__0__296__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:42.932 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__297__20250327T2122Z
+2025/03/27 21:22:53.101 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__297__20250327T2122Z] [airlineStatsAvro__0__297__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:53.111 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__298__20250327T2122Z
+2025/03/27 21:22:56.963 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__298__20250327T2122Z] [airlineStatsAvro__0__298__20250327T2122Z] Releasing the consumer semaphore
+2025/03/27 21:22:56.993 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__299__20250327T2122Z
+2025/03/27 21:23:01.032 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__299__20250327T2122Z] [HelixTaskExecutor-message_handle_thread_39] Releasing the consumer semaphore
+2025/03/27 21:23:01.041 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__300__20250327T2123Z
+2025/03/27 21:23:05.041 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__300__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_1] Releasing the consumer semaphore
+2025/03/27 21:23:05.053 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__301__20250327T2123Z
+2025/03/27 21:23:09.004 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__301__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_3] Releasing the consumer semaphore
+2025/03/27 21:23:09.013 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__302__20250327T2123Z
+2025/03/27 21:23:13.002 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__302__20250327T2123Z] [airlineStatsAvro__0__302__20250327T2123Z] Releasing the consumer semaphore
+2025/03/27 21:23:13.028 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__303__20250327T2123Z
+2025/03/27 21:23:17.069 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__303__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_7] Releasing the consumer semaphore
+2025/03/27 21:23:17.100 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__304__20250327T2123Z
+2025/03/27 21:23:21.101 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__304__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:23:21.110 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__305__20250327T2123Z
+2025/03/27 21:23:31.208 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__305__20250327T2123Z] [airlineStatsAvro__0__305__20250327T2123Z] Releasing the consumer semaphore
+2025/03/27 21:23:31.219 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__306__20250327T2123Z
+2025/03/27 21:23:35.104 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__306__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_14] Releasing the consumer semaphore
+2025/03/27 21:23:35.108 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__307__20250327T2123Z
+2025/03/27 21:23:39.201 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__307__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_16] Releasing the consumer semaphore
+2025/03/27 21:23:39.211 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__308__20250327T2123Z
+2025/03/27 21:23:43.111 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__308__20250327T2123Z] [airlineStatsAvro__0__308__20250327T2123Z] Releasing the consumer semaphore
+2025/03/27 21:23:43.142 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__309__20250327T2123Z
+2025/03/27 21:23:47.166 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__309__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_19] Releasing the consumer semaphore
+2025/03/27 21:23:47.172 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__310__20250327T2123Z
+2025/03/27 21:23:51.180 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__310__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_22] Releasing the consumer semaphore
+2025/03/27 21:23:51.202 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__311__20250327T2123Z
+2025/03/27 21:23:55.167 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__311__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_24] Releasing the consumer semaphore
+2025/03/27 21:23:55.174 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__312__20250327T2123Z
+2025/03/27 21:23:59.209 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__312__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_26] Releasing the consumer semaphore
+2025/03/27 21:23:59.216 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__313__20250327T2123Z
+2025/03/27 21:24:03.222 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__313__20250327T2123Z] [HelixTaskExecutor-message_handle_thread_28] Releasing the consumer semaphore
+2025/03/27 21:24:03.229 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__314__20250327T2124Z
+2025/03/27 21:24:07.222 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__314__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_30] Releasing the consumer semaphore
+2025/03/27 21:24:07.231 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__315__20250327T2124Z
+2025/03/27 21:24:11.253 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__315__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_32] Releasing the consumer semaphore
+2025/03/27 21:24:11.261 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__316__20250327T2124Z
+2025/03/27 21:24:15.276 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__316__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_34] Releasing the consumer semaphore
+2025/03/27 21:24:15.305 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__317__20250327T2124Z
+2025/03/27 21:24:19.305 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__317__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_36] Releasing the consumer semaphore
+2025/03/27 21:24:19.311 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__318__20250327T2124Z
+2025/03/27 21:24:23.298 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__318__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_37] Releasing the consumer semaphore
+2025/03/27 21:24:23.313 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__319__20250327T2124Z
+2025/03/27 21:24:27.316 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__319__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_39] Releasing the consumer semaphore
+2025/03/27 21:24:27.327 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__320__20250327T2124Z
+2025/03/27 21:24:31.352 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__320__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_2] Releasing the consumer semaphore
+2025/03/27 21:24:31.366 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__321__20250327T2124Z
+2025/03/27 21:24:35.410 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__321__20250327T2124Z] [airlineStatsAvro__0__321__20250327T2124Z] Releasing the consumer semaphore
+2025/03/27 21:24:35.513 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__322__20250327T2124Z
+2025/03/27 21:24:39.344 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__322__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_6] Releasing the consumer semaphore
+2025/03/27 21:24:39.355 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__323__20250327T2124Z
+2025/03/27 21:24:43.351 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__323__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_8] Releasing the consumer semaphore
+2025/03/27 21:24:43.364 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__324__20250327T2124Z
+2025/03/27 21:24:47.356 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__324__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_9] Releasing the consumer semaphore
+2025/03/27 21:24:47.364 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__325__20250327T2124Z
+2025/03/27 21:24:51.411 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__325__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_11] Releasing the consumer semaphore
+2025/03/27 21:24:51.418 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__326__20250327T2124Z
+2025/03/27 21:24:55.417 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__326__20250327T2124Z] [HelixTaskExecutor-message_handle_thread_13] Releasing the consumer semaphore
+2025/03/27 21:24:55.427 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__327__20250327T2124Z
+2025/03/27 21:25:05.525 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__327__20250327T2124Z] [airlineStatsAvro__0__327__20250327T2124Z] Releasing the consumer semaphore
+2025/03/27 21:25:05.606 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__328__20250327T2125Z
+2025/03/27 21:25:15.525 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__328__20250327T2125Z] [airlineStatsAvro__0__328__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:25:15.530 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__329__20250327T2125Z
+2025/03/27 21:25:19.436 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__329__20250327T2125Z] [airlineStatsAvro__0__329__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:25:19.453 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__330__20250327T2125Z
+2025/03/27 21:25:23.440 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__330__20250327T2125Z] [airlineStatsAvro__0__330__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:25:23.463 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__331__20250327T2125Z
+2025/03/27 21:25:27.554 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__331__20250327T2125Z] [HelixTaskExecutor-message_handle_thread_23] Releasing the consumer semaphore
+2025/03/27 21:25:27.610 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__332__20250327T2125Z
+2025/03/27 21:25:31.506 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__332__20250327T2125Z] [HelixTaskExecutor-message_handle_thread_26] Releasing the consumer semaphore
+2025/03/27 21:25:31.516 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__333__20250327T2125Z
+2025/03/27 21:25:35.520 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__333__20250327T2125Z] [HelixTaskExecutor-message_handle_thread_27] Releasing the consumer semaphore
+2025/03/27 21:25:35.530 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__334__20250327T2125Z
+2025/03/27 21:25:45.610 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__334__20250327T2125Z] [airlineStatsAvro__0__334__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:25:45.617 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__335__20250327T2125Z
+2025/03/27 21:25:55.653 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__335__20250327T2125Z] [airlineStatsAvro__0__335__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:25:55.659 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__336__20250327T2125Z
+2025/03/27 21:26:05.690 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__336__20250327T2125Z] [airlineStatsAvro__0__336__20250327T2125Z] Releasing the consumer semaphore
+2025/03/27 21:26:05.701 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__337__20250327T2126Z
+2025/03/27 21:26:15.724 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__337__20250327T2126Z] [airlineStatsAvro__0__337__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:26:15.731 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__338__20250327T2126Z
+2025/03/27 21:26:25.652 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__338__20250327T2126Z] [airlineStatsAvro__0__338__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:26:25.699 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__339__20250327T2126Z
+2025/03/27 21:26:35.684 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__339__20250327T2126Z] [airlineStatsAvro__0__339__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:26:35.726 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__340__20250327T2126Z
+2025/03/27 21:26:45.731 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__340__20250327T2126Z] [airlineStatsAvro__0__340__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:26:45.756 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__341__20250327T2126Z
+2025/03/27 21:26:55.721 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__341__20250327T2126Z] [airlineStatsAvro__0__341__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:26:55.800 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__342__20250327T2126Z
+2025/03/27 21:27:05.771 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__342__20250327T2126Z] [airlineStatsAvro__0__342__20250327T2126Z] Releasing the consumer semaphore
+2025/03/27 21:27:05.798 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__343__20250327T2127Z
+2025/03/27 21:27:15.912 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__343__20250327T2127Z] [airlineStatsAvro__0__343__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:27:15.920 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__344__20250327T2127Z
+2025/03/27 21:27:25.825 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__344__20250327T2127Z] [airlineStatsAvro__0__344__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:27:25.860 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__345__20250327T2127Z
+2025/03/27 21:27:35.833 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__345__20250327T2127Z] [airlineStatsAvro__0__345__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:27:35.852 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__346__20250327T2127Z
+2025/03/27 21:27:45.906 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__346__20250327T2127Z] [airlineStatsAvro__0__346__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:27:45.932 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__347__20250327T2127Z
+2025/03/27 21:27:55.923 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__347__20250327T2127Z] [airlineStatsAvro__0__347__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:27:55.945 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__348__20250327T2127Z
+2025/03/27 21:28:05.970 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__348__20250327T2127Z] [airlineStatsAvro__0__348__20250327T2127Z] Releasing the consumer semaphore
+2025/03/27 21:28:06.005 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__349__20250327T2128Z
+2025/03/27 21:28:16.008 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__349__20250327T2128Z] [airlineStatsAvro__0__349__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:28:16.039 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__350__20250327T2128Z
+2025/03/27 21:28:26.021 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__350__20250327T2128Z] [airlineStatsAvro__0__350__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:28:26.058 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__351__20250327T2128Z
+2025/03/27 21:28:36.068 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__351__20250327T2128Z] [airlineStatsAvro__0__351__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:28:36.124 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__352__20250327T2128Z
+2025/03/27 21:28:46.071 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__352__20250327T2128Z] [airlineStatsAvro__0__352__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:28:46.109 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__353__20250327T2128Z
+2025/03/27 21:28:56.093 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__353__20250327T2128Z] [airlineStatsAvro__0__353__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:28:56.128 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__354__20250327T2128Z
+2025/03/27 21:29:06.123 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__354__20250327T2128Z] [airlineStatsAvro__0__354__20250327T2128Z] Releasing the consumer semaphore
+2025/03/27 21:29:06.150 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__355__20250327T2129Z
+2025/03/27 21:29:16.162 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__355__20250327T2129Z] [airlineStatsAvro__0__355__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:29:16.203 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__356__20250327T2129Z
+2025/03/27 21:29:26.198 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__356__20250327T2129Z] [airlineStatsAvro__0__356__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:29:26.232 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__357__20250327T2129Z
+2025/03/27 21:29:36.233 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__357__20250327T2129Z] [airlineStatsAvro__0__357__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:29:36.261 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__358__20250327T2129Z
+2025/03/27 21:29:46.268 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__358__20250327T2129Z] [airlineStatsAvro__0__358__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:29:46.306 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__359__20250327T2129Z
+2025/03/27 21:29:56.300 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__359__20250327T2129Z] [airlineStatsAvro__0__359__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:29:56.331 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__360__20250327T2129Z
+2025/03/27 21:30:06.332 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__360__20250327T2129Z] [airlineStatsAvro__0__360__20250327T2129Z] Releasing the consumer semaphore
+2025/03/27 21:30:06.361 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__361__20250327T2130Z
+2025/03/27 21:30:16.365 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__361__20250327T2130Z] [airlineStatsAvro__0__361__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:30:16.410 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__362__20250327T2130Z
+2025/03/27 21:30:26.369 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__362__20250327T2130Z] [airlineStatsAvro__0__362__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:30:26.408 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_6] Added new CONSUMING segment: airlineStatsAvro__0__363__20250327T2130Z
+2025/03/27 21:30:36.388 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__363__20250327T2130Z] [airlineStatsAvro__0__363__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:30:36.416 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__364__20250327T2130Z
+2025/03/27 21:30:46.421 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__364__20250327T2130Z] [airlineStatsAvro__0__364__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:30:46.449 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__365__20250327T2130Z
+2025/03/27 21:30:56.475 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__365__20250327T2130Z] [airlineStatsAvro__0__365__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:30:56.510 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__366__20250327T2130Z
+2025/03/27 21:31:06.512 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__366__20250327T2130Z] [airlineStatsAvro__0__366__20250327T2130Z] Releasing the consumer semaphore
+2025/03/27 21:31:06.538 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__367__20250327T2131Z
+2025/03/27 21:31:16.514 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__367__20250327T2131Z] [airlineStatsAvro__0__367__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:31:16.554 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__368__20250327T2131Z
+2025/03/27 21:31:26.603 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__368__20250327T2131Z] [airlineStatsAvro__0__368__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:31:26.637 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__369__20250327T2131Z
+2025/03/27 21:31:36.626 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__369__20250327T2131Z] [airlineStatsAvro__0__369__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:31:36.657 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_19] Added new CONSUMING segment: airlineStatsAvro__0__370__20250327T2131Z
+2025/03/27 21:31:46.664 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__370__20250327T2131Z] [airlineStatsAvro__0__370__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:31:46.709 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__371__20250327T2131Z
+2025/03/27 21:31:56.748 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__371__20250327T2131Z] [airlineStatsAvro__0__371__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:31:56.765 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__372__20250327T2131Z
+2025/03/27 21:32:06.713 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__372__20250327T2131Z] [airlineStatsAvro__0__372__20250327T2131Z] Releasing the consumer semaphore
+2025/03/27 21:32:06.750 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__373__20250327T2132Z
+2025/03/27 21:32:16.712 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__373__20250327T2132Z] [airlineStatsAvro__0__373__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:32:16.761 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__374__20250327T2132Z
+2025/03/27 21:32:26.849 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__374__20250327T2132Z] [airlineStatsAvro__0__374__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:32:26.855 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__375__20250327T2132Z
+2025/03/27 21:32:36.794 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__375__20250327T2132Z] [airlineStatsAvro__0__375__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:32:36.815 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_32] Added new CONSUMING segment: airlineStatsAvro__0__376__20250327T2132Z
+2025/03/27 21:32:46.826 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__376__20250327T2132Z] [airlineStatsAvro__0__376__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:32:46.847 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__377__20250327T2132Z
+2025/03/27 21:32:56.854 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__377__20250327T2132Z] [airlineStatsAvro__0__377__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:32:56.886 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_35] Added new CONSUMING segment: airlineStatsAvro__0__378__20250327T2132Z
+2025/03/27 21:33:06.911 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__378__20250327T2132Z] [airlineStatsAvro__0__378__20250327T2132Z] Releasing the consumer semaphore
+2025/03/27 21:33:06.945 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__379__20250327T2133Z
+2025/03/27 21:33:16.926 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__379__20250327T2133Z] [airlineStatsAvro__0__379__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:33:16.960 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_0] Added new CONSUMING segment: airlineStatsAvro__0__380__20250327T2133Z
+2025/03/27 21:33:26.960 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__380__20250327T2133Z] [airlineStatsAvro__0__380__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:33:26.990 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__381__20250327T2133Z
+2025/03/27 21:33:37.012 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__381__20250327T2133Z] [airlineStatsAvro__0__381__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:33:37.041 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__382__20250327T2133Z
+2025/03/27 21:33:47.031 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__382__20250327T2133Z] [airlineStatsAvro__0__382__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:33:47.059 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__383__20250327T2133Z
+2025/03/27 21:33:57.059 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__383__20250327T2133Z] [airlineStatsAvro__0__383__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:33:57.116 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__384__20250327T2133Z
+2025/03/27 21:34:07.072 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__384__20250327T2133Z] [airlineStatsAvro__0__384__20250327T2133Z] Releasing the consumer semaphore
+2025/03/27 21:34:07.099 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__385__20250327T2134Z
+2025/03/27 21:34:17.095 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__385__20250327T2134Z] [airlineStatsAvro__0__385__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:34:17.138 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_12] Added new CONSUMING segment: airlineStatsAvro__0__386__20250327T2134Z
+2025/03/27 21:34:27.150 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__386__20250327T2134Z] [airlineStatsAvro__0__386__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:34:27.173 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__387__20250327T2134Z
+2025/03/27 21:34:37.174 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__387__20250327T2134Z] [airlineStatsAvro__0__387__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:34:37.200 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__388__20250327T2134Z
+2025/03/27 21:34:47.161 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__388__20250327T2134Z] [airlineStatsAvro__0__388__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:34:47.178 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__389__20250327T2134Z
+2025/03/27 21:34:57.241 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__389__20250327T2134Z] [airlineStatsAvro__0__389__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:34:57.275 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__390__20250327T2134Z
+2025/03/27 21:35:07.273 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__390__20250327T2134Z] [airlineStatsAvro__0__390__20250327T2134Z] Releasing the consumer semaphore
+2025/03/27 21:35:07.307 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__391__20250327T2135Z
+2025/03/27 21:35:17.286 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__391__20250327T2135Z] [airlineStatsAvro__0__391__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:35:17.309 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__392__20250327T2135Z
+2025/03/27 21:35:27.305 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__392__20250327T2135Z] [airlineStatsAvro__0__392__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:35:27.334 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_26] Added new CONSUMING segment: airlineStatsAvro__0__393__20250327T2135Z
+2025/03/27 21:35:37.336 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__393__20250327T2135Z] [airlineStatsAvro__0__393__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:35:37.362 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__394__20250327T2135Z
+2025/03/27 21:35:47.407 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__394__20250327T2135Z] [airlineStatsAvro__0__394__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:35:47.432 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__395__20250327T2135Z
+2025/03/27 21:35:57.412 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__395__20250327T2135Z] [airlineStatsAvro__0__395__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:35:57.434 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__396__20250327T2135Z
+2025/03/27 21:36:07.443 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__396__20250327T2135Z] [airlineStatsAvro__0__396__20250327T2135Z] Releasing the consumer semaphore
+2025/03/27 21:36:07.466 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__397__20250327T2136Z
+2025/03/27 21:36:17.471 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__397__20250327T2136Z] [airlineStatsAvro__0__397__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:36:17.503 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__398__20250327T2136Z
+2025/03/27 21:36:27.506 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__398__20250327T2136Z] [airlineStatsAvro__0__398__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:36:27.531 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_37] Added new CONSUMING segment: airlineStatsAvro__0__399__20250327T2136Z
+2025/03/27 21:36:37.524 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__399__20250327T2136Z] [airlineStatsAvro__0__399__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:36:37.544 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__400__20250327T2136Z
+2025/03/27 21:36:47.563 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__400__20250327T2136Z] [airlineStatsAvro__0__400__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:36:47.587 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__401__20250327T2136Z
+2025/03/27 21:36:57.603 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__401__20250327T2136Z] [airlineStatsAvro__0__401__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:36:57.630 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_4] Added new CONSUMING segment: airlineStatsAvro__0__402__20250327T2136Z
+2025/03/27 21:37:07.663 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__402__20250327T2136Z] [airlineStatsAvro__0__402__20250327T2136Z] Releasing the consumer semaphore
+2025/03/27 21:37:07.728 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__403__20250327T2137Z
+2025/03/27 21:37:17.698 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__403__20250327T2137Z] [airlineStatsAvro__0__403__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:37:17.726 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__404__20250327T2137Z
+2025/03/27 21:37:27.710 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__404__20250327T2137Z] [airlineStatsAvro__0__404__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:37:27.733 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__405__20250327T2137Z
+2025/03/27 21:37:37.702 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__405__20250327T2137Z] [airlineStatsAvro__0__405__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:37:37.720 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__406__20250327T2137Z
+2025/03/27 21:37:47.730 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__406__20250327T2137Z] [airlineStatsAvro__0__406__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:37:47.754 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__407__20250327T2137Z
+2025/03/27 21:37:57.870 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__407__20250327T2137Z] [airlineStatsAvro__0__407__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:37:57.901 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__408__20250327T2137Z
+2025/03/27 21:38:07.791 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__408__20250327T2137Z] [airlineStatsAvro__0__408__20250327T2137Z] Releasing the consumer semaphore
+2025/03/27 21:38:07.813 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_18] Added new CONSUMING segment: airlineStatsAvro__0__409__20250327T2138Z
+2025/03/27 21:38:17.838 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__409__20250327T2138Z] [airlineStatsAvro__0__409__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:38:17.864 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__410__20250327T2138Z
+2025/03/27 21:38:27.843 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__410__20250327T2138Z] [airlineStatsAvro__0__410__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:38:27.861 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__411__20250327T2138Z
+2025/03/27 21:38:37.906 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__411__20250327T2138Z] [airlineStatsAvro__0__411__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:38:37.937 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_24] Added new CONSUMING segment: airlineStatsAvro__0__412__20250327T2138Z
+2025/03/27 21:38:47.936 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__412__20250327T2138Z] [airlineStatsAvro__0__412__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:38:47.955 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__413__20250327T2138Z
+2025/03/27 21:38:57.985 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__413__20250327T2138Z] [airlineStatsAvro__0__413__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:38:58.003 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_27] Added new CONSUMING segment: airlineStatsAvro__0__414__20250327T2138Z
+2025/03/27 21:39:07.989 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__414__20250327T2138Z] [airlineStatsAvro__0__414__20250327T2138Z] Releasing the consumer semaphore
+2025/03/27 21:39:08.011 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_30] Added new CONSUMING segment: airlineStatsAvro__0__415__20250327T2139Z
+2025/03/27 21:39:18.048 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__415__20250327T2139Z] [airlineStatsAvro__0__415__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:39:18.100 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__416__20250327T2139Z
+2025/03/27 21:39:28.067 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__416__20250327T2139Z] [airlineStatsAvro__0__416__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:39:28.088 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_34] Added new CONSUMING segment: airlineStatsAvro__0__417__20250327T2139Z
+2025/03/27 21:39:38.095 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__417__20250327T2139Z] [airlineStatsAvro__0__417__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:39:38.119 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__418__20250327T2139Z
+2025/03/27 21:39:48.138 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__418__20250327T2139Z] [airlineStatsAvro__0__418__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:39:48.161 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__419__20250327T2139Z
+2025/03/27 21:39:58.158 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__419__20250327T2139Z] [airlineStatsAvro__0__419__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:39:58.189 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__420__20250327T2139Z
+2025/03/27 21:40:08.203 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__420__20250327T2139Z] [airlineStatsAvro__0__420__20250327T2139Z] Releasing the consumer semaphore
+2025/03/27 21:40:08.226 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_1] Added new CONSUMING segment: airlineStatsAvro__0__421__20250327T2140Z
+2025/03/27 21:40:18.243 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__421__20250327T2140Z] [airlineStatsAvro__0__421__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:40:18.265 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__422__20250327T2140Z
+2025/03/27 21:40:28.271 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__422__20250327T2140Z] [airlineStatsAvro__0__422__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:40:28.294 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__423__20250327T2140Z
+2025/03/27 21:40:38.316 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__423__20250327T2140Z] [airlineStatsAvro__0__423__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:40:38.345 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_8] Added new CONSUMING segment: airlineStatsAvro__0__424__20250327T2140Z
+2025/03/27 21:40:48.363 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__424__20250327T2140Z] [airlineStatsAvro__0__424__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:40:48.394 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_9] Added new CONSUMING segment: airlineStatsAvro__0__425__20250327T2140Z
+2025/03/27 21:40:58.380 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__425__20250327T2140Z] [airlineStatsAvro__0__425__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:40:58.409 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__426__20250327T2140Z
+2025/03/27 21:41:08.406 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__426__20250327T2140Z] [airlineStatsAvro__0__426__20250327T2140Z] Releasing the consumer semaphore
+2025/03/27 21:41:08.429 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_14] Added new CONSUMING segment: airlineStatsAvro__0__427__20250327T2141Z
+2025/03/27 21:41:18.462 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__427__20250327T2141Z] [airlineStatsAvro__0__427__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:41:18.492 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_15] Added new CONSUMING segment: airlineStatsAvro__0__428__20250327T2141Z
+2025/03/27 21:41:28.467 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__428__20250327T2141Z] [airlineStatsAvro__0__428__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:41:28.484 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__429__20250327T2141Z
+2025/03/27 21:41:38.516 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__429__20250327T2141Z] [airlineStatsAvro__0__429__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:41:38.541 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__430__20250327T2141Z
+2025/03/27 21:41:48.543 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__430__20250327T2141Z] [airlineStatsAvro__0__430__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:41:48.568 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_21] Added new CONSUMING segment: airlineStatsAvro__0__431__20250327T2141Z
+2025/03/27 21:41:58.562 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__431__20250327T2141Z] [airlineStatsAvro__0__431__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:41:58.586 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_23] Added new CONSUMING segment: airlineStatsAvro__0__432__20250327T2141Z
+2025/03/27 21:42:08.581 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__432__20250327T2141Z] [airlineStatsAvro__0__432__20250327T2141Z] Releasing the consumer semaphore
+2025/03/27 21:42:08.613 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_25] Added new CONSUMING segment: airlineStatsAvro__0__433__20250327T2142Z
+2025/03/27 21:42:18.648 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__433__20250327T2142Z] [airlineStatsAvro__0__433__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:42:18.708 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_28] Added new CONSUMING segment: airlineStatsAvro__0__434__20250327T2142Z
+2025/03/27 21:42:28.673 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__434__20250327T2142Z] [airlineStatsAvro__0__434__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:42:28.703 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_29] Added new CONSUMING segment: airlineStatsAvro__0__435__20250327T2142Z
+2025/03/27 21:42:38.695 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__435__20250327T2142Z] [airlineStatsAvro__0__435__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:42:38.721 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_31] Added new CONSUMING segment: airlineStatsAvro__0__436__20250327T2142Z
+2025/03/27 21:42:48.727 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__436__20250327T2142Z] [airlineStatsAvro__0__436__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:42:48.758 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_33] Added new CONSUMING segment: airlineStatsAvro__0__437__20250327T2142Z
+2025/03/27 21:42:58.762 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__437__20250327T2142Z] [airlineStatsAvro__0__437__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:42:58.799 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_36] Added new CONSUMING segment: airlineStatsAvro__0__438__20250327T2142Z
+2025/03/27 21:43:08.780 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__438__20250327T2142Z] [airlineStatsAvro__0__438__20250327T2142Z] Releasing the consumer semaphore
+2025/03/27 21:43:08.801 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_38] Added new CONSUMING segment: airlineStatsAvro__0__439__20250327T2143Z
+2025/03/27 21:43:18.818 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__439__20250327T2143Z] [airlineStatsAvro__0__439__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:43:18.852 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_39] Added new CONSUMING segment: airlineStatsAvro__0__440__20250327T2143Z
+2025/03/27 21:43:28.835 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__440__20250327T2143Z] [airlineStatsAvro__0__440__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:43:28.864 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_2] Added new CONSUMING segment: airlineStatsAvro__0__441__20250327T2143Z
+2025/03/27 21:43:38.967 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__441__20250327T2143Z] [airlineStatsAvro__0__441__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:43:38.973 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_3] Added new CONSUMING segment: airlineStatsAvro__0__442__20250327T2143Z
+2025/03/27 21:43:48.891 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__442__20250327T2143Z] [airlineStatsAvro__0__442__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:43:48.914 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_5] Added new CONSUMING segment: airlineStatsAvro__0__443__20250327T2143Z
+2025/03/27 21:43:58.945 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__443__20250327T2143Z] [airlineStatsAvro__0__443__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:43:58.973 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_7] Added new CONSUMING segment: airlineStatsAvro__0__444__20250327T2143Z
+2025/03/27 21:44:09.000 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__444__20250327T2143Z] [airlineStatsAvro__0__444__20250327T2143Z] Releasing the consumer semaphore
+2025/03/27 21:44:09.033 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_10] Added new CONSUMING segment: airlineStatsAvro__0__445__20250327T2144Z
+2025/03/27 21:44:19.007 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__445__20250327T2144Z] [airlineStatsAvro__0__445__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:44:19.035 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_11] Added new CONSUMING segment: airlineStatsAvro__0__446__20250327T2144Z
+2025/03/27 21:44:29.058 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__446__20250327T2144Z] [airlineStatsAvro__0__446__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:44:29.101 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_13] Added new CONSUMING segment: airlineStatsAvro__0__447__20250327T2144Z
+2025/03/27 21:44:39.041 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__447__20250327T2144Z] [airlineStatsAvro__0__447__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:44:39.075 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_16] Added new CONSUMING segment: airlineStatsAvro__0__448__20250327T2144Z
+2025/03/27 21:44:49.082 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__448__20250327T2144Z] [airlineStatsAvro__0__448__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:44:49.105 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_17] Added new CONSUMING segment: airlineStatsAvro__0__449__20250327T2144Z
+2025/03/27 21:44:59.091 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__449__20250327T2144Z] [airlineStatsAvro__0__449__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:44:59.125 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_20] Added new CONSUMING segment: airlineStatsAvro__0__450__20250327T2144Z
+2025/03/27 21:45:09.149 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__450__20250327T2144Z] [airlineStatsAvro__0__450__20250327T2144Z] Releasing the consumer semaphore
+2025/03/27 21:45:09.172 INFO [airlineStatsAvro_REALTIME-RealtimeTableDataManager] [HelixTaskExecutor-message_handle_thread_22] Added new CONSUMING segment: airlineStatsAvro__0__451__20250327T2145Z
+2025/03/27 21:45:19.183 INFO [RealtimeSegmentDataManager_airlineStatsAvro__0__451__20250327T2145Z] [airlineStatsAvro__0__451__20250327T2145Z] Releasing the consumer
