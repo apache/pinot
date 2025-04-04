@@ -352,19 +352,19 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
       if (!rebalanceContext.getUniqueSegments().contains(segmentName)) {
         newSegmentsNotExistingBefore.add(segmentName);
       }
+      // Don't track segments that are not on the rebalance monitor list
+      if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
+        if (newSegmentsNotExistingBefore.contains(segmentName)) {
+          // Don't track newly added segments unless they're on the monitor list, remove them if they were added
+          // before
+          totalNewSegmentsNotMonitored++;
+          newSegmentsNotExistingBefore.remove(segmentName);
+        }
+        continue;
+      }
       for (Map.Entry<String, String> entry : entrySet.getValue().entrySet()) {
         String instanceName = entry.getKey();
         String instanceState = entry.getValue();
-        // Don't track segments that are not on the rebalance monitor list
-        if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
-          if (newSegmentsNotExistingBefore.contains(segmentName)) {
-            // Don't track newly added segments unless they're on the monitor list, remove them if they were added
-            // before
-            totalNewSegmentsNotMonitored++;
-            newSegmentsNotExistingBefore.remove(segmentName);
-          }
-          continue;
-        }
         if (instanceState.equals(CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
           // Skip tracking segments that are in OFFLINE state in the target assignment
           targetInstanceToOfflineSegmentsMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
@@ -377,11 +377,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       String segmentName = entrySet.getKey();
+      // Don't track segments that are not on the rebalance monitor list
+      if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
+        continue;
+      }
       for (String instanceName : entrySet.getValue().keySet()) {
-        // Don't track segments that are not on the rebalance monitor list
-        if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
-          continue;
-        }
         if (targetInstanceToOfflineSegmentsMap.containsKey(instanceName)
             && targetInstanceToOfflineSegmentsMap.get(instanceName).contains(segmentName)) {
           // Skip tracking segments that are in OFFLINE state in the target assignment
