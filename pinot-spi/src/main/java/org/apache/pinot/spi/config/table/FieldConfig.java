@@ -146,7 +146,10 @@ public class FieldConfig extends BaseJsonConfig {
     CLP(false, false),
     CLPV2(false, false),
     CLPV2_ZSTD(false, false),
-    CLPV2_LZ4(false, false);
+    CLPV2_LZ4(false, false),
+
+    DELTA(true, false),
+    DELTADELTA(true, false);
 
     //@formatter:on
 
