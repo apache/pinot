@@ -24,9 +24,7 @@ import java.util.Objects;
 
 
 /**
- * These are rebalance stats as to how the current state is, when compared to the target state.
- * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
- * is 4 and _replicasToRebalance is 16.
+ * These are rebalance progress stats to track how the rebalance is progressing over time
  */
 @JsonPropertyOrder({"status", "startTimeMs", "timeToFinishInSeconds", "completionStatusMsg",
     "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
@@ -202,30 +200,74 @@ public class TableRebalanceProgressStats {
     if (currentStepStats._totalCarryOverSegmentsToBeAdded > 0) {
       currentOverallStats._totalRemainingSegmentsToBeAdded = previousOverallStats._totalRemainingSegmentsToBeAdded;
     } else {
-      // If additional segments were added in the previous step, these need to be added to the remaining to be added
-      // number as they are new segments that should be tracked for completion
-      // Example:
-      //     currentStepStats: totalSegmentsToBeAdded = 20
-      //     previousStepStats: totalSegmentsToBeAdded = 10
-      //     numAdditionalSegmentsAdded = 20 - 10 = 10
-      // In the above scenario, the new 'numAdditionalSegmentsAdded' also need to be tracked as
-      // 'totalRemainingSegmentsToBeAdded' for the current step, thus we need to add the number of segments processed
-      // If 'numAdditionalSegmentsAdded' = 0, that means no new segments were added in the previous step, and if there
-      // was a change in the segments processed in the last step, they completed processing
-      currentOverallStats._totalRemainingSegmentsToBeAdded = numAdditionalSegmentsAdded == 0
-          ? previousOverallStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep
-          : previousOverallStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+      if (numAdditionalSegmentsAdded == 0) {
+        // No new additional segments added, subtract the number of processed segments from the last step
+        currentOverallStats._totalRemainingSegmentsToBeAdded =
+            previousOverallStats._totalRemainingSegmentsToBeAdded - numSegmentAddsProcessedInLastStep;
+      } else {
+        if (currentStepStats._totalRemainingSegmentsToBeAdded <= previousStepStats._totalRemainingSegmentsToBeAdded) {
+          // Case I: currentStepStats._totalRemainingSegmentsToBeAdded
+          //         <= previousStepStats._totalRemainingSegmentsToBeAdded
+          // Example:
+          //    currentStepStats: totalSegmentsToBeAdded = 20
+          //    previousStepStats: totalSegmentsToBeAdded = 10
+          //    numAdditionalSegmentsAdded = 20 - 10 = 10
+          //    currentStepStats: totalRemainingSegmentsToBeAdded = 5
+          //    previousStepStats: totalRemainingSegmentsToBeAdded = 5
+          //    remainingSegmentsWithoutConsideringProcessed = 5 + 10 = 15
+          //    netProcessedSegments = 15 - 5 = 10 -> how much to subtract after adding additional segments to remaining
+          int remainingSegmentsWithoutConsideringProcessed =
+              previousStepStats._totalRemainingSegmentsToBeAdded + numAdditionalSegmentsAdded;
+          int netProcessedSegments = remainingSegmentsWithoutConsideringProcessed
+              - currentStepStats._totalRemainingSegmentsToBeAdded;
+          currentOverallStats._totalRemainingSegmentsToBeAdded = previousOverallStats._totalRemainingSegmentsToBeAdded
+              + numAdditionalSegmentsAdded - netProcessedSegments;
+        } else {
+          // Case II: currentStepStats._totalRemainingSegmentsToBeAdded
+          //          > previousStepStats._totalRemainingSegmentsToBeAdded
+          // Example:
+          //     currentStepStats: totalSegmentsToBeAdded = 20
+          //     previousStepStats: totalSegmentsToBeAdded = 10
+          //     numAdditionalSegmentsAdded = 20 - 10 = 10
+          //     currentStepStats: totalRemainingSegmentsToBeAdded = 15
+          //     previousStepStats: totalRemainingSegmentsToBeAdded = 10
+          // In the above scenario, the new 'numAdditionalSegmentsAdded' also need to be tracked as
+          // 'totalRemainingSegmentsToBeAdded' for the current step, thus we need to add the number of segments
+          // processed
+          currentOverallStats._totalRemainingSegmentsToBeAdded =
+              previousOverallStats._totalRemainingSegmentsToBeAdded + numSegmentAddsProcessedInLastStep;
+        }
+      }
     }
     currentOverallStats._totalCarryOverSegmentsToBeAdded = currentStepStats._totalCarryOverSegmentsToBeAdded;
     if (currentStepStats._totalCarryOverSegmentsToBeDeleted > 0) {
       currentOverallStats._totalRemainingSegmentsToBeDeleted = previousOverallStats._totalRemainingSegmentsToBeDeleted;
     } else {
-      // If additional segments were deleted in the previous step, these need to be added to the remaining to be deleted
-      // number as they are new segments that should be tracked for completion
-      // A similar example as for the add scenario can be applied here as well
-      currentOverallStats._totalRemainingSegmentsToBeDeleted = numAdditionalSegmentsDeleted == 0
-          ? previousOverallStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep
-          : previousOverallStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
+      if (numAdditionalSegmentsDeleted == 0) {
+        // No new additional segments deleted, subtract the number of processed segments from the last step
+        currentOverallStats._totalRemainingSegmentsToBeDeleted =
+            previousOverallStats._totalRemainingSegmentsToBeDeleted - numSegmentDeletesProcessedInLastStep;
+      } else {
+        if (currentStepStats._totalRemainingSegmentsToBeDeleted
+            <= previousStepStats._totalRemainingSegmentsToBeDeleted) {
+          // Case I: currentStepStats._totalRemainingSegmentsToBeDeleted
+          //         <= previousStepStats._totalRemainingSegmentsToBeDeleted
+          // Similar example as in the adds case
+          int remainingSegmentsWithoutConsideringProcessed =
+              previousStepStats._totalRemainingSegmentsToBeDeleted + numAdditionalSegmentsDeleted;
+          int netProcessedSegments = remainingSegmentsWithoutConsideringProcessed
+              - currentStepStats._totalRemainingSegmentsToBeDeleted;
+          currentOverallStats._totalRemainingSegmentsToBeDeleted =
+              previousOverallStats._totalRemainingSegmentsToBeDeleted
+                  + numAdditionalSegmentsDeleted - netProcessedSegments;
+        } else {
+          // Case II: currentStepStats._totalRemainingSegmentsToBeDeleted
+          //          > previousStepStats._totalRemainingSegmentsToBeDeleted
+          // Similar example as in the adds case
+          currentOverallStats._totalRemainingSegmentsToBeDeleted =
+              previousOverallStats._totalRemainingSegmentsToBeDeleted + numSegmentDeletesProcessedInLastStep;
+        }
+      }
     }
     currentOverallStats._totalCarryOverSegmentsToBeDeleted = currentStepStats._totalCarryOverSegmentsToBeDeleted;
 
@@ -298,6 +340,11 @@ public class TableRebalanceProgressStats {
   }
 
   // TODO: Clean this up once new stats are verified
+  /**
+   * These are rebalance stats as to how the current state is, when compared to the target state.
+   * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
+   * is 4 and _replicasToRebalance is 16.
+   */
   public static class RebalanceStateStats {
     public int _segmentsMissing;
     public int _segmentsToRebalance;
