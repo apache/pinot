@@ -438,6 +438,17 @@ public class TableRebalancer {
       minAvailableReplicas = Math.max(numReplicas + minReplicasToKeepUpForNoDowntime, 0);
     }
 
+    int numCurrentAssignmentReplicas = Integer.MAX_VALUE;
+    for (String segment : segmentsToMove) {
+      numCurrentAssignmentReplicas = Math.min(currentAssignment.get(segment).size(), numCurrentAssignmentReplicas);
+    }
+    if (minAvailableReplicas > numCurrentAssignmentReplicas) {
+      LOGGER.warn("For rebalanceId: {}, minAvailableReplicas: {} larger than existing number of replicas: {}, "
+          + "resetting minAvailableReplicas to {}", rebalanceJobId, minAvailableReplicas, numCurrentAssignmentReplicas,
+          numCurrentAssignmentReplicas);
+      minAvailableReplicas = numCurrentAssignmentReplicas;
+    }
+
     LOGGER.info(
         "For rebalanceId: {}, rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
             + "bestEfforts: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}",

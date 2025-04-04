@@ -28,7 +28,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
-import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -195,7 +194,7 @@ public abstract class BlockExchange {
   }
 
   /**
-   * A mailbox that sends data blocks to a {@link org.apache.pinot.query.runtime.operator.exchange.BlockExchange}.
+   * A mailbox that sends data blocks to a {@link BlockExchange}.
    *
    * BlockExchanges send data to a list of {@link SendingMailbox}es, which are responsible for sending the data
    * to the corresponding {@link ReceivingMailbox}es. This class applies the decorator pattern to expose a BlockExchange
@@ -205,8 +204,6 @@ public abstract class BlockExchange {
    * data to all the stages (the first BlockExchange). Then for each stage, we need to send the data to the
    * corresponding workers (the inner BlockExchange). The inner BlockExchange may send data using a different
    * distribution strategy.
-   *
-   * @see MailboxSendNode#isMultiSend()}
    */
   private class BlockExchangeSendingMailbox implements SendingMailbox {
     private final String _id;

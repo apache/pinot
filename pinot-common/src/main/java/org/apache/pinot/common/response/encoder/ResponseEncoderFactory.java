@@ -18,14 +18,29 @@
  */
 package org.apache.pinot.common.response.encoder;
 
+import org.apache.pinot.spi.utils.CommonConstants;
+
+
 public class ResponseEncoderFactory {
   private ResponseEncoderFactory() {
+  }
+
+  public static String[] getResponseEncoderTypes() {
+    return new String[]{
+        "JSON", "ARROW"
+    };
+  }
+
+  public static String getDefaultResponseEncoderType() {
+    return CommonConstants.Broker.Grpc.DEFAULT_ENCODING;
   }
 
   public static ResponseEncoder getResponseEncoder(String format) {
     switch (format.toUpperCase()) {
       case "JSON":
         return new JsonResponseEncoder();
+      case "ARROW":
+        return new ArrowResponseEncoder();
       default:
         throw new IllegalArgumentException("Unsupported format: " + format);
     }

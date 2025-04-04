@@ -211,6 +211,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public String getAvgMultiValueCount() {
+    return _serverConfig.getProperty(AVERAGE_MV_COUNT);
+  }
+
+  @Override
   public boolean isRealtimeOffHeapAllocation() {
     return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_ALLOCATION);
   }
@@ -220,23 +225,22 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _serverConfig.getProperty(REALTIME_OFFHEAP_DIRECT_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION);
   }
 
+  @Override
   public boolean shouldReloadConsumingSegment() {
     return _serverConfig.getProperty(RELOAD_CONSUMING_SEGMENT, DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override
-  public String getAvgMultiValueCount() {
-    return _serverConfig.getProperty(AVERAGE_MV_COUNT);
-  }
-
   public int getMaxParallelRefreshThreads() {
     return _serverConfig.getProperty(MAX_PARALLEL_REFRESH_THREADS, 1);
   }
 
+  @Override
   public int getMaxSegmentPreloadThreads() {
     return _serverConfig.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
 
+  @Override
   public int getMaxParallelSegmentBuilds() {
     return _serverConfig.getProperty(MAX_PARALLEL_SEGMENT_BUILDS, DEFAULT_MAX_PARALLEL_SEGMENT_BUILDS);
   }
@@ -246,6 +250,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _serverConfig.getProperty(MAX_PARALLEL_SEGMENT_DOWNLOADS, DEFAULT_MAX_PARALLEL_SEGMENT_DOWNLOADS);
   }
 
+  @Override
   public String getSegmentDirectoryLoader() {
     return _serverConfig.getProperty(SEGMENT_DIRECTORY_LOADER,
         SegmentDirectoryLoaderRegistry.DEFAULT_SEGMENT_DIRECTORY_LOADER_NAME);

@@ -128,6 +128,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
+  public InstanceDataManager getInstanceDataManager() {
+    return _instanceDataManager;
+  }
+
+  @Override
   public synchronized void start() {
     LOGGER.info("Query executor started");
   }
