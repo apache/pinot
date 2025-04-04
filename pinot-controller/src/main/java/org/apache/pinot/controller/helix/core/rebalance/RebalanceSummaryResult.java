@@ -329,10 +329,7 @@ public class RebalanceSummaryResult {
      *                                                         before the segment created. We collect segment age
      *                                                         here as there is no obvious way to get the age of the
      *                                                         oldest data in the stream for a specific consuming
-     *                                                         segment.
-     *                                                         consumingSegmentsToBeMovedWithMostOffsetsToCatchUp
-     *                                                         is a better indicator to the cost of moving a consuming
-     *                                                         segment if it presents.
+     *                                                         segment
      * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
      */
     @JsonCreator
