@@ -32,6 +32,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -65,9 +66,10 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
-    super.init(enabledInstances, idealState, externalView, onlineSegments);
+  public void init(Set<String> enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore enabledServerManager,
+                   IdealState idealState, ExternalView externalView,
+                   Set<String> onlineSegments) {
+    super.init(enabledInstances, enabledServerManager, idealState, externalView, onlineSegments);
     _instancePartitions = getInstancePartitions();
   }
 

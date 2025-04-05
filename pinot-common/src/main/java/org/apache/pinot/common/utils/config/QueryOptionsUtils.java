@@ -21,8 +21,11 @@ package org.apache.pinot.common.utils.config;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -180,6 +183,19 @@ public class QueryOptionsUtils {
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
+  }
+
+  public static List<Integer> getOrderedPreferredReplicas(Map<String, String> queryOptions) {
+    String orderedPreferredReplicas = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    if (orderedPreferredReplicas == null) {
+      return Collections.emptyList();
+    }
+    String[] replicas = orderedPreferredReplicas.split("\\|");
+    List<Integer> preferredReplicas = new ArrayList<>(replicas.length);
+    for (String replica : replicas) {
+      preferredReplicas.add(Integer.parseInt(replica));
+    }
+    return preferredReplicas;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
