@@ -152,10 +152,10 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$0], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])",
-          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($4, 0), <($5, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5))])",
+          "\n  LogicalFilter(condition=[AND(>($1, 10), >=($4, 0), <($5, 20), <=($2, 10), =(/(CAST($2):DOUBLE NOT NULL, $1), 5.0E0))])",
           "\n    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($1)], agg#2=[$SUM0($2)], agg#3=[MAX($1)], agg#4=[MIN($1)], aggType=[DIRECT])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n            PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -167,7 +167,7 @@
         "output": [
           "Execution Plan",
           "\nPinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($1)], agg#2=[$SUM0($2)], aggType=[DIRECT])",
-          "\n  LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
+          "\n  LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
           "\n    LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n"
