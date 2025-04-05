@@ -40,6 +40,9 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.distinct.BaseOffHeapSet;
+import org.apache.pinot.core.query.aggregation.function.distinct.OffHeap128BitSet;
+import org.apache.pinot.core.query.aggregation.function.distinct.OffHeap64BitSet;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -267,6 +270,80 @@ public class DistinctCountQueriesTest extends BaseQueriesTest {
     List<Object[]> expectedRows = Collections.nCopies(10, expectedRow);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), 4 * NUM_RECORDS, 0, 4 * 6 * NUM_RECORDS,
         4 * NUM_RECORDS, expectedRows);
+  }
+
+  @Test
+  public void testOffHeap() {
+    // Dictionary based
+    String query = "SELECT "
+        + "DISTINCTCOUNTOFFHEAP(intColumn), "
+        + "DISTINCTCOUNTOFFHEAP(longColumn), "
+        + "DISTINCTCOUNTOFFHEAP(floatColumn), "
+        + "DISTINCTCOUNTOFFHEAP(doubleColumn), "
+        + "DISTINCTCOUNTOFFHEAP(stringColumn), "
+        + "DISTINCTCOUNTOFFHEAP(bytesColumn) "
+        + "FROM testTable";
+
+    // Inner segment
+    for (Object operator : Arrays.asList(getOperator(query), getOperatorWithFilter(query))) {
+      assertTrue(operator instanceof NonScanBasedAggregationOperator);
+      AggregationResultsBlock resultsBlock = ((NonScanBasedAggregationOperator) operator).nextBlock();
+      QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS,
+          0, 0, NUM_RECORDS);
+      List<Object> aggregationResult = resultsBlock.getResults();
+      assertNotNull(aggregationResult);
+      assertEquals(aggregationResult.size(), 6);
+      for (int i = 0; i < 6; i++) {
+        assertEquals(((BaseOffHeapSet) aggregationResult.get(i)).size(), _values.size());
+      }
+    }
+
+    // Inter segments
+    Object[] expectedResults = Collections.nCopies(6, _values.size()).toArray();
+    for (BrokerResponseNative brokerResponse : Arrays.asList(getBrokerResponse(query),
+        getBrokerResponseWithFilter(query))) {
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0, 0, 4 * NUM_RECORDS, expectedResults);
+    }
+
+    // Regular aggregation
+    query = query + " WHERE intColumn >= 500";
+
+    // Inner segment
+    int expectedResult = 0;
+    for (Integer value : _values) {
+      if (value >= 500) {
+        expectedResult++;
+      }
+    }
+    AggregationOperator aggregationOperator = getOperator(query);
+    List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 6);
+    for (int i = 0; i < 6; i++) {
+      assertEquals(((BaseOffHeapSet) aggregationResult.get(i)).size(), expectedResult);
+    }
+
+    // Inter segment
+    expectedResults = Collections.nCopies(6, expectedResult).toArray();
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), expectedResults);
+
+    // Change parameters
+    query = "SELECT DISTINCTCOUNTOFFHEAP(stringColumn, 'initialcapacity=10;hashbits=128') FROM testTable";
+    NonScanBasedAggregationOperator nonScanOperator = getOperator(query);
+    aggregationResult = nonScanOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof OffHeap128BitSet);
+    assertEquals(((OffHeap128BitSet) aggregationResult.get(0)).size(), _values.size());
+
+    query = "SELECT DISTINCTCOUNTOFFHEAP(bytesColumn, 'initialcapacity=100') FROM testTable "
+        + "WHERE intColumn >= 500";
+    aggregationOperator = getOperator(query);
+    aggregationResult = aggregationOperator.nextBlock().getResults();
+    assertNotNull(aggregationResult);
+    assertEquals(aggregationResult.size(), 1);
+    assertTrue(aggregationResult.get(0) instanceof OffHeap64BitSet);
+    assertEquals(((OffHeap64BitSet) aggregationResult.get(0)).size(), expectedResult);
   }
 
   @Test
