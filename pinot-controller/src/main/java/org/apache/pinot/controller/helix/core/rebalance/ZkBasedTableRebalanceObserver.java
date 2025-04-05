@@ -485,8 +485,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._totalCarryOverSegmentsToBeAdded = 0;
         progressStats._totalCarryOverSegmentsToBeDeleted = 0;
         progressStats._totalRemainingSegmentsToConverge = segmentsUnchangedYetNotConverged;
+        // For IS update we don't re-calculate the new unique segments added as they were captured previously
+        // (the segmentsToMonitor is passed in as null), copy over the existing stats
         progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
-            existingProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
+            existingProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance;
         progressStats._percentageRemainingSegmentsToBeAdded = TableRebalanceProgressStats.calculatePercentageChange(
             progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
         progressStats._percentageRemainingSegmentsToBeDeleted = TableRebalanceProgressStats.calculatePercentageChange(
