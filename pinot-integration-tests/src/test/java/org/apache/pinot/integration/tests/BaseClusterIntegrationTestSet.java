@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -637,7 +638,21 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       assertNotNull(is, "Failed to find ideal state for table: " + tableNameWithType);
       ExternalView ev = _helixResourceManager.getTableExternalView(tableNameWithType);
       assertNotNull(ev, "Failed to find external view for table: " + tableNameWithType);
-      return ev.getRecord().getMapFields().equals(is.getRecord().getMapFields());
+      for (Map.Entry<String, Map<String, String>> entry : is.getRecord().getMapFields().entrySet()) {
+        String segmentName = entry.getKey();
+        Map<String, String> instanceStateMap = entry.getValue();
+        Map<String, String> instanceStateMapInEV = ev.getStateMap(segmentName);
+        // Ignore OFFLINE servers in ideal state
+        for (Map.Entry<String, String> instanceState : instanceStateMap.entrySet()) {
+          String state = instanceState.getValue();
+          if (!state.equals(SegmentStateModel.OFFLINE)) {
+            if (instanceStateMapInEV == null || !state.equals(instanceStateMapInEV.get(instanceState.getKey()))) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
     }, 30_000L, "Failed to match the ideal state");
   }
 
