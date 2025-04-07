@@ -140,7 +140,7 @@ public class ImplicitTableRoute extends BaseTableRoute {
    */
   @Override
   public boolean isOffline() {
-    return hasOffline()  && !hasRealtime();
+    return hasOffline() && !hasRealtime();
   }
 
   /**
