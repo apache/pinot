@@ -499,7 +499,7 @@ public class RealtimeSegmentDataManagerTest {
 
   // Tests to go online from consuming state
 
-  // If the state is is COMMITTED or RETAINED, nothing to do
+  // If the state is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
   @Test
   public void testOnlineTransitionAfterStop()
@@ -571,14 +571,25 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
 
-    // But then if we get to the exact offset, we get to build and replace, not download
+    // But then if we get to the exact offset and consumer semaphore is acquired, we just build the segment.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._consumeOffsets.add(finalOffset);
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
+
+    // But then if we get to the exact offset, we still download because consumer semaphore was never acquired.
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
       segmentDataManager.goOnlineFromConsuming(metadata);
-      Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
-      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
   }
 

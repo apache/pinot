@@ -2055,4 +2055,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   public void forceCommit() {
     _forceCommitMessageReceived = true;
   }
+
+  @VisibleForTesting
+  AtomicBoolean getConsumerSemaphoreAcquired() {
+    return _consumerSemaphoreAcquired;
+  }
 }
