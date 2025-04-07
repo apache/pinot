@@ -271,11 +271,6 @@ public class ImplicitTableRouteCalculationTest {
         assertTrue(expectedOfflineRoutingTable.containsKey(serverInstance.toString()));
         assertEquals(expectedOfflineRoutingTable.get(serverInstance.toString()), segments);
       }
-
-      Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = tableRoute.getOfflineRequestMap(0, "broker",
-          false);
-      assertNotNull(offlineRequestMap);
-      assertFalse(offlineRequestMap.isEmpty());
     } else {
       assertNull(tableRoute.getOfflineRoutingTable());
     }
@@ -291,11 +286,6 @@ public class ImplicitTableRouteCalculationTest {
         assertTrue(expectedRealtimeRoutingTable.containsKey(serverInstance.toString()));
         assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
       }
-
-      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = tableRoute.getRealtimeRequestMap(0, "broker",
-          false);
-      assertNotNull(realtimeRequestMap);
-      assertFalse(realtimeRequestMap.isEmpty());
     } else {
       assertNull(tableRoute.getRealtimeRoutingTable());
     }

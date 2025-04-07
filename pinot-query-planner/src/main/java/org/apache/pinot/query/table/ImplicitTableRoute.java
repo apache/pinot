@@ -50,14 +50,12 @@ public class ImplicitTableRoute extends BaseTableRoute {
 
   private final String _rawTableName;
 
-  private boolean _isOfflineTableExists;
-  private String _offlineTableName;
+  private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
   private TableConfig _offlineTableConfig;
   private boolean _isOfflineTableDisabled;
 
-  private boolean _isRealtimeTableExists;
-  private String _realtimeTableName;
+  private String _realtimeTableName = null;
   private boolean _isRealtimeRouteExists;
   private TableConfig _realtimeTableConfig;
   private boolean _isRealtimeTableDisabled;
@@ -77,18 +75,11 @@ public class ImplicitTableRoute extends BaseTableRoute {
 
     if (tableType == TableType.OFFLINE) {
       _offlineTableName = tableName;
-      _isOfflineTableExists = true;
-      _isRealtimeTableExists = false;
     } else if (tableType == TableType.REALTIME) {
       _realtimeTableName = tableName;
-      _isOfflineTableExists = false;
-      _isRealtimeTableExists = true;
     } else {
       _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      _isOfflineTableExists = true;
-
       _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      _isRealtimeTableExists = true;
     }
   }
 
@@ -101,16 +92,12 @@ public class ImplicitTableRoute extends BaseTableRoute {
 
   @Override
   public void getTableConfig(TableCache tableCache) {
-    if (_isOfflineTableExists) {
-      assert _offlineTableName != null;
+    if (_offlineTableName != null) {
       _offlineTableConfig = tableCache.getTableConfig(_offlineTableName);
-      _isOfflineTableExists = _offlineTableConfig != null;
     }
 
-    if (_isRealtimeTableExists) {
-      assert _realtimeTableName != null;
+    if (_realtimeTableName != null) {
       _realtimeTableConfig = tableCache.getTableConfig(_realtimeTableName);
-      _isRealtimeTableExists = _realtimeTableConfig != null;
     }
   }
 
@@ -127,48 +114,12 @@ public class ImplicitTableRoute extends BaseTableRoute {
   }
 
   /**
-   * Hybrid if both offline and realtime table configs are present.
-   * @return
-   */
-  @Override
-  public boolean isHybrid() {
-    return _isOfflineTableExists && _isRealtimeTableExists;
-  }
-
-  /**
-   * Offline if offline table config is present and realtime table config is not present.
-   * @return true if the table is offline, false otherwise
-   */
-  @Override
-  public boolean isOffline() {
-    return _isOfflineTableExists && !_isRealtimeTableExists;
-  }
-
-  /**
-   * Realtime if realtime table config is present and offline table config is not present.
-   * @return true if the table is realtime, false otherwise
-   */
-  @Override
-  public boolean isRealtime() {
-    return !_isOfflineTableExists && _isRealtimeTableExists;
-  }
-
-  /**
-   * Exists if there is at least one table with a TableConfig.
-   * @return true if the table exists, false otherwise
-   */
-  @Override
-  public boolean isExists() {
-    return _isOfflineTableExists || _isRealtimeTableExists;
-  }
-
-  /**
    * Offline if offline table config is present.
    * @return true if there is an OFFLINE table, false otherwise
    */
   @Override
   public boolean hasOffline() {
-    return _isOfflineTableExists;
+    return _offlineTableConfig != null;
   }
 
   /**
@@ -177,31 +128,67 @@ public class ImplicitTableRoute extends BaseTableRoute {
    */
   @Override
   public boolean hasRealtime() {
-    return _isRealtimeTableExists;
+    return _realtimeTableConfig != null;
+  }
+
+  /**
+   * Hybrid if both offline and realtime table configs are present.
+   * @return true if the table is hybrid, false otherwise
+   */
+  @Override
+  public boolean isHybrid() {
+    return hasOffline() && hasRealtime();
+  }
+
+  /**
+   * Offline if offline table config is present and realtime table config is not present.
+   * @return true if the table is offline, false otherwise
+   */
+  @Override
+  public boolean isOffline() {
+    return hasOffline()  && !hasRealtime();
+  }
+
+  /**
+   * Realtime if realtime table config is present and offline table config is not present.
+   * @return true if the table is realtime, false otherwise
+   */
+  @Override
+  public boolean isRealtime() {
+    return !hasOffline() && hasRealtime();
+  }
+
+  /**
+   * Exists if there is at least one table with a TableConfig.
+   * @return true if the table exists, false otherwise
+   */
+  @Override
+  public boolean isExists() {
+    return hasOffline() || hasRealtime();
   }
 
   @Override
   public void checkRoutes(RoutingManager routingManager) {
-    if (_isOfflineTableExists) {
-      assert _offlineTableName != null;
+    if (hasOffline()) {
       _isOfflineRouteExists = routingManager.routingExists(_offlineTableName);
       _isOfflineTableDisabled = routingManager.isTableDisabled(_offlineTableName);
     }
 
-    if (_isRealtimeTableExists) {
+    if (hasRealtime()) {
       assert _realtimeTableName != null;
       _isRealtimeRouteExists = routingManager.routingExists(_realtimeTableName);
       _isRealtimeTableDisabled = routingManager.isTableDisabled(_realtimeTableName);
     }
 
     // Get TimeBoundaryInfo. If there is no time boundary, then do not consider the offline table.
-    if (_isOfflineTableExists && _isRealtimeTableExists) {
+    if (isHybrid()) {
       // Time boundary info might be null when there is no segment in the offline table, query real-time side only
       _timeBoundaryInfo = routingManager.getTimeBoundaryInfo(_offlineTableName);
       if (_timeBoundaryInfo == null) {
         LOGGER.debug("No time boundary info found for hybrid table: {}",
             TableNameBuilder.extractRawTableName(_offlineTableName));
-        _isOfflineTableExists = false;
+        _offlineTableName = null;
+        _offlineTableConfig = null;
       }
     }
   }

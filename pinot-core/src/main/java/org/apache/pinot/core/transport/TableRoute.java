@@ -136,7 +136,8 @@ public interface TableRoute {
   TimeBoundaryInfo getTimeBoundaryInfo();
 
   /**
-   * Calculate the Routing Table for a query.
+   * Calculate the Routing Table for a query. The routing table consists of the server name and list of segments that
+   * have to be queried on that server.
    * @param routingManager the routing manager.
    * @param offlineBrokerRequest Broker Request for the offline table.
    * @param realtimeBrokerRequest Broker Request for the realtime table.
@@ -170,10 +171,4 @@ public interface TableRoute {
    * @return the combined request map
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
-
-  @Nullable
-  Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId, boolean preferTls);
-
-  @Nullable
-  Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId, boolean preferTls);
 }
