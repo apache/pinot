@@ -409,21 +409,21 @@ public class ImplicitTableRouteTest {
       _brokerResponse = brokerResponse;
     }
 
-    boolean similar(ImplicitTableRoute hybridTable) {
+    boolean similar(ImplicitTableRoute tableRoute) {
       boolean isEquals = true;
 
       if (_offlineTableName != null) {
-        isEquals &= hybridTable.hasOffline() && hybridTable.isOfflineRouteExists()
-            && _offlineTableName.equals(hybridTable.getOfflineTableName());
+        isEquals &= tableRoute.hasOffline() && tableRoute.isOfflineRouteExists()
+            && _offlineTableName.equals(tableRoute.getOfflineTableName());
       } else {
-        isEquals &= !hybridTable.hasOffline() || !hybridTable.isOfflineRouteExists();
+        isEquals &= !tableRoute.hasOffline() || !tableRoute.isOfflineRouteExists();
       }
 
       if (_realtimeTableName != null) {
-        isEquals &= hybridTable.hasRealtime() && hybridTable.isRealtimeRouteExists()
-            && _realtimeTableName.equals(hybridTable.getRealtimeTableName());
+        isEquals &= tableRoute.hasRealtime() && tableRoute.isRealtimeRouteExists()
+            && _realtimeTableName.equals(tableRoute.getRealtimeTableName());
       } else {
-        isEquals &= !hybridTable.hasRealtime() || !hybridTable.isRealtimeRouteExists();
+        isEquals &= !tableRoute.hasRealtime() || !tableRoute.isRealtimeRouteExists();
       }
 
       return isEquals;

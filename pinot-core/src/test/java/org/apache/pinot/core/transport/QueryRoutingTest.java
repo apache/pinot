@@ -114,16 +114,6 @@ public class QueryRoutingTest {
     }
 
     @Override
-    public boolean isOfflineRouteExists() {
-      return false;
-    }
-
-    @Override
-    public boolean isRealtimeRouteExists() {
-      return false;
-    }
-
-    @Override
     public boolean isDisabled() {
       return false;
     }

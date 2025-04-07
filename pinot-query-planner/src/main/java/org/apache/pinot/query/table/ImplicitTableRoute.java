@@ -212,12 +212,10 @@ public class ImplicitTableRoute extends BaseTableRoute {
     }
   }
 
-  @Override
   public boolean isOfflineRouteExists() {
     return _isOfflineRouteExists;
   }
 
-  @Override
   public boolean isRealtimeRouteExists() {
     return _isRealtimeRouteExists;
   }
@@ -303,7 +301,6 @@ public class ImplicitTableRoute extends BaseTableRoute {
         _numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         _offlineBrokerRequest = null;
-        _isOfflineRouteExists = false;
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -327,7 +324,6 @@ public class ImplicitTableRoute extends BaseTableRoute {
         _numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         _realtimeBrokerRequest = null;
-        _isRealtimeRouteExists = false;
       }
     }
   }
