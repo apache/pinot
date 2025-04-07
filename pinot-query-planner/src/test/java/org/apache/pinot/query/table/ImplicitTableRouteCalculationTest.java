@@ -303,9 +303,9 @@ public class ImplicitTableRouteCalculationTest {
     assertTrue(tableRoute.getUnavailableSegments().isEmpty());
     assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertTrue(tableRoute.isEmpty());
+      assertFalse(tableRoute.isRouteExists());
     } else {
-      assertFalse(tableRoute.isEmpty());
+      assertTrue(tableRoute.isRouteExists());
       Map<ServerRoutingInstance, InstanceRequest> requestMap = tableRoute.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());
@@ -482,9 +482,9 @@ public class ImplicitTableRouteCalculationTest {
     assertEquals(tableRoute.getUnavailableSegments(), expectedTableRoute._unavailableSegments);
     assertEquals(tableRoute.getNumPrunedSegmentsTotal(), expectedTableRoute._numPrunedSegmentsTotal);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertTrue(tableRoute.isEmpty());
+      assertFalse(tableRoute.isRouteExists());
     } else {
-      assertFalse(tableRoute.isEmpty());
+      assertTrue(tableRoute.isRouteExists());
     }
   }
 
@@ -544,7 +544,7 @@ public class ImplicitTableRouteCalculationTest {
     assertNull(tableRoute.getRealtimeRoutingTable());
     assertTrue(tableRoute.getUnavailableSegments().isEmpty());
     assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
-    assertTrue(tableRoute.isEmpty());
+    assertFalse(tableRoute.isRouteExists());
   }
 
   @Test(dataProvider = "partiallyDisabledTableProvider")

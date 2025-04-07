@@ -31,16 +31,22 @@ import org.apache.pinot.spi.config.table.TableConfig;
 
 
 /**
- * The HybridTable interface represents a table that consists of both offline and realtime tables.
- * An Offline and a realtime table is represented by PhysicalTable objects.
- * In the general case, a HybridTable can have many offline and realtime tables.
- * It is used to organize metadata about hybrid tables and helps with query planning in SSE.
+ * The TableRoute interface provides the metadata required to route query execution to servers. The important sources
+ * of the metadata are table config, broker routing information and the broker request.
  */
 public interface TableRoute {
 
+  /**
+   * Get the table configs for all the tables from the table cache.
+   * @param tableCache the table cache
+   */
   void getTableConfig(TableCache tableCache);
 
-  void checkRoutes(RoutingManager routingManager);
+  @Nullable
+  TableConfig getOfflineTableConfig();
+
+  @Nullable
+  TableConfig getRealtimeTableConfig();
 
   /**
    * Checks if the table exists. A table exists if all required TableConfig objects are available.
@@ -48,34 +54,6 @@ public interface TableRoute {
    * @return true if the table exists, false otherwise
    */
   boolean isExists();
-
-  /**
-   * Checks if the broker has routes for at least 1 of the physical tables.
-   *
-   * @return true if any route exists, false otherwise
-   */
-  boolean isRouteExists();
-
-  /**
-   * Checks if routes for all the offline table(s) is available in the broker.
-   *
-   * @return true if an offline table route exists, false otherwise
-   */
-  boolean isOfflineRouteExists();
-
-  /**
-   * Checks if routes for all realtime table(s) is available in the broker.
-   *
-   * @return true if a realtime table route exists, false otherwise
-   */
-  boolean isRealtimeRouteExists();
-
-  /**
-   * Checks if all the physical tables are disabled.
-   *
-   * @return true if the table is disabled, false otherwise
-   */
-  boolean isDisabled();
 
   /**
    * Checks if there are both offline and realtime tables.
@@ -112,25 +90,58 @@ public interface TableRoute {
    */
   boolean hasRealtime();
 
-  boolean hasTimeBoundaryInfo();
-
-  @Nullable
-  TimeBoundaryInfo getTimeBoundaryInfo();
-
   @Nullable
   String getOfflineTableName();
 
   @Nullable
   String getRealtimeTableName();
 
-  @Nullable
-  TableConfig getOfflineTableConfig();
+  /**
+   * Check the routing manager if there are routes available for the table.
+   * @param routingManager the routing manager
+   */
+  void checkRoutes(RoutingManager routingManager);
 
-  @Nullable
-  TableConfig getRealtimeTableConfig();
+  /**
+   * Checks if the broker has routes for at least 1 of the physical tables.
+   *
+   * @return true if any route exists, false otherwise
+   */
+  boolean isRouteExists();
+
+  /**
+   * Checks if routes for all the offline table(s) is available in the broker.
+   *
+   * @return true if an offline table route exists, false otherwise
+   */
+  boolean isOfflineRouteExists();
+
+  /**
+   * Checks if routes for all realtime table(s) is available in the broker.
+   *
+   * @return true if a realtime table route exists, false otherwise
+   */
+  boolean isRealtimeRouteExists();
+
+  /**
+   * Checks if all the physical tables are disabled.
+   *
+   * @return true if the table is disabled, false otherwise
+   */
+  boolean isDisabled();
 
   List<String> getDisabledTableNames();
 
+  @Nullable
+  TimeBoundaryInfo getTimeBoundaryInfo();
+
+  /**
+   * Calculate the Routing Table for a query.
+   * @param routingManager the routing manager.
+   * @param offlineBrokerRequest Broker Request for the offline table.
+   * @param realtimeBrokerRequest Broker Request for the realtime table.
+   * @param requestId Request ID assigned to the query.
+   */
   void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId);
 
@@ -150,14 +161,6 @@ public interface TableRoute {
 
   int getNumPrunedSegmentsTotal();
 
-  boolean isEmpty();
-
-  @Nullable
-  Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId, boolean preferTls);
-
-  @Nullable
-  Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId, boolean preferTls);
-
   /**
    * Gets the combined request map.
    *
@@ -167,4 +170,10 @@ public interface TableRoute {
    * @return the combined request map
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  @Nullable
+  Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  @Nullable
+  Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId, boolean preferTls);
 }

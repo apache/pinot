@@ -90,7 +90,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Add servers queried/responded stats
-    assert !route.isEmpty();
+    assert route.isRouteExists();
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();

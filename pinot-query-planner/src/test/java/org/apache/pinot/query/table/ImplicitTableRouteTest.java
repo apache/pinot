@@ -218,6 +218,7 @@ public class ImplicitTableRouteTest {
   public void testWithNoTimeBoundary() {
     ImplicitTableRoute table = new ImplicitTableRoute("b");
     table.getTableConfig(_tableCache);
+    table.checkRoutes(_routingManager);
 
     assertTrue(table.isExists(), "The table should exist");
     assertTrue(table.isRealtime(), "The table should be realtime");

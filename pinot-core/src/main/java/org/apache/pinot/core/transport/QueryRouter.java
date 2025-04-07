@@ -83,7 +83,7 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRoute route, long timeoutMs) {
-    assert !route.isEmpty();
+    assert route.isRouteExists();
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
     boolean preferTls = _serverChannelsTls != null;
