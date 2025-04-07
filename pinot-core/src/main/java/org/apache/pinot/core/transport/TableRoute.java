@@ -167,5 +167,4 @@ public interface TableRoute {
    * @return the combined request map
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
-
 }
