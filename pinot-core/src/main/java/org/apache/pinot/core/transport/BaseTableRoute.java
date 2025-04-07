@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -30,6 +31,14 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public abstract class BaseTableRoute implements TableRoute {
+  @Nullable
+  protected abstract Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
+      boolean preferTls);
+
+  @Nullable
+  protected abstract Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
+      boolean preferTls);
+
   public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap =
