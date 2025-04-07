@@ -83,14 +83,16 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRoute route, long timeoutMs) {
-    assert route.isRouteExists();
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
+
+    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
     boolean preferTls = _serverChannelsTls != null;
 
     // skip unavailable servers if the query option is set
-    boolean skipUnavailableServers =
-        isSkipUnavailableServers(route.getOfflineBrokerRequest(), route.getRealtimeBrokerRequest());
+    boolean skipUnavailableServers = isSkipUnavailableServers(offlineBrokerRequest, realtimeBrokerRequest);
 
     // Build map from server to request based on the routing table
     Map<ServerRoutingInstance, InstanceRequest> requestMap = route.getRequestMap(requestId, _brokerId, preferTls);

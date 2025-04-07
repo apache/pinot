@@ -89,13 +89,13 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    // TODO: Add servers queried/responded stats
-    assert route.isRouteExists();
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = route.getRealtimeRoutingTable();
 
+    // TODO: Add servers queried/responded stats
+    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
