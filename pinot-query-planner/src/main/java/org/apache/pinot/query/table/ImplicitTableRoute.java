@@ -48,8 +48,6 @@ import org.slf4j.LoggerFactory;
 public class ImplicitTableRoute extends BaseTableRoute {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitTableRoute.class);
 
-  private final String _rawTableName;
-
   private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
   private TableConfig _offlineTableConfig;
@@ -71,7 +69,6 @@ public class ImplicitTableRoute extends BaseTableRoute {
 
   public ImplicitTableRoute(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    _rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {
       _offlineTableName = tableName;
@@ -83,12 +80,9 @@ public class ImplicitTableRoute extends BaseTableRoute {
     }
   }
 
-  /********************************
-   *
-   *  Table Config
-   *
-   ********************************
-  */
+  /*
+   *  Table Config Section
+   */
 
   @Override
   public void getTableConfig(TableCache tableCache) {
@@ -167,6 +161,22 @@ public class ImplicitTableRoute extends BaseTableRoute {
     return hasOffline() || hasRealtime();
   }
 
+  @Nullable
+  @Override
+  public String getOfflineTableName() {
+    return _offlineTableName;
+  }
+
+  @Nullable
+  @Override
+  public String getRealtimeTableName() {
+    return _realtimeTableName;
+  }
+
+  /*
+   *  Check Routes Section
+   */
+
   @Override
   public void checkRoutes(RoutingManager routingManager) {
     if (hasOffline()) {
@@ -191,10 +201,6 @@ public class ImplicitTableRoute extends BaseTableRoute {
         _offlineTableConfig = null;
       }
     }
-  }
-
-  public String getRawTableName() {
-    return _rawTableName;
   }
 
   /**
@@ -241,18 +247,6 @@ public class ImplicitTableRoute extends BaseTableRoute {
     return _timeBoundaryInfo;
   }
 
-  @Nullable
-  @Override
-  public String getOfflineTableName() {
-    return _offlineTableName;
-  }
-
-  @Nullable
-  @Override
-  public String getRealtimeTableName() {
-    return _realtimeTableName;
-  }
-
   public boolean isOfflineTableDisabled() {
     return _isOfflineTableDisabled;
   }
@@ -276,6 +270,10 @@ public class ImplicitTableRoute extends BaseTableRoute {
     }
     return List.of();
   }
+
+  /*
+   *  Calculate Routes Section
+   */
 
   @Override
   public void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
@@ -361,6 +359,10 @@ public class ImplicitTableRoute extends BaseTableRoute {
   public int getNumPrunedSegmentsTotal() {
     return _numPrunedSegmentsTotal;
   }
+
+  /*
+   * Calculate RequestMap Section
+   */
 
   @Nullable
   @Override
