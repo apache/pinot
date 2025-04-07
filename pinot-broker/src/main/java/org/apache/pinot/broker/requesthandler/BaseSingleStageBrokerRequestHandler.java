@@ -549,7 +549,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // If all tables in a hybrid are disabled then return an error.
     // Note that if a query is for one of OFFLINE or REALTIME table and the other physical table is disabled,
     // we still want to run the query. So this condition is false.
-    // Tested by the tables "hybrid_o_disabled_REALTIME" and "hybrid_r_disabled_OFFLINE" in ImplicitHybridTableTest
+    // Tested by the tables "hybrid_o_disabled_REALTIME" and "hybrid_r_disabled_OFFLINE" in ImplicitTableRouteTest
     if (tableRoute.isDisabled()) {
       requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
       return BrokerResponseNative.TABLE_IS_DISABLED;
@@ -583,7 +583,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
     }
 
-    if (tableRoute.isEmpty()) {
+    if (!tableRoute.isRouteExists()) {
       if (!errorMsgs.isEmpty()) {
         QueryProcessingException firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"

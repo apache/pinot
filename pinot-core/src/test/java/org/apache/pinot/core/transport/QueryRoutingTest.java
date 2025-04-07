@@ -154,11 +154,6 @@ public class QueryRoutingTest {
     }
 
     @Override
-    public boolean hasTimeBoundaryInfo() {
-      return false;
-    }
-
-    @Override
     public @org.jetbrains.annotations.Nullable TimeBoundaryInfo getTimeBoundaryInfo() {
       return null;
     }
@@ -225,11 +220,6 @@ public class QueryRoutingTest {
     @Override
     public int getNumPrunedSegmentsTotal() {
       return 0;
-    }
-
-    @Override
-    public boolean isEmpty() {
-      return _offlineBrokerRequest == null && _realtimeBrokerRequest == null;
     }
 
     @Override
