@@ -184,7 +184,7 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
 
     String tableName = TABLE_NAME + "_" + _iteration;
     _tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableName);
-    _tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig,
+    _tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, SCHEMA,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, SEGMENT_OPERATIONS_THROTTLER);
     _tableDataManager.start();
 
