@@ -97,12 +97,10 @@ public class QueryRoutingTest {
 
     @Override
     public void getTableConfig(TableCache tableCache) {
-
     }
 
     @Override
     public void checkRoutes(RoutingManager routingManager) {
-
     }
 
     @Override
@@ -193,7 +191,6 @@ public class QueryRoutingTest {
     @Override
     public void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
         BrokerRequest realtimeBrokerRequest, long requestId) {
-
     }
 
     @Nullable

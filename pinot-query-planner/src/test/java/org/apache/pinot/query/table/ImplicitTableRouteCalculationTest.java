@@ -272,7 +272,8 @@ public class ImplicitTableRouteCalculationTest {
         assertEquals(expectedOfflineRoutingTable.get(serverInstance.toString()), segments);
       }
 
-      Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = tableRoute.getOfflineRequestMap(0, "broker", false);
+      Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = tableRoute.getOfflineRequestMap(0, "broker",
+          false);
       assertNotNull(offlineRequestMap);
       assertFalse(offlineRequestMap.isEmpty());
     } else {
@@ -291,7 +292,8 @@ public class ImplicitTableRouteCalculationTest {
         assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
       }
 
-      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = tableRoute.getRealtimeRequestMap(0, "broker", false);
+      Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = tableRoute.getRealtimeRequestMap(0, "broker",
+          false);
       assertNotNull(realtimeRequestMap);
       assertFalse(realtimeRequestMap.isEmpty());
     } else {
@@ -369,8 +371,9 @@ public class ImplicitTableRouteCalculationTest {
     }
   }
 
-  private static GetTableRouteResult getTableRouting(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
-      String offlineTableName, String realtimeTableName, RoutingManager routingManager) {
+  private static GetTableRouteResult getTableRouting(BrokerRequest offlineBrokerRequest,
+      BrokerRequest realtimeBrokerRequest, String offlineTableName, String realtimeTableName,
+      RoutingManager routingManager) {
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
     List<String> unavailableSegments = new ArrayList<>();
@@ -421,8 +424,9 @@ public class ImplicitTableRouteCalculationTest {
       }
     }
 
-    return new GetTableRouteResult(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable, realtimeRoutingTable,
-        unavailableSegments, numPrunedSegmentsTotal, offlineTableDisabled, realtimeTableDisabled);
+    return new GetTableRouteResult(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable,
+        realtimeRoutingTable, unavailableSegments, numPrunedSegmentsTotal, offlineTableDisabled,
+        realtimeTableDisabled);
   }
 
   private void assertTableRouting(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
@@ -469,7 +473,8 @@ public class ImplicitTableRouteCalculationTest {
       assertNotNull(tableRoute.getRealtimeRoutingTable());
       assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
-      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), tableRoute.getRealtimeRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(),
+          tableRoute.getRealtimeRoutingTable().entrySet());
     } else {
       assertNull(tableRoute.getRealtimeRoutingTable());
     }
@@ -592,7 +597,8 @@ public class ImplicitTableRouteCalculationTest {
       assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
       assertFalse(expectedTableRoute._realtimeTableDisabled);
-      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(), tableRoute.getRealtimeRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(),
+          tableRoute.getRealtimeRoutingTable().entrySet());
     }
   }
 

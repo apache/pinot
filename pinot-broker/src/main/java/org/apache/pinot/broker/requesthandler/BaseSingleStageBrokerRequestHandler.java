@@ -694,8 +694,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       onQueryStart(
           requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
       try {
-        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRoute, remainingTimeMs,
-            serverStats, requestContext);
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRoute,
+            remainingTimeMs, serverStats, requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
         onQueryFinish(requestId);
