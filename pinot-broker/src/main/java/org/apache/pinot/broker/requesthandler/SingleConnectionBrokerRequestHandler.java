@@ -96,7 +96,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    assert route.isRouteExists();
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
+
+    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
