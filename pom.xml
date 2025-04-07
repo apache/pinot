@@ -294,7 +294,7 @@
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
     <mockito-core.version>5.17.0</mockito-core.version>
-    <equalsverifier.version>3.19.2</equalsverifier.version>
+    <equalsverifier.version>3.19.3</equalsverifier.version>
     <testcontainers.version>1.20.6</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
