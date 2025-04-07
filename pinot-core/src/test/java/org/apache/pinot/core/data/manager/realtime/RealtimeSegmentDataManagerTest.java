@@ -571,7 +571,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
 
-    // But then if we get to the exact offset and consumer semaphore is acquired, we just build the segment.
+    // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
@@ -582,7 +582,7 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     }
 
-    // But then if we get to the exact offset, we still download because consumer semaphore was never acquired.
+    // But then if we get to the exact offset, we download the segment because consumer semaphore was never acquired.
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
