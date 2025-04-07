@@ -510,6 +510,7 @@ public class RealtimeSegmentDataManagerTest {
     metadata.setEndOffset(finalOffset.toString());
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -518,6 +519,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.RETAINED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -526,6 +528,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -534,6 +537,7 @@ public class RealtimeSegmentDataManagerTest {
     }
 
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -543,6 +547,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If holding, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -553,6 +558,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we have overshot the expected final offset, the download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -563,6 +569,7 @@ public class RealtimeSegmentDataManagerTest {
 
     // If catching up, but we did not get to the final offset, then download and replace
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -573,10 +580,10 @@ public class RealtimeSegmentDataManagerTest {
 
     // But then if we get to the exact offset, we get to build and replace, not download
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
-      segmentDataManager.getConsumerSemaphoreAcquired().set(true);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
