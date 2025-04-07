@@ -544,6 +544,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     List<String> unavailableSegments = tableRoute.getUnavailableSegments();
     int numPrunedSegmentsTotal = tableRoute.getNumPrunedSegmentsTotal();
 
+    // Rewrite the broker requests as the rest of the code expects them to be null or not based on whether the routing
+    // calculation was successful or not.
+    offlineBrokerRequest = tableRoute.getOfflineBrokerRequest();
+    realtimeBrokerRequest = tableRoute.getRealtimeBrokerRequest();
+
     List<QueryProcessingException> errorMsgs = new ArrayList<>();
 
     // If all tables in a hybrid are disabled then return an error.
@@ -583,7 +588,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
     }
 
-    if (!tableRoute.isRouteExists()) {
+    if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       if (!errorMsgs.isEmpty()) {
         QueryProcessingException firstErrorMsg = errorMsgs.get(0);
         String logTail = errorMsgs.size() > 1 ? (errorMsgs.size()) + " errorMsgs found. Logging only the first one"

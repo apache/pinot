@@ -293,9 +293,9 @@ public class ImplicitTableRouteCalculationTest {
     assertTrue(tableRoute.getUnavailableSegments().isEmpty());
     assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertFalse(tableRoute.isRouteExists());
+      assertTrue(tableRoute.getOfflineBrokerRequest() == null && tableRoute.getRealtimeBrokerRequest() == null);
     } else {
-      assertTrue(tableRoute.isRouteExists());
+      assertFalse(tableRoute.getOfflineBrokerRequest() == null && tableRoute.getRealtimeBrokerRequest() == null);
       Map<ServerRoutingInstance, InstanceRequest> requestMap = tableRoute.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());

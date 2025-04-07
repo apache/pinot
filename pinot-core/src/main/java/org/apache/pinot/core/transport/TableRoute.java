@@ -97,7 +97,8 @@ public interface TableRoute {
   String getRealtimeTableName();
 
   /**
-   * Check the routing manager if there are routes available for the table.
+   * This function checks if the required entries are available in the BrokerRoutingManager.
+   * It should not attempt to calculate the routes.
    * @param routingManager the routing manager
    */
   void checkRoutes(RoutingManager routingManager);
@@ -108,20 +109,6 @@ public interface TableRoute {
    * @return true if any route exists, false otherwise
    */
   boolean isRouteExists();
-
-  /**
-   * Checks if routes for all the offline table(s) is available in the broker.
-   *
-   * @return true if an offline table route exists, false otherwise
-   */
-  boolean isOfflineRouteExists();
-
-  /**
-   * Checks if routes for all realtime table(s) is available in the broker.
-   *
-   * @return true if a realtime table route exists, false otherwise
-   */
-  boolean isRealtimeRouteExists();
 
   /**
    * Checks if all the physical tables are disabled.
@@ -138,6 +125,8 @@ public interface TableRoute {
   /**
    * Calculate the Routing Table for a query. The routing table consists of the server name and list of segments that
    * have to be queried on that server.
+   * Note that the implementation is expected to signal whether the calculation was successful or not by returning a
+   * null from the getter functions getOfflineRoutingTable() and getRealtimeRoutingTable().
    * @param routingManager the routing manager.
    * @param offlineBrokerRequest Broker Request for the offline table.
    * @param realtimeBrokerRequest Broker Request for the realtime table.
