@@ -816,6 +816,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManagerStatusCache = getTaskManagerStatusCache();
     // Create and add task manager
     _taskManager = createTaskManager();
+    _taskManager.init();
     periodicTasks.add(_taskManager);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
