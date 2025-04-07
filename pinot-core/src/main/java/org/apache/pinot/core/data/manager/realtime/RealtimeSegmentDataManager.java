@@ -1451,14 +1451,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 buildSegmentAndReplace();
               } else {
                 boolean success = false;
-                // since online helix transition for a segment can arrive before segment's consumer acquires the
+                // Since online helix transition for a segment can arrive before segment's consumer acquires the
                 // semaphore, check _consumerSemaphoreAcquired before catching up.
                 // This is to avoid consuming in parallel to another segment's consumer.
                 if (_consumerSemaphoreAcquired.get()) {
                   _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
                   success = catchupToFinalOffset(endOffset,
                       TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                } else {
+                  _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
+                      _currentOffset, endOffset);
                 }
+
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
                   buildSegmentAndReplace();
