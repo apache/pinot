@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
  *     in subsequent worker assignment steps to simplify Exchange.
  *   </li>
  * </ul>
- * <h1>Planned / Upcoming Features</h3>
+ * <h1>Planned / Upcoming Features</h1>
  * <ul>
  *   <li>Support for look-up join.</li>
  *   <li>Support for partition parallelism and the colocated join hint. See F2 in #15455.</li>
