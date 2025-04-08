@@ -61,7 +61,6 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
    */
   public BaseSegmentOperationsThrottler(int maxConcurrency, int maxConcurrencyBeforeServingQueries,
       boolean isServingQueries, ServerGauge thresholdGauge, ServerGauge countGauge, Logger logger) {
-    _serverMetrics = ServerMetrics.get();
     _logger = logger;
     _logger.info("Initializing SegmentOperationsThrottler, maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}, "
             + "isServingQueries: {}",
@@ -86,8 +85,7 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
     int concurrency = _isServingQueries ? _maxConcurrency : _maxConcurrencyBeforeServingQueries;
     _semaphore = new AdjustableSemaphore(concurrency, true);
     _numSegmentsAcquiredSemaphore = new AtomicInteger(0);
-    _serverMetrics.setValueOfGlobalGauge(_thresholdGauge, concurrency);
-    _serverMetrics.setValueOfGlobalGauge(_countGauge, 0);
+    initializeMetrics();
     _logger.info("Created semaphore with total permits: {}, available permits: {}", totalPermits(),
         availablePermits());
   }
@@ -96,6 +94,8 @@ public abstract class BaseSegmentOperationsThrottler implements PinotClusterConf
    * The ServerMetrics may be created after these throttle objects are created. In that case, the initialization that
    * happens in the constructor may have occurred on the NOOP metrics. This should be called after the server metrics
    * are created and registered to ensure the correct metrics object is used and the metrics are updated correctly
+   *
+   * This is called in the same thread as the constructor so there is no need to make _serverMetrics volatile here
    */
   public void initializeMetrics() {
     _serverMetrics = ServerMetrics.get();
