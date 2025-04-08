@@ -34,12 +34,8 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceSummaryResult {
-
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final ServerInfo _serverInfo;
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final SegmentInfo _segmentInfo;
-  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final List<TagInfo> _tagsInfo;
 
   /**
@@ -71,6 +67,7 @@ public class RebalanceSummaryResult {
     return _tagsInfo;
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerSegmentChangeInfo {
     private final ServerStatus _serverStatus;
     private final int _totalSegmentsAfterRebalance;
@@ -78,7 +75,6 @@ public class RebalanceSummaryResult {
     private final int _segmentsAdded;
     private final int _segmentsDeleted;
     private final int _segmentsUnchanged;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final List<String> _tagList;
 
     /**
@@ -227,19 +223,14 @@ public class RebalanceSummaryResult {
     }
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerInfo {
     private final int _numServersGettingNewSegments;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numServers;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversAdded;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversRemoved;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversUnchanged;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Set<String> _serversGettingNewSegments;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
     /**
@@ -306,18 +297,130 @@ public class RebalanceSummaryResult {
     }
   }
 
+  public static class ConsumingSegmentToBeMovedSummary {
+    private final int _numConsumingSegmentsToBeMoved;
+    private final int _numServersGettingConsumingSegmentsAdded;
+    private final Map<String, Integer> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
+    private final Map<String, Integer> _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
+    private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
+
+    /**
+     * Constructor for ConsumingSegmentToBeMovedSummary
+     * @param numConsumingSegmentsToBeMoved total number of consuming segments to be moved as part of this rebalance
+     * @param numServersGettingConsumingSegmentsAdded maximum bytes of consuming segments to be moved to catch up
+     * @param consumingSegmentsToBeMovedWithMostOffsetsToCatchUp top consuming segments to be moved to catch up.
+     *                                                           Map from segment name to its number of offsets to
+     *                                                           catch up on the new server. This is essentially the
+     *                                                           difference between the latest offset of the stream
+     *                                                           and the segment's start offset of the stream. The
+     *                                                           map is set to null if the number of offsets to catch
+     *                                                           up could not be determined for at least one
+     *                                                           consuming segment
+     * @param consumingSegmentsToBeMovedWithOldestAgeInMinutes oldest consuming segments to be moved to catch up. Map
+     *                                                         from segment name to its age in minutes. The map is
+     *                                                         set to null if ZK metadata is not available or the
+     *                                                         creation time is not found for at least one consuming
+     *                                                         segment.
+     *                                                         The age of a segment is determined by its creation
+     *                                                         time from ZK metadata. Segment age is an approximation
+     *                                                         to data age for a consuming segment. It may not reflect
+     *                                                         the actual oldest age of data in the consuming segment.
+     *                                                         For reasons, a segment could consume events which date
+     *                                                         before the segment created. We collect segment age
+     *                                                         here as there is no obvious way to get the age of the
+     *                                                         oldest data in the stream for a specific consuming
+     *                                                         segment
+     * @param serverConsumingSegmentSummary ConsumingSegmentSummaryPerServer per server
+     */
+    @JsonCreator
+    public ConsumingSegmentToBeMovedSummary(
+        @JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
+        @JsonProperty("numServersGettingConsumingSegmentsAdded") int numServersGettingConsumingSegmentsAdded,
+        @JsonProperty("consumingSegmentsToBeMovedWithMostOffsetsToCatchUp") @Nullable
+        Map<String, Integer> consumingSegmentsToBeMovedWithMostOffsetsToCatchUp,
+        @JsonProperty("consumingSegmentsToBeMovedWithOldestAgeInMinutes") @Nullable
+        Map<String, Integer> consumingSegmentsToBeMovedWithOldestAgeInMinutes,
+        @JsonProperty("serverConsumingSegmentSummary") @Nullable
+        Map<String, ConsumingSegmentSummaryPerServer> serverConsumingSegmentSummary) {
+      _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
+      _numServersGettingConsumingSegmentsAdded = numServersGettingConsumingSegmentsAdded;
+      _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp = consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
+      _consumingSegmentsToBeMovedWithOldestAgeInMinutes = consumingSegmentsToBeMovedWithOldestAgeInMinutes;
+      _serverConsumingSegmentSummary = serverConsumingSegmentSummary;
+    }
+
+    @JsonProperty
+    public int getNumConsumingSegmentsToBeMoved() {
+      return _numConsumingSegmentsToBeMoved;
+    }
+
+    @JsonProperty
+    public int getNumServersGettingConsumingSegmentsAdded() {
+      return _numServersGettingConsumingSegmentsAdded;
+    }
+
+    @JsonProperty
+    public Map<String, Integer> getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() {
+      return _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
+    }
+
+    @JsonProperty
+    public Map<String, Integer> getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() {
+      return _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
+    }
+
+    @JsonProperty
+    public Map<String, ConsumingSegmentSummaryPerServer> getServerConsumingSegmentSummary() {
+      return _serverConsumingSegmentSummary;
+    }
+
+    public static class ConsumingSegmentSummaryPerServer {
+      private final int _numConsumingSegmentsToBeAdded;
+      private final int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
+
+      /**
+       * Constructor for ConsumingSegmentSummaryPerServer
+       * @param numConsumingSegmentsToBeAdded number of consuming segments to be added to this server
+       * @param totalOffsetsToCatchUpAcrossAllConsumingSegments total number of offsets to catch up across all consuming
+       *                                                         segments. The number of offsets to catch up for a
+       *                                                         consuming segment is essentially the difference
+       *                                                         between the latest offset of the stream and the
+       *                                                         segment's start offset of the stream. Set to -1 if
+       *                                                         the offsets to catch up could not be determined for
+       *                                                         at least one consuming segment
+       */
+      @JsonCreator
+      public ConsumingSegmentSummaryPerServer(
+          @JsonProperty("numConsumingSegmentsToBeAdded") int numConsumingSegmentsToBeAdded,
+          @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments")
+          int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
+        _numConsumingSegmentsToBeAdded = numConsumingSegmentsToBeAdded;
+        _totalOffsetsToCatchUpAcrossAllConsumingSegments = totalOffsetsToCatchUpAcrossAllConsumingSegments;
+      }
+
+      @JsonProperty
+      public int getNumConsumingSegmentsToBeAdded() {
+        return _numConsumingSegmentsToBeAdded;
+      }
+
+      @JsonProperty
+      public int getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
+        return _totalOffsetsToCatchUpAcrossAllConsumingSegments;
+      }
+    }
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class SegmentInfo {
     // TODO: Add a metric to estimate the total time it will take to rebalance
     private final int _totalSegmentsToBeMoved;
     private final int _maxSegmentsAddedToASingleServer;
     private final long _estimatedAverageSegmentSizeInBytes;
     private final long _totalEstimatedDataToBeMovedInBytes;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _replicationFactor;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numSegmentsInSingleReplica;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private final RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
+    private final ConsumingSegmentToBeMovedSummary _consumingSegmentToBeMovedSummary;
 
     /**
      * Constructor for SegmentInfo
@@ -328,6 +431,7 @@ public class RebalanceSummaryResult {
      * @param replicationFactor replication factor before and after this rebalance
      * @param numSegmentsInSingleReplica number of segments in single replica before and after this rebalance
      * @param numSegmentsAcrossAllReplicas total number of segments across all replicas before and after this rebalance
+     * @param consumingSegmentToBeMovedSummary consuming segment summary. Set to null if the table is an offline table
      */
     @JsonCreator
     public SegmentInfo(@JsonProperty("totalSegmentsToBeMoved") int totalSegmentsToBeMoved,
@@ -336,7 +440,9 @@ public class RebalanceSummaryResult {
         @JsonProperty("totalEstimatedDataToBeMovedInBytes") long totalEstimatedDataToBeMovedInBytes,
         @JsonProperty("replicationFactor") @Nullable RebalanceChangeInfo replicationFactor,
         @JsonProperty("numSegmentsInSingleReplica") @Nullable RebalanceChangeInfo numSegmentsInSingleReplica,
-        @JsonProperty("numSegmentsAcrossAllReplicas") @Nullable RebalanceChangeInfo numSegmentsAcrossAllReplicas) {
+        @JsonProperty("numSegmentsAcrossAllReplicas") @Nullable RebalanceChangeInfo numSegmentsAcrossAllReplicas,
+        @JsonProperty("consumingSegmentToBeMovedSummary") @Nullable
+        ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary) {
       _totalSegmentsToBeMoved = totalSegmentsToBeMoved;
       _maxSegmentsAddedToASingleServer = maxSegmentsAddedToASingleServer;
       _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
@@ -344,6 +450,7 @@ public class RebalanceSummaryResult {
       _replicationFactor = replicationFactor;
       _numSegmentsInSingleReplica = numSegmentsInSingleReplica;
       _numSegmentsAcrossAllReplicas = numSegmentsAcrossAllReplicas;
+      _consumingSegmentToBeMovedSummary = consumingSegmentToBeMovedSummary;
     }
 
     @JsonProperty
@@ -379,6 +486,11 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public RebalanceChangeInfo getNumSegmentsAcrossAllReplicas() {
       return _numSegmentsAcrossAllReplicas;
+    }
+
+    @JsonProperty
+    public ConsumingSegmentToBeMovedSummary getConsumingSegmentToBeMovedSummary() {
+      return _consumingSegmentToBeMovedSummary;
     }
   }
 
