@@ -26,30 +26,68 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 
 
+/**
+ * Routing information for a table required to route plan fragments to servers.
+ * RequestMap is used to submit plan fragments to servers.
+ * Offline and realtime routing tables are used to keep track of which servers are executing the query.
+ * getUnavailableSegments() returns the segments that are not available when calculating the routing table.
+ * numPrunedSegmentsTotal() returns the number of segments that were pruned when calculating the routing table.
+ */
 public interface TableRoute {
+
+  /**
+   * Gets the broker request for the offline table, if available.
+   *
+   * @return the broker request for the offline table, or null if not available
+   */
   @Nullable
   BrokerRequest getOfflineBrokerRequest();
 
+  /**
+   * Gets the broker request for the realtime table, if available.
+   *
+   * @return the broker request for the realtime table, or null if not available
+   */
   @Nullable
   BrokerRequest getRealtimeBrokerRequest();
 
+  /**
+   * Gets the routing table for the offline table, if available.
+   *
+   * @return a map of server instances to their route information for the offline table, or null if not available
+   */
   @Nullable
   Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
 
+  /**
+   * Gets the routing table for the realtime table, if available.
+   *
+   * @return a map of server instances to their route information for the realtime table, or null if not available
+   */
   @Nullable
   Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
 
+  /**
+   * Gets the list of unavailable segments for the table.
+   *
+   * @return a list of unavailable segment names
+   */
   List<String> getUnavailableSegments();
 
+  /**
+   * Gets the total number of pruned segments for the table.
+   *
+   * @return the total number of pruned segments
+   */
   int getNumPrunedSegmentsTotal();
 
   /**
-   * Gets the combined request map.
+   * Gets the combined request map for the table, including both offline and realtime requests.
    *
    * @param requestId the request ID
    * @param brokerId the broker ID
-   * @param preferTls whether to prefer TLS
-   * @return the combined request map
+   * @param preferTls whether to prefer TLS for the requests
+   * @return a map of server routing instances to their corresponding instance requests
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
 }
