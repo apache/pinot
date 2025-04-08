@@ -39,7 +39,7 @@ public class PhysicalTableScan extends TableScan implements PRelNode {
   @Nullable
   private final TableScanMetadata _tableScanMetadata;
 
-  public PhysicalTableScan(TableScan tableScan, int nodeId, PinotDataDistribution pinotDataDistribution,
+  public PhysicalTableScan(TableScan tableScan, int nodeId, @Nullable PinotDataDistribution pinotDataDistribution,
       @Nullable TableScanMetadata tableScanMetadata) {
     this(tableScan.getCluster(), tableScan.getTraitSet(), tableScan.getHints(), tableScan.getTable(), nodeId,
         pinotDataDistribution, tableScanMetadata);
