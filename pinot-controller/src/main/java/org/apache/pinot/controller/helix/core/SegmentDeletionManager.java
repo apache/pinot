@@ -252,11 +252,11 @@ public class SegmentDeletionManager {
 
     try {
       if (!filesToDelete.isEmpty()) {
-        LOGGER.info("Deleting {} segment files.", filesToDelete.size());
+        LOGGER.info("Deleting {} segment files", filesToDelete.size());
         pinotFS.deleteBatch(filesToDelete, true);
       }
       if (!metadataFilesToDelete.isEmpty()) {
-        LOGGER.info("Deleting {} segment metadata files.", metadataFilesToDelete.size());
+        LOGGER.info("Deleting {} segment metadata files", metadataFilesToDelete.size());
         pinotFS.deleteBatch(metadataFilesToDelete, true);
       }
     } catch (IOException e) {
@@ -297,6 +297,7 @@ public class SegmentDeletionManager {
       // This is catch all clean up to ensure that metadata is removed from deep store.
       deleteSegmentMetadataFromStore(pinotFS, fileToDeleteURI, segmentId);
       if (retentionMs <= 0) {
+        // delete the segment file instantly if retention is set to zero
         segmentDeletion(segmentId, pinotFS, fileToDeleteURI);
       } else {
         moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
@@ -336,7 +337,6 @@ public class SegmentDeletionManager {
   }
 
   private static void segmentDeletion(String segmentId, PinotFS pinotFS, URI fileToDeleteURI) {
-    // delete the segment file instantly if retention is set to zero
     try {
       if (pinotFS.delete(fileToDeleteURI, true)) {
         LOGGER.info("Deleted segment {} from {}", segmentId, fileToDeleteURI.toString());
