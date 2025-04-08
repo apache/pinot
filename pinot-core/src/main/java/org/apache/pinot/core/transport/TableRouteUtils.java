@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -48,6 +49,7 @@ public class TableRouteUtils {
       ServerRouteInfo segments) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
+    instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setQuery(brokerRequest);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions != null) {
