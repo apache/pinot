@@ -1237,6 +1237,12 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- com.google.api.grpc:proto-google-common-protos needs to appear before com.google.cloud:libraries-bom -->
+      <dependency>
+        <groupId>com.google.api.grpc</groupId>
+        <artifactId>proto-google-common-protos</artifactId>
+        <version>${proto-google-common-protos.version}</version>
+      </dependency>
       <!-- libraries-bom should be imported after protobuf-bom and grpc-bom to honor their versions -->
       <dependency>
         <groupId>com.google.cloud</groupId>
