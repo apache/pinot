@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
@@ -80,6 +82,56 @@ public class QueryRouter {
     _serverChannels = new ServerChannels(this, brokerMetrics, nettyConfig, null);
     _serverChannelsTls = tlsConfig != null ? new ServerChannels(this, brokerMetrics, nettyConfig, tlsConfig) : null;
     _serverRoutingStatsManager = serverRoutingStatsManager;
+  }
+
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
+    TableRoute tableRoute = new TableRoute() {
+      @Nullable
+      @Override
+      public BrokerRequest getOfflineBrokerRequest() {
+        return offlineBrokerRequest;
+      }
+
+      @Nullable
+      @Override
+      public BrokerRequest getRealtimeBrokerRequest() {
+        return realtimeBrokerRequest;
+      }
+
+      @Nullable
+      @Override
+      public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+        return offlineRoutingTable;
+      }
+
+      @Nullable
+      @Override
+      public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+        return realtimeRoutingTable;
+      }
+
+      @Override
+      public List<String> getUnavailableSegments() {
+        return List.of();
+      }
+
+      @Override
+      public int getNumPrunedSegmentsTotal() {
+        return 0;
+      }
+
+      @Override
+      public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
+          boolean preferTls) {
+        return TableRouteUtils.getRequestMap(requestId, brokerId, this, preferTls);
+      }
+    };
+
+    return submitQuery(requestId, rawTableName, tableRoute, timeoutMs);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRoute route, long timeoutMs) {

@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -36,12 +35,9 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
-import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -79,7 +75,7 @@ public class QueryRoutingTest {
   private QueryServer _queryServer;
   private QueryThreadContext.CloseableContext _closeableContext;
 
-  private static class TestRoute extends BaseTableRoute {
+  private static class TestRoute implements TableRoute {
     private final BrokerRequest _offlineBrokerRequest;
     private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
     private final BrokerRequest _realtimeBrokerRequest;
@@ -93,89 +89,6 @@ public class QueryRoutingTest {
       _offlineRoutingTable = offlineRoutingTable;
       _realtimeBrokerRequest = realtimeBrokerRequest;
       _realtimeRoutingTable = realtimeRoutingTable;
-    }
-
-    @Override
-    public void getTableConfig(TableCache tableCache) {
-    }
-
-    @Override
-    public void checkRoutes(RoutingManager routingManager) {
-    }
-
-    @Override
-    public boolean isExists() {
-      return false;
-    }
-
-    @Override
-    public boolean isRouteExists() {
-      return false;
-    }
-
-    @Override
-    public boolean isDisabled() {
-      return false;
-    }
-
-    @Override
-    public boolean isHybrid() {
-      return false;
-    }
-
-    @Override
-    public boolean isOffline() {
-      return false;
-    }
-
-    @Override
-    public boolean isRealtime() {
-      return false;
-    }
-
-    @Override
-    public boolean hasOffline() {
-      return false;
-    }
-
-    @Override
-    public boolean hasRealtime() {
-      return false;
-    }
-
-    @Override
-    public @org.jetbrains.annotations.Nullable TimeBoundaryInfo getTimeBoundaryInfo() {
-      return null;
-    }
-
-    @Override
-    public @org.jetbrains.annotations.Nullable String getOfflineTableName() {
-      return "";
-    }
-
-    @Override
-    public @org.jetbrains.annotations.Nullable String getRealtimeTableName() {
-      return "";
-    }
-
-    @Override
-    public @org.jetbrains.annotations.Nullable TableConfig getOfflineTableConfig() {
-      return null;
-    }
-
-    @Override
-    public @org.jetbrains.annotations.Nullable TableConfig getRealtimeTableConfig() {
-      return null;
-    }
-
-    @Override
-    public List<String> getDisabledTableNames() {
-      return List.of();
-    }
-
-    @Override
-    public void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
-        BrokerRequest realtimeBrokerRequest, long requestId) {
     }
 
     @Nullable
@@ -213,23 +126,9 @@ public class QueryRoutingTest {
     }
 
     @Override
-    public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
+    public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
         boolean preferTls) {
-      if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
-        return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId,
-            preferTls);
-      }
-      return null;
-    }
-
-    @Override
-    public Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
-        boolean preferTls) {
-      if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
-        return getRequestMapFromRoutingTable(_realtimeRoutingTable, _realtimeBrokerRequest, requestId, brokerId,
-            preferTls);
-      }
-      return null;
+      return TableRouteUtils.getRequestMap(requestId, brokerId, this, preferTls);
     }
   }
 

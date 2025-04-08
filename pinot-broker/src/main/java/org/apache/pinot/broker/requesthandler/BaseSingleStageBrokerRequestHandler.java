@@ -85,10 +85,10 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRoute;
+import org.apache.pinot.core.transport.TableRouteComputer;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.query.table.ImplicitTableRoute;
+import org.apache.pinot.query.table.ImplicitTableRouteComputer;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -391,7 +391,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Get the tables hit by the request
-    TableRoute tableRoute = new ImplicitTableRoute(tableName);
+    TableRouteComputer tableRoute = new ImplicitTableRouteComputer(tableName);
     tableRoute.getTableConfig(_tableCache);
     tableRoute.checkRoutes(_routingManager);
 
@@ -1946,7 +1946,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRouteComputer route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
