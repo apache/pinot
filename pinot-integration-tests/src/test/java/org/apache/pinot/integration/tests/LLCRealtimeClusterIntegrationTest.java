@@ -21,9 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URI;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -33,11 +31,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
@@ -62,6 +58,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -70,10 +67,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -127,40 +121,31 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Override
   protected void runValidationJob(long timeoutMs)
       throws Exception {
-    final int partition = ExceptingKafkaConsumerFactory.PARTITION_FOR_EXCEPTIONS;
+    int partition = ExceptingKafkaConsumerFactory.PARTITION_FOR_EXCEPTIONS;
     if (partition < 0) {
       return;
     }
-    int[] seqNumbers = {ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CREATE_EXCEPTION,
-        ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CONSUME_EXCEPTION};
-    Arrays.sort(seqNumbers);
-    for (int seqNum : seqNumbers) {
-      if (seqNum < 0) {
-        continue;
-      }
-      TestUtils.waitForCondition(() -> isOffline(partition, seqNum), 5000L, timeoutMs,
-          "Failed to find offline segment in partition " + partition + " seqNum ", true,
-          Duration.ofMillis(timeoutMs / 10));
+    for (int seqNum : new int[]{
+        ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CREATE_EXCEPTION,
+        ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CONSUME_EXCEPTION
+    }) {
+      TestUtils.waitForCondition(aVoid -> isOffline(partition, seqNum), timeoutMs,
+          "Failed to find OFFLINE segment in partition: " + partition + ", seqNum: " + seqNum);
       getControllerRequestClient().runPeriodicTask("RealtimeSegmentValidationManager");
     }
   }
 
   private boolean isOffline(int partition, int seqNum) {
-    ExternalView ev = _helixAdmin.getResourceExternalView(getHelixClusterName(),
+    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(),
         TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
-
-    boolean isOffline = false;
-    for (String segmentNameStr : ev.getPartitionSet()) {
-      if (LLCSegmentName.isLLCSegment(segmentNameStr)) {
-        LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-        if (segmentName.getSequenceNumber() == seqNum && segmentName.getPartitionGroupId() == partition
-            && ev.getStateMap(segmentNameStr).values().contains(
-            CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE)) {
-          isOffline = true;
-        }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
+      if (llcSegmentName != null && llcSegmentName.getPartitionGroupId() == partition
+          && llcSegmentName.getSequenceNumber() == seqNum) {
+        return !entry.getValue().containsValue(SegmentStateModel.CONSUMING);
       }
     }
-    return isOffline;
+    return false;
   }
 
   @Override
@@ -432,7 +417,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     assertNotNull(idealState);
     Set<String> consumingSegments = new HashSet<>();
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      if (entry.getValue().containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
+      if (entry.getValue().containsValue(SegmentStateModel.CONSUMING)) {
         consumingSegments.add(entry.getKey());
       }
     }
@@ -552,22 +537,17 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }
 
     private int getSegmentSeqNum(int partition) {
-      IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName,
-          TableNameBuilder.REALTIME.tableNameWithType(_tableName));
-      AtomicInteger seqNum = new AtomicInteger(-1);
-      is.getPartitionSet().forEach(segmentNameStr -> {
-        if (LLCSegmentName.isLLCSegment(segmentNameStr)) {
-          if (is.getInstanceStateMap(segmentNameStr).values().contains(
-              CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING)) {
-            LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-            if (segmentName.getPartitionGroupId() == partition) {
-              seqNum.set(segmentName.getSequenceNumber());
-            }
-          }
+      IdealState idealState =
+          _helixAdmin.getResourceIdealState(_helixClusterName, TableNameBuilder.REALTIME.tableNameWithType(_tableName));
+      for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+        LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
+        if (llcSegmentName != null && llcSegmentName.getPartitionGroupId() == partition && entry.getValue()
+            .containsValue(SegmentStateModel.CONSUMING)) {
+          return llcSegmentName.getSequenceNumber();
         }
-      });
-      assertTrue(seqNum.get() >= 0, "No consuming segment found in partition: " + partition);
-      return seqNum.get();
+      }
+      fail("No consuming segment found in partition: " + partition);
+      return -1;
     }
 
     public static class ExceptingKafkaConsumer extends KafkaPartitionLevelConsumer {

@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -33,7 +32,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -143,24 +141,82 @@ public class SegmentAssignmentUtils {
   }
 
   /**
-   * Rebalances the table with Helix AutoRebalanceStrategy.
+   * Rebalances the table for the non-replica-group based segment assignment strategy by using uniformly spraying
+   * segment replicas to the instances.
+   * <ul>
+   *   <li>
+   *     1. Calculate the target number of segments on each instance
+   *   </li>
+   *   <li>
+   *     2. Loop over all the segments and keep the assignment if target number of segments for the instance has not
+   *     been reached and track the not assigned segments
+   *   </li>
+   *   <li>
+   *     3. Assign the left-over segments to the instances with the least segments, or the smallest index if there is a
+   *     tie
+   *   </li>
+   * </ul>
    */
-  public static Map<String, Map<String, String>> rebalanceTableWithHelixAutoRebalanceStrategy(
+  public static Map<String, Map<String, String>> rebalanceNonReplicaGroupBasedTable(
       Map<String, Map<String, String>> currentAssignment, List<String> instances, int replication) {
-    // Use Helix AutoRebalanceStrategy to rebalance the table
-    LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-    states.put(SegmentStateModel.ONLINE, replication);
-    AutoRebalanceStrategy autoRebalanceStrategy =
-        new AutoRebalanceStrategy(null, new ArrayList<>(currentAssignment.keySet()), states);
-    // Make a copy of the current assignment because this step might change the passed in assignment
-    Map<String, Map<String, String>> currentAssignmentCopy = new TreeMap<>();
+    Map<String, Integer> instanceNameToIdMap = getInstanceNameToIdMap(instances);
+
+    // Calculate target number of segments per instance
+    // NOTE: in order to minimize the segment movements, use the ceiling of the quotient
+    int numInstances = instances.size();
+    int numSegments = currentAssignment.size();
+    int targetNumSegmentsPerInstance = (numSegments * replication + numInstances - 1) / numInstances;
+
+    // Do not move segment if target number of segments is not reached, track the segments need to be moved
+    Map<String, Map<String, String>> newAssignment = new TreeMap<>();
+    int[] numSegmentsAssignedPerInstance = new int[numInstances];
+    List<String> segmentsNotAssigned = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-      currentAssignmentCopy.put(segmentName, new TreeMap<>(instanceStateMap));
+      Set<String> currentInstances = entry.getValue().keySet();
+      int remainingReplicas = replication;
+      for (String instanceName : currentInstances) {
+        Integer instanceId = instanceNameToIdMap.get(instanceName);
+        if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
+          newAssignment.computeIfAbsent(segmentName, k -> new TreeMap<>()).put(instanceName, SegmentStateModel.ONLINE);
+          numSegmentsAssignedPerInstance[instanceId]++;
+          remainingReplicas--;
+          if (remainingReplicas == 0) {
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < remainingReplicas; i++) {
+        segmentsNotAssigned.add(segmentName);
+      }
     }
-    return autoRebalanceStrategy.computePartitionAssignment(instances, instances, currentAssignmentCopy, null)
-        .getMapFields();
+
+    // Assign each not assigned segment to the instance with the least segments, or the smallest id if there is a tie
+    PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
+    for (int instanceId = 0; instanceId < numInstances; instanceId++) {
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerInstance[instanceId], instanceId));
+    }
+    List<Pairs.IntPair> skippedPairs = new ArrayList<>();
+    for (String segmentName : segmentsNotAssigned) {
+      Map<String, String> instanceStateMap = newAssignment.computeIfAbsent(segmentName, k -> new TreeMap<>());
+      while (true) {
+        Pairs.IntPair intPair = heap.remove();
+        int instanceId = intPair.getRight();
+        String instanceName = instances.get(instanceId);
+        // Skip the instance if it already has the segment
+        if (instanceStateMap.put(instanceName, SegmentStateModel.ONLINE) == null) {
+          intPair.setLeft(intPair.getLeft() + 1);
+          heap.add(intPair);
+          break;
+        } else {
+          skippedPairs.add(intPair);
+        }
+      }
+      heap.addAll(skippedPairs);
+      skippedPairs.clear();
+    }
+
+    return newAssignment;
   }
 
   /**
