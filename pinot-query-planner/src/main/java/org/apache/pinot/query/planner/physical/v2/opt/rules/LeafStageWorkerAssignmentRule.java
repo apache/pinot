@@ -192,6 +192,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
           return assignmentResult;
         }
       } else {
+        // TODO(mse-physical): Support automatic partitioned dist for hybrid tables.
         LOGGER.warn("Automatic Partitioned Distribution not supported for Hybrid Tables yet");
       }
     }

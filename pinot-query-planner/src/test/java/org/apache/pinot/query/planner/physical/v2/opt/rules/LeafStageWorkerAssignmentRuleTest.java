@@ -96,7 +96,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   @Test
-  public void testAssignPartitionedOfflineTable() {
+  public void testAssignTableScanPartitionedOfflineTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
         OFFLINE_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo()));
     // Basic checks.
@@ -112,7 +112,7 @@ public class LeafStageWorkerAssignmentRuleTest {
   }
 
   @Test
-  public void testAssignPartitionedRealtimeTable() {
+  public void testAssignTableScanPartitionedRealtimeTable() {
     TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
         REALTIME_INSTANCE_ID_TO_SEGMENTS, Map.of("REALTIME", createRealtimeTablePartitionInfo()));
     // Basic checks.
@@ -125,6 +125,19 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
     assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
     validateTableScanAssignment(result, REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
+  }
+
+  @Test
+  public void testAssignTableScanPartitionedHybridTable() {
+    TableScanWorkerAssignmentResult result = LeafStageWorkerAssignmentRule.assignTableScan(TABLE_NAME, FIELDS_IN_SCAN,
+        HYBRID_INSTANCE_ID_TO_SEGMENTS, Map.of("OFFLINE", createOfflineTablePartitionInfo(),
+            "REALTIME", createRealtimeTablePartitionInfo()));
+    assertEquals(result._pinotDataDistribution.getType(), RelDistribution.Type.RANDOM_DISTRIBUTED);
+    assertEquals(result._pinotDataDistribution.getWorkers().size(), 4);
+    assertEquals(result._pinotDataDistribution.getCollation(), RelCollations.EMPTY);
+    assertEquals(result._pinotDataDistribution.getHashDistributionDesc().size(), 0);
+    validateTableScanAssignment(result, HYBRID_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap, "OFFLINE");
+    validateTableScanAssignment(result, HYBRID_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
   }
 
   private static void validateTableScanAssignment(TableScanWorkerAssignmentResult assignmentResult,
