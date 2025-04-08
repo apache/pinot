@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
@@ -132,6 +133,28 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     LOGGER.info("Deleting uri {} force {}", segmentUri, forceDelete);
     return delete(new GcsUri(segmentUri), forceDelete);
+  }
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    boolean result = true;
+    List<BlobId> blobIds = new ArrayList<>();
+    Iterator<URI> iterator = segmentUris.iterator();
+    while (iterator.hasNext()) {
+      GcsUri gcsUri = new GcsUri(iterator.next());
+      if (existsDirectoryOrBucket(gcsUri)) {
+        result &= delete(gcsUri, forceDelete);
+      } else {
+        blobIds.add(getBlob(gcsUri).getBlobId());
+        if (blobIds.size() >= BATCH_LIMIT || !iterator.hasNext()) {
+          List<Boolean> deleted = _storage.delete(blobIds);
+          result &= deleted.stream().allMatch(Boolean::booleanValue);
+          blobIds.clear();
+        }
+      }
+    }
+    return result;
   }
 
   @Override
