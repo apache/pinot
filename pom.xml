@@ -185,6 +185,10 @@
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
+    <fmpp.version>0.9.16</fmpp.version>
+    <s3mock.version>2.17.0</s3mock.version>
+    <localstack-utils.version>0.2.23</localstack-utils.version>
+    <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.3</spark3.version>
