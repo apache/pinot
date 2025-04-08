@@ -40,7 +40,17 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 public class RowHeapDataBlock implements MseBlock.Data {
   private final DataSchema _dataSchema;
   private final List<Object[]> _rows;
+  /// This is a hack we created to support different hash exchange distributions.
+  /// We should find a new way to keep this information that is more solid than the current one.
+  /// This information is only set in [org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator] and
+  /// [org.apache.pinot.query.runtime.operator.AggregateOperator] and consumed in
+  /// [org.apache.pinot.query.runtime.operator.exchange.HashExchange] when we need to shuffle data.
+  /// This means that the value of this attribute is the same for all blocks in the stage, so we should be able to
+  /// pass this static information from the operator to the exchange without the need to store it in the block.
+  /// Also, some operators in the middle (like [org.apache.pinot.query.runtime.operator.FilterOperator]) may remove
+  /// the aggregation functions from the block, which may be problematic.
   @Nullable
+  @Deprecated
   @SuppressWarnings("rawtypes")
   private final AggregationFunction[] _aggFunctions;
 
@@ -78,6 +88,7 @@ public class RowHeapDataBlock implements MseBlock.Data {
     return _rows;
   }
 
+  @Deprecated
   @Nullable
   @SuppressWarnings("rawtypes")
   public AggregationFunction[] getAggFunctions() {
