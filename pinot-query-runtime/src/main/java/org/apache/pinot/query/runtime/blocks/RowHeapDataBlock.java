@@ -33,7 +33,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 /// At the time of writing, this class is used almost every time we need to read or create data blocks.
 /// The only place where this class is not used is when we need to shuffle data through the network, in which case
 /// we use [SerializedDataBlock].
-public class RowHeapDataBlock implements MseBlock, MseBlock.Data {
+public class RowHeapDataBlock implements MseBlock.Data {
   private final DataSchema _dataSchema;
   private final List<Object[]> _rows;
   @Nullable
