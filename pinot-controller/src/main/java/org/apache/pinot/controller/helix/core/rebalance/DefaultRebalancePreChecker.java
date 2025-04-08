@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,7 +78,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
-    Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
+    Map<String, RebalancePreCheckerResult> preCheckResult = new LinkedHashMap<>();
     // Check for reload status
     preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType,
         preCheckContext.getCurrentAssignment()));
