@@ -339,7 +339,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     Set<String> newSegmentsNotExistingBefore = new HashSet<>();
 
     // Segments to monitor is the list of segments that are being moved as part of the table rebalance that the
-    // table rebalance intends to track convergence for. This list usually includes segments from the last next
+    // table rebalance intends to track convergence for. This list usually includes segments from the last
     // assignment IS update and the current IS update. The EV-IS convergence check only tracks convergence for the
     // segments on this list, and if any additional segments are found that haven't converged they are ignored.
     // From the stats perspective, we also only care about tracking the convergence of actual segments that the
