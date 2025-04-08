@@ -39,7 +39,7 @@ public interface SendingMailbox {
 
   /**
    * Sends a data block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call,
-   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was a
+   * and they should <b>not</b> acquire any resources when they are created. This method should throw if there was an
    * error sending the data, since that would allow {@link BlockExchange} to exit early.
    */
   void send(MseBlock.Data data)
