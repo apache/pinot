@@ -38,7 +38,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -103,11 +102,6 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
-  private String _hostname;
-  private int _port;
-  private HelixManager _helixManager;
-  private ServerMetrics _serverMetrics;
-
   private ExecutorService _executorService;
   private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
@@ -141,18 +135,14 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, HelixManager helixManager,
-      ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, @Nullable TlsConfig tlsConfig,
+      BooleanSupplier sendStats) {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
     int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
-    _hostname = hostname;
-    _port = port;
-    _helixManager = helixManager;
-    _serverMetrics = serverMetrics;
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
@@ -192,6 +182,7 @@ public class QueryRunner {
         Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE
     );
 
+    ServerMetrics serverMetrics = ServerMetrics.get();
     MetricsExecutor metricsExecutor = new MetricsExecutor(
         baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
@@ -209,8 +200,7 @@ public class QueryRunner {
     _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
-          serverMetrics);
+      _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -299,8 +289,8 @@ public class QueryRunner {
             workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
-          _leafQueryExecutor, _executorService);
+      opChain =
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
@@ -485,8 +475,9 @@ public class QueryRunner {
     OpChainExecutionContext executionContext = new OpChainExecutionContext(_mailboxService, requestId, deadlineMs,
         opChainMetadata, stageMetadata, workerMetadata, null, null, false);
 
-    OpChain opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager,
-        _serverMetrics, _leafQueryExecutor, _executorService, leafNodesConsumer, true);
+    OpChain opChain =
+        ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+            leafNodesConsumer, true);
     opChain.close(); // probably unnecessary, but formally needed
 
     PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);
@@ -534,8 +525,7 @@ public class QueryRunner {
       if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
         String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
         String[] segments = entry.getValue().split(",");
-        result.put(planId,
-            Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+        result.put(planId, Stream.of(segments).map(String::strip).collect(Collectors.toList()));
       }
     }
     return result;

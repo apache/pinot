@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
 
@@ -456,6 +455,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
         "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+    public static final String CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN =
+            "pinot.broker.enable.dynamic.filtering.semijoin";
+    public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
     public static class Request {
       public static final String SQL = "sql";
@@ -1116,6 +1118,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_ID = "pinot.controller.instance.id";
     public static final String CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES =
         "pinot.controller.query.rewriter.class.names";
+
+    // Task Manager configuration
+    public static final String CONFIG_OF_TASK_MANAGER_CLASS = "pinot.controller.task.manager.class";
+    public static final String DEFAULT_TASK_MANAGER_CLASS =
+        "org.apache.pinot.controller.helix.core.minion.PinotTaskManager";
+
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
@@ -1247,9 +1255,6 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
-
-    public static final String CONFIG_OF_INSTANCE_TYPE = "accounting.instance.type";
-    public static final InstanceType DEFAULT_CONFIG_OF_INSTANCE_TYPE = InstanceType.SERVER;
 
     public static final String CONFIG_OF_GC_WAIT_TIME_MS = "accounting.gc.wait.time.ms";
     public static final int DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS = 0;

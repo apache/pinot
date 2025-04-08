@@ -65,6 +65,7 @@ public class SegmentPreProcessor implements AutoCloseable {
   private final SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
 
+  // TODO: Use Schema from IndexLoadingConfig
   public SegmentPreProcessor(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema) {
     _segmentDirectory = segmentDirectory;

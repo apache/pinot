@@ -99,11 +99,9 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -1188,8 +1186,7 @@ public class TablesResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
-      Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
-      return tableDataManager.getStaleSegments(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+      return tableDataManager.getStaleSegments();
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

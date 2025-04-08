@@ -19,10 +19,7 @@
 
 import React from 'react';
 import {
-  Grid,
-  Box,
-  Typography,
-  Divider, Button
+  Grid, Box, Typography, Divider, Button, CircularProgress
 } from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
@@ -42,9 +39,9 @@ type Props = {
   hideModal: (event: React.MouseEvent<HTMLElement, MouseEvent>) => void
 };
 
-const DryRunAction = ({ handleOnRun }: { handleOnRun: () => void }) => {
+const DryRunAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disabled?: boolean }) => {
   return (
-      <Button onClick={handleOnRun} variant="outlined" style={{ textTransform: 'none' }} color="primary">
+      <Button disabled={disabled} onClick={handleOnRun} variant="outlined" style={{ textTransform: 'none' }} color="primary">
         Dry Run
       </Button>
   );
@@ -55,6 +52,7 @@ export default function RebalanceServerTableOp({
   tableName,
   tableType
 }: Props) {
+  const [pending, setPending] = React.useState(false);
   const [rebalanceResponse, setRebalanceResponse] = React.useState(null)
   const [rebalanceConfig, setRebalanceConfig] = React.useState(
       rebalanceServerOptions.reduce((config, option) => ({ ...config, [option.name]: option.defaultValue }), {})
@@ -69,18 +67,39 @@ export default function RebalanceServerTableOp({
 
   const handleSave = async () => {
     const data = getData();
+    setPending(true);
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, data);
-    setRebalanceResponse(response);
+
+    if (response.error) {
+      setRebalanceResponse({
+        description: response.error,
+        jobId: "NA",
+        status: response.code
+      })
+    } else {
+      setRebalanceResponse(response);
+    }
+    setPending(false);
   };
 
   const handleDryRun = async () => {
     const data = getData();
+    setPending(true);
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, {
       ...data,
       dryRun: true,
       preChecks: true
     });
-    setRebalanceResponse(response);
+    if (response.error) {
+      setRebalanceResponse({
+        description: response.error,
+        jobId: "NA",
+        status: response.code
+      })
+    } else {
+      setRebalanceResponse(response);
+    }
+    setPending(false);
   };
 
   const handleConfigChange = (config: { [key: string]: string | number | boolean }) => {
@@ -90,19 +109,37 @@ export default function RebalanceServerTableOp({
     });
   }
 
+  if (pending) {
+    return (
+        <Dialog
+            showTitleDivider
+            showFooterDivider
+            size='md'
+            open={true}
+            handleClose={hideModal}
+            title={<RebalanceServerDialogHeader />}
+            showOkBtn={false}
+        >
+          <Box alignItems='center' display='flex' justifyContent='center'>
+            <CircularProgress />
+          </Box>
+        </Dialog>
+    )
+  }
 
   return (
     <Dialog
       showTitleDivider
       showFooterDivider
       size='md'
+      okBtnDisabled={pending}
       open={true}
       handleClose={hideModal}
       title={<RebalanceServerDialogHeader />}
       handleSave={handleSave}
       btnOkText='Rebalance'
       showOkBtn={!rebalanceResponse}
-      moreActions={!rebalanceResponse ? <DryRunAction handleOnRun={handleDryRun} /> : null}
+      moreActions={!rebalanceResponse ? <DryRunAction disabled={pending} handleOnRun={handleDryRun} /> : null}
     >
         {!rebalanceResponse ?
           <Box flexDirection="column">
