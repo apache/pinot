@@ -294,6 +294,7 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <openhft.posix.version>2.27ea1</openhft.posix.version>
     <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
+    <proto-google-common-protos.version>2.54.1</proto-google-common-protos.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
