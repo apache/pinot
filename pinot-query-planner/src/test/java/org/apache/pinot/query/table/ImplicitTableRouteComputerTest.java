@@ -47,7 +47,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class ImplicitTableRouteTest {
+public class ImplicitTableRouteComputerTest {
   //@formatter:off
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of(
@@ -157,7 +157,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "offlineTableProvider")
   public void testOfflineTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -181,7 +181,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "realtimeTableProvider")
   public void testRealtimeTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -204,7 +204,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "hybridTableProvider")
   public void testHybridTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -216,7 +216,7 @@ public class ImplicitTableRouteTest {
    */
   @Test
   public void testWithNoTimeBoundary() {
-    ImplicitTableRoute table = new ImplicitTableRoute("b");
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer("b");
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -243,7 +243,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "nonExistentTableProvider")
   public void testNonExistentTableName(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
 
     assertFalse(table.isExists(), "The table should not exist");
@@ -271,7 +271,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "routeExistsProvider")
   public void testRouteExists(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -295,7 +295,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "routeNotExistsProvider")
   public void testRouteNotExists(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -332,7 +332,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -352,7 +352,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -377,7 +377,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledTable(String parameter) {
-    ImplicitTableRoute table = new ImplicitTableRoute(parameter);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -409,7 +409,7 @@ public class ImplicitTableRouteTest {
       _brokerResponse = brokerResponse;
     }
 
-    boolean similar(ImplicitTableRoute tableRoute) {
+    boolean similar(ImplicitTableRouteComputer tableRoute) {
       boolean isEquals = true;
 
       if (_offlineTableName != null) {
@@ -515,7 +515,7 @@ public class ImplicitTableRouteTest {
   @Test(dataProvider = "tableNameAndConfigSuccessProvider")
   public void testTableNameAndConfigSuccess(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -544,7 +544,7 @@ public class ImplicitTableRouteTest {
   @Test(dataProvider = "tableNameAndConfigFailureProvider")
   public void testTableNameAndConfigFailure(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -595,7 +595,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -611,7 +611,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -629,7 +629,7 @@ public class ImplicitTableRouteTest {
 
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRoute table = new ImplicitTableRoute(tableName);
+    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 

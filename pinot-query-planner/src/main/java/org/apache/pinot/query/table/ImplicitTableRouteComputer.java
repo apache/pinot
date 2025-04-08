@@ -30,9 +30,10 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.BaseTableRoute;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.TableRouteComputer;
+import org.apache.pinot.core.transport.TableRouteUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -45,8 +46,8 @@ import org.slf4j.LoggerFactory;
  * then it represents a OFFLINE and REALTIME table with the same raw table name.
  * If the table name has a type, then it represents the table with the given type.
  */
-public class ImplicitTableRoute extends BaseTableRoute {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitTableRoute.class);
+public class ImplicitTableRouteComputer implements TableRouteComputer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitTableRouteComputer.class);
 
   private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
@@ -67,7 +68,7 @@ public class ImplicitTableRoute extends BaseTableRoute {
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegmentsTotal = 0;
 
-  public ImplicitTableRoute(String tableName) {
+  public ImplicitTableRouteComputer(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {
@@ -363,25 +364,7 @@ public class ImplicitTableRoute extends BaseTableRoute {
   /*
    * Calculate RequestMap Section
    */
-
-  @Nullable
-  @Override
-  public Map<ServerRoutingInstance, InstanceRequest> getOfflineRequestMap(long requestId, String brokerId,
-      boolean preferTls) {
-    if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
-      return getRequestMapFromRoutingTable(_offlineRoutingTable, _offlineBrokerRequest, requestId, brokerId, preferTls);
-    }
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public Map<ServerRoutingInstance, InstanceRequest> getRealtimeRequestMap(long requestId, String brokerId,
-      boolean preferTls) {
-    if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
-      return getRequestMapFromRoutingTable(_realtimeRoutingTable, _realtimeBrokerRequest, requestId, brokerId,
-          preferTls);
-    }
-    return null;
+  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
+    return TableRouteUtils.getRequestMap(requestId, brokerId, this, preferTls);
   }
 }
