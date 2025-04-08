@@ -80,16 +80,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(MseBlock.Data data)
       throws IOException, TimeoutException {
-    sendPrivate(data, List.of());
+    sendInternal(data, List.of());
   }
 
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
       throws IOException, TimeoutException {
-    sendPrivate(block, serializedStats);
+    sendInternal(block, serializedStats);
   }
 
-  private void sendPrivate(MseBlock block, List<DataBuffer> serializedStats)
+  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
