@@ -27,6 +27,10 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 /// A block that contains data in row heap format.
+/// This means that the data is stored as list of rows, where each row is an array of objects and each object is a
+/// reference to the cell value.
+/// This representation is expensive in terms of memory and should be avoided if possible, although it is used almost
+/// everytime a [org.apache.pinot.query.runtime.operator.MultiStageOperator] is used.
 ///
 /// This class is a subclass of [MseBlock.Data] and is used to store data in row heap format.
 /// This is probably the less efficient way to store data, but it is also the easiest to work with.
