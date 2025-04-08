@@ -86,10 +86,4 @@ public class PhysicalJoin extends Join implements PRelNode {
     return new PhysicalJoin(getCluster(), getTraitSet(), getHints(), getCondition(), getVariablesSet(), getJoinType(),
         newNodeId, newInputs.get(0), newInputs.get(1), newDistribution);
   }
-
-  @Override
-  public PhysicalJoin asLeafStage() {
-    // TODO(mse-physical): Lookup join may be included in the leaf stage.
-    throw new UnsupportedOperationException("Join cannot be included in the leaf stage");
-  }
 }

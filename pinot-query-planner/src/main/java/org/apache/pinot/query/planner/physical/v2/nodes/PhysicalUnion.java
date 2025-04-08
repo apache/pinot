@@ -83,9 +83,4 @@ public class PhysicalUnion extends Union implements PRelNode {
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalUnion(getCluster(), getTraitSet(), getHints(), all, newInputs, newNodeId, newDistribution);
   }
-
-  @Override
-  public PRelNode asLeafStage() {
-    throw new UnsupportedOperationException("Union cannot be in the leaf stage");
-  }
 }

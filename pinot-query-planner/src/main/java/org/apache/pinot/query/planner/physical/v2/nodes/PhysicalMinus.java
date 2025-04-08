@@ -81,9 +81,4 @@ public class PhysicalMinus extends Minus implements PRelNode {
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalMinus(getCluster(), getTraitSet(), getHints(), newInputs, all, newNodeId, newDistribution);
   }
-
-  @Override
-  public PhysicalMinus asLeafStage() {
-    throw new UnsupportedOperationException("Minus cannot be in the leaf stage");
-  }
 }

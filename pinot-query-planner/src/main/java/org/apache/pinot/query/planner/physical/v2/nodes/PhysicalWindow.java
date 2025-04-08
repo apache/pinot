@@ -91,9 +91,4 @@ public class PhysicalWindow extends Window implements PRelNode {
     return new PhysicalWindow(getCluster(), getTraitSet(), getHints(), getConstants(), getRowType(), groups, newNodeId,
         newInputs.get(0), newDistribution);
   }
-
-  @Override
-  public PhysicalWindow asLeafStage() {
-    throw new UnsupportedOperationException("Window cannot be in the leaf stage");
-  }
 }

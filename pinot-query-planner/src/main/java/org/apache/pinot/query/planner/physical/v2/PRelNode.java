@@ -110,5 +110,7 @@ public interface PRelNode {
     return with(getNodeId(), newInputs, getPinotDataDistributionOrThrow());
   }
 
-  PRelNode asLeafStage();
+  default PRelNode asLeafStage() {
+    throw new UnsupportedOperationException(String.format("Cannot make %s a leaf stage node", unwrap()));
+  }
 }
