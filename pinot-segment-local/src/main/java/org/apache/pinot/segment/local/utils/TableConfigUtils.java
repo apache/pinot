@@ -377,7 +377,8 @@ public final class TableConfigUtils {
           try {
             FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
           } catch (Exception e) {
-            throw new IllegalStateException("Invalid filter function " + filterFunction + e.getMessage(), e);
+            throw new IllegalStateException(
+                "Invalid filter function " + filterFunction + ", exception: " + e.getMessage(), e);
           }
         }
       }
@@ -539,7 +540,7 @@ public final class TableConfigUtils {
           } catch (Exception e) {
             throw new IllegalStateException(
                 "Invalid transform function '" + transformFunction + "' for column '" + columnName
-                    + "'" + e.getMessage(), e);
+                    + "', exception: " + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {

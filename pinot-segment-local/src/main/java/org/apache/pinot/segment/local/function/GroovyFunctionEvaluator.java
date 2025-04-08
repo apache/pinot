@@ -86,8 +86,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     try {
       _script = createSafeShell(_binding).parse(scriptText);
     } catch (Exception e) {
-      LOGGER.error("Groovy compilation error: " + closure, e);
-      throw new IllegalStateException("Failed to compile groovy script in transform function:" + e.getMessage(), e);
+      throw new IllegalStateException(
+          "Failed to compile groovy script in transform function with exception:" + e.getMessage(), e);
     }
   }
 
