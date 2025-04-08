@@ -30,7 +30,8 @@ public class PhysicalOptRuleSet {
   private PhysicalOptRuleSet() {
   }
 
-  public static List<Pair<PRelOptRule, RuleExecutors.Type>> create(PhysicalPlannerContext context, TableCache tableCache) {
+  public static List<Pair<PRelOptRule, RuleExecutors.Type>> create(PhysicalPlannerContext context,
+      TableCache tableCache) {
     return List.of(
         Pair.of(LeafStageBoundaryRule.INSTANCE, RuleExecutors.Type.POST_ORDER),
         Pair.of(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER));
