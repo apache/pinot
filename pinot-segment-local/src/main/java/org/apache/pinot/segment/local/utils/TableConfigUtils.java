@@ -538,7 +538,8 @@ public final class TableConfigUtils {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'" + e.getMessage() , e);
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName
+                    + "'" + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
