@@ -398,11 +398,16 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
       throws IOException {
-    // assumption: all URIs in the batch are from the same bucket
     boolean deletionResult = true;
+    String prevBucket = null;
     try {
       List<ObjectIdentifier> objectsToDelete = new ArrayList<>();
       LOGGER.info("Deleting URIs {} force {}", segmentUris, forceDelete);
+      // initialize the first bucket
+      if (!segmentUris.isEmpty()) {
+        prevBucket = segmentUris.get(0).getHost();
+      }
+      // Iterate through the URIs and delete them
       for (URI segmentUri : segmentUris) {
 
         if (isDirectory(segmentUri)) {
@@ -418,18 +423,20 @@ public class S3PinotFS extends BasePinotFS {
         } else {
           String key = sanitizePath(segmentUri.getPath());
           objectsToDelete.add(ObjectIdentifier.builder().key(key).build());
+          String bucket = segmentUri.getHost();
 
           // If batch reaches max size, process the batch
-          if (objectsToDelete.size() >= DELETE_BATCH_SIZE) {
-            deletionResult &= processBatch(segmentUri.getHost(), objectsToDelete);
+          if (objectsToDelete.size() >= DELETE_BATCH_SIZE || !bucket.equals(prevBucket)) {
+            deletionResult &= processBatch(prevBucket, objectsToDelete);
             objectsToDelete.clear();  // Clear list for the next batch
+            prevBucket = bucket;
           }
         }
       }
 
       // Process remaining files in the last batch
       if (!objectsToDelete.isEmpty()) {
-        deletionResult &= processBatch(segmentUris.get(0).getHost(), objectsToDelete);
+        deletionResult &= processBatch(prevBucket, objectsToDelete);
       }
       return deletionResult;
     } catch (S3Exception e) {
