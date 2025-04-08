@@ -132,7 +132,7 @@ public enum QueryErrorCode {
   }
 
   public QueryException asSimpleException(String message) {
-    return new SimpleQueryException(message);
+    return new SimpleQueryException(this, message);
   }
 
   public boolean isClientError() {
