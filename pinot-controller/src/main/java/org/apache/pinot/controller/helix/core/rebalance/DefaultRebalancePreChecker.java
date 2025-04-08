@@ -78,6 +78,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     LOGGER.info("Start pre-checks for table: {} with rebalanceJobId: {}", tableNameWithType, rebalanceJobId);
 
+    // If pre-check items are to be done in parallel, we should not use linked hash map but to sort the result in the
+    // end
     Map<String, RebalancePreCheckerResult> preCheckResult = new LinkedHashMap<>();
     // Check for reload status
     preCheckResult.put(NEEDS_RELOAD_STATUS, checkReloadNeededOnServers(rebalanceJobId, tableNameWithType,
@@ -131,7 +133,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       LOGGER.info("Received {} needs reload responses and {} failed responses from servers for table: {} with "
-          + "rebalanceJobId: {}, number of servers queried: {}", needsReloadMetadata.size(), failedResponses,
+              + "rebalanceJobId: {}, number of servers queried: {}", needsReloadMetadata.size(), failedResponses,
           tableNameWithType, rebalanceJobId, currentlyAssignedServers.size());
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
