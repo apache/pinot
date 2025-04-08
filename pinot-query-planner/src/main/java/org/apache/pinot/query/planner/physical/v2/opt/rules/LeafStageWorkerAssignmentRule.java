@@ -187,7 +187,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
         String tableNameWithType = TableNameBuilder.forType(TableType.valueOf(tableType)).tableNameWithType(tableName);
         TableScanWorkerAssignmentResult assignmentResult = attemptPartitionedDistribution(tableNameWithType,
             fieldNames, instanceIdToSegments.getSegmentsMap(TableType.valueOf(tableType)),
-            tpiMap.get(tableNameWithType));
+            tpiMap.get(tableType));
         if (assignmentResult != null) {
           return assignmentResult;
         }
@@ -215,7 +215,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       for (var tableTypeAndSegments : entry.getValue().entrySet()) {
         String tableType = tableTypeAndSegments.getKey();
         List<String> segments = tableTypeAndSegments.getValue();
-        workerIdToSegmentsMap.put(workers.size(), Map.of(tableType, segments));
+        workerIdToSegmentsMap.computeIfAbsent(workers.size(), (x) -> new HashMap<>()).put(tableType, segments);
       }
       workers.add(String.format("%s@%s", workers.size(), instanceId));
     }

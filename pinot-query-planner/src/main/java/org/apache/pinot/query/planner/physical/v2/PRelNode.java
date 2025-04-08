@@ -25,8 +25,6 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
-import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
 
 
 /**
