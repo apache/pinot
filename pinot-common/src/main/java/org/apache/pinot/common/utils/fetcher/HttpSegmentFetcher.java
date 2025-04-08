@@ -44,9 +44,9 @@ import org.apache.pinot.spi.utils.retry.RetryPolicies;
 
 public class HttpSegmentFetcher extends BaseSegmentFetcher {
   protected FileUploadDownloadClient _httpClient;
-  private static final String CONNECTION_REQUEST_TIMEOUT_CONFIG_KEY =
+  public static final String CONNECTION_REQUEST_TIMEOUT_CONFIG_KEY =
       "http.request.connectionRequestTimeoutMs";
-  private static final String SOCKET_TIMEOUT_CONFIG_KEY = "http.request.socketTimeoutMs";
+  public static final String SOCKET_TIMEOUT_CONFIG_KEY = "http.request.socketTimeoutMs";
   private int _connectionRequestTimeoutMs;
   private int _socketTimeoutMs;
 
@@ -54,6 +54,17 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   void setHttpClient(FileUploadDownloadClient httpClient) {
     _httpClient = httpClient;
   }
+
+  @VisibleForTesting
+  public int getConnectionRequestTimeoutMs() {
+    return _connectionRequestTimeoutMs;
+  }
+
+  @VisibleForTesting
+  public int getSocketTimeoutMs() {
+    return _socketTimeoutMs;
+  }
+
 
   @Override
   protected void doInit(PinotConfiguration config) {
