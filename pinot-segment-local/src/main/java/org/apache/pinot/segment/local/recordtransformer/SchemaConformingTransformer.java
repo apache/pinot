@@ -94,8 +94,8 @@ import org.slf4j.LoggerFactory;
  * }
  * Apart from the basic transformation above, this transformer today also does the following additional tasks (which in
  * future can be decoupled from this transformer):
- *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate text indexing and search. This
- *       extra step can be enabled via mergedTextIndexFieldSpec.
+ *    1. Put all field + value pair in a special column "_mergedTextIndex" to facilitate full text indexing and search.
+ *    This extra step can be enabled via mergedTextIndexFieldSpec.
  *    2. Allow users to tag certain fields in the input record not to be included in the catch-all field.
  * </pre>
  * <p>
@@ -338,7 +338,8 @@ public class SchemaConformingTransformer implements RecordTransformer {
       putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
           extraFieldsContainer.getUnindexableExtras(), outputRecord);
 
-      // Generate merged text index
+      // Generate merged text index. This optional step puts all field + value pairs in the input record in a special
+      // column "_mergedTextIndex" to perform full text indexing and search.
       if (null != _mergedTextIndexFieldSpec && !mergedTextIndexMap.isEmpty()) {
         List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(mergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
