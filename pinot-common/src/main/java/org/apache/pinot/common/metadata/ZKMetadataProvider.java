@@ -376,6 +376,15 @@ public class ZKMetadataProvider {
     return propertyStore.remove(constructPropertyStorePathForSegment(tableNameWithType, segmentName),
         AccessOption.PERSISTENT);
   }
+  public static boolean removePauselessDebugMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    String pauselessDebugMetadataPath = constructPropertyStorePathForPauselessDebugMetadata(tableNameWithType);
+    if (propertyStore.exists(pauselessDebugMetadataPath, AccessOption.PERSISTENT)) {
+      return propertyStore.remove(pauselessDebugMetadataPath, AccessOption.PERSISTENT);
+    }
+    return true;
+  }
+
 
   @Nullable
   public static ZNRecord getZnRecord(ZkHelixPropertyStore<ZNRecord> propertyStore, String path) {
