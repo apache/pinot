@@ -179,7 +179,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     } catch (QueryException e) {
       if (isYellowError(e)) {
         // a _yellow_ error (see handleRequestThrowing javadoc)
-        LOGGER.warn("Request {} failed with exception", requestId, e);
+        if (isIncludeStackTrace(e)) {
+          LOGGER.warn("Request {} failed with exception", requestId, e);
+        } else {
+          LOGGER.warn("Request {} failed with exception: {}", requestId, e.getErrorCode() + " - " + e.getMessage());
+        }
       } else {
         // a _green_ error (see handleRequestThrowing javadoc)
         LOGGER.info("Request {} failed with message {}", requestId, e.getMessage());
@@ -699,6 +703,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       case BROKER_TIMEOUT:
       case BROKER_REQUEST_SEND:
       case SERVER_NOT_RESPONDING:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  public static boolean isIncludeStackTrace(QueryException e) {
+    switch (e.getErrorCode()) {
+      case INTERNAL:
+      case UNKNOWN:
         return true;
       default:
         return false;
