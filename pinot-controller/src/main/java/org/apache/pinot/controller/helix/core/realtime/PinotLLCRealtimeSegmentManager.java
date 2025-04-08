@@ -824,7 +824,8 @@ public class PinotLLCRealtimeSegmentManager {
           "Segment status for segment %s should be COMMITTING, found: %s", segmentName,
           committingSegmentZKMetadata.getStatus());
       LOGGER.info("Updating segment ZK metadata for segment: {}", segmentName);
-      updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, false);
+      committingSegmentZKMetadata =
+          updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, false);
       LOGGER.info("Successfully updated segment metadata for segment: {}", segmentName);
       // remove the segment from the committing segment list
       LOGGER.info("Removing segment: {} from committing segment list", segmentName);

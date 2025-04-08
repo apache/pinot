@@ -149,7 +149,7 @@
     <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.15</swagger.version>
-    <swagger-ui.version>5.20.3</swagger-ui.version>
+    <swagger-ui.version>5.20.6</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -176,14 +176,14 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.15</aws.sdk.version>
+    <aws.sdk.version>2.31.16</aws.sdk.version>
     <azure.sdk.version>1.2.33</azure.sdk.version>
     <azure.msal4j.version>1.19.1</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
-    <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
 
     <spark2.version>2.4.8</spark2.version>
@@ -272,11 +272,29 @@
     <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.11.0-pre2</c3p0.version>
     <mchange-commons-java.version>0.3.2</mchange-commons-java.version>
+    <checker-qual.version>3.49.2</checker-qual.version>
+    <groovy-all.version>2.4.21</groovy-all.version>
+    <xml-apis.version>2.0.2</xml-apis.version>
+    <roaring-bitmap.version>1.3.0</roaring-bitmap.version>
+    <prometheus.jmx-exporter-javaagent.version>0.19.0</prometheus.jmx-exporter-javaagent.version>
+    <fastutil.version>8.5.15</fastutil.version>
+    <disruptor.version>4.0.0</disruptor.version>
+    <snakeyaml.version>2.4</snakeyaml.version>
+    <hadoop-shaded-protobuf_3_25.version>1.4.0</hadoop-shaded-protobuf_3_25.version>
+    <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
+    <datasketches-java.version>6.2.0</datasketches-java.version>
+    <t-digest.version>3.2</t-digest.version>
+    <picocli.version>4.7.6</picocli.version>
+    <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
+    <jopt-simple.version>5.0.4</jopt-simple.version>
+    <ipaddress.version>5.5.1</ipaddress.version>
+    <openhft.posix.version>2.27ea1</openhft.posix.version>
+    <openhft.chronicle-core.version>2.27ea2</openhft.chronicle-core.version>
 
     <!-- Test Libraries -->
     <testng.version>7.11.0</testng.version>
-    <mockito-core.version>5.16.1</mockito-core.version>
-    <equalsverifier.version>3.19.2</equalsverifier.version>
+    <mockito-core.version>5.17.0</mockito-core.version>
+    <equalsverifier.version>3.19.3</equalsverifier.version>
     <testcontainers.version>1.20.6</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
@@ -805,22 +823,22 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.49.2</version>
+        <version>${checker-qual.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>2.4.21</version>
+        <version>${groovy-all.version}</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>2.0.2</version>
+        <version>${xml-apis.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.3.0</version>
+        <version>${roaring-bitmap.version}</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -842,7 +860,7 @@
       <dependency>
         <groupId>io.prometheus.jmx</groupId>
         <artifactId>jmx_prometheus_javaagent</artifactId>
-        <version>0.19.0</version>
+        <version>${prometheus.jmx-exporter-javaagent.version}</version>
         <scope>test</scope>
       </dependency>
 
@@ -868,7 +886,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.15</version>
+        <version>${fastutil.version}</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -996,7 +1014,7 @@
       <dependency>
         <groupId>com.lmax</groupId>
         <artifactId>disruptor</artifactId>
-        <version>4.0.0</version>
+        <version>${disruptor.version}</version>
       </dependency>
 
       <dependency>
@@ -1007,7 +1025,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.4</version>
+        <version>${snakeyaml.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.zookeeper</groupId>
@@ -1389,7 +1407,7 @@
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
-        <version>1.4.0</version>
+        <version>${hadoop-shaded-protobuf_3_25.version}</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1427,12 +1445,12 @@
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
-        <version>2.9.8</version>
+        <version>${clearspring-stream-lib.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>6.2.0</version>
+        <version>${datasketches-java.version}</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1442,7 +1460,7 @@
       <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
-        <version>3.2</version>
+        <version>${t-digest.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1572,17 +1590,17 @@
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.6</version>
+        <version>${picocli.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.2.0</version>
+        <version>${tyrus-standalone-client.version}</version>
       </dependency>
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
-        <version>5.0.4</version>
+        <version>${jopt-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1603,18 +1621,18 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.5.1</version>
+        <version>${ipaddress.version}</version>
       </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.27ea1</version>
+        <version>${openhft.posix.version}</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.27ea2</version>
+        <version>${openhft.chronicle-core.version}</version>
       </dependency>
 
       <dependency>

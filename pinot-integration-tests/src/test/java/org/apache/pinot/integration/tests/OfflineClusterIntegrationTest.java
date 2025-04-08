@@ -75,6 +75,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResul
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -298,6 +299,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     _executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, _executorService, _controllerConfig.getDiskUtilizationThreshold());
+    ConsumingSegmentInfoReader consumingSegmentInfoReader =
+        new ConsumingSegmentInfoReader(_executorService, null, _helixResourceManager);
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null, null, preChecker,
         _resourceManager.getTableSizeReader());
   }

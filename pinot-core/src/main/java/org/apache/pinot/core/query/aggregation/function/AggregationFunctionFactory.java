@@ -58,7 +58,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored in V1.
+   * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
@@ -360,6 +360,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
+          case DISTINCTCOUNTOFFHEAP:
+            return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
