@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -48,7 +50,12 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.grpc.GrpcConnection;
+import org.apache.pinot.common.compression.CompressionFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -99,6 +106,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected final List<BaseBrokerStarter> _brokerStarters = new ArrayList<>();
   protected final List<Integer> _brokerPorts = new ArrayList<>();
   protected String _brokerBaseApiUrl;
+  protected String _brokerGrpcEndpoint;
 
   protected final List<BaseServerStarter> _serverStarters = new ArrayList<>();
   protected int _serverGrpcPort;
@@ -124,6 +132,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  protected String getBrokerGrpcEndpoint() {
+    return _brokerGrpcEndpoint;
   }
 
   public String getMinionBaseApiUrl() {
@@ -174,6 +186,13 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+
+    int brokerGrpcPort = NetUtils.findOpenPort(_nextBrokerGrpcPort);
+    brokerConf.setProperty(Broker.Grpc.KEY_OF_GRPC_PORT, brokerGrpcPort);
+    if (_brokerGrpcEndpoint == null) {
+      _brokerGrpcEndpoint = "localhost:" + brokerGrpcPort;
+    }
+    _nextBrokerGrpcPort = brokerGrpcPort + 1;
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -330,6 +349,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters.clear();
     _brokerPorts.clear();
     _brokerBaseApiUrl = null;
+    _brokerGrpcEndpoint = null;
   }
 
   protected void stopServer() {
@@ -510,13 +530,60 @@ public abstract class ClusterTest extends ControllerTest {
     return JsonUtils.stringToJsonNode(sendGetRequest(getBrokerBaseApiUrl() + "/" + uri));
   }
 
+  public JsonNode queryGrpcEndpoint(String query, Map<String, String> metadataMap)
+      throws IOException {
+    try (GrpcConnection grpcConnection = ConnectionFactory.fromHostListGrpc(new Properties(),
+        List.of(getBrokerGrpcEndpoint()))) {
+      return grpcConnection.getJsonResponse(query, metadataMap);
+    }
+  }
+
   /**
-   * Queries the broker's sql query endpoint (/query/sql)
+   * Queries the broker's query endpoint (/query/sql), picking http or grpc randomly.
    */
   public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
+    if (useGrpcEndpoint()) {
+      return queryBrokerGrpcEndpoint(query);
+    }
+    return queryBrokerHttpEndpoint(query);
+  }
+
+  /**
+   * Queries the broker's query endpoint (/query/sql)
+   */
+  public JsonNode queryBrokerHttpEndpoint(@Language("sql") String query)
+      throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
+  }
+
+  /**
+   * Queries the broker's grpc query endpoint (/query/sql).
+   */
+  public JsonNode queryBrokerGrpcEndpoint(@Language("sql") String query)
+      throws Exception {
+    return queryGrpcEndpoint(query,
+        Map.of(
+            Broker.Request.QUERY_OPTIONS,
+            Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=" + useMultiStageQueryEngine(),
+            Broker.Grpc.ENCODING, getRandomEncoding(),
+            Broker.Grpc.COMPRESSION, getRandomCompression()
+        ));
+  }
+
+  private static String getRandomEncoding() {
+    int encodingSeqIdx = (int) (System.currentTimeMillis() % ResponseEncoderFactory.getResponseEncoderTypes().length);
+    return ResponseEncoderFactory.getResponseEncoderTypes()[encodingSeqIdx];
+  }
+
+  private static String getRandomCompression() {
+    int compressionSeqIdx = (int) (System.currentTimeMillis() % CompressionFactory.getCompressionTypes().length);
+    return CompressionFactory.getCompressionTypes()[compressionSeqIdx];
+  }
+
+  private static boolean useGrpcEndpoint() {
+    return System.currentTimeMillis() % 2 == 0;
   }
 
   /**
@@ -555,7 +622,109 @@ public abstract class ClusterTest extends ControllerTest {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerQueryApiUrl, payload.toString(), headers));
+    JsonNode responseJsonNode =
+        JsonUtils.stringToJsonNode(sendPostRequest(brokerQueryApiUrl, payload.toString(), headers));
+    return sanitizeResponse(responseJsonNode);
+  }
+
+  private static JsonNode sanitizeResponse(JsonNode responseJsonNode) {
+    try {
+      DataSchema schema =
+          JsonUtils.jsonNodeToObject(responseJsonNode.get("resultTable").get("dataSchema"), DataSchema.class);
+      JsonNode rowsJsonNode = responseJsonNode.get("resultTable").get("rows");
+      if (rowsJsonNode != null) {
+        for (int i = 0; i < rowsJsonNode.size(); i++) {
+          ArrayNode rowJsonNode = (ArrayNode) rowsJsonNode.get(i);
+          for (int j = 0; j < schema.size(); j++) {
+            DataSchema.ColumnDataType columnDataType = schema.getColumnDataType(j);
+            JsonNode jsonValue = rowJsonNode.get(j);
+            if (columnDataType.isArray()) {
+              rowJsonNode.set(j, extractArray(columnDataType, jsonValue));
+            } else if (columnDataType != DataSchema.ColumnDataType.MAP) {
+              rowJsonNode.set(j, extractValue(columnDataType, jsonValue));
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      // Handle any exceptions that occur during the sanitization process
+      System.err.println("Error sanitizing response: " + e.getMessage());
+    }
+    return responseJsonNode;
+  }
+
+  private static JsonNode extractArray(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
+    Object[] array = new Object[jsonValue.size()];
+    for (int k = 0; k < jsonValue.size(); k++) {
+      if (jsonValue.get(k).isNull()) {
+        array[k] = null;
+      }
+      switch (columnDataType) {
+        case BOOLEAN_ARRAY:
+          array[k] = jsonValue.get(k).asBoolean();
+          break;
+        case INT_ARRAY:
+          array[k] = jsonValue.get(k).asInt();
+          break;
+        case LONG_ARRAY:
+          array[k] = jsonValue.get(k).asLong();
+          break;
+        case FLOAT_ARRAY:
+          array[k] = Double.valueOf(jsonValue.get(k).asDouble()).floatValue();
+          break;
+        case DOUBLE_ARRAY:
+          array[k] = jsonValue.get(k).asDouble();
+          break;
+        case STRING_ARRAY:
+        case TIMESTAMP_ARRAY:
+        case BYTES_ARRAY:
+          array[k] = jsonValue.get(k).textValue();
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported data type: " + columnDataType);
+      }
+    }
+    return JsonUtils.objectToJsonNode(array);
+  }
+
+  private static JsonNode extractValue(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
+    if (jsonValue.isNull()) {
+      return jsonValue;
+    }
+    Object object;
+    switch (columnDataType) {
+      case BOOLEAN:
+        object = jsonValue.asBoolean();
+        break;
+      case INT:
+        object = jsonValue.asInt();
+        break;
+      case LONG:
+        object = jsonValue.asLong();
+        break;
+      case FLOAT:
+        object = Double.valueOf(jsonValue.asDouble()).floatValue();
+        break;
+      case DOUBLE:
+        object = jsonValue.asDouble();
+        break;
+      case STRING:
+      case BYTES:
+      case TIMESTAMP:
+      case JSON:
+      case BIG_DECIMAL:
+        object = jsonValue.textValue();
+        break;
+      case UNKNOWN:
+        object = null;
+        break;
+      case OBJECT:
+      case MAP:
+        return jsonValue;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + columnDataType);
+    }
+    return JsonUtils.objectToJsonNode(object);
   }
 
   /**
@@ -576,7 +745,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   public JsonNode cancelQuery(String clientQueryId)
-    throws Exception {
+      throws Exception {
     URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
     Object o = _httpClient.sendDeleteRequest(cancelURI);
     return null; // TODO

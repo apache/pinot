@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {Box, Typography} from "@material-ui/core";
+import {Box, Divider, Typography} from "@material-ui/core";
 import React, {ReactNode, useEffect, useRef, useState} from "react";
 import Link from "@material-ui/core/Link";
 
 type RebalanceServerConfigurationSectionProps = {
     sectionTitle: string;
     children: ReactNode;
+    maxHeight?: number;
     showSectionByDefault?: boolean;
     canHideSection?: boolean;
+    additionalSectionTitle?: ReactNode;
 }
 
-export const RebalanceServerConfigurationSection = (
-    { sectionTitle, children, showSectionByDefault = true, canHideSection = false }: RebalanceServerConfigurationSectionProps
+export const RebalanceServerSection = (
+    { sectionTitle, additionalSectionTitle, children, showSectionByDefault = true, canHideSection = false, maxHeight }: RebalanceServerConfigurationSectionProps
 ) => {
     const [showSection, setShowSection] = useState<boolean>(showSectionByDefault);
     const showHideSectionRef = useRef(null);
@@ -50,12 +52,13 @@ export const RebalanceServerConfigurationSection = (
     }, [showSection, showHideSectionRef]);
 
     return (
-        <Box marginBottom={2}>
-            <Box display='flex' flexDirection='row' alignItems='center' marginBottom={2}>
+        <Box marginBottom={showSection ? 2 : 0}>
+            <Box display='flex' flexDirection='row' alignItems='center' marginBottom={showSection ? 2 : 0}>
                 <div ref={showHideSectionRef} />
                 <Typography variant='body1' style={{ fontWeight: 'bold', marginRight: 10 }}>
                     {sectionTitle}
                 </Typography>
+                {additionalSectionTitle && <Box marginRight={1}>{additionalSectionTitle}</Box>}
                 {canHideSection && (
                     <Link style={{ cursor: 'pointer' }} onClick={() => setShowSection(visible => !visible)}>
                         { showSection ? "Hide" : "Show" }

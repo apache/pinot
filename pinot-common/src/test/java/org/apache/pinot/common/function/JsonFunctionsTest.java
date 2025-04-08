@@ -401,4 +401,35 @@ public class JsonFunctionsTest {
     assertFalse(JsonFunctions.jsonPathExists(null, "$.[*].name"));
     assertFalse(JsonFunctions.jsonPathExists(null, null));
   }
+
+  @Test
+  public void testJsonKeyValueArrayToMap() {
+    String jsonString = "["
+        + "{\"key\": \"k1\", \"value\": \"v1\"}, "
+        + "{\"key\": \"k2\", \"value\": \"v2\"}, "
+        + "{\"key\": \"k3\", \"value\": \"v3\"}, "
+        + "{\"key\": \"k4\", \"value\": \"v4\"}, "
+        + "{\"key\": \"k5\", \"value\": \"v5\"}"
+        + "]";
+    Map<String, Object> expected = ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3", "k4", "v4", "k5", "v5");
+    assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonString), expected);
+
+    Object[] jsonArray = new Object[]{
+        "{\"key\": \"k1\", \"value\": \"v1\"}",
+        "{\"key\": \"k2\", \"value\": \"v2\"}",
+        "{\"key\": \"k3\", \"value\": \"v3\"}",
+        "{\"key\": \"k4\", \"value\": \"v4\"}",
+        "{\"key\": \"k5\", \"value\": \"v5\"}"
+    };
+    assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonArray), expected);
+
+    List<Object> jsonList = ImmutableList.of(
+        "{\"key\": \"k1\", \"value\": \"v1\"}",
+        "{\"key\": \"k2\", \"value\": \"v2\"}",
+        "{\"key\": \"k3\", \"value\": \"v3\"}",
+        "{\"key\": \"k4\", \"value\": \"v4\"}",
+        "{\"key\": \"k5\", \"value\": \"v5\"}"
+    );
+    assertEquals(JsonFunctions.jsonKeyValueArrayToMap(jsonList), expected);
+  }
 }

@@ -159,17 +159,23 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       if (returnFinalResult) {
         for (int i = 0; i < numColumns; i++) {
           Object result = _aggregationFunctions[i].extractFinalResult(_results.get(i));
-          assert result != null;
-          setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+          if (result == null) {
+            dataTableBuilder.setNull(i);
+          } else {
+            setFinalResult(dataTableBuilder, columnDataTypes, i, result);
+          }
         }
       } else {
         for (int i = 0; i < numColumns; i++) {
           Object result = _results.get(i);
-          assert result != null;
-          if (columnDataTypes[i] == ColumnDataType.OBJECT) {
-            dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+          if (result == null) {
+            dataTableBuilder.setNull(i);
           } else {
-            setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+            if (columnDataTypes[i] == ColumnDataType.OBJECT) {
+              dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
+            } else {
+              setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+            }
           }
         }
       }

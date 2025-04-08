@@ -31,6 +31,7 @@ import {
   TableData,
 } from 'Models';
 import Loading from '../components/Loading';
+import moment from "moment";
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -463,6 +464,10 @@ const getLoadingTableData = (columns: string[]): TableData => {
   };
 }
 
+const formatTime = (time: number, format?: string): string => {
+  return moment(time).format(format ?? "MMMM Do YYYY, HH:mm:ss")
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -477,5 +482,6 @@ export default {
   splitStringByLastUnderscore,
   pinotTableDetailsFormat,
   pinotTableDetailsFromArray,
-  getLoadingTableData
+  getLoadingTableData,
+  formatTime
 };

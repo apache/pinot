@@ -39,8 +39,10 @@ import org.apache.pinot.core.query.aggregation.function.array.SumArrayDoubleAggr
 import org.apache.pinot.core.query.aggregation.function.array.SumArrayLongAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelCompleteCountAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelEventsFunctionEvalAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMatchStepAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelMaxStepAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.funnel.window.FunnelStepDurationStatsAggregationFunction;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -56,7 +58,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored in V1.
+   * <p>NOTE: Underscores in the function name are ignored.
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
@@ -358,6 +360,8 @@ public class AggregationFunctionFactory {
             return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
+          case DISTINCTCOUNTOFFHEAP:
+            return new DistinctCountOffHeapAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -467,6 +471,10 @@ public class AggregationFunctionFactory {
             return new FunnelMatchStepAggregationFunction(arguments);
           case FUNNELCOMPLETECOUNT:
             return new FunnelCompleteCountAggregationFunction(arguments);
+          case FUNNELSTEPDURATIONSTATS:
+            return new FunnelStepDurationStatsAggregationFunction(arguments);
+          case FUNNELEVENTSFUNCTIONEVAL:
+            return new FunnelEventsFunctionEvalAggregationFunction(arguments);
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:

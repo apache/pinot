@@ -90,6 +90,10 @@ pinotAuth:
 # ------------------------------------------------------------------------------
 controller:
   name: controller
+  # Controls whether controller.port is included in the configuration.
+  # Set to false to exclude controller.port when using TLS-only mode or when
+  # you want to specify the port in controller.access.protocols.https.port instead.
+  configureControllerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -179,6 +183,7 @@ controller:
       tls: { }
       path: /
       hosts: [ ]
+      # port: 9433
     v1:
       enabled: false
       ingressClassName: ""
@@ -186,6 +191,7 @@ controller:
       tls: []
       path: /
       hosts: []
+      # port: 9433
 
   resources:
     requests:
@@ -236,6 +242,10 @@ controller:
 # ------------------------------------------------------------------------------
 broker:
   name: broker
+  # Controls whether pinot.broker.client.queryPort is included in the configuration.
+  # Set to false to exclude pinot.broker.client.queryPort when using TLS-only mode or when
+  # you want to specify the port in pinot.broker.access.protocols.https.port instead.
+  configureBrokerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -316,6 +326,7 @@ broker:
       tls: {}
       path: /
       hosts: []
+      # port: 8443
     v1:
       enabled: false
       ingressClassName: ""
@@ -323,6 +334,7 @@ broker:
       tls: []
       path: /
       hosts: []
+      # port: 8443
 
   resources:
     requests:
@@ -374,6 +386,10 @@ broker:
 # ------------------------------------------------------------------------------
 server:
   name: server
+  # Controls whether pinot.server.netty.port is included in the configuration.
+  # Set to false to exclude pinot.server.netty.port when using TLS-only mode or when
+  # you want to specify the port in pinot.server.nettytls.port instead.
+  configureServerPort: true
   replicaCount: 1
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -504,6 +520,10 @@ server:
 minion:
   enabled: false
   name: minion
+  # Controls whether pinot.minion.port is included in the configuration.
+  # Set to false to exclude pinot.minion.port when using TLS-only mode
+  # or when you're configuring ports through another mechanism.
+  configureMinionPort: true
   replicaCount: 0
   podManagementPolicy: Parallel
   podSecurityContext: {}
@@ -618,6 +638,10 @@ minion:
 minionStateless:
   enabled: true
   name: minion-stateless
+  # Controls whether pinot.minion.port is included in the configuration.
+  # Set to false to exclude pinot.minion.port when using TLS-only mode
+  # or when you're configuring ports through another mechanism.
+  configureMinionStatelessPort: true
   replicaCount: 1
   podSecurityContext: {}
     # fsGroup: 2000

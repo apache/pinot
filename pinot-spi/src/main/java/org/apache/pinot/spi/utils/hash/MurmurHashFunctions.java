@@ -279,94 +279,60 @@ public class MurmurHashFunctions {
   }
 
   /**
-   * Hash a value using the x64 128 bit variant of MurmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 128 bit hashed key, in an array containing two longs
+   * Hash a value using the x64 128 bit variant of MurmurHash3.
    */
-  public static byte[] murmurHash3X64Bit128(final byte[] key, final int seed) {
-    State state = new State();
-
-    state._h1 = 0x9368e53c2f6af274L ^ seed;
-    state._h2 = 0x586dcd208f7cd3fdL ^ seed;
-
-    state._c1 = 0x87c37b91114253d5L;
-    state._c2 = 0x4cf5ad432745937fL;
-
-    for (int i = 0; i < key.length / 16; i++) {
-      state._k1 = getblock(key, i * 2 * 8);
-      state._k2 = getblock(key, (i * 2 + 1) * 8);
-
-      bmix(state);
-    }
-
-    state._k1 = 0;
-    state._k2 = 0;
-
-    int tail = (key.length >>> 4) << 4;
-    // CHECKSTYLE:OFF: checkstyle:coding
-    switch (key.length & 15) {
-      case 15:
-        state._k2 ^= (long) key[tail + 14] << 48;
-      case 14:
-        state._k2 ^= (long) key[tail + 13] << 40;
-      case 13:
-        state._k2 ^= (long) key[tail + 12] << 32;
-      case 12:
-        state._k2 ^= (long) key[tail + 11] << 24;
-      case 11:
-        state._k2 ^= (long) key[tail + 10] << 16;
-      case 10:
-        state._k2 ^= (long) key[tail + 9] << 8;
-      case 9:
-        state._k2 ^= key[tail + 8];
-      case 8:
-        state._k1 ^= (long) key[tail + 7] << 56;
-      case 7:
-        state._k1 ^= (long) key[tail + 6] << 48;
-      case 6:
-        state._k1 ^= (long) key[tail + 5] << 40;
-      case 5:
-        state._k1 ^= (long) key[tail + 4] << 32;
-      case 4:
-        state._k1 ^= (long) key[tail + 3] << 24;
-      case 3:
-        state._k1 ^= (long) key[tail + 2] << 16;
-      case 2:
-        state._k1 ^= (long) key[tail + 1] << 8;
-      case 1:
-        state._k1 ^= key[tail + 0];
-        bmix(state);
-    }
-    // CHECKSTYLE:ON: checkstyle:coding
-
-    state._h2 ^= key.length;
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
-    state._h1 = fmix(state._h1);
-    state._h2 = fmix(state._h2);
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
+  public static byte[] murmurHash3X64Bit128(byte[] key, int length, int seed) {
+    State state = murmurHash3X64(key, length, seed);
     ByteBuffer buffer = ByteBuffer.allocate(16);
     buffer.putLong(state._h1);
     buffer.putLong(state._h2);
     return buffer.array();
   }
 
+  public static byte[] murmurHash3X64Bit128(byte[] key, int seed) {
+    return murmurHash3X64Bit128(key, key.length, seed);
+  }
+
   /**
-   * Hash a value using the x64 64 bit variant of murmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 64 bit hashed key
+   * Hash a value using the x64 128 bit variant of MurmurHash3.
    */
-  public static long murmurHash3X64Bit64(final byte[] key, final int seed) {
-    // Exactly the same as murmurHash3X64Bit128, except it only returns state.h1
+  public static long[] murmurHash3X64Bit128AsLongs(byte[] key, int length, int seed) {
+    State state = murmurHash3X64(key, length, seed);
+    return new long[]{state._h1, state._h2};
+  }
+
+  public static long[] murmurHash3X64Bit128AsLongs(byte[] key, int seed) {
+    return murmurHash3X64Bit128AsLongs(key, key.length, seed);
+  }
+
+  /**
+   * Hash a value using the x64 64 bit variant of murmurHash3.
+   */
+  public static long murmurHash3X64Bit64(byte[] key, int length, int seed) {
+    return murmurHash3X64(key, length, seed)._h1;
+  }
+
+  public static long murmurHash3X64Bit64(byte[] key, int seed) {
+    return murmurHash3X64Bit64(key, key.length, seed);
+  }
+
+  /**
+   * Hash a value using the x64 64 bit variant of murmurHash3.
+   */
+  public static int murmurHash3X64Bit32(byte[] key, int length, int seed) {
+    return (int) (murmurHash3X64(key, length, seed)._h1 >>> 32);
+  }
+
+  public static int murmurHash3X64Bit32(byte[] key, int seed) {
+    return murmurHash3X64Bit32(key, key.length, seed);
+  }
+
+  /**
+   * Taken and modified from
+   * <a href="https://github.com/infinispan/infinispan/blob/main/commons/all/src/main/java/org/infinispan/commons/hash/
+   * MurmurHash3.java">Infinispan code base</a>.
+   */
+  private static State murmurHash3X64(byte[] key, int length, int seed) {
     State state = new State();
 
     state._h1 = 0x9368e53c2f6af274L ^ seed;
@@ -375,9 +341,10 @@ public class MurmurHashFunctions {
     state._c1 = 0x87c37b91114253d5L;
     state._c2 = 0x4cf5ad432745937fL;
 
-    for (int i = 0; i < key.length / 16; i++) {
-      state._k1 = getblock(key, i * 2 * 8);
-      state._k2 = getblock(key, (i * 2 + 1) * 8);
+    int end = length - 15;
+    for (int i = 0; i < end; i += 16) {
+      state._k1 = getblock(key, i);
+      state._k2 = getblock(key, i + 8);
 
       bmix(state);
     }
@@ -385,9 +352,9 @@ public class MurmurHashFunctions {
     state._k1 = 0;
     state._k2 = 0;
 
-    int tail = (key.length >>> 4) << 4;
+    int tail = length & 0xFFFFFFF0;
     // CHECKSTYLE:OFF: checkstyle:coding
-    switch (key.length & 15) {
+    switch (length & 15) {
       case 15:
         state._k2 ^= (long) key[tail + 14] << 48;
       case 14:
@@ -422,7 +389,7 @@ public class MurmurHashFunctions {
     }
     // CHECKSTYLE:ON: checkstyle:coding
 
-    state._h2 ^= key.length;
+    state._h2 ^= length;
 
     state._h1 += state._h2;
     state._h2 += state._h1;
@@ -433,18 +400,7 @@ public class MurmurHashFunctions {
     state._h1 += state._h2;
     state._h2 += state._h1;
 
-    return state._h1;
-  }
-
-  /**
-   * Hash a value using the x64 32 bit variant of murmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 32 bit hashed key
-   */
-  public static int murmurHash3X64Bit32(final byte[] key, final int seed) {
-    return (int) (murmurHash3X64Bit64(key, seed) >>> 32);
+    return state;
   }
 
   private static void addByte(State state, byte b, int len) {
@@ -462,8 +418,8 @@ public class MurmurHashFunctions {
     }
   }
 
-  static long getblock(byte[] key, int i) {
-    return ((key[i + 0] & 0x00000000000000FFL)) | ((key[i + 1] & 0x00000000000000FFL) << 8) | (
+  private static long getblock(byte[] key, int i) {
+    return (key[i] & 0x00000000000000FFL) | ((key[i + 1] & 0x00000000000000FFL) << 8) | (
         (key[i + 2] & 0x00000000000000FFL) << 16) | ((key[i + 3] & 0x00000000000000FFL) << 24) | (
         (key[i + 4] & 0x00000000000000FFL) << 32) | ((key[i + 5] & 0x00000000000000FFL) << 40) | (
         (key[i + 6] & 0x00000000000000FFL) << 48) | ((key[i + 7] & 0x00000000000000FFL) << 56);

@@ -193,6 +193,13 @@ public class ImmutableSegmentLoader {
   /**
    * Preprocess the local segment directory according to the current table config and schema.
    */
+  public static void preprocess(File indexDir, IndexLoadingConfig indexLoadingConfig,
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
+      throws Exception {
+    preprocess(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema(), segmentOperationsThrottler);
+  }
+
+  @Deprecated
   public static void preprocess(File indexDir, IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema,
       @Nullable SegmentOperationsThrottler segmentOperationsThrottler)
       throws Exception {
@@ -219,6 +226,12 @@ public class ImmutableSegmentLoader {
   /**
    * Load the segment represented by the SegmentDirectory object to serve queries.
    */
+  public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    return load(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
+  }
+
+  @Deprecated
   public static ImmutableSegment load(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
@@ -277,9 +290,15 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * Check segment directory against the table config and schema to see if any preprocessing is needed,
-   * like changing segment format, adding new indices or updating default columns.
+   * Check segment directory against the IndexLoadingConfig to see if any preprocessing is needed, such as changing
+   * segment format, adding new indices or updating default columns.
    */
+  public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    return needPreprocess(segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
+  }
+
+  @Deprecated
   public static boolean needPreprocess(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
