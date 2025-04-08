@@ -146,8 +146,7 @@ public abstract class MultiStageOperator
     return getChildOperators().stream()
         .map(MultiStageOperator::calculateStats)
         .reduce((s1, s2) -> {
-          s1.mergeUpstream(s2);
-          s1.getCurrentStats().concat(s2.getCurrentStats());
+          s1.mergeSameStage(s2);
           return s1;
         })
         .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));

@@ -184,14 +184,18 @@ public class MultiStageQueryStats {
     return _closedStats.get(index);
   }
 
-  public void mergeInOrder(MultiStageQueryStats otherStats, MultiStageOperator.Type type,
-      StatMap<?> statMap) {
+  /**
+   * Merge stats from another MultiStageQueryStats on the same stage into the receiver object.
+   *
+   * It is important to call this method in the correct order to preserve the in-order traversal of the operator tree,
+   * which is required to be able to reconstruct the stats when the result is sent to the user.
+   */
+  public void mergeSameStage(MultiStageQueryStats otherStats) {
     Preconditions.checkArgument(_currentStageId == otherStats._currentStageId,
         "Cannot merge stats from different stages (%s and %s)", _currentStageId, otherStats._currentStageId);
     mergeUpstream(otherStats);
     StageStats.Open currentStats = getCurrentStats();
     currentStats.concat(otherStats.getCurrentStats());
-    currentStats.addLastOperator(type, statMap);
   }
 
   private void growUpToStage(int stageId) {
