@@ -2855,6 +2855,10 @@
               <pattern>com.google.common</pattern>
               <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
             </relocation>
+            <relocation>
+              <pattern>org.scala-lang</pattern>
+              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
+            </relocation>
           </relocations>
         </configuration>
       </plugin>
