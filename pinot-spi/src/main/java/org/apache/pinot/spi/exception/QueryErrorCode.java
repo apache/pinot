@@ -131,6 +131,10 @@ public enum QueryErrorCode {
     return new QueryException(this, message, cause);
   }
 
+  public QueryException asSimpleException(String message) {
+    return new SimpleQueryException(message);
+  }
+
   public boolean isClientError() {
     switch (this) {
       // NOTE: QueryException.BROKER_RESOURCE_MISSING_ERROR can be triggered due to issues

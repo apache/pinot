@@ -19,31 +19,20 @@
 package org.apache.pinot.spi.exception;
 
 /**
- * The base runtime exception for Pinot.
- *
- * Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
- * {@link RuntimeException} directly. We should gradually migrate to this class.
- *
+ * Exception that only requires to be reported as a basic message.
  */
-public class PinotRuntimeException extends RuntimeException {
-
-  public PinotRuntimeException() {
-  }
-
-  public PinotRuntimeException(String message) {
+public class BasicMessageException extends RuntimeException {
+  public BasicMessageException(String message) {
     super(message);
   }
 
-  public PinotRuntimeException(String message, Throwable cause) {
-    super(message, cause);
+  @Override
+  public StackTraceElement[] getStackTrace() {
+    return null;
   }
 
-  public PinotRuntimeException(Throwable cause) {
-    super(cause);
-  }
-
-  public PinotRuntimeException(String message, Throwable cause, boolean enableSuppression,
-      boolean writableStackTrace) {
-    super(message, cause, enableSuppression, writableStackTrace);
+  @Override
+  public synchronized Throwable getCause() {
+    return null;
   }
 }

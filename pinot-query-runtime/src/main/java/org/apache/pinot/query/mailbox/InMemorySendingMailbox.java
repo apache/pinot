@@ -28,6 +28,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.SimpleQueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,9 +88,10 @@ public class InMemorySendingMailbox implements SendingMailbox {
       case CANCELLED:
         throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
       case ERROR:
-        throw new RuntimeException(String.format("Mailbox: %s already errored out (received error block before)", _id));
+        throw new SimpleQueryException(
+            String.format("Mailbox: %s already errored out (received error block before)", _id));
       case TIMEOUT:
-        throw new TimeoutException(
+        throw new SimpleQueryException(
             String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
       case EARLY_TERMINATED:
         _isEarlyTerminated = true;

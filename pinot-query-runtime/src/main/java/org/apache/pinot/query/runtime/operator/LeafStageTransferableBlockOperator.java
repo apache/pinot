@@ -65,6 +65,7 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.SimpleQueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
@@ -167,7 +168,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     BaseResultsBlock resultsBlock =
         _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     if (resultsBlock == null) {
-      throw new TimeoutException("Timed out waiting for results block");
+      throw new SimpleQueryException("Timed out waiting for results block");
     }
     // Terminate when receiving exception block
     Map<Integer, String> exceptions = _exceptions;
@@ -445,7 +446,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           }
           try {
             if (!latch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
-              throw new TimeoutException("Timed out waiting for leaf stage to finish");
+              throw new SimpleQueryException("Timed out waiting for leaf stage to finish");
             }
             // Propagate the exception thrown by the leaf stage
             for (Future<Map<String, String>> future : futures) {
@@ -454,7 +455,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               mergeExecutionStats(stats);
             }
           } catch (TimeoutException e) {
-            throw new TimeoutException("Timed out waiting for leaf stage to finish");
+            throw new SimpleQueryException("Timed out waiting for leaf stage to finish");
           } finally {
             for (Future<?> future : futures) {
               future.cancel(true);
@@ -474,7 +475,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       throws InterruptedException, TimeoutException {
     if (!_blockingQueue.offer(resultsBlock, _context.getDeadlineMs() - System.currentTimeMillis(),
         TimeUnit.MILLISECONDS)) {
-      throw new TimeoutException("Timed out waiting to add results block");
+      throw new SimpleQueryException("Timed out waiting to add results block");
     }
   }
 

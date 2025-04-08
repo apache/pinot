@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -41,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.SimpleQueryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +150,7 @@ public class ReceivingMailbox {
     if (timeoutMs <= 0) {
       LOGGER.debug("Mailbox: {} is already timed out", _id);
       setErrorBlock(
-          ErrorMseBlock.fromException(new TimeoutException("Timed out while offering data to mailbox: " + _id)),
+          ErrorMseBlock.fromException(new SimpleQueryException("Timed out while offering data to mailbox: " + _id)),
           stats);
       return ReceivingMailboxStatus.TIMEOUT;
     }
@@ -174,7 +174,7 @@ public class ReceivingMailbox {
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
-        TimeoutException exception = new TimeoutException(
+        SimpleQueryException exception = new SimpleQueryException(
             "Timed out while waiting for receive operator to consume data from mailbox: " + _id);
         setErrorBlock(ErrorMseBlock.fromException(exception), stats);
         return ReceivingMailboxStatus.TIMEOUT;

@@ -81,6 +81,7 @@ import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClie
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.SimpleQueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -318,7 +319,7 @@ public class QueryDispatcher {
       }
     }
     if (deadline.isExpired()) {
-      throw new TimeoutException("Timed out waiting for response of async query-dispatch");
+      throw new SimpleQueryException("Timed out waiting for response of async query-dispatch");
     }
   }
 
@@ -545,7 +546,7 @@ public class QueryDispatcher {
       if (queryExceptions.size() == 1) {
         Map.Entry<QueryErrorCode, String> error = queryExceptions.entrySet().iterator().next();
         QueryErrorCode errorCode = error.getKey();
-        throw errorCode.asException("Received 1 error from servers: " + error.getValue());
+        throw errorCode.asSimpleException("Received 1 error from servers: " + error.getValue());
       } else {
         Map.Entry<QueryErrorCode, String> highestPriorityError = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)

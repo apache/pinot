@@ -55,6 +55,12 @@ public class QueryException extends PinotRuntimeException {
     _errorCode = errorCode;
   }
 
+  public QueryException(QueryErrorCode errorCode, String message, Throwable cause, boolean enableSuppression,
+      boolean writableStackTrace) {
+    super(message, cause, enableSuppression, writableStackTrace);
+    _errorCode = errorCode;
+  }
+
   public QueryErrorCode getErrorCode() {
     return _errorCode;
   }

@@ -19,31 +19,29 @@
 package org.apache.pinot.spi.exception;
 
 /**
- * The base runtime exception for Pinot.
+ * A Pinot exception where contextual information is not relevant.
  *
- * Notice that this class was introduced in the Pinot 1.4.0 release and the vast majority of the codebase still uses
- * {@link RuntimeException} directly. We should gradually migrate to this class.
- *
+ * This exception is used in scenarios where the stack trace is not relevant to the exception. For example, when a
+ * mailbox is not capable of offering or polling data from a queue. On these scenarios the stack trace we already know
+ * what the code was doing, and we don't need to flood logs with unnecessary stack traces.
  */
-public class PinotRuntimeException extends RuntimeException {
+public class SimpleQueryException extends QueryException {
 
-  public PinotRuntimeException() {
+  public SimpleQueryException(QueryErrorCode errorCode, String message) {
+    super(errorCode, message, null, false, false);
   }
 
-  public PinotRuntimeException(String message) {
-    super(message);
+  public SimpleQueryException(String message) {
+    this(QueryErrorCode.UNKNOWN, message);
   }
 
-  public PinotRuntimeException(String message, Throwable cause) {
-    super(message, cause);
+  @Override
+  public synchronized Throwable fillInStackTrace() {
+    return this;
   }
 
-  public PinotRuntimeException(Throwable cause) {
-    super(cause);
-  }
-
-  public PinotRuntimeException(String message, Throwable cause, boolean enableSuppression,
-      boolean writableStackTrace) {
-    super(message, cause, enableSuppression, writableStackTrace);
+  @Override
+  public String toString() {
+    return getClass().getName() + ": " + getMessage();
   }
 }

@@ -401,7 +401,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
-      LOGGER.warn(errMsg, e);
+      LOGGER.warn(errMsg);
       return onException(QueryErrorCode.INTERNAL, errMsg);
     }
 
@@ -417,7 +417,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         LOGGER.warn("Could not serialize stats", ioEx);
         serializedStats = Collections.emptyList();
       }
-      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(code.asException(errMsg));
+      ErrorMseBlock errorBlock = ErrorMseBlock.fromException(code.asSimpleException(errMsg));
       return new ReceivingMailbox.MseBlockWithStats(errorBlock, serializedStats);
     }
 
