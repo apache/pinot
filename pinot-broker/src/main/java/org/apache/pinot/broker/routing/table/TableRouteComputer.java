@@ -19,14 +19,11 @@
 package org.apache.pinot.broker.routing.table;
 
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.spi.config.table.TableConfig;
 
@@ -135,22 +132,6 @@ public interface TableRouteComputer {
    */
   TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId);
-
-  /**
-   * Gets the routing table for the offline table, if available.
-   *
-   * @return a map of server instances to their route information for the offline table, or null if not available
-   */
-  @Nullable
-  Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
-
-  /**
-   * Gets the routing table for the realtime table, if available.
-   *
-   * @return a map of server instances to their route information for the realtime table, or null if not available
-   */
-  @Nullable
-  Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
 
   /**
    * Gets the list of unavailable segments for the table.

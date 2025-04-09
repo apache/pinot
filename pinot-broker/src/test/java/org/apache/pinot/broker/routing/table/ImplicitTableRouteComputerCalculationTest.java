@@ -65,8 +65,8 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     }
   }
 
-  @DataProvider(name = "offlineTableProvider")
-  public static Object[][] offlineTableProvider() {
+  @DataProvider(name = "offlineTableAndRouteProvider")
+  public static Object[][] offlineTableAndRouteProvider() {
     //@formatter:off
     return new Object[][] {
         {"b_OFFLINE", Map.of("Server_localhost_2", ImmutableSet.of("b2"))},
@@ -80,8 +80,8 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     //@formatter:on
   }
 
-  @DataProvider(name = "realtimeTableProvider")
-  public static Object[][] realtimeTableProvider() {
+  @DataProvider(name = "realtimeTableAndRouteProvider")
+  public static Object[][] realtimeTableAndRouteProvider() {
     //@formatter:off
     return new Object[][] {
         {"a_REALTIME", Map.of("Server_localhost_1", ImmutableSet.of("a1", "a2"),
@@ -92,8 +92,8 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     //@formatter:on
   }
 
-  @DataProvider(name = "hybridTableProvider")
-  public static Object[][] hybridTableProvider() {
+  @DataProvider(name = "hybridTableAndRouteProvider")
+  public static Object[][] hybridTableAndRouteProvider() {
     //@formatter:off
     return new Object[][] {
         {"d", Map.of("Server_localhost_1", ImmutableSet.of("d1"),
@@ -105,8 +105,8 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     //@formatter:on
   }
 
-  @DataProvider(name = "partiallyDisabledTableProvider")
-  public static Object[][] partiallyDisabledTableProvider() {
+  @DataProvider(name = "partiallyDisabledTableAndRouteProvider")
+  public static Object[][] partiallyDisabledTableAndRouteProvider() {
     //@formatter:off
     return new Object[][] {
         {"hybrid_o_disabled", null, Map.of("Server_localhost_1", ImmutableSet.of("hor1"),
@@ -143,59 +143,63 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
 
     TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
+    // If a routing table for offline table is expected, then compare it with the expected routing table.
     if (isOfflineExpected) {
-      assertNotNull(routeComputer.getOfflineRoutingTable());
-      assertFalse(routeComputer.getOfflineRoutingTable().isEmpty());
-      assertEquals(routeComputer.getOfflineRoutingTable().size(), expectedOfflineRoutingTable.size());
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeComputer.getOfflineRoutingTable().entrySet()) {
-        ServerInstance serverInstance = entry.getKey();
-        ServerRouteInfo serverRouteInfo = entry.getValue();
-        Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
-        assertTrue(expectedOfflineRoutingTable.containsKey(serverInstance.toString()));
-        assertEquals(expectedOfflineRoutingTable.get(serverInstance.toString()), segments);
-      }
+      assertNotNull(tableRoute.getOfflineRoutingTable());
+      assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
+      assertEquals(tableRoute.getOfflineRoutingTable().size(), expectedOfflineRoutingTable.size());
+      assertRoutingTableEqual(tableRoute.getOfflineRoutingTable(), expectedOfflineRoutingTable);
     } else {
-      assertNull(routeComputer.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
     }
 
+    // If a routing table for realtime table is expected, then compare it with the expected routing table.
     if (isRealtimeExpected) {
-      assertNotNull(routeComputer.getRealtimeRoutingTable());
-      assertFalse(routeComputer.getRealtimeRoutingTable().isEmpty());
-      assertEquals(routeComputer.getRealtimeRoutingTable().size(), expectedRealtimeRoutingTable.size());
-      for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeComputer.getRealtimeRoutingTable().entrySet()) {
-        ServerInstance serverInstance = entry.getKey();
-        ServerRouteInfo serverRouteInfo = entry.getValue();
-        Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
-        assertTrue(expectedRealtimeRoutingTable.containsKey(serverInstance.toString()));
-        assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
-      }
+      assertNotNull(tableRoute.getRealtimeRoutingTable());
+      assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
+      assertEquals(tableRoute.getRealtimeRoutingTable().size(), expectedRealtimeRoutingTable.size());
+      assertRoutingTableEqual(tableRoute.getRealtimeRoutingTable(), expectedRealtimeRoutingTable);
     } else {
-      assertNull(routeComputer.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
     }
 
+    //TODO: There are no meaningful tests to check unavailable segments and pruned segments.
     assertTrue(routeComputer.getUnavailableSegments().isEmpty());
     assertEquals(routeComputer.getNumPrunedSegmentsTotal(), 0);
+
     if (!isOfflineExpected && !isRealtimeExpected) {
       assertTrue(tableRoute.getOfflineBrokerRequest() == null && tableRoute.getRealtimeBrokerRequest() == null);
     } else {
       assertFalse(tableRoute.getOfflineBrokerRequest() == null && tableRoute.getRealtimeBrokerRequest() == null);
+      // Check requestMap
       Map<ServerRoutingInstance, InstanceRequest> requestMap = tableRoute.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
       assertFalse(requestMap.isEmpty());
     }
   }
 
-  @Test(dataProvider = "offlineTableProvider")
+  private static void assertRoutingTableEqual(Map<ServerInstance, ServerRouteInfo> routeComputer,
+      Map<String, Set<String>> expectedRealtimeRoutingTable) {
+    for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeComputer.entrySet()) {
+      ServerInstance serverInstance = entry.getKey();
+      ServerRouteInfo serverRouteInfo = entry.getValue();
+      Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
+      assertTrue(expectedRealtimeRoutingTable.containsKey(serverInstance.toString()));
+      assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
+    }
+  }
+
+  @Test(dataProvider = "offlineTableAndRouteProvider")
   void testOfflineTableRoute(String tableName, Map<String, Set<String>> expectedRoutingTable) {
     assertTableRoute(tableName, expectedRoutingTable, null, true, false);
   }
 
-  @Test(dataProvider = "realtimeTableProvider")
+  @Test(dataProvider = "realtimeTableAndRouteProvider")
   void testRealtimeTableRoute(String tableName, Map<String, Set<String>> expectedRoutingTable) {
     assertTableRoute(tableName, null, expectedRoutingTable, false, true);
   }
 
-  @Test(dataProvider = "hybridTableProvider")
+  @Test(dataProvider = "hybridTableAndRouteProvider")
   void testHybridTableRoute(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
     assertTableRoute(tableName, expectedOfflineRoutingTable, expectedRealtimeRoutingTable,
@@ -207,7 +211,7 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     assertTableRoute(tableName, null, null, false, false);
   }
 
-  @Test(dataProvider = "partiallyDisabledTableProvider")
+  @Test(dataProvider = "partiallyDisabledTableAndRouteProvider")
   void testPartiallyDisabledTable(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
     assertTableRoute(tableName, expectedOfflineRoutingTable, expectedRealtimeRoutingTable,
@@ -244,6 +248,20 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     }
   }
 
+  /**
+   * This is a copy of the section in BaseSingleStageBrokerRequestHandlerTest.doHandleRequest which gets the
+   * routing tables for offline and realtime tables. It also get the list of unavailable segments and the number of
+   * pruned segments.
+   * Note that an important side effect of this method is that it sets the offlineBrokerRequest and
+   * realtimeBrokerRequest to null if the routing table is empty. This is used in subsequent code to determine if
+   * either of the physical tables is available
+   * @param offlineBrokerRequest Offline broker request
+   * @param realtimeBrokerRequest Realtime broker request
+   * @param offlineTableName Offline table name
+   * @param realtimeTableName Realtime table name
+   * @param routingManager Routing manager
+   * @return GetTableRouteResult containing the routing tables, unavailable segments and number of pruned segments
+   */
   private static GetTableRouteResult getTableRouting(BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, String offlineTableName, String realtimeTableName,
       RoutingManager routingManager) {
@@ -304,9 +322,9 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
 
   private void assertTableRouting(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    TableRouteComputer tableRoute = new ImplicitTableRouteComputer(tableName);
-    tableRoute.getTableConfig(_tableCache);
-    tableRoute.checkRoutes(_routingManager);
+    TableRouteComputer routeComputer = new ImplicitTableRouteComputer(tableName);
+    routeComputer.getTableConfig(_tableCache);
+    routeComputer.checkRoutes(_routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -316,13 +334,13 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
 
-    if (tableRoute.hasOffline()) {
+    if (routeComputer.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (tableRoute.hasRealtime()) {
+    if (routeComputer.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
@@ -331,13 +349,15 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     GetTableRouteResult expectedTableRoute =
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
-    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    TableRoute tableRoute =
+        routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (isOfflineExpected) {
       assertNotNull(tableRoute.getOfflineRoutingTable());
       assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._offlineRoutingTable);
       assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRoute.getOfflineRoutingTable().entrySet());
+      assertRoutingTableEqual(tableRoute.getOfflineRoutingTable(), expectedOfflineRoutingTable);
     } else {
       assertNull(tableRoute.getOfflineRoutingTable());
     }
@@ -348,30 +368,31 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
       assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(),
           tableRoute.getRealtimeRoutingTable().entrySet());
+      assertRoutingTableEqual(tableRoute.getRealtimeRoutingTable(), expectedRealtimeRoutingTable);
     } else {
       assertNull(tableRoute.getRealtimeRoutingTable());
     }
 
-    assertEquals(tableRoute.getUnavailableSegments(), expectedTableRoute._unavailableSegments);
-    assertEquals(tableRoute.getNumPrunedSegmentsTotal(), expectedTableRoute._numPrunedSegmentsTotal);
+    assertEquals(routeComputer.getUnavailableSegments(), expectedTableRoute._unavailableSegments);
+    assertEquals(routeComputer.getNumPrunedSegmentsTotal(), expectedTableRoute._numPrunedSegmentsTotal);
     if (!isOfflineExpected && !isRealtimeExpected) {
-      assertFalse(tableRoute.isRouteExists());
+      assertFalse(routeComputer.isRouteExists());
     } else {
-      assertTrue(tableRoute.isRouteExists());
+      assertTrue(routeComputer.isRouteExists());
     }
   }
 
-  @Test(dataProvider = "offlineTableProvider")
+  @Test(dataProvider = "offlineTableAndRouteProvider")
   void testTableRoutingForOffline(String tableName, Map<String, Set<String>> expectedRoutingTable) {
     assertTableRouting(tableName, expectedRoutingTable, null, true, false);
   }
 
-  @Test(dataProvider = "realtimeTableProvider")
+  @Test(dataProvider = "realtimeTableAndRouteProvider")
   void testTableRoutingForRealtime(String tableName, Map<String, Set<String>> expectedRoutingTable) {
     assertTableRouting(tableName, null, expectedRoutingTable, false, true);
   }
 
-  @Test(dataProvider = "hybridTableProvider")
+  @Test(dataProvider = "hybridTableAndRouteProvider")
   void testTableRoutingForHybrid(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
     assertTableRouting(tableName, expectedOfflineRoutingTable, expectedRealtimeRoutingTable,
@@ -380,9 +401,9 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
 
   @Test(dataProvider = "routeNotExistsProvider")
   void testTableRoutingForRouteNotExists(String tableName) {
-    TableRouteComputer tableRoute = new ImplicitTableRouteComputer(tableName);
-    tableRoute.getTableConfig(_tableCache);
-    tableRoute.checkRoutes(_routingManager);
+    TableRouteComputer routeComputer = new ImplicitTableRouteComputer(tableName);
+    routeComputer.getTableConfig(_tableCache);
+    routeComputer.checkRoutes(_routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -392,13 +413,13 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
 
-    if (tableRoute.hasOffline()) {
+    if (routeComputer.hasOffline()) {
       PinotQuery offlinePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
     }
 
-    if (tableRoute.hasRealtime()) {
+    if (routeComputer.hasRealtime()) {
       PinotQuery realtimePinotQuery = brokerRequest.getPinotQuery().deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
@@ -411,16 +432,17 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
     assertNull(expectedTableRoute._offlineRoutingTable);
     assertNull(expectedTableRoute._realtimeRoutingTable);
 
-    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    TableRoute tableRoute =
+        routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     assertNull(tableRoute.getOfflineRoutingTable());
     assertNull(tableRoute.getRealtimeRoutingTable());
-    assertTrue(tableRoute.getUnavailableSegments().isEmpty());
-    assertEquals(tableRoute.getNumPrunedSegmentsTotal(), 0);
-    assertFalse(tableRoute.isRouteExists());
+    assertTrue(routeComputer.getUnavailableSegments().isEmpty());
+    assertEquals(routeComputer.getNumPrunedSegmentsTotal(), 0);
+    assertFalse(routeComputer.isRouteExists());
   }
 
-  @Test(dataProvider = "partiallyDisabledTableProvider")
+  @Test(dataProvider = "partiallyDisabledTableAndRouteProvider")
   void testTableRoutingForPartiallyDisabledTable(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
     TableRouteComputer tableRouteComputer = new ImplicitTableRouteComputer(tableName);
@@ -447,32 +469,30 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
 
-    tableRouteComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    TableRoute tableRoute =
+        tableRouteComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (expectedOfflineRoutingTable == null) {
-      assertNull(tableRouteComputer.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
       assertNull(expectedTableRoute._offlineRoutingTable);
+    } else {
+      assertFalse(tableRoute.getOfflineRoutingTable().isEmpty());
+      assertNotNull(expectedTableRoute._offlineRoutingTable);
+      assertFalse(expectedTableRoute._offlineTableDisabled);
+      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRoute.getOfflineRoutingTable().entrySet());
+      assertRoutingTableEqual(tableRoute.getOfflineRoutingTable(), expectedOfflineRoutingTable);
     }
 
     if (expectedRealtimeRoutingTable == null) {
-      assertNull(tableRouteComputer.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
       assertNull(expectedTableRoute._realtimeRoutingTable);
-    }
-
-    if (tableRouteComputer.getOfflineRoutingTable() != null) {
-      assertFalse(tableRouteComputer.getOfflineRoutingTable().isEmpty());
-      assertNotNull(expectedTableRoute._offlineRoutingTable);
-      assertFalse(expectedTableRoute._offlineTableDisabled);
-      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(),
-          tableRouteComputer.getOfflineRoutingTable().entrySet());
-    }
-
-    if (tableRouteComputer.getRealtimeRoutingTable() != null) {
-      assertFalse(tableRouteComputer.getRealtimeRoutingTable().isEmpty());
+    } else {
+      assertFalse(tableRoute.getRealtimeRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._realtimeRoutingTable);
       assertFalse(expectedTableRoute._realtimeTableDisabled);
       assertEquals(expectedTableRoute._realtimeRoutingTable.entrySet(),
-          tableRouteComputer.getRealtimeRoutingTable().entrySet());
+          tableRoute.getRealtimeRoutingTable().entrySet());
+      assertRoutingTableEqual(tableRoute.getRealtimeRoutingTable(), expectedRealtimeRoutingTable);
     }
   }
 
@@ -506,18 +526,19 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
         getTableRouting(offlineBrokerRequest, realtimeBrokerRequest, offlineTableName, realtimeTableName,
             _routingManager);
 
-    tableRouteComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    TableRoute tableRoute =
+        tableRouteComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
 
     if (expectedTableRoute._offlineTableDisabled) {
-      assertNull(tableRouteComputer.getOfflineRoutingTable());
+      assertNull(tableRoute.getOfflineRoutingTable());
     } else if (expectedTableRoute._offlineRoutingTable != null) {
-      assertNotNull(tableRouteComputer.getOfflineRoutingTable());
+      assertNotNull(tableRoute.getOfflineRoutingTable());
     }
 
     if (expectedTableRoute._realtimeTableDisabled) {
-      assertNull(tableRouteComputer.getRealtimeRoutingTable());
+      assertNull(tableRoute.getRealtimeRoutingTable());
     } else if (expectedTableRoute._realtimeRoutingTable != null) {
-      assertNotNull(tableRouteComputer.getRealtimeRoutingTable());
+      assertNotNull(tableRoute.getRealtimeRoutingTable());
     }
   }
 }
