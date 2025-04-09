@@ -62,6 +62,7 @@ import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -833,6 +834,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
           TimeUnit.MILLISECONDS);
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+    }
+
+    for (int group : brokerResponse.getReplicaGroups()) {
+      _brokerMetrics.addMeteredValue(BrokerMeter.REPLICA_QUERIES, 1,
+          BrokerMetrics.getTagForPreferredGroup(sqlNodeAndOptions.getOptions()), String.valueOf(group));
     }
 
     // Log query and stats

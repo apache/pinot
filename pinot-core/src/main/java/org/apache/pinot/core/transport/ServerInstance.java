@@ -102,7 +102,7 @@ public final class ServerInstance {
     _queryServicePort = INVALID_PORT;
     _queryMailboxPort = INVALID_PORT;
     _adminEndpoint = null;
-    _group = -1;
+    _group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
   }
 
   public String getInstanceId() {
