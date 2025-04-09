@@ -621,11 +621,17 @@ public class PinotLLCRealtimeSegmentManager {
     preProcessNewSegmentZKMetadata();
 
     // Step-2: Create new segment metadata if needed
-    LOGGER.info("Creating new segment metadata with status IN_PROGRESS");
+    LOGGER.info("Creating new segment metadata with status: {}", Status.IN_PROGRESS);
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName =
         createNewSegmentMetadata(tableConfig, idealState, committingSegmentDescriptor, committingSegmentZKMetadata,
             instancePartitions);
+    if (newConsumingSegmentName != null) {
+      LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
+          Status.IN_PROGRESS);
+    } else {
+      LOGGER.info("Skipped creation of new segment metadata as new consuming segment name is: null");
+    }
 
     preProcessCommitIdealStateUpdate();
 
@@ -1072,7 +1078,11 @@ public class PinotLLCRealtimeSegmentManager {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
-        assert stateMap != null;
+        if (stateMap == null) {
+          LOGGER.info("Skipping update for segment: {} state to state: {} in ideal state as instanceStateMap is null.",
+              segmentName, SegmentStateModel.OFFLINE);
+          return idealState;
+        }
         String state = stateMap.get(instanceName);
         if (SegmentStateModel.CONSUMING.equals(state)) {
           LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);

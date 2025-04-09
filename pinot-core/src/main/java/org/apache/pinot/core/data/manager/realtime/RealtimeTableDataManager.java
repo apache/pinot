@@ -634,8 +634,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Thread.sleep(sleepTimeMs);
     }
 
-    _logger.error("Failed to download segment: {} after: {}ms.", segmentName, downloadTimeoutMs);
-
     // If we exit the loop without returning, throw an exception
     throw new TimeoutException(
         "Failed to download segment: " + segmentName + " after: " + downloadTimeoutMs + "ms of retrying");
