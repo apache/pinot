@@ -35,8 +35,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
-
-
   @Test(dataProvider = "offlineTableProvider")
   public void testOfflineTable(String parameter) {
     ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
@@ -183,21 +181,26 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
       _brokerResponse = brokerResponse;
     }
 
-    boolean similar(ImplicitTableRouteComputer tableRoute) {
+    /**
+     * Similar if offlineTableName is not null and there is a route in the routing table. Same for realtimeTableName.
+     * @param routeComputer
+     * @return
+     */
+    boolean similar(ImplicitTableRouteComputer routeComputer) {
       boolean isEquals = true;
 
       if (_offlineTableName != null) {
-        isEquals &= tableRoute.hasOffline() && tableRoute.isOfflineRouteExists()
-            && _offlineTableName.equals(tableRoute.getOfflineTableName());
+        isEquals &= routeComputer.hasOffline() && routeComputer.isOfflineRouteExists() && _offlineTableName.equals(
+            routeComputer.getOfflineTableName());
       } else {
-        isEquals &= !tableRoute.hasOffline() || !tableRoute.isOfflineRouteExists();
+        isEquals &= !routeComputer.hasOffline() || !routeComputer.isOfflineRouteExists();
       }
 
       if (_realtimeTableName != null) {
-        isEquals &= tableRoute.hasRealtime() && tableRoute.isRealtimeRouteExists()
-            && _realtimeTableName.equals(tableRoute.getRealtimeTableName());
+        isEquals &= routeComputer.hasRealtime() && routeComputer.isRealtimeRouteExists() && _realtimeTableName.equals(
+            routeComputer.getRealtimeTableName());
       } else {
-        isEquals &= !tableRoute.hasRealtime() || !tableRoute.isRealtimeRouteExists();
+        isEquals &= !routeComputer.hasRealtime() || !routeComputer.isRealtimeRouteExists();
       }
 
       return isEquals;
@@ -205,11 +208,16 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
   }
 
   /**
-   * This method implements the previous version to check if a table exists. It took as input two pieces of metadata:
+   * This method implements the previous version to check if a table exists.
+   * It is a byte to byte copy-paste of a section from BaseSingleStageBrokerRequestHandler.
+   * It takes as input two pieces of metadata:
    * - TableConfig
    * - Route
    * If both existed, then a physical table is available. This method is used to test the new implementations of
-   * HybridTable.isExists and HybridTable.isRouteExists behave in the same way.
+   * ImplicitTableRouteComputer.isExists and ImplicitTableRouteComputer.isRouteExists behave in the same way.
+   *
+   * If there is an error i.e. either table config or router is not found, then the BrokerResponse with right
+   * error code is set.
    * @param tableName The name of the table to check
    * @return The table name and config
    */
@@ -286,6 +294,11 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     //@formatter:on
   }
 
+  /**
+   * This test checks tables that have a table config and an entry in routing manager.
+   * It makes sure that getTableNameAndConfig() behaves the same way as ImplicitTableRouteComputer.
+   * @param tableName
+   */
   @Test(dataProvider = "tableNameAndConfigSuccessProvider")
   public void testTableNameAndConfigSuccess(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
@@ -315,6 +328,10 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     //@formatter:on
   }
 
+  /**
+   * This test checks tables that do not have a table config or an entry in routing manager.
+   * @param tableName
+   */
   @Test(dataProvider = "tableNameAndConfigFailureProvider")
   public void testTableNameAndConfigFailure(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
@@ -322,6 +339,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
+    // getTableNameAndConfig() returns an error as a BrokerResponse with the right error code.
     assertNotNull(tableNameAndConfig._brokerResponse);
     assertTrue(tableNameAndConfig._brokerResponse == BrokerResponseNative.TABLE_DOES_NOT_EXIST
         || tableNameAndConfig._brokerResponse == BrokerResponseNative.NO_TABLE_RESULT);
@@ -348,6 +366,19 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     }
   }
 
+  /**
+   * This function is a byte to byte copy-paste of the section in BaseSingleStageBrokerRequestHandler.doHandleRequest()
+   * that checks if a table is disabled and returns the right error code. There are multiple types of responses.
+   * Only realtime table which is disabled, then return broker response with error code TABLE_IS_DISABLED.
+   * Only offline table which is disabled, then return broker response with error code TABLE_IS_DISABLED.
+   * Hybrid table and all tables are disabled, then return broker response with error code TABLE_IS_DISABLED.
+   * Hybrid table and one of the tables is disabled, then return exception with error code TABLE_IS_DISABLED.
+   * @param offlineTableDisabled is the offline table disabled
+   * @param realtimeTableDisabled is the realtime table disabled
+   * @param offlineTableConfig Offline Table Config
+   * @param realtimeTableConfig Realtime Table Config
+   * @return The error code if the table is disabled, null otherwise
+   */
   ExceptionOrResponse checkTableDisabled(boolean offlineTableDisabled, boolean realtimeTableDisabled,
       TableConfig offlineTableConfig, TableConfig realtimeTableConfig) {
     if (offlineTableDisabled || realtimeTableDisabled) {
@@ -367,6 +398,11 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     return null;
   }
 
+  /**
+   * If a table is not disabled, then checkTableDisabled() should return null.
+   * ImplicitTableRouteComputer should not be disabled.
+   * @param tableName
+   */
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledWithCheckDisabled(String tableName) {
     ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
@@ -383,6 +419,11 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     assertFalse(table.isDisabled());
   }
 
+  /**
+   * In a hybrid table, if one of the tables is disabled, then checkTableDisabled() should return an exception.
+   * ImplicitTableRouteComputer should not be disabled.
+   * @param tableName
+   */
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledWithCheckDisabled(String tableName) {
     ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
@@ -401,6 +442,12 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
     assertFalse(table.isDisabled());
   }
 
+  /**
+   * If a table is disabled, then checkTableDisabled() should return a broker response with error code
+   * TABLE_IS_DISABLED.
+   * ImplicitTableRouteComputer should be disabled.
+   * @param tableName
+   */
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledWithCheckDisabled(String tableName) {
     ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);

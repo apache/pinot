@@ -59,10 +59,6 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
 
   private TimeBoundaryInfo _timeBoundaryInfo;
 
-  private BrokerRequest _offlineBrokerRequest = null;
-  private Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable = null;
-  private BrokerRequest _realtimeBrokerRequest = null;
-  private Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable = null;
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegmentsTotal = 0;
 
@@ -184,7 +180,6 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
     }
 
     if (hasRealtime()) {
-      assert _realtimeTableName != null;
       _isRealtimeRouteExists = routingManager.routingExists(_realtimeTableName);
       _isRealtimeTableDisabled = routingManager.isTableDisabled(_realtimeTableName);
     }
@@ -277,6 +272,9 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
   @Override
   public TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
+
     if (offlineBrokerRequest != null) {
       Preconditions.checkNotNull(_offlineTableName);
 
@@ -290,14 +288,13 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
         Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
-          _offlineBrokerRequest = offlineBrokerRequest;
-          _offlineRoutingTable = serverInstanceToSegmentsMap;
+          offlineRoutingTable = serverInstanceToSegmentsMap;
         } else {
-          _offlineBrokerRequest = null;
+          offlineBrokerRequest = null;
         }
         _numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
-        _offlineBrokerRequest = null;
+        offlineBrokerRequest = null;
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -313,31 +310,18 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
         Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
-          _realtimeBrokerRequest = realtimeBrokerRequest;
-          _realtimeRoutingTable = serverInstanceToSegmentsMap;
+          realtimeRoutingTable = serverInstanceToSegmentsMap;
         } else {
-          _realtimeBrokerRequest = null;
+          realtimeBrokerRequest = null;
         }
         _numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
-        _realtimeBrokerRequest = null;
+        realtimeBrokerRequest = null;
       }
     }
 
-    return new ImplicitHybridTableRoute(_offlineBrokerRequest, _realtimeBrokerRequest, _offlineRoutingTable,
-        _realtimeRoutingTable);
-  }
-
-  @Nullable
-  @Override
-  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
-    return _offlineRoutingTable;
-  }
-
-  @Nullable
-  @Override
-  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
-    return _realtimeRoutingTable;
+    return new ImplicitHybridTableRoute(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable,
+        realtimeRoutingTable);
   }
 
   @Override
