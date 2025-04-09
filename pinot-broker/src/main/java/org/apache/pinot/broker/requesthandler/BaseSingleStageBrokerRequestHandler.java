@@ -538,7 +538,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+        requestId);
 
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRoute.getOfflineRoutingTable();
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRoute.getRealtimeRoutingTable();
