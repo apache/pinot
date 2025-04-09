@@ -172,7 +172,8 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
     if (!isOfflineExpected && !isRealtimeExpected) {
       assertTrue(tableRouteInfo.getOfflineBrokerRequest() == null && tableRouteInfo.getRealtimeBrokerRequest() == null);
     } else {
-      assertFalse(tableRouteInfo.getOfflineBrokerRequest() == null && tableRouteInfo.getRealtimeBrokerRequest() == null);
+      assertFalse(tableRouteInfo.getOfflineBrokerRequest() == null
+          && tableRouteInfo.getRealtimeBrokerRequest() == null);
       // Check requestMap
       Map<ServerRoutingInstance, InstanceRequest> requestMap = tableRouteInfo.getRequestMap(0, "broker", false);
       assertNotNull(requestMap);
@@ -358,7 +359,8 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
       assertNotNull(tableRouteInfo.getOfflineRoutingTable());
       assertFalse(tableRouteInfo.getOfflineRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._offlineRoutingTable);
-      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRouteInfo.getOfflineRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(),
+          tableRouteInfo.getOfflineRoutingTable().entrySet());
       assertRoutingTableEqual(tableRouteInfo.getOfflineRoutingTable(), expectedOfflineRoutingTable);
     } else {
       assertNull(tableRouteInfo.getOfflineRoutingTable());
@@ -481,7 +483,8 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
       assertFalse(tableRouteInfo.getOfflineRoutingTable().isEmpty());
       assertNotNull(expectedTableRoute._offlineRoutingTable);
       assertFalse(expectedTableRoute._offlineTableDisabled);
-      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(), tableRouteInfo.getOfflineRoutingTable().entrySet());
+      assertEquals(expectedTableRoute._offlineRoutingTable.entrySet(),
+          tableRouteInfo.getOfflineRoutingTable().entrySet());
       assertRoutingTableEqual(tableRouteInfo.getOfflineRoutingTable(), expectedOfflineRoutingTable);
     }
 
