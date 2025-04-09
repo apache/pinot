@@ -64,7 +64,13 @@ export const RebalanceResponse = ({ response }) => {
             {
                 responseSectionsToShow.map((section) => {
                     if (Object.keys(response).includes(section.key)) {
-                        return <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response[section.key]} />
+                        return (
+                            <Grid item xs={12}>
+                                <RebalanceServerResponseCard>
+                                    <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response[section.key]} />
+                                </RebalanceServerResponseCard>
+                            </Grid>
+                        );
                     }
                 })
             }

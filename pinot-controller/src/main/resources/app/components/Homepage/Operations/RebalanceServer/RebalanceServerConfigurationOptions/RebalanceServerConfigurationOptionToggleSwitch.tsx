@@ -26,10 +26,13 @@ import {
 type RebalanceServerConfigurationOptionSwitchProps = {
     option: RebalanceServerOption;
     handleConfigChange: (config: { [key: string]: string | number | boolean }) => void;
+    rebalanceConfig: { [optionName: string]: string | boolean | number };
 }
 export const RebalanceServerConfigurationOptionSwitch = (
-    { option, handleConfigChange }: RebalanceServerConfigurationOptionSwitchProps) => {
-    const [isChecked, setIsChecked] = useState<boolean>(option.defaultValue as boolean);
+    { option, handleConfigChange, rebalanceConfig }: RebalanceServerConfigurationOptionSwitchProps) => {
+    const [isChecked, setIsChecked] = useState<boolean>(
+        (Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue) as boolean
+    );
     return (
         <Box display='flex' flexDirection='column'>
             <FormControlLabel

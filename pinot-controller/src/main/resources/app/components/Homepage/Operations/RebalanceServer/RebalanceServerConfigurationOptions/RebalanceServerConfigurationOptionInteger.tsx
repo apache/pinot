@@ -26,11 +26,14 @@ import {
 type RebalanceServerConfigurationOptionIntegerProps = {
     option: RebalanceServerOption;
     handleConfigChange: (config: { [key: string]: string | number | boolean }) => void;
+    rebalanceConfig: { [optionName: string]: string | boolean | number };
 }
 export const RebalanceServerConfigurationOptionInteger = (
-    { option, handleConfigChange }: RebalanceServerConfigurationOptionIntegerProps
+    { option, handleConfigChange, rebalanceConfig }: RebalanceServerConfigurationOptionIntegerProps
 ) => {
-    const [value, setValue] = useState<number>(option.defaultValue as number);
+    const [value, setValue] = useState<number>(
+        (Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue) as number
+    );
     return (
         <Box display='flex' flexDirection='column'>
             <FormControl fullWidth>
