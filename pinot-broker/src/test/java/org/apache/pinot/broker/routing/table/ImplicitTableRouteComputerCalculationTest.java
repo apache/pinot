@@ -141,7 +141,8 @@ public class ImplicitTableRouteComputerCalculationTest extends BaseTableRouteTes
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
     }
 
-    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, 0);
+    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+        0);
 
     // If a routing table for offline table is expected, then compare it with the expected routing table.
     if (isOfflineExpected) {
