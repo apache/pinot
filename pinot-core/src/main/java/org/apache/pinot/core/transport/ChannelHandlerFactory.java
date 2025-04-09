@@ -106,6 +106,7 @@ public class ChannelHandlerFactory {
   public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
       ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap,
       ConcurrentHashMap<SocketChannel, Boolean> allChannels, ServerSocketChannel serverSocketChannel) {
-    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap, allChannels, serverSocketChannel);
+    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap, allChannels,
+        serverSocketChannel);
   }
 }

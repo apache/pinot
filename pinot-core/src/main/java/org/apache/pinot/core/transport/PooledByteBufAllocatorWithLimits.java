@@ -37,15 +37,15 @@ public class PooledByteBufAllocatorWithLimits {
 
   // Allocate 1/5th of unused offheap memory to direct buffer allocators when using netty channels on broker and
   // server side
-  static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
+  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
     int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
     final int defaultMinNumArena = NettyRuntime.availableProcessors() * 2;
     int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 9);
     final int defaultChunkSize = defaultPageSize << defaultMaxOrder;
     long maxDirectMemory = PlatformDependent.maxDirectMemory();
-    long usedDirectMemory = getReservedMemory();/* your own tracking logic */
-    ;
+    long usedDirectMemory = getReservedMemory();
     long remainingDirectMemory = maxDirectMemory - usedDirectMemory;
+
     int numDirectArenas = Math.max(0, SystemPropertyUtil.getInt("io.netty.allocator.numDirectArenas",
         (int) Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5)));
     boolean useCacheForAllThreads = SystemPropertyUtil.getBoolean("io.netty.allocator.useCacheForAllThreads", false);

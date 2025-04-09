@@ -138,8 +138,7 @@ public class QueryServer {
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
 
-              ch.pipeline()
-                  .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, null));
+              ch.pipeline().addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, null));
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
@@ -151,7 +150,6 @@ public class QueryServer {
               ch.pipeline().addLast(_instanceRequestHandler);
             }
           }).bind(_port).sync().channel();
-
     } catch (Exception e) {
       // Shut down immediately
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);

@@ -111,6 +111,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
             LOGGER.error("Closing ALL channels to servers, as we are running out of direct memory "
                 + "while receiving response from {}", _serverRoutingInstance, cause);// broker side direct OOM handler
             BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
+
             // close all channels to servers
             _serverToChannelMap.keySet().forEach(serverRoutingInstance -> {
               ServerChannels.ServerChannel removed = _serverToChannelMap.remove(serverRoutingInstance);
