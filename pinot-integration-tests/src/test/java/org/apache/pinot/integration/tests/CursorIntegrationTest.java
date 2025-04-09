@@ -59,8 +59,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TEST_QUERY_THREE =
       "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay "
           + "ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
-  private static final String EMPTY_RESULT_QUERY =
-      "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
+  private static final String TEST_QUERY_ALWAYS_FALSE =
+      "SELECT ArrTime AS varchar FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
+  private static final String TEST_QUERY_ALWAYS_FALSE_AGGR =
+      "SELECT SUM(ArrTime) AS total FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
 
   private static int _resultSize;
 
@@ -314,9 +316,9 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testQueryWithEmptyResult()
+  public void testQueryAlwaysFalse()
       throws Exception {
-    JsonNode pinotResponse = ClusterTest.postQuery(EMPTY_RESULT_QUERY,
+    JsonNode pinotResponse = ClusterTest.postQuery(TEST_QUERY_ALWAYS_FALSE,
         ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
             + getCursorQueryProperties(1000), getHeaders(), getExtraQueryProperties());
 
@@ -329,9 +331,27 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     Assert.assertTrue(pinotResponse.get("exceptions").isEmpty());
   }
 
+  @Test
+  public void testQueryAlwaysFaseAggregated()
+      throws Exception {
+    JsonNode pinotResponse = ClusterTest.postQuery(TEST_QUERY_ALWAYS_FALSE_AGGR,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
+            + getCursorQueryProperties(1000), getHeaders(), getExtraQueryProperties());
+
+    // There should no resultTable.
+    Assert.assertNotNull(pinotResponse.get("resultTable"));
+    // Total Rows in result set should be 1.
+    Assert.assertEquals(pinotResponse.get("numRowsResultSet").asInt(), 1);
+    // Rows in the current response should be 1
+    Assert.assertEquals(pinotResponse.get("numRows").asInt(), 1);
+    // Result for the single row should be 0.
+    Assert.assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(0).asLong(), 0);
+    Assert.assertTrue(pinotResponse.get("exceptions").isEmpty());
+  }
+
   @DataProvider(name = "InvalidOffsetQueryProvider")
   public Object[][] invalidOffsetQueryProvider() {
-    return new Object[][]{{TEST_QUERY_ONE}, {EMPTY_RESULT_QUERY}};
+    return new Object[][]{{TEST_QUERY_ONE}, {TEST_QUERY_ALWAYS_FALSE}};
   }
 
   @Test(dataProvider = "InvalidOffsetQueryProvider", expectedExceptions = IOException.class,
