@@ -119,6 +119,9 @@ public class QueryServer {
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
       ServerMetrics metrics = ServerMetrics.get();
+      PooledByteBufAllocator bufAllocatorWithLimits =
+          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
+      metric = bufAllocatorWithLimits.metric();
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
@@ -129,12 +132,14 @@ public class QueryServer {
       metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
       _channel = (ServerSocketChannel) serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
-          .option(ChannelOption.ALLOCATOR, bufAllocator).childHandler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.ALLOCATOR, bufAllocatorWithLimits)
+          .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
 
-              ch.pipeline().addLast(ChannelHandlerFactory.getDirectOOMServerHandler(_allChannels, _channel));
+              ch.pipeline()
+                  .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, null));
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
@@ -146,6 +151,7 @@ public class QueryServer {
               ch.pipeline().addLast(_instanceRequestHandler);
             }
           }).bind(_port).sync().channel();
+
     } catch (Exception e) {
       // Shut down immediately
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
