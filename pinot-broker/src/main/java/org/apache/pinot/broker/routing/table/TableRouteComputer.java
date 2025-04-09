@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.broker.routing.table;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +26,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
