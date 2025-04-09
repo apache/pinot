@@ -12,6 +12,7 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
@@ -27,12 +28,14 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_MAP_INDEX";
 
   private final JsonMatchFilterOperator _jsonMatchOperator;
+  private final ExpressionFilterOperator _expressionFilterOperator;
   private final String _columnName;
   private final String _keyName;
   private final Predicate _predicate;
   private final JsonMatchPredicate _jsonMatchPredicate;
 
-  public MapIndexFilterOperator(IndexSegment indexSegment, Predicate predicate, int numDocs) {
+  public MapIndexFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
+      int numDocs) {
     super(numDocs, false);
     _predicate = predicate;
 
@@ -46,29 +49,6 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     //FIXME keyName contains single quotes, which should be removed
     _keyName = String.valueOf(arguments.get(1).getLiteral());
 
-    // Convert predicate to JSON format based on type
-    String jsonValue;
-    switch (predicate.getType()) {
-      case EQ:
-        jsonValue = createJsonPredicateValue(_keyName, ((EqPredicate) predicate).getValue());
-        break;
-      case IN:
-        jsonValue = createJsonArrayPredicateValue(_keyName, ((InPredicate) predicate).getValues());
-        break;
-      case RANGE:
-        RangePredicate rangePredicate = (RangePredicate) predicate;
-        jsonValue =
-            createJsonRangePredicateValue(_keyName, rangePredicate.getLowerBound(), rangePredicate.getUpperBound(),
-                rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
-        break;
-      default:
-        throw new IllegalStateException("Unsupported predicate type for map index: " + predicate.getType());
-    }
-
-    // Create identifier expression for the JSON column
-    ExpressionContext jsonLhs = ExpressionContext.forIdentifier("json");
-    _jsonMatchPredicate = new JsonMatchPredicate(jsonLhs, jsonValue);
-
     // Get JSON index and create operator
     DataSource dataSource = indexSegment.getDataSource(_columnName);
 
@@ -76,14 +56,55 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
       MapDataSource mapDS = (MapDataSource) dataSource;
       DataSource keyDS = mapDS.getKeyDataSource(_keyName);
       JsonIndexReader jsonIndex = keyDS.getJsonIndex();
-      if (jsonIndex == null) {
-        throw new IllegalStateException("No JSON index found for column: " + _columnName);
+
+      if (jsonIndex != null) {
+        _jsonMatchPredicate = createJsonMatchPredicate();
+        _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, numDocs);
+        _expressionFilterOperator = null;
+      } else {
+        _jsonMatchPredicate = null;
+        _jsonMatchOperator = null;
+        _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
       }
-      _jsonMatchOperator = new JsonMatchFilterOperator(jsonIndex, _jsonMatchPredicate, numDocs);
     } else {
       throw new IllegalStateException(
           "Expected MapDataSource for column: " + _columnName + ", found: " + dataSource.getClass().getSimpleName());
     }
+  }
+
+  /**
+   * Creates a JsonMatchPredicate based on the original predicate type
+   */
+  private JsonMatchPredicate createJsonMatchPredicate() {
+    // Convert predicate to JSON format based on type
+    String jsonValue;
+    switch (_predicate.getType()) {
+      case EQ:
+        jsonValue = createJsonPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
+        break;
+      case IN:
+        jsonValue = createJsonArrayPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
+        break;
+      case RANGE:
+        RangePredicate rangePredicate = (RangePredicate) _predicate;
+        jsonValue =
+            createJsonRangePredicateValue(_keyName, rangePredicate.getLowerBound(), rangePredicate.getUpperBound(),
+                rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
+        break;
+      default:
+        throw new IllegalStateException("Unsupported predicate type for map index: " + _predicate.getType());
+    }
+
+    // Create identifier expression for the JSON column
+    ExpressionContext jsonLhs = ExpressionContext.forIdentifier("json");
+    return new JsonMatchPredicate(jsonLhs, jsonValue);
+  }
+
+  /**
+   * Initializes the JsonMatchFilterOperator with the given JsonIndexReader
+   */
+  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex, int numDocs) {
+    return new JsonMatchFilterOperator(jsonIndex, _jsonMatchPredicate, numDocs);
   }
 
   private String createJsonPredicateValue(String key, String value) {
@@ -126,27 +147,47 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return _jsonMatchOperator.getTrues();
+    if (_jsonMatchOperator != null) {
+      return _jsonMatchOperator.getTrues();
+    } else {
+      return _expressionFilterOperator.getTrues();
+    }
   }
 
   @Override
   public boolean canOptimizeCount() {
-    return _jsonMatchOperator.canOptimizeCount();
+    if (_jsonMatchOperator != null) {
+      return _jsonMatchOperator.canOptimizeCount();
+    } else {
+      return _expressionFilterOperator.canOptimizeCount();
+    }
   }
 
   @Override
   public int getNumMatchingDocs() {
-    return _jsonMatchOperator.getNumMatchingDocs();
+    if (_jsonMatchOperator != null) {
+      return _jsonMatchOperator.getNumMatchingDocs();
+    } else {
+      return _expressionFilterOperator.getNumMatchingDocs();
+    }
   }
 
   @Override
   public boolean canProduceBitmaps() {
-    return _jsonMatchOperator.canProduceBitmaps();
+    if (_jsonMatchOperator != null) {
+      return _jsonMatchOperator.canProduceBitmaps();
+    } else {
+      return _expressionFilterOperator.canProduceBitmaps();
+    }
   }
 
   @Override
   public BitmapCollection getBitmaps() {
-    return _jsonMatchOperator.getBitmaps();
+    if (_jsonMatchOperator != null) {
+      return _jsonMatchOperator.getBitmaps();
+    } else {
+      return _expressionFilterOperator.getBitmaps();
+    }
   }
 
   @Override
@@ -159,8 +200,15 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     StringBuilder stringBuilder =
         new StringBuilder(EXPLAIN_NAME).append("(column:").append(_columnName).append(",key:").append(_keyName)
             .append(",indexLookUp:map_index").append(",operator:").append(_predicate.getType()).append(",predicate:")
-            .append(_predicate).append(",delegateTo:json_match").append(')');
-    return stringBuilder.toString();
+            .append(_predicate);
+
+    if (_jsonMatchOperator != null) {
+      stringBuilder.append(",delegateTo:json_match");
+    } else {
+      stringBuilder.append(",delegateTo:expression_filter");
+    }
+
+    return stringBuilder.append(')').toString();
   }
 
   @Override
@@ -176,6 +224,11 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("indexLookUp", "map_index");
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("predicate", _predicate.toString());
-    attributeBuilder.putString("delegateTo", "json_match");
+
+    if (_jsonMatchOperator != null) {
+      attributeBuilder.putString("delegateTo", "json_match");
+    } else {
+      attributeBuilder.putString("delegateTo", "expression_filter");
+    }
   }
 }
