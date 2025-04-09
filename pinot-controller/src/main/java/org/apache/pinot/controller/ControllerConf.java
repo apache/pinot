@@ -908,7 +908,7 @@ public class ControllerConf extends PinotConfiguration {
   @Deprecated
   public int getMinionInstancesCleanupTaskMinOfflineTimeBeforeDeletionInSeconds() {
     return Optional.ofNullable(
-            getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
+        getProperty(ControllerPeriodicTasksConf.MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_PERIOD))
         .map(period -> (int) convertPeriodToSeconds(period)).orElseGet(() -> getProperty(
             ControllerPeriodicTasksConf.
                 DEPRECATED_MINION_INSTANCES_CLEANUP_TASK_MIN_OFFLINE_TIME_BEFORE_DELETION_SECONDS,
