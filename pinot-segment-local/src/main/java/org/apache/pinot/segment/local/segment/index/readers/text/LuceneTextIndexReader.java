@@ -27,8 +27,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DocumentStoredFieldVisitor;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.Collector;
@@ -44,6 +48,7 @@ import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.segment.spi.index.TextIndexConfig.DocIdTranslatorMode;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -92,12 +97,13 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
-      _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
       // If the properties file exists, use the analyzer properties and query parser class from the properties file
       File propertiesFile = new File(indexFile, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
       if (propertiesFile.exists()) {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
       }
+
+      _docIdTranslator = prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
@@ -199,6 +205,135 @@ public class LuceneTextIndexReader implements TextIndexReader {
     _analyzer.close();
   }
 
+  DocIdTranslator prepareDocIdTranslator(File segmentIndexDir, String column, int numDocs,
+      IndexSearcher indexSearcher, TextIndexConfig config, File indexDir)
+      throws IOException {
+    if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.Skip) {
+      LOGGER.debug("Using no-op doc id translator");
+      return NoOpDocIdTranslator.INSTANCE;
+    }
+
+    int length = Integer.BYTES * numDocs;
+    File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
+        column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    // The mapping is local to a segment. It is created on the server during segment load.
+    // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
+    // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
+    String desc = "Text index docId mapping buffer: " + column;
+    PinotDataBuffer buffer = null;
+
+    try {
+      if (docIdMappingFile.exists()) {
+        // we will be here for segment reload and server restart
+        // for refresh, we will not be here since segment is deleted/replaced
+        // TODO: see if we can prefetch the pages
+        buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+
+        return new DefaultDocIdTranslator(buffer);
+      } else {
+        buffer =
+            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
+
+        if (config.getDocIdTranslatorMode() == DocIdTranslatorMode.TryOptimize) {
+          LOGGER.debug("Creating lucene to pinot doc id mapping.");
+          boolean allIdsAreEqual = true;
+
+          class DocIdVisitor extends DocumentStoredFieldVisitor {
+            int _pinotDocId;
+
+            @Override
+            public Status needsField(FieldInfo fieldInfo) {
+              // assume doc id is the only stored document
+              assert LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME.equals(fieldInfo.name);
+              return Status.YES;
+            }
+
+            @Override
+            public void intField(FieldInfo fieldInfo, int value) {
+              _pinotDocId = value;
+            }
+          }
+
+          DocIdVisitor visitor = new DocIdVisitor();
+          StoredFields storedFields = indexSearcher.storedFields();
+
+          for (int i = 0; i < numDocs; i++) {
+            storedFields.document(i, visitor);
+            int pinotDocId = visitor._pinotDocId;
+            allIdsAreEqual &= (i == pinotDocId);
+            buffer.putInt(i * Integer.BYTES, pinotDocId);
+          }
+
+          if (allIdsAreEqual) {
+            LOGGER.error("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
+            // TODO: it'd be better to unmap without flushing the buffer. Only some buffer types support it, though.
+            buffer.close();
+            buffer = null;
+            // get rid of mapping and use lucene ids
+            docIdMappingFile.delete();
+
+            // mapping is unnecessary so store flag in config file to skip checking on next load
+            TextIndexConfig newConfig =
+                new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Skip.name()).build();
+            TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
+
+            return NoOpDocIdTranslator.INSTANCE;
+          } else {
+            LOGGER.debug("Lucene doc ids are not equal to Pinot's. Keeping the mapping.");
+            // mapping is required so switch to default mode
+            TextIndexConfig newConfig =
+                new TextIndexConfigBuilder(config).withDocIdTranslatorMode(DocIdTranslatorMode.Default.name()).build();
+            TextIndexUtils.writeConfigToPropertiesFile(indexDir, newConfig);
+
+            return new DefaultDocIdTranslator(buffer);
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            Document document = indexSearcher.doc(i);
+            IndexableField field = document.getField(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME);
+            int pinotDocId = Integer.parseInt(field.stringValue());
+            buffer.putInt(i * Integer.BYTES, pinotDocId);
+          }
+          return new DefaultDocIdTranslator(buffer);
+        }
+      }
+    } catch (Exception e) {
+      if (buffer != null) {
+        buffer.close();
+      }
+
+      throw new RuntimeException(
+          "Caught exception while building doc id mapping for text index column: " + column, e);
+    }
+  }
+
+  public interface DocIdTranslator extends Closeable {
+    int getPinotDocId(int luceneDocId);
+  }
+
+  /**
+   * Doc id translator that does no actual translation and just returns given lucene id.
+   * Used when doc ids are the same and translation is not necessary.
+   */
+  static class NoOpDocIdTranslator implements DocIdTranslator {
+    static final NoOpDocIdTranslator INSTANCE = new NoOpDocIdTranslator();
+
+    private NoOpDocIdTranslator() {
+    }
+
+    @Override
+    public int getPinotDocId(int luceneDocId) {
+      return luceneDocId;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      // do nothing
+    }
+  }
+
   /**
    * Lucene docIDs are not same as pinot docIDs. The internal implementation
    * of Lucene can change the docIds and they are not guaranteed to be the
@@ -207,41 +342,14 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * This class is used to map the luceneDocId (returned by the search query
    * to the collector) to corresponding pinotDocId.
    */
-  static class DocIdTranslator implements Closeable {
+  static class DefaultDocIdTranslator implements DocIdTranslator {
     final PinotDataBuffer _buffer;
 
-    DocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher)
-        throws Exception {
-      int length = Integer.BYTES * numDocs;
-      File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
-      // The mapping is local to a segment. It is created on the server during segment load.
-      // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
-      // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
-      String desc = "Text index docId mapping buffer: " + column;
-      if (docIdMappingFile.exists()) {
-        // we will be here for segment reload and server restart
-        // for refresh, we will not be here since segment is deleted/replaced
-        // TODO: see if we can prefetch the pages
-        _buffer =
-            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ true, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
-      } else {
-        _buffer =
-            PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length, ByteOrder.LITTLE_ENDIAN, desc);
-        for (int i = 0; i < numDocs; i++) {
-          try {
-            Document document = indexSearcher.doc(i);
-            int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
-            _buffer.putInt(i * Integer.BYTES, pinotDocId);
-          } catch (Exception e) {
-            throw new RuntimeException(
-                "Caught exception while building doc id mapping for text index column: " + column, e);
-          }
-        }
-      }
+    DefaultDocIdTranslator(PinotDataBuffer buffer) {
+      _buffer = buffer;
     }
 
-    int getPinotDocId(int luceneDocId) {
+    public int getPinotDocId(int luceneDocId) {
       return _buffer.getInt(luceneDocId * Integer.BYTES);
     }
 
