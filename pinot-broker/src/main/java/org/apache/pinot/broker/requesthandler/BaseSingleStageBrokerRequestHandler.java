@@ -85,7 +85,7 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRoute;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.broker.routing.table.TableRouteComputer;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
@@ -538,18 +538,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
+    TableRouteInfo
+        tableRouteInfo = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest,
         requestId);
 
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRoute.getOfflineRoutingTable();
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRoute.getRealtimeRoutingTable();
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRouteInfo.getOfflineRoutingTable();
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRouteInfo.getRealtimeRoutingTable();
     List<String> unavailableSegments = routeComputer.getUnavailableSegments();
     int numPrunedSegmentsTotal = routeComputer.getNumPrunedSegmentsTotal();
 
     // Rewrite the broker requests as the rest of the code expects them to be null or not based on whether the routing
     // calculation was successful or not.
-    offlineBrokerRequest = tableRoute.getOfflineBrokerRequest();
-    realtimeBrokerRequest = tableRoute.getRealtimeBrokerRequest();
+    offlineBrokerRequest = tableRouteInfo.getOfflineBrokerRequest();
+    realtimeBrokerRequest = tableRouteInfo.getRealtimeBrokerRequest();
 
     List<QueryProcessingException> errorMsgs = new ArrayList<>();
 
@@ -701,7 +702,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       onQueryStart(
           requestId, clientRequestId, query, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
       try {
-        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRoute,
+        brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRouteInfo,
             remainingTimeMs, serverStats, requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
       } finally {
@@ -709,7 +710,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         LOGGER.debug("Remove track of running query: {}", requestId);
       }
     } else {
-      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRoute, remainingTimeMs,
+      brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, tableRouteInfo, remainingTimeMs,
           serverStats, requestContext);
     }
     brokerResponse.setTablesQueried(Set.of(rawTableName));
@@ -1948,7 +1949,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 

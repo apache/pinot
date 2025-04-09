@@ -30,13 +30,13 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class ImplicitHybridTableRoute implements TableRoute {
+public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
   private final BrokerRequest _offlineBrokerRequest;
   private final BrokerRequest _realtimeBrokerRequest;
   private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
   private final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
 
-  public ImplicitHybridTableRoute(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+  public ImplicitHybridTableRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
       Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
     _offlineBrokerRequest = offlineBrokerRequest;
@@ -109,13 +109,13 @@ public class ImplicitHybridTableRoute implements TableRoute {
 
     if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
       offlineRequestMap =
-          ImplicitHybridTableRoute.getRequestMapFromRoutingTable(TableType.OFFLINE, _offlineRoutingTable,
+          ImplicitHybridTableRouteInfo.getRequestMapFromRoutingTable(TableType.OFFLINE, _offlineRoutingTable,
               _offlineBrokerRequest, requestId, brokerId, preferTls);
     }
 
     if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
       realtimeRequestMap =
-          ImplicitHybridTableRoute.getRequestMapFromRoutingTable(TableType.REALTIME, _realtimeRoutingTable,
+          ImplicitHybridTableRouteInfo.getRequestMapFromRoutingTable(TableType.REALTIME, _realtimeRoutingTable,
               _realtimeBrokerRequest, requestId, brokerId, preferTls);
     }
 

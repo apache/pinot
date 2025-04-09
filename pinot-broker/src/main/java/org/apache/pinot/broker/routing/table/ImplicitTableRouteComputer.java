@@ -29,9 +29,9 @@ import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.ImplicitHybridTableRoute;
+import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRoute;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -270,7 +270,7 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
    */
 
   @Override
-  public TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
+  public TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
@@ -320,7 +320,7 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
       }
     }
 
-    return new ImplicitHybridTableRoute(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable,
+    return new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest, offlineRoutingTable,
         realtimeRoutingTable);
   }
 

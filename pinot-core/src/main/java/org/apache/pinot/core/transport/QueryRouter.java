@@ -88,13 +88,13 @@ public class QueryRouter {
       @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
-    TableRoute tableRoute = new ImplicitHybridTableRoute(offlineBrokerRequest, realtimeBrokerRequest,
+    TableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest,
         offlineRoutingTable, realtimeRoutingTable);
 
-    return submitQuery(requestId, rawTableName, tableRoute, timeoutMs);
+    return submitQuery(requestId, rawTableName, tableRouteInfo, timeoutMs);
   }
 
-  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRoute route, long timeoutMs) {
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs) {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
 
