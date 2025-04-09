@@ -56,6 +56,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
+
 public class QueryRoutingTest {
   private static final int TEST_PORT = 12345;
   private static final ServerInstance SERVER_INSTANCE = new ServerInstance("localhost", TEST_PORT);
