@@ -1079,7 +1079,7 @@ public class TableRebalancer {
   }
 
   /**
-   * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
+   * This is called without the context of a rebalance job. Create a TableRebalanceLogger without a jobId.
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
@@ -1087,6 +1087,9 @@ public class TableRebalancer {
         new TableRebalanceLogger(LOGGER));
   }
 
+  /**
+   * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
+   */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun,
       @Nullable Boolean minimizeDataMovement, TableRebalanceLogger tableRebalanceLogger) {
@@ -1351,7 +1354,7 @@ public class TableRebalancer {
                   _tableRebalanceObserver.getStopStatus()));
         }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-            idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor)) {
+            idealState.getRecord().getMapFields(), lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger)) {
           tableRebalanceLogger.info("ExternalView converged for table: {}", tableNameWithType);
           return idealState;
         }
