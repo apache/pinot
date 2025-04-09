@@ -44,8 +44,8 @@ import org.slf4j.LoggerFactory;
  * then it represents a OFFLINE and REALTIME table with the same raw table name.
  * If the table name has a type, then it represents the table with the given type.
  */
-public class ImplicitTableRouteComputer implements TableRouteComputer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitTableRouteComputer.class);
+public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ImplicitHybridTableRouteProvider.class);
 
   private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
@@ -62,7 +62,7 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegmentsTotal = 0;
 
-  public ImplicitTableRouteComputer(String tableName) {
+  public ImplicitHybridTableRouteProvider(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {
