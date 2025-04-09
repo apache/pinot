@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /**
@@ -26,7 +28,6 @@ import java.util.Map;
  * during critical triggers. The 3 main triggers during a rebalance operation are show below.
  * For example, we can track stats + status of rebalance during these triggers.
  */
-
 public interface TableRebalanceObserver {
   enum Trigger {
     // Start of rebalance Trigger
@@ -35,10 +36,12 @@ public interface TableRebalanceObserver {
     EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
     // Ideal state changes due to external events and new target for rebalance is computed
     IDEAL_STATE_CHANGE_TRIGGER,
+    // Next assignment calculation change trigger which calculates next assignment to act on
+    NEXT_ASSINGMENT_CALCULATION_TRIGGER,
   }
 
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
-      Map<String, Map<String, String>> targetState);
+      Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext);
 
   void onNoop(String msg);
 
@@ -49,4 +52,29 @@ public interface TableRebalanceObserver {
   boolean isStopped();
 
   RebalanceResult.Status getStopStatus();
+
+  class RebalanceContext {
+    private final long _estimatedAverageSegmentSizeInBytes;
+    private final Set<String> _uniqueSegments;
+    private final Set<String> _segmentsToMonitor;
+
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
+        @Nullable Set<String> segmentsToMonitor) {
+      _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
+      _uniqueSegments = uniqueSegments;
+      _segmentsToMonitor = segmentsToMonitor;
+    }
+
+    public long getEstimatedAverageSegmentSizeInBytes() {
+      return _estimatedAverageSegmentSizeInBytes;
+    }
+
+    public Set<String> getUniqueSegments() {
+      return _uniqueSegments;
+    }
+
+    public Set<String> getSegmentsToMonitor() {
+      return _segmentsToMonitor;
+    }
+  }
 }
