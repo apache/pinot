@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -29,11 +30,46 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class TableRouteUtils {
-  private TableRouteUtils() {
+public class ImplicitHybridTableRoute implements TableRoute {
+  private final BrokerRequest _offlineBrokerRequest;
+  private final BrokerRequest _realtimeBrokerRequest;
+  private final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
+  private final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+
+  public ImplicitHybridTableRoute(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+      Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+    _offlineBrokerRequest = offlineBrokerRequest;
+    _realtimeBrokerRequest = realtimeBrokerRequest;
+    _offlineRoutingTable = offlineRoutingTable;
+    _realtimeRoutingTable = realtimeRoutingTable;
   }
 
-  public static Map<ServerRoutingInstance, InstanceRequest> getRequestMapFromRoutingTable(TableType tableType,
+  @Nullable
+  @Override
+  public BrokerRequest getOfflineBrokerRequest() {
+    return _offlineBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public BrokerRequest getRealtimeBrokerRequest() {
+    return _realtimeBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+    return _offlineRoutingTable;
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+    return _realtimeRoutingTable;
+  }
+
+  protected static Map<ServerRoutingInstance, InstanceRequest> getRequestMapFromRoutingTable(TableType tableType,
       Map<ServerInstance, ServerRouteInfo> routingTable, BrokerRequest brokerRequest, long requestId, String brokerId,
       boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
@@ -45,7 +81,7 @@ public class TableRouteUtils {
     return requestMap;
   }
 
-  public static InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
+  protected static InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
       ServerRouteInfo segments) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
@@ -66,22 +102,21 @@ public class TableRouteUtils {
     return instanceRequest;
   }
 
-  public static Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
-      TableRoute tableRoute, boolean preferTls) {
+  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> offlineRequestMap = null;
     Map<ServerRoutingInstance, InstanceRequest> realtimeRequestMap = null;
 
-    if (tableRoute.getOfflineRoutingTable() != null && tableRoute.getOfflineBrokerRequest() != null) {
+    if (_offlineRoutingTable != null && _offlineBrokerRequest != null) {
       offlineRequestMap =
-          TableRouteUtils.getRequestMapFromRoutingTable(TableType.OFFLINE, tableRoute.getOfflineRoutingTable(),
-              tableRoute.getOfflineBrokerRequest(), requestId, brokerId, preferTls);
+          ImplicitHybridTableRoute.getRequestMapFromRoutingTable(TableType.OFFLINE, _offlineRoutingTable,
+              _offlineBrokerRequest, requestId, brokerId, preferTls);
     }
 
-    if (tableRoute.getRealtimeRoutingTable() != null && tableRoute.getRealtimeBrokerRequest() != null) {
+    if (_realtimeRoutingTable != null && _realtimeBrokerRequest != null) {
       realtimeRequestMap =
-          TableRouteUtils.getRequestMapFromRoutingTable(TableType.REALTIME, tableRoute.getRealtimeRoutingTable(),
-              tableRoute.getRealtimeBrokerRequest(), requestId, brokerId, preferTls);
+          ImplicitHybridTableRoute.getRequestMapFromRoutingTable(TableType.REALTIME, _realtimeRoutingTable,
+              _realtimeBrokerRequest, requestId, brokerId, preferTls);
     }
 
     if (offlineRequestMap != null) {

@@ -85,6 +85,7 @@ import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.core.transport.TableRouteComputer;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
@@ -391,28 +392,28 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Get the tables hit by the request
-    TableRouteComputer tableRoute = new ImplicitTableRouteComputer(tableName);
-    tableRoute.getTableConfig(_tableCache);
-    tableRoute.checkRoutes(_routingManager);
+    TableRouteComputer routeComputer = new ImplicitTableRouteComputer(tableName);
+    routeComputer.getTableConfig(_tableCache);
+    routeComputer.checkRoutes(_routingManager);
 
-    if (!tableRoute.isExists()) {
+    if (!routeComputer.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST);
       return BrokerResponseNative.TABLE_DOES_NOT_EXIST;
     }
 
-    if (!tableRoute.isRouteExists()) {
+    if (!routeComputer.isRouteExists()) {
       LOGGER.info("No table matches for request {}: {}", requestId, query);
       requestContext.setErrorCode(QueryErrorCode.BROKER_RESOURCE_MISSING);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
 
-    String offlineTableName = tableRoute.getOfflineTableName();
-    String realtimeTableName = tableRoute.getRealtimeTableName();
-    TableConfig offlineTableConfig = tableRoute.getOfflineTableConfig();
-    TableConfig realtimeTableConfig = tableRoute.getRealtimeTableConfig();
-    TimeBoundaryInfo timeBoundaryInfo = tableRoute.getTimeBoundaryInfo();
+    String offlineTableName = routeComputer.getOfflineTableName();
+    String realtimeTableName = routeComputer.getRealtimeTableName();
+    TableConfig offlineTableConfig = routeComputer.getOfflineTableConfig();
+    TableConfig realtimeTableConfig = routeComputer.getRealtimeTableConfig();
+    TimeBoundaryInfo timeBoundaryInfo = routeComputer.getTimeBoundaryInfo();
 
     HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
     validateGroovyScript(serverPinotQuery, handlerContext._disableGroovy);
@@ -466,7 +467,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     BrokerRequest offlineBrokerRequest = null;
     BrokerRequest realtimeBrokerRequest = null;
 
-    if (tableRoute.isHybrid()) {
+    if (routeComputer.isHybrid()) {
       // Hybrid
       PinotQuery offlinePinotQuery = serverPinotQuery.deepCopy();
       offlinePinotQuery.getDataSource().setTableName(offlineTableName);
@@ -488,7 +489,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       requestContext.setFanoutType(RequestContext.FanoutType.HYBRID);
       requestContext.setOfflineServerTenant(getServerTenant(offlineTableName));
       requestContext.setRealtimeServerTenant(getServerTenant(realtimeTableName));
-    } else if (tableRoute.isOffline()) {
+    } else if (routeComputer.isOffline()) {
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
@@ -537,12 +538,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Calculate routing table for the query
     // TODO: Modify RoutingManager interface to directly take PinotQuery
     long routingStartTimeNs = System.nanoTime();
-    tableRoute.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+    TableRoute tableRoute = routeComputer.calculateRoutes(_routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
 
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = tableRoute.getOfflineRoutingTable();
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = tableRoute.getRealtimeRoutingTable();
-    List<String> unavailableSegments = tableRoute.getUnavailableSegments();
-    int numPrunedSegmentsTotal = tableRoute.getNumPrunedSegmentsTotal();
+    List<String> unavailableSegments = routeComputer.getUnavailableSegments();
+    int numPrunedSegmentsTotal = routeComputer.getNumPrunedSegmentsTotal();
 
     // Rewrite the broker requests as the rest of the code expects them to be null or not based on whether the routing
     // calculation was successful or not.
@@ -555,12 +556,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Note that if a query is for one of OFFLINE or REALTIME table and the other physical table is disabled,
     // we still want to run the query. So this condition is false.
     // Tested by the tables "hybrid_o_disabled_REALTIME" and "hybrid_r_disabled_OFFLINE" in ImplicitTableRouteTest
-    if (tableRoute.isDisabled()) {
+    if (routeComputer.isDisabled()) {
       requestContext.setErrorCode(QueryErrorCode.TABLE_IS_DISABLED);
       return BrokerResponseNative.TABLE_IS_DISABLED;
     }
 
-    List<String> disabledTableNames = tableRoute.getDisabledTableNames();
+    List<String> disabledTableNames = routeComputer.getDisabledTableNames();
     if (disabledTableNames != null) {
       for (String name : disabledTableNames) {
         String errorMessage = String.format("%s Table is disabled", name);
@@ -1946,7 +1947,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, TableRouteComputer route, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.transport;
 
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -66,20 +65,6 @@ public interface TableRoute {
    */
   @Nullable
   Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
-
-  /**
-   * Gets the list of unavailable segments for the table.
-   *
-   * @return a list of unavailable segment names
-   */
-  List<String> getUnavailableSegments();
-
-  /**
-   * Gets the total number of pruned segments for the table.
-   *
-   * @return the total number of pruned segments
-   */
-  int getNumPrunedSegmentsTotal();
 
   /**
    * Gets the combined request map for the table, including both offline and realtime requests.
