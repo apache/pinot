@@ -616,7 +616,8 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Committing segment metadata for segment: {}", committingSegmentName);
     long startTimeNs1 = System.nanoTime();
     SegmentZKMetadata committingSegmentZKMetadata =
-        updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, toCommitting);
+        toCommitting ? updateSegmentZKMetadataToCommitting(realtimeTableName, committingSegmentDescriptor)
+            : updateSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor, Status.IN_PROGRESS);
 
     preProcessNewSegmentZKMetadata();
 
@@ -693,17 +694,50 @@ public class PinotLLCRealtimeSegmentManager {
     return true;
   }
 
-  // Step 1: Update committing segment metadata
-  private SegmentZKMetadata updateCommittingSegmentMetadata(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor, boolean toCommitting) {
-    String committingSegmentName = committingSegmentDescriptor.getSegmentName();
-    SegmentZKMetadata committingSegmentZKMetadata =
-        toCommitting ? updateCommittingSegmentZKMetadataToCommiting(realtimeTableName, committingSegmentDescriptor)
-            : updateCommittingSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor);
+  // Step 1: Update committing segment ZK metadata
+
+  /// When invoked from non-pauseless table, expected status is IN_PROGRESS; when invoked from pauseless table, expected
+  /// status is COMMITTING.
+  private SegmentZKMetadata updateSegmentZKMetadataToDone(String realtimeTableName,
+      CommittingSegmentDescriptor committingSegmentDescriptor, Status expectedStatus) {
+    String segmentName = committingSegmentDescriptor.getSegmentName();
+    Stat stat = new Stat();
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    Preconditions.checkState(segmentZKMetadata.getStatus() == expectedStatus,
+        "Segment status for segment: %s should be %s, found: %s", segmentName, expectedStatus,
+        segmentZKMetadata.getStatus());
+
+    // Update segment ZK metadata per committing descriptor
+    SegmentMetadataImpl segmentMetadata = committingSegmentDescriptor.getSegmentMetadata();
+    Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
+        segmentName);
+    String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
+    String downloadUrl =
+        isPeerURL(segmentLocation) ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : segmentLocation;
+    SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, segmentZKMetadata, segmentMetadata,
+        downloadUrl, committingSegmentDescriptor.getSegmentSizeBytes(), committingSegmentDescriptor.getNextOffset());
+    persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
 
     // Refresh the Broker routing
-    _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
-    return committingSegmentZKMetadata;
+    _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, segmentName, false, true);
+
+    return segmentZKMetadata;
+  }
+
+  /// For pauseless consumption only, the status should be IN_PROGRESS.
+  private SegmentZKMetadata updateSegmentZKMetadataToCommitting(String realtimeTableName,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
+    String segmentName = committingSegmentDescriptor.getSegmentName();
+    Stat stat = new Stat();
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    Preconditions.checkState(segmentZKMetadata.getStatus() == Status.IN_PROGRESS,
+        "Segment status for segment: %s should be IN_PROGRESS, found: %s", segmentName, segmentZKMetadata.getStatus());
+
+    segmentZKMetadata.setStatus(Status.COMMITTING);
+    segmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
+    persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, stat.getVersion());
+
+    return segmentZKMetadata;
   }
 
   // Step 2: Create new segment metadata
@@ -818,14 +852,9 @@ public class PinotLLCRealtimeSegmentManager {
         throw new HelixHelper.PermanentUpdaterException(
             "Exceeded max segment completion time for segment " + segmentName);
       }
-      Stat stat = new Stat();
-      SegmentZKMetadata committingSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-      Preconditions.checkState(committingSegmentZKMetadata.getStatus() == Status.COMMITTING,
-          "Segment status for segment %s should be COMMITTING, found: %s", segmentName,
-          committingSegmentZKMetadata.getStatus());
       LOGGER.info("Updating segment ZK metadata for segment: {}", segmentName);
-      committingSegmentZKMetadata =
-          updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, false);
+      SegmentZKMetadata committingSegmentZKMetadata =
+          updateSegmentZKMetadataToDone(realtimeTableName, committingSegmentDescriptor, Status.COMMITTING);
       LOGGER.info("Successfully updated segment metadata for segment: {}", segmentName);
       // remove the segment from the committing segment list
       LOGGER.info("Removing segment: {} from committing segment list", segmentName);
@@ -847,56 +876,6 @@ public class PinotLLCRealtimeSegmentManager {
     } finally {
       _numCompletingSegments.addAndGet(-1);
     }
-  }
-
-  /**
-   * Updates segment ZK metadata for the committing segment to status COMMITTING.
-   */
-  private SegmentZKMetadata updateCommittingSegmentZKMetadataToCommiting(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor) {
-    String segmentName = committingSegmentDescriptor.getSegmentName();
-
-    Stat stat = new Stat();
-    SegmentZKMetadata committingSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    Preconditions.checkState(committingSegmentZKMetadata.getStatus() == Status.IN_PROGRESS,
-        "Segment status for segment: %s should be IN_PROGRESS, found: %s", segmentName,
-        committingSegmentZKMetadata.getStatus());
-
-    committingSegmentZKMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
-    committingSegmentZKMetadata.setStatus(Status.COMMITTING);
-
-    persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
-    return committingSegmentZKMetadata;
-  }
-
-  /**
-   * Updates segment ZK metadata for the committing segment to status DONE.
-   */
-  private SegmentZKMetadata updateCommittingSegmentZKMetadataToDone(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor) {
-    String segmentName = committingSegmentDescriptor.getSegmentName();
-
-    Stat stat = new Stat();
-    SegmentZKMetadata committingSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
-    // The segment status can be:
-    // 1. IN_PROGRESS for normal tables
-    // 2. COMMITTING for pauseless tables
-    Status status = committingSegmentZKMetadata.getStatus();
-    Preconditions.checkState(status == Status.IN_PROGRESS || status == Status.COMMITTING,
-        "Segment status for segment: %s should be IN_PROGRESS or COMMITTING, found: %s", segmentName);
-
-    SegmentMetadataImpl segmentMetadata = committingSegmentDescriptor.getSegmentMetadata();
-    Preconditions.checkState(segmentMetadata != null, "Failed to find segment metadata from descriptor for segment: %s",
-        segmentName);
-    String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
-    String downloadUrl =
-        isPeerURL(segmentLocation) ? CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD : segmentLocation;
-    SegmentZKMetadataUtils.updateCommittingSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata,
-        segmentMetadata, downloadUrl, committingSegmentDescriptor.getSegmentSizeBytes(),
-        committingSegmentDescriptor.getNextOffset());
-
-    persistSegmentZKMetadata(realtimeTableName, committingSegmentZKMetadata, stat.getVersion());
-    return committingSegmentZKMetadata;
   }
 
   private boolean isPeerURL(String segmentLocation) {
