@@ -392,9 +392,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Get the tables hit by the request
-    TableRouteProvider routeProvider = new ImplicitHybridTableRouteProvider(tableName);
-    routeProvider.getTableConfig(_tableCache);
-    routeProvider.checkRoutes(_routingManager);
+    TableRouteProvider routeProvider = ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     if (!routeProvider.isExists()) {
       LOGGER.info("Table not found for request {}: {}", requestId, query);
