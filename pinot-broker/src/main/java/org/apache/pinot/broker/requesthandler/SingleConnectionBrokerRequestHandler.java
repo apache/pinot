@@ -45,7 +45,7 @@ import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.transport.TableRoute;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -93,7 +93,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();

@@ -24,7 +24,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.TableRoute;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
@@ -130,7 +130,7 @@ public interface TableRouteComputer {
    * @param realtimeBrokerRequest Broker Request for the realtime table.
    * @param requestId Request ID assigned to the query.
    */
-  TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
+  TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId);
 
   /**

@@ -32,7 +32,7 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
  * getUnavailableSegments() returns the segments that are not available when calculating the routing table.
  * numPrunedSegmentsTotal() returns the number of segments that were pruned when calculating the routing table.
  */
-public interface TableRoute {
+public interface TableRouteInfo {
 
   /**
    * Gets the broker request for the offline table, if available.
