@@ -51,6 +51,7 @@ import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
@@ -203,25 +204,10 @@ public class FilterPlanNode implements PlanNode {
    */
   private boolean canApplyMapFilter(Predicate predicate, String column) {
     // Get column name and key name from function arguments
-    //FIXME  Check for ITEM tranform function in the predicate
-    List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
-    if (arguments.size() != 2) {
-      throw new IllegalStateException("Expected two arguments (column name and key name), found: " + arguments.size());
-    }
+    FunctionContext function = predicate.getLhs().getFunction();
 
-    String columnName = arguments.get(0).getIdentifier();
-    String keyName = arguments.get(1).getIdentifier();
-
-    DataSource dataSource = _indexSegment.getDataSource(columnName);
-
-    if (dataSource instanceof MapDataSource) {
-      MapDataSource mapDS = (MapDataSource) dataSource;
-      DataSource keyDS = mapDS.getKeyDataSource(keyName);
-      //FIXME we can also get the list of keys enabled for json index from json config
-      JsonIndexReader jsonIndex = keyDS.getJsonIndex();
-      return jsonIndex != null;
-    }
-    return false;
+    // Check if the function is an ItemTransformFunction
+    return function.getFunctionName().equals(ItemTransformFunction.FUNCTION_NAME);
   }
 
   /**
@@ -271,8 +257,7 @@ public class FilterPlanNode implements PlanNode {
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyMapFilter(predicate, lhs.getIdentifier())) {
-            // FIXME can we go for all path in this method
-            return new MapIndexFilterOperator(_indexSegment, predicate, numDocs);
+            return new MapIndexFilterOperator(_indexSegment, predicate, _queryContext, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
