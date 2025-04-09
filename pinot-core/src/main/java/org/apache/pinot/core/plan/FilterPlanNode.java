@@ -192,7 +192,7 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Map filter can be applied iff:
+   * FIXME: Map filter can be applied iff:
    * <ul>
    *   <li>Predicate </li>
    *   <li>Map has index like </li>
@@ -200,14 +200,13 @@ public class FilterPlanNode implements PlanNode {
    */
   private boolean canApplyMapFilter(Predicate predicate, String column) {
     // Get column name and key name from function arguments
+    //FIXME  Check for ITEM tranform function in the predicate
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     if (arguments.size() != 2) {
       throw new IllegalStateException("Expected two arguments (column name and key name), found: " + arguments.size());
     }
 
-    // First argument is column name
     String columnName = arguments.get(0).getIdentifier();
-    // Second argument is key name
     String keyName = arguments.get(1).getIdentifier();
 
     DataSource dataSource = _indexSegment.getDataSource(columnName);
@@ -215,6 +214,7 @@ public class FilterPlanNode implements PlanNode {
     if (dataSource instanceof MapDataSource) {
       MapDataSource mapDS = (MapDataSource) dataSource;
       DataSource keyDS = mapDS.getKeyDataSource(keyName);
+      //FIXME we can also get the list of keys enabled for json index from json config
       JsonIndexReader jsonIndex = keyDS.getJsonIndex();
       return jsonIndex != null;
     }
@@ -268,6 +268,7 @@ public class FilterPlanNode implements PlanNode {
           } else if (canApplyH3IndexForInclusionCheck(predicate, lhs.getFunction())) {
             return new H3InclusionIndexFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
           } else if (canApplyMapFilter(predicate, lhs.getIdentifier())) {
+            // FIXME can we go for all path in this method
             return new MapIndexFilterOperator(_indexSegment, predicate, numDocs);
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
