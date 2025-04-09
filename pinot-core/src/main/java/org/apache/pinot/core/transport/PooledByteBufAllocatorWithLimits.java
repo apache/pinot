@@ -35,6 +35,9 @@ import org.slf4j.LoggerFactory;
 public class PooledByteBufAllocatorWithLimits {
   private static final Logger LOGGER = LoggerFactory.getLogger(PooledByteBufAllocatorWithLimits.class);
 
+  private PooledByteBufAllocatorWithLimits() {
+  }
+
   // Allocate 1/5th of unused offheap memory to direct buffer allocators when using netty channels on broker and
   // server side
   public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {

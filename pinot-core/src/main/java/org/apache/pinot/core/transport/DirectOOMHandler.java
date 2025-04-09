@@ -109,7 +109,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
         try {
           if (_serverToChannelMap != null && !_serverToChannelMap.isEmpty()) {
             LOGGER.error("Closing ALL channels to servers, as we are running out of direct memory "
-                + "while receiving response from {}", _serverRoutingInstance, cause);// broker side direct OOM handler
+                + "while receiving response from {}", _serverRoutingInstance, cause); // broker side direct OOM handler
             BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
 
             // close all channels to servers
@@ -122,7 +122,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
                 new QueryCancelledException("Query cancelled as broker is out of direct memory"));
           } else if (_allChannels != null && !_allChannels.isEmpty()) { // server side direct OOM handler
             LOGGER.error("Closing channel from broker, as we are running out of direct memory "
-                + "while initiating request from broker through {}", _serverSocketChannel, cause);
+                + "while initiating request to server through {}", _serverSocketChannel, cause);
             ServerMetrics.get().addMeteredGlobalValue(ServerMeter.DIRECT_MEMORY_OOM, 1L);
             closeAllChannels();
           }
