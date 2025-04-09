@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.table;
+package org.apache.pinot.broker.routing.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -32,7 +32,6 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ImplicitHybridTableRoute;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRoute;
-import org.apache.pinot.core.transport.TableRouteComputer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;

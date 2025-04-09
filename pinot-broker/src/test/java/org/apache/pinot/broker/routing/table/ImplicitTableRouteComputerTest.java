@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.table;
+package org.apache.pinot.broker.routing.table;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
