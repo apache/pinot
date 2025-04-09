@@ -61,8 +61,8 @@ public class FunctionEvaluatorFactory {
         functionEvaluator = getExpressionEvaluator(transformExpression);
       } catch (Exception e) {
         throw new IllegalStateException(
-            "Caught exception while constructing expression evaluator for transform expression:" + transformExpression
-                + ", of column:" + columnName + ", exception: " + e.getMessage(), e);
+            "Caught exception while constructing expression evaluator for transform expression: " + transformExpression
+                + " of column: " + columnName + ", exception: " + e.getMessage(), e);
       }
     } else if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
 

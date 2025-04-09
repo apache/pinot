@@ -378,7 +378,7 @@ public final class TableConfigUtils {
             FunctionEvaluatorFactory.getExpressionEvaluator(filterFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid filter function " + filterFunction + ", exception: " + e.getMessage(), e);
+                "Invalid filter function '" + filterFunction + "', exception: " + e.getMessage(), e);
           }
         }
       }
