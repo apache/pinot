@@ -62,7 +62,8 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegmentsTotal = 0;
 
-  public static ImplicitHybridTableRouteProvider create(String tableName, TableCache tableCache, RoutingManager routingManager) {
+  public static ImplicitHybridTableRouteProvider create(String tableName, TableCache tableCache,
+      RoutingManager routingManager) {
     ImplicitHybridTableRouteProvider provider = new ImplicitHybridTableRouteProvider(tableName);
     provider.getTableConfig(tableCache);
     provider.checkRoutes(routingManager);
@@ -279,7 +280,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   @Override
   public TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
-    assert(isExists());
+    assert (isExists());
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
 
