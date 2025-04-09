@@ -26,7 +26,7 @@ import java.util.Map;
 public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   @Override
   public void onTrigger(TableRebalanceObserver.Trigger trigger, Map<String, Map<String, String>> initialState,
-      Map<String, Map<String, String>> targetState) {
+      Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext) {
   }
 
   @Override

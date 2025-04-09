@@ -86,7 +86,7 @@ public class QueryLoggerTest {
   public void shouldFormatLogLineProperly() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
-    QueryLogger.QueryLogParams params = generateParams(false, 0, 456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     // When:
@@ -105,6 +105,7 @@ public class QueryLoggerTest {
         + "consumingFreshnessTimeMs=11,"
         + "servers=12/13,"
         + "groupLimitReached=false,"
+        + "groupWarningLimitReached=false,"
         + "brokerReduceTimeMs=20,"
         + "exceptions=0,"
         + "serverStats=serverStats,"
@@ -120,7 +121,7 @@ public class QueryLoggerTest {
   public void shouldOmitClientId() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(true);
-    QueryLogger.QueryLogParams params = generateParams(false, 0, 456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, false, _logger, _droppedRateLimiter);
 
     // When:
@@ -136,7 +137,7 @@ public class QueryLoggerTest {
   public void shouldNotForceLog() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
-    QueryLogger.QueryLogParams params = generateParams(false, 0, 456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     // When:
@@ -150,7 +151,7 @@ public class QueryLoggerTest {
   public void shouldForceLogWhenNumGroupsLimitIsReached() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
-    QueryLogger.QueryLogParams params = generateParams(true, 0, 456);
+    QueryLogger.QueryLogParams params = generateParams(true, true, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     // When:
@@ -164,7 +165,7 @@ public class QueryLoggerTest {
   public void shouldForceLogWhenExceptionsExist() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
-    QueryLogger.QueryLogParams params = generateParams(false, 1, 456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 1, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     // When:
@@ -178,7 +179,7 @@ public class QueryLoggerTest {
   public void shouldForceLogWhenTimeIsMoreThanOneSecond() {
     // Given:
     Mockito.when(_logRateLimiter.tryAcquire()).thenReturn(false);
-    QueryLogger.QueryLogParams params = generateParams(false, 0, 1456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 1456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     // When:
@@ -212,7 +213,7 @@ public class QueryLoggerTest {
       return true;
     }).thenReturn(true);
 
-    QueryLogger.QueryLogParams params = generateParams(false, 0, 456);
+    QueryLogger.QueryLogParams params = generateParams(false, false, 0, 456);
     QueryLogger queryLogger = new QueryLogger(_logRateLimiter, 100, true, _logger, _droppedRateLimiter);
 
     ExecutorService executorService = Executors.newFixedThreadPool(4);
@@ -240,7 +241,8 @@ public class QueryLoggerTest {
     Assert.assertEquals((long) _numDropped.get(0), 2L);
   }
 
-  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, int numExceptions, long timeUsedMs) {
+  private QueryLogger.QueryLogParams generateParams(boolean numGroupsLimitReached, boolean numGroupsWarningLimitReached,
+      int numExceptions, long timeUsedMs) {
     RequestContext requestContext = new DefaultRequestContext();
     requestContext.setRequestId(123);
     requestContext.setQuery("SELECT * FROM foo");
@@ -248,6 +250,7 @@ public class QueryLoggerTest {
 
     BrokerResponseNative response = new BrokerResponseNative();
     response.setNumGroupsLimitReached(numGroupsLimitReached);
+    response.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     for (int i = 0; i < numExceptions; i++) {
       response.addException(new QueryProcessingException(QueryErrorCode.INTERNAL, "message" + i));
     }

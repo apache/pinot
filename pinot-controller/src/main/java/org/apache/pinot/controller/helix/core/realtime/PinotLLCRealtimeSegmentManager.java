@@ -108,6 +108,7 @@ import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -823,7 +824,8 @@ public class PinotLLCRealtimeSegmentManager {
           "Segment status for segment %s should be COMMITTING, found: %s", segmentName,
           committingSegmentZKMetadata.getStatus());
       LOGGER.info("Updating segment ZK metadata for segment: {}", segmentName);
-      updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, false);
+      committingSegmentZKMetadata =
+          updateCommittingSegmentMetadata(realtimeTableName, committingSegmentDescriptor, false);
       LOGGER.info("Successfully updated segment metadata for segment: {}", segmentName);
       // remove the segment from the committing segment list
       LOGGER.info("Removing segment: {} from committing segment list", segmentName);
@@ -997,9 +999,9 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   Set<Integer> getPartitionIds(StreamConfig streamConfig)
       throws Exception {
-    String clientId =
+    String clientId = StreamConsumerFactory.getUniqueClientId(
         PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
-            + streamConfig.getTopicName();
+            + streamConfig.getTopicName());
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     try (StreamMetadataProvider metadataProvider = consumerFactory.createStreamMetadataProvider(clientId)) {
       return metadataProvider.fetchPartitionIds(5000L);
@@ -1099,6 +1101,35 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       // Ignore
     }
+  }
+
+  /**
+   * An instance is reporting that it cannot build segment due to non-recoverable error, usually due to size too large.
+   * Reduce the segment "segment.flush.threshold.size" to half of the current segment size target.
+   */
+  public void reduceSegmentSizeAndReset(LLCSegmentName llcSegmentName, int prevNumRows) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+    // reduce the segment size to its half
+    String segmentName = llcSegmentName.getSegmentName();
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
+
+    Stat stat = new Stat();
+    SegmentZKMetadata prevSegmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName, stat);
+    Preconditions.checkState(prevSegmentZKMetadata.getStatus() == Status.IN_PROGRESS,
+        "Segment status for segment: %s should be IN_PROGRESS, found: %s", segmentName,
+        prevSegmentZKMetadata.getStatus());
+
+    int prevTargetNumRows = prevSegmentZKMetadata.getSizeThresholdToFlushSegment();
+    int newNumRows = Math.min(prevNumRows / 2, prevTargetNumRows / 2);
+    prevSegmentZKMetadata.setSizeThresholdToFlushSegment(newNumRows);
+
+    persistSegmentZKMetadata(realtimeTableName, prevSegmentZKMetadata, stat.getVersion());
+    _helixResourceManager.resetSegment(
+        realtimeTableName, segmentName, null);
+    LOGGER.info("Reduced segment size of {} from prevTarget {} prevActual {} to {}",
+        segmentName, prevTargetNumRows, prevNumRows, newNumRows);
+    _controllerMetrics.addMeteredTableValue(
+        realtimeTableName, ControllerMeter.SEGMENT_SIZE_AUTO_REDUCTION, 1L);
   }
 
   /**
@@ -2330,9 +2361,10 @@ public class PinotLLCRealtimeSegmentManager {
    *   Request body (JSON):
    *
    * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
-   * @param realtimeTableName The table name with type, e.g. "myTable_REALTIME"
+   * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(String realtimeTableName) {
+  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig) {
+    String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
@@ -2396,7 +2428,12 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
+
     if (segmentsInErrorStateInAtLeastOneReplica.isEmpty()) {
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 0);
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0);
       return;
     }
 
@@ -2404,6 +2441,23 @@ public class PinotLLCRealtimeSegmentManager {
             + "{} segments with all replicas in ERROR state: {} in table: {}, repairing them",
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
+
+    boolean isPartialUpsertEnabled =
+        tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
+    boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
+    if ((isPartialUpsertEnabled || isDedupEnabled)) {
+      // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
+      // lead to data inconsistencies
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
+      LOGGER.error("Skipping repair for errored segments in table: {} because dedup or partial upsert is enabled.",
+          realtimeTableName);
+      return;
+    } else {
+      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+          ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
+    }
+
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);

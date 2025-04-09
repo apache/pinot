@@ -28,7 +28,6 @@ import org.apache.pinot.core.accounting.AggregateByQueryIdAccountantFactoryForTe
 import org.apache.pinot.integration.tests.window.utils.WindowFunnelUtils;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -66,9 +65,6 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE,
-        InstanceType.BROKER);
     brokerConf.setProperty(
         CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
         AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());

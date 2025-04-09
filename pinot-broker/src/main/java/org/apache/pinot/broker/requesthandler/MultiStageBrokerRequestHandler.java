@@ -248,7 +248,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponse handleRequestThrowing(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws QueryException, WebApplicationException {
-    LOGGER.debug("SQL query for request {}: {}", requestId, query);
+    _queryLogger.log(requestId, query);
 
     long queryTimeoutMs = getTimeout(sqlNodeAndOptions.getOptions());
     Timer queryTimer = new Timer(queryTimeoutMs, TimeUnit.MILLISECONDS);
@@ -311,6 +311,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Broker.DEFAULT_OF_SPOOLS);
     boolean defaultEnableGroupTrim = _config.getProperty(CommonConstants.Broker.CONFIG_OF_MSE_ENABLE_GROUP_TRIM,
         CommonConstants.Broker.DEFAULT_MSE_ENABLE_GROUP_TRIM);
+    boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
+        CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
     return QueryEnvironment.configBuilder()
         .database(database)
         .tableCache(_tableCache)
@@ -318,6 +321,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
+        .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .build();
   }
 

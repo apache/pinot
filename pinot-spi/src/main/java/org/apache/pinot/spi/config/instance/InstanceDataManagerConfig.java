@@ -51,6 +51,12 @@ public interface InstanceDataManagerConfig {
 
   boolean isDirectRealtimeOffHeapAllocation();
 
+  boolean shouldReloadConsumingSegment();
+
+  int getMaxParallelRefreshThreads();
+
+  int getMaxSegmentPreloadThreads();
+
   int getMaxParallelSegmentBuilds();
 
   int getMaxParallelSegmentDownloads();

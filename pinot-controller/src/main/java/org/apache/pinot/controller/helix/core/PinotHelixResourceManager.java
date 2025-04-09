@@ -2127,6 +2127,15 @@ public class PinotHelixResourceManager {
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
 
+    // Remove COMMITTING segment list
+    if (TableNameBuilder.REALTIME.equals(tableType)) {
+      if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
+        LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+      } else {
+        LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+      }
+    }
+
     // Remove instance partitions
     if (tableType == TableType.OFFLINE) {
       InstancePartitionsUtils.removeInstancePartitions(_propertyStore, tableNameWithType);

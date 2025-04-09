@@ -98,6 +98,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
@@ -144,12 +145,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
   /**
    * Number of times the max number of groups has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
-   * by 2.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+  /**
+   * Number of times the warning threshold for number of groups has been reached.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
   /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.
@@ -186,7 +191,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
   PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
   PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
-  PREDOWNLOAD_FAILED("predownloadFailed", true);
+  PREDOWNLOAD_FAILED("predownloadFailed", true),
+
+  // reingestion metrics
+  SEGMENT_REINGESTION_FAILURE("segments", false);
 
   private final String _meterName;
   private final String _unit;

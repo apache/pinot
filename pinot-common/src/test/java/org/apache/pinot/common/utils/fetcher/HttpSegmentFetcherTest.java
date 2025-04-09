@@ -21,14 +21,17 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.fetcher.HttpSegmentFetcher.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -46,12 +49,23 @@ public class HttpSegmentFetcherTest {
     _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 3);
     _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_WAIT_MS_CONFIG_KEY, 10);
     _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, 1.1);
+    _fetcherConfig.setProperty(CONNECTION_REQUEST_TIMEOUT_CONFIG_KEY, 1000);
+    _fetcherConfig.setProperty(SOCKET_TIMEOUT_CONFIG_KEY, 1000);
   }
 
   private HttpSegmentFetcher getSegmentFetcher(FileUploadDownloadClient client) {
-    HttpSegmentFetcher segmentFetcher = new HttpSegmentFetcher();
-    segmentFetcher.setHttpClient(client);
+    HttpSegmentFetcher segmentFetcher;
+    if (ThreadLocalRandom.current().nextBoolean()) {
+      segmentFetcher = new HttpsSegmentFetcher();
+    } else {
+      segmentFetcher = new HttpSegmentFetcher();
+    }
+
     segmentFetcher.init(_fetcherConfig);
+    segmentFetcher.setHttpClient(client);
+
+    Assert.assertEquals(segmentFetcher.getSocketTimeoutMs(), 1000);
+    Assert.assertEquals(segmentFetcher.getConnectionRequestTimeoutMs(), 1000);
     return segmentFetcher;
   }
 

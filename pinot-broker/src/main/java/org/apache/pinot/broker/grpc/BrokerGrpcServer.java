@@ -34,10 +34,7 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import io.grpc.stub.StreamObserver;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.stream.Collectors;
 import nl.altindag.ssl.SSLFactory;
@@ -54,6 +51,8 @@ import org.apache.pinot.common.proto.PinotQueryBrokerGrpc;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.encoder.ResponseEncoder;
+import org.apache.pinot.common.response.encoder.ResponseEncoderFactory;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
@@ -181,15 +180,17 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(query, requestJsonNode);
     } catch (Exception e) {
-      // Do not log or emit metric here because it is pure user error
+      BrokerResponse brokerResponse;
       Broker.BrokerResponse errorBlock;
       try {
+        brokerResponse = new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
         errorBlock = Broker.BrokerResponse.newBuilder().setPayload(ByteString.copyFrom(
-            new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage()).toJsonString().getBytes())).build();
+            brokerResponse.toJsonString().getBytes())).build();
       } catch (IOException ex) {
         responseObserver.onCompleted();
         throw new RuntimeException(ex);
       }
+      brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       responseObserver.onNext(errorBlock);
       responseObserver.onCompleted();
       return;
@@ -210,6 +211,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
               .asRuntimeException());
       throw new RuntimeException(e);
     }
+    brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
     ResultTable resultTable = brokerResponse.getResultTable();
     // Handle empty and error block
     if (resultTable == null) {
@@ -258,23 +260,17 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
     String compressionAlgorithm = metadataMap.getOrDefault(CommonConstants.Broker.Grpc.COMPRESSION,
         CommonConstants.Broker.Grpc.DEFAULT_COMPRESSION);
     Compressor compressor = CompressionFactory.getCompressor(compressionAlgorithm);
+
+    String encodingAlgorithm = metadataMap.getOrDefault(CommonConstants.Broker.Grpc.ENCODING,
+        CommonConstants.Broker.Grpc.DEFAULT_ENCODING);
+    ResponseEncoder encoder = ResponseEncoderFactory.getResponseEncoder(encodingAlgorithm);
     // Multiple response blocks are compressed data rows
     for (int i = 0; i < resultTable.getRows().size(); i += blockRowSize) {
       try {
-        int rowSize = 0;
+        int rowSize = Math.min(blockRowSize, resultTable.getRows().size() - i);
         // Serialize the rows to a byte array
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-
-        for (int j = i; j < Math.min(i + blockRowSize, resultTable.getRows().size()); j++) {
-          String rowString = JsonUtils.objectToJsonNode(resultTable.getRows().get(j)).toString();
-          byte[] bytesToWrite = rowString.getBytes(StandardCharsets.UTF_8);
-          byteArrayOutputStream.write(ByteBuffer.allocate(4).putInt(bytesToWrite.length).array());
-          byteArrayOutputStream.write(bytesToWrite);
-          rowSize += 1;
-        }
-
+        byte[] serializedData = encoder.encodeResultTable(resultTable, i, rowSize);
         // Compress the byte array using the compressor
-        byte[] serializedData = byteArrayOutputStream.toByteArray();
         byte[] compressedResultTable = compressor.compress(serializedData);
         int originalSize = serializedData.length;
         int compressedSize = compressedResultTable.length;
@@ -285,6 +281,7 @@ public class BrokerGrpcServer extends PinotQueryBrokerGrpc.PinotQueryBrokerImplB
                 .putMetadata("compressedSize", String.valueOf(compressedSize))
                 .putMetadata("rowSize", String.valueOf(rowSize))
                 .putMetadata("compression", compressionAlgorithm)
+                .putMetadata("encoding", encodingAlgorithm)
                 .build();
         responseObserver.onNext(dataBlock);
       } catch (Exception e) {
