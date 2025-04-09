@@ -37,7 +37,10 @@ public class TableRebalanceLogger {
   }
 
   private static String formatMessage(String message, String rebalanceJobId, Object... args) {
-    return String.format("[%s] %s", rebalanceJobId, MessageFormatter.arrayFormat(message, args).getMessage());
+    if (args.length == 0) {
+      return "[" + rebalanceJobId + "] " + message;
+    }
+    return "[" + rebalanceJobId + "] " + MessageFormatter.arrayFormat(message, args).getMessage();
   }
 
   public void info(String message, Object... args) {
