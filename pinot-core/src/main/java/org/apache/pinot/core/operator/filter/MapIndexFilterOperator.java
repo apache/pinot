@@ -12,15 +12,10 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.spi.trace.FilterType;
-import org.apache.pinot.spi.trace.InvocationRecording;
-import org.apache.pinot.spi.trace.Tracing;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
@@ -48,6 +43,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     }
 
     _columnName = arguments.get(0).getIdentifier();
+    //FIXME keyName contains single quotes, which should be removed
     _keyName = String.valueOf(arguments.get(1).getLiteral());
 
     // Convert predicate to JSON format based on type
@@ -91,10 +87,12 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   }
 
   private String createJsonPredicateValue(String key, String value) {
-    // Format: '"$[0].key" = ''value'''
-    // Example: JSON_MATCH(items, '"$[0].price" = ''100''')
-    //"$[1].key"='foo'
-    return String.format("\"$[0].%s\" = '%s'", key, value);
+    String cleanKey = key;
+    if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
+      cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
+    }
+
+    return String.format("%s = %s", cleanKey, value);
   }
 
   private String createJsonArrayPredicateValue(String key, List<String> values) {
@@ -128,9 +126,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    ImmutableRoaringBitmap bitmap = _jsonMatchOperator.getBitmaps().reduce();
-    record(bitmap);
-    return new BitmapDocIdSet(bitmap, _numDocs);
+    return _jsonMatchOperator.getTrues();
   }
 
   @Override
@@ -181,14 +177,5 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("predicate", _predicate.toString());
     attributeBuilder.putString("delegateTo", "json_match");
-  }
-
-  private void record(ImmutableRoaringBitmap bitmap) {
-    InvocationRecording recording = Tracing.activeRecording();
-    if (recording.isEnabled()) {
-      recording.setColumnName(_columnName);
-      recording.setFilter(FilterType.INDEX, _predicate.getType().name());
-      recording.setNumDocsMatchingAfterFilter(bitmap.getCardinality());
-    }
   }
 }

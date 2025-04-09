@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
@@ -42,11 +43,19 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ForwardIndexCreatorFactory {
+  private static final String FORWARD_INDEX_CREATOR_CLASS_NAME = "forwardIndexCreatorClassName";
   private ForwardIndexCreatorFactory() {
   }
 
   public static ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
+    if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_CREATOR_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(FORWARD_INDEX_CREATOR_CLASS_NAME).toString();
+      //FIXME: raghav remove precondition
+      Preconditions.checkNotNull(className, "ForwardIndexCreator class name must be provided");
+      return (ForwardIndexCreator) Class.forName(className)
+          .getConstructor(IndexCreationContext.class, ForwardIndexConfig.class).newInstance(context, indexConfig);
+    }
     File indexDir = context.getIndexDir();
     FieldSpec fieldSpec = context.getFieldSpec();
     String columnName = fieldSpec.getName();

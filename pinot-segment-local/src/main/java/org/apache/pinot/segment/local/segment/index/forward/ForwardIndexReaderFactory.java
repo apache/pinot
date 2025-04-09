@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
@@ -50,6 +51,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
   private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
+  private static final String FORWARD_INDEX_READER_CLASS_NAME = "forwardIndexReaderClassName";
 
   public static void setInstance(ForwardIndexReaderFactory factory) {
     _instance = factory;
@@ -68,6 +70,17 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
       ForwardIndexConfig indexConfig)
       throws IndexReaderConstraintException {
+    if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_READER_CLASS_NAME)) {
+      String className = indexConfig.getConfigs().get(FORWARD_INDEX_READER_CLASS_NAME).toString();
+      //FIXME : remove precondition check
+      Preconditions.checkNotNull(className, "MapIndexReader class name must be provided");
+      try {
+        return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
+            .newInstance(dataBuffer, metadata);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create MapIndexReader", e);
+      }
+    }
     return createIndexReader(dataBuffer, metadata);
   }
 
