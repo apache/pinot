@@ -62,7 +62,15 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegmentsTotal = 0;
 
-  public ImplicitHybridTableRouteProvider(String tableName) {
+  public static ImplicitHybridTableRouteProvider create(String tableName, TableCache tableCache, RoutingManager routingManager) {
+    ImplicitHybridTableRouteProvider provider = new ImplicitHybridTableRouteProvider(tableName);
+    provider.getTableConfig(tableCache);
+    provider.checkRoutes(routingManager);
+
+    return provider;
+  }
+
+  private ImplicitHybridTableRouteProvider(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {
@@ -79,8 +87,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
    *  Table Config Section
    */
 
-  @Override
-  public void getTableConfig(TableCache tableCache) {
+  private void getTableConfig(TableCache tableCache) {
     if (_offlineTableName != null) {
       _offlineTableConfig = tableCache.getTableConfig(_offlineTableName);
     }
@@ -172,8 +179,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
    *  Check Routes Section
    */
 
-  @Override
-  public void checkRoutes(RoutingManager routingManager) {
+  private void checkRoutes(RoutingManager routingManager) {
     if (hasOffline()) {
       _isOfflineRouteExists = routingManager.routingExists(_offlineTableName);
       _isOfflineTableDisabled = routingManager.isTableDisabled(_offlineTableName);
@@ -249,6 +255,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
     return _isRealtimeTableDisabled;
   }
 
+  @Nullable
   @Override
   public List<String> getDisabledTableNames() {
     if (isOffline() && isOfflineTableDisabled()) {
@@ -262,7 +269,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
     } else if (isRealtimeTableDisabled()) {
       return List.of(_realtimeTableName);
     }
-    return List.of();
+    return null;
   }
 
   /*
@@ -272,6 +279,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   @Override
   public TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
+    assert(isExists());
     Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
     Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
 

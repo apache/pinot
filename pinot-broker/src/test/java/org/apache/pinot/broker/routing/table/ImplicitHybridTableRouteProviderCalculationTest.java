@@ -119,9 +119,7 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
 
   private void assertTableRoute(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    TableRouteProvider routeComputer = new ImplicitHybridTableRouteProvider(tableName);
-    routeComputer.getTableConfig(_tableCache);
-    routeComputer.checkRoutes(_routingManager);
+    TableRouteProvider routeComputer = ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -325,9 +323,7 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
 
   private void assertTableRouting(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable, boolean isOfflineExpected, boolean isRealtimeExpected) {
-    TableRouteProvider routeComputer = new ImplicitHybridTableRouteProvider(tableName);
-    routeComputer.getTableConfig(_tableCache);
-    routeComputer.checkRoutes(_routingManager);
+    TableRouteProvider routeComputer = ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -405,9 +401,7 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
 
   @Test(dataProvider = "routeNotExistsProvider")
   void testTableRoutingForRouteNotExists(String tableName) {
-    TableRouteProvider routeComputer = new ImplicitHybridTableRouteProvider(tableName);
-    routeComputer.getTableConfig(_tableCache);
-    routeComputer.checkRoutes(_routingManager);
+    TableRouteProvider routeComputer = ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -449,9 +443,8 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
   @Test(dataProvider = "partiallyDisabledTableAndRouteProvider")
   void testTableRoutingForPartiallyDisabledTable(String tableName, Map<String, Set<String>> expectedOfflineRoutingTable,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
-    TableRouteProvider tableRouteProvider = new ImplicitHybridTableRouteProvider(tableName);
-    tableRouteProvider.getTableConfig(_tableCache);
-    tableRouteProvider.checkRoutes(_routingManager);
+    TableRouteProvider tableRouteProvider =
+        ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =
@@ -503,9 +496,8 @@ public class ImplicitHybridTableRouteProviderCalculationTest extends BaseTableRo
 
   @Test(dataProvider = "disabledTableProvider")
   void testTableRoutingForDisabledTable(String tableName) {
-    TableRouteProvider tableRouteProvider = new ImplicitHybridTableRouteProvider(tableName);
-    tableRouteProvider.getTableConfig(_tableCache);
-    tableRouteProvider.checkRoutes(_routingManager);
+    TableRouteProvider tableRouteProvider =
+        ImplicitHybridTableRouteProvider.create(tableName, _tableCache, _routingManager);
 
     String query = String.format(QUERY_FORMAT, tableName);
     BrokerRequest brokerRequest =

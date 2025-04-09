@@ -20,7 +20,6 @@ package org.apache.pinot.broker.routing.table;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -33,13 +32,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * of the metadata are table config, broker routing information and the broker request.
  */
 public interface TableRouteProvider {
-
-  /**
-   * Get the table configs for all the tables from the table cache.
-   * @param tableCache the table cache
-   */
-  void getTableConfig(TableCache tableCache);
-
   @Nullable
   TableConfig getOfflineTableConfig();
 
@@ -95,13 +87,6 @@ public interface TableRouteProvider {
   String getRealtimeTableName();
 
   /**
-   * This function checks if the required entries are available in the BrokerRoutingManager.
-   * It should not attempt to calculate the routes.
-   * @param routingManager the routing manager
-   */
-  void checkRoutes(RoutingManager routingManager);
-
-  /**
    * Checks if the broker has routes for at least 1 of the physical tables.
    *
    * @return true if any route exists, false otherwise
@@ -115,6 +100,7 @@ public interface TableRouteProvider {
    */
   boolean isDisabled();
 
+  @Nullable
   List<String> getDisabledTableNames();
 
   @Nullable
