@@ -200,6 +200,7 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.rebalanceTablesSequentially";
     public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
         "controller.segmentRelocator.rebalanceIncludeConsuming";
+    // Available options are: "ENABLE", "DISABLE", "DEFAULT"
     public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
         "controller.segmentRelocator.rebalanceMinimizeDataMovement";
 
