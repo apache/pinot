@@ -89,8 +89,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
-        _logger.error("Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOnlineFromConsuming()",
-            e);
+        _logger.error(
+            "Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOnlineFromConsuming() for "
+                + "table: {}, segment: {}",
+            message.getResourceName(), message.getPartitionName(), e);
         throw e;
       }
     }
@@ -139,8 +141,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
-        _logger.error("Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline()",
-            e);
+        _logger.error(
+            "Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() for table: "
+                + "{}, segment: {}",
+            message.getResourceName(), message.getPartitionName(), e);
         throw e;
       }
     }
