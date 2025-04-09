@@ -19,10 +19,12 @@
 package org.apache.pinot.core.transport;
 
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 
@@ -31,7 +33,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * The TableRoute interface provides the metadata required to route query execution to servers. The important sources
  * of the metadata are table config, broker routing information and the broker request.
  */
-public interface TableRouteComputer extends TableRoute {
+public interface TableRouteComputer {
 
   /**
    * Get the table configs for all the tables from the table cache.
@@ -129,6 +131,36 @@ public interface TableRouteComputer extends TableRoute {
    * @param realtimeBrokerRequest Broker Request for the realtime table.
    * @param requestId Request ID assigned to the query.
    */
-  void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
+  TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId);
+
+  /**
+   * Gets the routing table for the offline table, if available.
+   *
+   * @return a map of server instances to their route information for the offline table, or null if not available
+   */
+  @Nullable
+  Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
+
+  /**
+   * Gets the routing table for the realtime table, if available.
+   *
+   * @return a map of server instances to their route information for the realtime table, or null if not available
+   */
+  @Nullable
+  Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
+
+  /**
+   * Gets the list of unavailable segments for the table.
+   *
+   * @return a list of unavailable segment names
+   */
+  List<String> getUnavailableSegments();
+
+  /**
+   * Gets the total number of pruned segments for the table.
+   *
+   * @return the total number of pruned segments
+   */
+  int getNumPrunedSegmentsTotal();
 }

@@ -41,7 +41,7 @@ import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.core.transport.TableRouteComputer;
+import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -86,7 +86,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, TableRouteComputer route, long timeoutMs,
+      BrokerRequest serverBrokerRequest, TableRoute route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();

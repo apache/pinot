@@ -25,15 +25,14 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ImplicitHybridTableRoute;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.TableRoute;
 import org.apache.pinot.core.transport.TableRouteComputer;
-import org.apache.pinot.core.transport.TableRouteUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -277,7 +276,7 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
    */
 
   @Override
-  public void calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
+  public TableRoute calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
     if (offlineBrokerRequest != null) {
       Preconditions.checkNotNull(_offlineTableName);
@@ -325,18 +324,9 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
         _realtimeBrokerRequest = null;
       }
     }
-  }
 
-  @Nullable
-  @Override
-  public BrokerRequest getOfflineBrokerRequest() {
-    return _offlineBrokerRequest;
-  }
-
-  @Nullable
-  @Override
-  public BrokerRequest getRealtimeBrokerRequest() {
-    return _realtimeBrokerRequest;
+    return new ImplicitHybridTableRoute(_offlineBrokerRequest, _realtimeBrokerRequest, _offlineRoutingTable,
+        _realtimeRoutingTable);
   }
 
   @Nullable
@@ -359,12 +349,5 @@ public class ImplicitTableRouteComputer implements TableRouteComputer {
   @Override
   public int getNumPrunedSegmentsTotal() {
     return _numPrunedSegmentsTotal;
-  }
-
-  /*
-   * Calculate RequestMap Section
-   */
-  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
-    return TableRouteUtils.getRequestMap(requestId, brokerId, this, preferTls);
   }
 }

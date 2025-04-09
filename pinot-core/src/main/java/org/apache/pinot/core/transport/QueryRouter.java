@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.transport;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
@@ -89,47 +88,8 @@ public class QueryRouter {
       @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
-    TableRoute tableRoute = new TableRoute() {
-      @Nullable
-      @Override
-      public BrokerRequest getOfflineBrokerRequest() {
-        return offlineBrokerRequest;
-      }
-
-      @Nullable
-      @Override
-      public BrokerRequest getRealtimeBrokerRequest() {
-        return realtimeBrokerRequest;
-      }
-
-      @Nullable
-      @Override
-      public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
-        return offlineRoutingTable;
-      }
-
-      @Nullable
-      @Override
-      public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
-        return realtimeRoutingTable;
-      }
-
-      @Override
-      public List<String> getUnavailableSegments() {
-        return List.of();
-      }
-
-      @Override
-      public int getNumPrunedSegmentsTotal() {
-        return 0;
-      }
-
-      @Override
-      public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId,
-          boolean preferTls) {
-        return TableRouteUtils.getRequestMap(requestId, brokerId, this, preferTls);
-      }
-    };
+    TableRoute tableRoute = new ImplicitHybridTableRoute(offlineBrokerRequest, realtimeBrokerRequest,
+        offlineRoutingTable, realtimeRoutingTable);
 
     return submitQuery(requestId, rawTableName, tableRoute, timeoutMs);
   }
