@@ -32,7 +32,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * The TableRoute interface provides the metadata required to route query execution to servers. The important sources
  * of the metadata are table config, broker routing information and the broker request.
  */
-public interface TableRouteComputer {
+public interface TableRouteProvider {
 
   /**
    * Get the table configs for all the tables from the table cache.

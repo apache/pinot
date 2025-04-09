@@ -34,10 +34,10 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
+public class ImplicitHybridTableRouteProviderTest extends BaseTableRouteTest {
   @Test(dataProvider = "offlineTableProvider")
   public void testOfflineTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -47,7 +47,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "realtimeTableProvider")
   public void testRealtimeTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -57,7 +57,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "hybridTableProvider")
   public void testHybridTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
 
     assertTrue(table.isExists(), "The table should exist");
@@ -69,7 +69,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
    */
   @Test
   public void testWithNoTimeBoundary() {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer("b");
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider("b");
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -80,7 +80,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "nonExistentTableProvider")
   public void testNonExistentTableName(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
 
     assertFalse(table.isExists(), "The table should not exist");
@@ -108,7 +108,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "routeExistsProvider")
   public void testRouteExists(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -119,7 +119,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "routeNotExistsProvider")
   public void testRouteNotExists(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -129,7 +129,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -139,7 +139,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -149,7 +149,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
 
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledTable(String parameter) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(parameter);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(parameter);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -186,7 +186,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
      * @param routeComputer
      * @return
      */
-    boolean similar(ImplicitTableRouteComputer routeComputer) {
+    boolean similar(ImplicitHybridTableRouteProvider routeComputer) {
       boolean isEquals = true;
 
       if (_offlineTableName != null) {
@@ -302,7 +302,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
   @Test(dataProvider = "tableNameAndConfigSuccessProvider")
   public void testTableNameAndConfigSuccess(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -335,7 +335,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
   @Test(dataProvider = "tableNameAndConfigFailureProvider")
   public void testTableNameAndConfigFailure(String tableName) {
     TableNameAndConfig tableNameAndConfig = getTableNameAndConfig(tableName);
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -405,7 +405,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
    */
   @Test(dataProvider = "notDisabledTableProvider")
   public void testNotDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -426,7 +426,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
    */
   @Test(dataProvider = "partiallyDisabledTableProvider")
   public void testPartiallyDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 
@@ -450,7 +450,7 @@ public class ImplicitTableRouteComputerTest extends BaseTableRouteTest {
    */
   @Test(dataProvider = "disabledTableProvider")
   public void testDisabledWithCheckDisabled(String tableName) {
-    ImplicitTableRouteComputer table = new ImplicitTableRouteComputer(tableName);
+    ImplicitHybridTableRouteProvider table = new ImplicitHybridTableRouteProvider(tableName);
     table.getTableConfig(_tableCache);
     table.checkRoutes(_routingManager);
 

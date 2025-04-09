@@ -86,10 +86,10 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
-import org.apache.pinot.broker.routing.table.TableRouteComputer;
+import org.apache.pinot.broker.routing.table.TableRouteProvider;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.broker.routing.table.ImplicitTableRouteComputer;
+import org.apache.pinot.broker.routing.table.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -392,7 +392,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // Get the tables hit by the request
-    TableRouteComputer routeComputer = new ImplicitTableRouteComputer(tableName);
+    TableRouteProvider routeComputer = new ImplicitHybridTableRouteProvider(tableName);
     routeComputer.getTableConfig(_tableCache);
     routeComputer.checkRoutes(_routingManager);
 
