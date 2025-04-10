@@ -49,9 +49,6 @@ public class ParserUtils {
    *         or {@code null} if the input was {@code null}.
    */
   public static String sanitizeSqlForParsing(String sql) {
-    if (sql == null) {
-      return null;
-    }
 
     // 1. Remove excessive whitespace
 
@@ -76,11 +73,14 @@ public class ParserUtils {
       }
     }
 
+    if (sql.length() == builder.length()) {
+      return sql; // No excessive whitespace found
+    }
+
     // Likewise extend for other improvements
 
-    return builder.toString().trim();
+    return builder.toString();
   }
-
 
   private static void validateJsonExtractScalarFunction(List<Expression> operands) {
     // Check that there are 3 or 4 arguments

@@ -28,7 +28,7 @@ public class ParserUtilsTest {
 
     testRemoveExcessiveWhiteSpace(
       "SELECT * FROM mytable " + " ".repeat(20000),
-      "SELECT * FROM mytable"
+      "SELECT * FROM mytable "
     );
 
     testRemoveExcessiveWhiteSpace(
@@ -38,12 +38,12 @@ public class ParserUtilsTest {
 
     testRemoveExcessiveWhiteSpace(
       "SELECT * " + " ".repeat(20000) + "FROM mytable " + " ".repeat(20000),
-      "SELECT * FROM mytable"
+      "SELECT * FROM mytable "
     );
 
     testRemoveExcessiveWhiteSpace(
-        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000),
-      "SELECT * FROM mytable options(a=b)"
+      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000),
+      "SELECT * FROM mytable options(a=b) "
     );
   }
 
