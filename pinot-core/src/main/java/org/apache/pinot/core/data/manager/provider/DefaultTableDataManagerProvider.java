@@ -47,11 +47,11 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  * Default implementation of {@link TableDataManagerProvider}.
  */
 public class DefaultTableDataManagerProvider implements TableDataManagerProvider {
-  private InstanceDataManagerConfig _instanceDataManagerConfig;
-  private HelixManager _helixManager;
-  private SegmentLocks _segmentLocks;
-  private Semaphore _segmentBuildSemaphore;
-  private SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected InstanceDataManagerConfig _instanceDataManagerConfig;
+  protected HelixManager _helixManager;
+  protected SegmentLocks _segmentLocks;
+  protected Semaphore _segmentBuildSemaphore;
+  protected SegmentOperationsThrottler _segmentOperationsThrottler;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,

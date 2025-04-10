@@ -1560,7 +1560,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return segmentDirectoryLoader.load(indexDir.toURI(), loaderContext);
   }
 
-  private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  protected static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     return zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc());
   }
 
