@@ -244,7 +244,7 @@ public class TableRebalancer {
     // Dry-run must be enabled to run pre-checks
     if (preChecks && !dryRun) {
       String errorMsg = String.format("Pre-checks can only be enabled in dry-run mode, not triggering rebalance for "
-          + "table: %s with rebalanceJobId: %s", tableNameWithType, rebalanceJobId);
+          + "table: %s", tableNameWithType);
       tableRebalanceLogger.error(errorMsg);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
           null);
@@ -366,8 +366,7 @@ public class TableRebalancer {
       tableRebalanceLogger.info("Table: {} is already balanced", tableNameWithType);
       if (instancePartitionsUnchanged && tierInstancePartitionsUnchanged) {
         _tableRebalanceObserver.onNoop(
-            String.format("For rebalanceId: %s, instance unchanged and table: %s is already balanced", rebalanceJobId,
-                tableNameWithType));
+            String.format("Instance unchanged and table: %s is already balanced", tableNameWithType));
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       } else {
@@ -377,8 +376,7 @@ public class TableRebalancer {
               instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
         } else {
           _tableRebalanceObserver.onSuccess(
-              String.format("For rebalanceId: %s, instance reassigned but table: %s is already balanced",
-                  rebalanceJobId, tableNameWithType));
+              String.format("Instance reassigned but table: %s is already balanced", tableNameWithType));
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
               "Instance reassigned, table is already balanced", instancePartitionsMap,
               tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -408,8 +406,8 @@ public class TableRebalancer {
             .set(idealStatePropertyKey.getPath(), idealStateRecord, idealStateRecord.getVersion(),
                 AccessOption.PERSISTENT), "Failed to update IdealState");
         String msg =
-            String.format("For rebalanceId: %s, finished rebalancing table: %s with downtime in %d ms.", rebalanceJobId,
-                tableNameWithType, System.currentTimeMillis() - startTimeMs);
+            String.format("Finished rebalancing table: %s with downtime in %d ms.", tableNameWithType,
+                System.currentTimeMillis() - startTimeMs);
         tableRebalanceLogger.info(msg);
         _tableRebalanceObserver.onSuccess(msg);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
@@ -506,8 +504,8 @@ public class TableRebalancer {
             allSegmentsFromIdealState, tableRebalanceLogger);
       } catch (Exception e) {
         String errorMsg = String.format(
-            "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
-                + "aborting the rebalance", rebalanceJobId, tableNameWithType);
+            "Caught exception while waiting for ExternalView to converge for table: %s, "
+                + "aborting the rebalance", tableNameWithType);
         tableRebalanceLogger.warn(errorMsg, e);
         if (_tableRebalanceObserver.isStopped()) {
           return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
@@ -584,8 +582,8 @@ public class TableRebalancer {
       }
 
       if (currentAssignment.equals(targetAssignment)) {
-        String msg = String.format("For rebalanceId: %s, finished rebalancing table: %s with minAvailableReplicas: %d, "
-                + "enableStrictReplicaGroup: %b, bestEfforts: %b in %d ms.", rebalanceJobId, tableNameWithType,
+        String msg = String.format("Finished rebalancing table: %s with minAvailableReplicas: %d, "
+                + "enableStrictReplicaGroup: %b, bestEfforts: %b in %d ms.", tableNameWithType,
             minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, System.currentTimeMillis() - startTimeMs);
         tableRebalanceLogger.info(msg);
         // Record completion
