@@ -78,6 +78,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     switch (trigger) {
       case START_TRIGGER:
         updateOnStart(currentState, targetState, rebalanceContext);
+        emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
         trackStatsInZk();
         updatedStatsInZk = true;
         break;
@@ -94,6 +95,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsOverall().equals(latestProgress)) {
             _tableRebalanceProgressStats.setRebalanceProgressStatsOverall(latestProgress);
+            emitProgressMetric(latestProgress);
           }
           trackStatsInZk();
           updatedStatsInZk = true;
@@ -113,6 +115,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
             _tableRebalanceProgressStats.updateOverallAndStepStatsFromLatestStepStats(latestProgress);
           }
+          emitProgressMetric(_tableRebalanceProgressStats.getRebalanceProgressStatsOverall());
           trackStatsInZk();
           updatedStatsInZk = true;
         }
@@ -122,6 +125,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
           _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
+          emitProgressMetric(latestProgress);
           trackStatsInZk();
           updatedStatsInZk = true;
         }
@@ -203,6 +207,12 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   public int getNumUpdatesToZk() {
     return _numUpdatesToZk;
+  }
+
+  private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getJobId(),
+        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
+        (long) overallProgress._percentageRemainingSegmentsToBeAdded * 100);
   }
 
   @VisibleForTesting
