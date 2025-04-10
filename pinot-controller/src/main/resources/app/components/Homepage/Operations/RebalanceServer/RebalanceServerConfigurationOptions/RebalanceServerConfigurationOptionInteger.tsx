@@ -22,6 +22,7 @@ import {RebalanceServerOption} from "../RebalanceServerOptions";
 import {
     RebalanceServerConfigurationOptionLabel
 } from "./RebalanceServerConfigurationOptionLabel/RebalanceServerConfigurationOptionLabel";
+import Utils from "../../../../../utils/Utils";
 
 type RebalanceServerConfigurationOptionIntegerProps = {
     option: RebalanceServerOption;
@@ -32,7 +33,7 @@ export const RebalanceServerConfigurationOptionInteger = (
     { option, handleConfigChange, rebalanceConfig }: RebalanceServerConfigurationOptionIntegerProps
 ) => {
     const [value, setValue] = useState<number>(
-        (Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue) as number
+        Utils.getRebalanceConfigValue(rebalanceConfig, option) as number
     );
     return (
         <Box display='flex' flexDirection='column'>

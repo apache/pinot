@@ -22,6 +22,7 @@ import {RebalanceServerOption} from "../RebalanceServerOptions";
 import {
     RebalanceServerConfigurationOptionLabel
 } from "./RebalanceServerConfigurationOptionLabel/RebalanceServerConfigurationOptionLabel";
+import Utils from "../../../../../utils/Utils";
 
 type RebalanceServerConfigurationOptionSwitchProps = {
     option: RebalanceServerOption;
@@ -31,7 +32,7 @@ type RebalanceServerConfigurationOptionSwitchProps = {
 export const RebalanceServerConfigurationOptionSwitch = (
     { option, handleConfigChange, rebalanceConfig }: RebalanceServerConfigurationOptionSwitchProps) => {
     const [isChecked, setIsChecked] = useState<boolean>(
-        (Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue) as boolean
+        Utils.getRebalanceConfigValue(rebalanceConfig, option) as boolean
     );
     return (
         <Box display='flex' flexDirection='column'>
