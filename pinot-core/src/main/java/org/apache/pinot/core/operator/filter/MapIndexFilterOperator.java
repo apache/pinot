@@ -3,6 +3,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -16,7 +17,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.MapDataSource;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 
 
 /**
@@ -54,10 +59,10 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
 
     if (dataSource instanceof MapDataSource) {
       MapDataSource mapDS = (MapDataSource) dataSource;
-      DataSource keyDS = mapDS.getKeyDataSource(_keyName);
-      JsonIndexReader jsonIndex = keyDS.getJsonIndex();
-
-      if (jsonIndex != null) {
+      MapIndexReader mapIndexReader = mapDS.getMapIndex();
+      if (mapIndexReader != null) {
+        Map<IndexType, IndexReader> indexes = mapIndexReader.getKeyIndexes(_keyName);
+        JsonIndexReader jsonIndex = (JsonIndexReader) indexes.get(StandardIndexes.json());
         _jsonMatchPredicate = createJsonMatchPredicate();
         _jsonMatchOperator = initializeJsonMatchFilterOperator(jsonIndex, numDocs);
         _expressionFilterOperator = null;
