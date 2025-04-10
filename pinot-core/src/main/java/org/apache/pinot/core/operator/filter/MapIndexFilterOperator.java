@@ -51,8 +51,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     }
 
     _columnName = arguments.get(0).getIdentifier();
-    //FIXME keyName contains single quotes, which should be removed
-    _keyName = String.valueOf(arguments.get(1).getLiteral());
+    _keyName = cleanKey(String.valueOf(arguments.get(1).getLiteral()));
 
     // Get JSON index and create operator
     DataSource dataSource = indexSegment.getDataSource(_columnName);
@@ -113,12 +112,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   }
 
   private String createJsonPredicateValue(String key, String value) {
-    String cleanKey = key;
-    if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
-      cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
-    }
-
-    return String.format("%s = %s", cleanKey, value);
+    return String.format("%s = %s", key, value);
   }
 
   private String createJsonArrayPredicateValue(String key, List<String> values) {
@@ -235,5 +229,19 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     } else {
       attributeBuilder.putString("delegateTo", "expression_filter");
     }
+  }
+
+  /**
+   * Cleans the key by removing leading and trailing single quotes if present.
+   *
+   * @param key The original key string
+   * @return The cleaned key string
+   */
+  public static String cleanKey(String key) {
+    String cleanKey = key;
+    if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
+      cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
+    }
+    return cleanKey;
   }
 }
