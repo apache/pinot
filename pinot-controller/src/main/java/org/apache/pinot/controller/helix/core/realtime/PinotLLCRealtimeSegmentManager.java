@@ -626,12 +626,6 @@ public class PinotLLCRealtimeSegmentManager {
     String newConsumingSegmentName =
         createNewSegmentMetadata(tableConfig, idealState, committingSegmentDescriptor, committingSegmentZKMetadata,
             instancePartitions);
-    if (newConsumingSegmentName != null) {
-      LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
-          Status.IN_PROGRESS);
-    } else {
-      LOGGER.info("Skipped creation of new segment metadata as new consuming segment name is: null");
-    }
 
     preProcessCommitIdealStateUpdate();
 
@@ -713,6 +707,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   // Step 2: Create new segment metadata
+  @Nullable
   private String createNewSegmentMetadata(TableConfig tableConfig, IdealState idealState,
       CommittingSegmentDescriptor committingSegmentDescriptor, SegmentZKMetadata committingSegmentZKMetadata,
       InstancePartitions instancePartitions) {
@@ -743,7 +738,11 @@ public class PinotLLCRealtimeSegmentManager {
             committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
             numReplicas);
         newConsumingSegmentName = newLLCSegment.getSegmentName();
+        LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
+            Status.IN_PROGRESS);
       }
+    } else {
+      LOGGER.info("Skipped creation of new segment metadata as the table: {} is paused", realtimeTableName);
     }
     return newConsumingSegmentName;
   }
