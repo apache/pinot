@@ -39,6 +39,49 @@ public class ParserUtils {
     }
   }
 
+  /**
+   * Sanitize the sql string for parsing by normalizing whitespace which can
+   * cause performance issues with regex based parsing.
+   * This method replaces multiple consecutive whitespace characters with a single space.
+   *
+   * @param sql The raw SQL string to sanitize. May be null.
+   * @return A sanitized SQL string with normalized whitespace and no trailing spaces,
+   *         or {@code null} if the input was {@code null}.
+   */
+  public static String sanitizeSqlForParsing(String sql) {
+    if (sql == null) {
+      return null;
+    }
+
+    // 1. Remove excessive whitespace
+
+    int length = sql.length();
+    StringBuilder builder = new StringBuilder(length);
+    boolean inWhitespaceBlock = false;
+
+    for (int charIndex = 0; charIndex < length; charIndex++) {
+      char currentChar = sql.charAt(charIndex);
+
+      if (Character.isWhitespace(currentChar)) {
+        if (currentChar == '\n' || currentChar == '\r') {
+          builder.append(currentChar); // preserve line breaks
+          inWhitespaceBlock = false; // reset space block
+        } else if (!inWhitespaceBlock) {
+          builder.append(' ');
+          inWhitespaceBlock = true;
+        }
+      } else {
+        builder.append(currentChar);
+        inWhitespaceBlock = false; // reset space block
+      }
+    }
+
+    // Likewise extend for other improvements
+
+    return builder.toString().trim();
+  }
+
+
   private static void validateJsonExtractScalarFunction(List<Expression> operands) {
     // Check that there are 3 or 4 arguments
     int numOperands = operands.size();
