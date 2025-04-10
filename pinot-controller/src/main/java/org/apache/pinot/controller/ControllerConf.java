@@ -372,6 +372,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
 
+  private final Map<String, String> _warnings = new HashMap<>();
+
   public ControllerConf() {
     super(new HashMap<>());
   }
@@ -1239,10 +1241,20 @@ public class ControllerConf extends PinotConfiguration {
     if (TimeUtils.isPeriodValid(periodStr)) {
       return true;
     } else {
-      LOGGER.error("Invalid time spec '{}' for config '{}'. Falling back to default config.", periodStr,
+      String message = String.format(
+          "Invalid time spec '%s' for config '%s'. Falling back to default config.", periodStr,
           propertyKey);
+      addControllerInvalidConfigs(propertyKey, message);
       return false;
     }
+  }
+
+  private void addControllerInvalidConfigs(String propertyKey, String errorMessage) {
+    _warnings.put(propertyKey, errorMessage);
+  }
+
+  public Map<String, String> getControllerInvalidConfigs() {
+    return _warnings;
   }
 
   private String getSupportedProtocol(String property) {
