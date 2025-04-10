@@ -46,6 +46,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
   protected static final String[] POSSIBLE_METADATA_MAP_OPTIONS = {
       CommonConstants.Broker.Grpc.BLOCK_ROW_SIZE,
       CommonConstants.Broker.Grpc.COMPRESSION,
+      CommonConstants.Broker.Grpc.ENCODING,
   };
   private GrpcConnection _session;
   private PinotControllerTransport _controllerTransport;

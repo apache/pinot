@@ -130,6 +130,15 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-vector</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-memory-netty</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
     </dependency>
@@ -410,7 +419,7 @@
               <dependency>
                 <groupId>net.sourceforge.fmpp</groupId>
                 <artifactId>fmpp</artifactId>
-                <version>0.9.16</version>
+                <version>${fmpp.version}</version>
               </dependency>
             </dependencies>
           </plugin>
