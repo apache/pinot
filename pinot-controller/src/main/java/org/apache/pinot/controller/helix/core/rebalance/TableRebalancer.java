@@ -195,7 +195,7 @@ public class TableRebalancer {
 
   private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
       @Nullable String rebalanceJobId, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
-    TableRebalanceLogger tableRebalanceLogger = new TableRebalanceLogger(LOGGER, rebalanceJobId);
+    Logger tableRebalanceLogger = LoggerFactory.getLogger(LOGGER.getName() + '_' + rebalanceJobId);
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
     if (rebalanceJobId == null) {
@@ -655,7 +655,7 @@ public class TableRebalancer {
   }
 
   private TableSizeReader.TableSubTypeSizeDetails fetchTableSizeDetails(String tableNameWithType,
-      TableRebalanceLogger tableRebalanceLogger) {
+      Logger tableRebalanceLogger) {
     if (_tableSizeReader == null) {
       tableRebalanceLogger.warn("tableSizeReader is null, cannot calculate table size for table {}!",
           tableNameWithType);
@@ -681,7 +681,7 @@ public class TableRebalancer {
   private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, String tableNameWithType,
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, TableConfig tableConfig,
-      TableRebalanceLogger tableRebalanceLogger) {
+      Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Calculating rebalance summary for table: {}",
         tableNameWithType);
     boolean isOfflineTable = TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE;
@@ -899,7 +899,7 @@ public class TableRebalancer {
   }
 
   private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(TableConfig tableConfig,
-      Map<String, Set<String>> newServersToConsumingSegmentMap, TableRebalanceLogger tableRebalanceLogger) {
+      Map<String, Set<String>> newServersToConsumingSegmentMap, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     if (newServersToConsumingSegmentMap.isEmpty()) {
       return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(0, 0, new HashMap<>(), new HashMap<>(),
@@ -968,7 +968,7 @@ public class TableRebalancer {
    */
   @Nullable
   private Map<String, Integer> getConsumingSegmentsAge(String tableNameWithType,
-      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, TableRebalanceLogger tableRebalanceLogger) {
+      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, Logger tableRebalanceLogger) {
     Map<String, Integer> consumingSegmentsAge = new HashMap<>();
     long now = System.currentTimeMillis();
     try {
@@ -998,7 +998,7 @@ public class TableRebalancer {
    */
   @Nullable
   private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
-      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, TableRebalanceLogger tableRebalanceLogger) {
+      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
     try {
@@ -1054,7 +1054,7 @@ public class TableRebalancer {
 
   @Nullable
   private Integer getLatestOffsetOfStream(TableConfig tableConfig, int partitionId,
-      TableRebalanceLogger tableRebalanceLogger) {
+      Logger tableRebalanceLogger) {
     try {
       StreamPartitionMsgOffset partitionMsgOffset = fetchStreamPartitionOffset(tableConfig, partitionId);
       if (!(partitionMsgOffset instanceof LongMsgOffset)) {
@@ -1069,7 +1069,7 @@ public class TableRebalancer {
     }
   }
 
-  private void onReturnFailure(String errorMsg, Exception e, TableRebalanceLogger tableRebalanceLogger) {
+  private void onReturnFailure(String errorMsg, Exception e, Logger tableRebalanceLogger) {
     if (e != null) {
       tableRebalanceLogger.warn(errorMsg, e);
     } else {
@@ -1079,12 +1079,12 @@ public class TableRebalancer {
   }
 
   /**
-   * This is called without the context of a rebalance job. Create a TableRebalanceLogger without a jobId.
+   * This is called without the context of a rebalance job. Create a Logger without a jobId.
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     return getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun, false,
-        new TableRebalanceLogger(LOGGER));
+        LOGGER);
   }
 
   /**
@@ -1092,7 +1092,7 @@ public class TableRebalancer {
    */
   public Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, TableRebalanceLogger tableRebalanceLogger) {
+      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
     boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -1138,7 +1138,7 @@ public class TableRebalancer {
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, TableRebalanceLogger tableRebalanceLogger) {
+      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
@@ -1243,7 +1243,7 @@ public class TableRebalancer {
    */
   private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun,
-      @Nullable Boolean minimizeDataMovement, TableRebalanceLogger tableRebalanceLogger) {
+      @Nullable Boolean minimizeDataMovement, Logger tableRebalanceLogger) {
     if (sortedTiers == null) {
       return Pair.of(null, true);
     }
@@ -1268,7 +1268,7 @@ public class TableRebalancer {
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitionsForTier(TableConfig tableConfig, Tier tier,
       boolean reassignInstances, boolean bootstrap, boolean dryRun, @Nullable Boolean minimizeDataMovement,
-      TableRebalanceLogger tableRebalanceLogger) {
+      Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String tierName = tier.getName();
     String instancePartitionsName =
@@ -1325,7 +1325,7 @@ public class TableRebalancer {
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
       Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
       long estimateAverageSegmentSizeInBytes, Set<String> allSegmentsFromIdealState,
-      TableRebalanceLogger tableRebalanceLogger)
+      Logger tableRebalanceLogger)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1381,7 +1381,7 @@ public class TableRebalancer {
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
       @Nullable Set<String> segmentsToMonitor) {
     return isExternalViewConverged(tableNameWithType, externalViewSegmentStates, idealStateSegmentStates, lowDiskMode,
-        bestEfforts, segmentsToMonitor, new TableRebalanceLogger(LOGGER));
+        bestEfforts, segmentsToMonitor, LOGGER);
   }
 
   /**
@@ -1399,7 +1399,7 @@ public class TableRebalancer {
   private static boolean isExternalViewConverged(String tableNameWithType,
       Map<String, Map<String, String>> externalViewSegmentStates,
       Map<String, Map<String, String>> idealStateSegmentStates, boolean lowDiskMode, boolean bestEfforts,
-      @Nullable Set<String> segmentsToMonitor, TableRebalanceLogger tableRebalanceLogger) {
+      @Nullable Set<String> segmentsToMonitor, Logger tableRebalanceLogger) {
     for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
       String segmentName = entry.getKey();
       if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
@@ -1451,7 +1451,7 @@ public class TableRebalancer {
   }
 
   private static void handleErrorInstance(String tableNameWithType, String segmentName, String instanceName,
-      boolean bestEfforts, TableRebalanceLogger tableRebalanceLogger) {
+      boolean bestEfforts, Logger tableRebalanceLogger) {
     if (bestEfforts) {
       tableRebalanceLogger.warn(
           "Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",

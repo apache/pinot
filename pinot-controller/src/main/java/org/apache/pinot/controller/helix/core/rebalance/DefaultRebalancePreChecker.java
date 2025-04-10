@@ -74,7 +74,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     String tableNameWithType = preCheckContext.getTableNameWithType();
     TableConfig tableConfig = preCheckContext.getTableConfig();
     RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
-    TableRebalanceLogger tableRebalanceLogger = new TableRebalanceLogger(LOGGER, rebalanceJobId);
+    Logger tableRebalanceLogger = LoggerFactory.getLogger(LOGGER.getName() + "_" + rebalanceJobId);
 
     tableRebalanceLogger.info("Start pre-checks for table: {}", tableNameWithType);
 
@@ -110,7 +110,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    *       and add a pre-check here to call that API.
    */
   private RebalancePreCheckerResult checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType,
-      Map<String, Map<String, String>> currentAssignment, TableRebalanceLogger tableRebalanceLogger) {
+      Map<String, Map<String, String>> currentAssignment, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Fetching whether reload is needed for table: {}", tableNameWithType);
     Boolean needsReload = null;
     if (_executorService == null) {
@@ -154,7 +154,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    * Checks if minimize data movement is set for the given table in the TableConfig
    */
   private RebalancePreCheckerResult checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
-      TableConfig tableConfig, RebalanceConfig rebalanceConfig, TableRebalanceLogger tableRebalanceLogger) {
+      TableConfig tableConfig, RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
     tableRebalanceLogger.info("Checking whether minimizeDataMovement is set for table: {}", tableNameWithType);
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
