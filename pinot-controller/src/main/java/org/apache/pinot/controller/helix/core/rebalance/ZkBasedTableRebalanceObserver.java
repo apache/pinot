@@ -244,7 +244,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * @param overallProgress the latest overall progress
    */
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
-    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getJobId(),
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
         ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
         (long) overallProgress._percentageRemainingSegmentsToBeAdded * 100);
   }
