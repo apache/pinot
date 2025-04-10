@@ -422,7 +422,9 @@ public class TableRebalancer {
 
     // Record the beginning of rebalance
     // We emit this metric only when the rebalance does get to this code path, i.e. excluding dry-run and downtime
-    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, 1L);
+    if (_controllerMetrics != null) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, 1L);
+    }
     _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
         targetAssignment, rebalanceContext);
 
@@ -495,13 +497,17 @@ public class TableRebalancer {
         String errorMsg = "Caught exception while waiting for ExternalView to converge, aborting the rebalance";
         tableRebalanceLogger.warn(errorMsg, e);
         if (_tableRebalanceObserver.isStopped()) {
-          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+          if (_controllerMetrics != null) {
+            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+          }
           return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
               "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
               tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
         }
         _tableRebalanceObserver.onError(errorMsg);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        if (_controllerMetrics != null) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        }
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -577,7 +583,9 @@ public class TableRebalancer {
         tableRebalanceLogger.info(msg);
         // Record completion
         _tableRebalanceObserver.onSuccess(msg);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        if (_controllerMetrics != null) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        }
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
             "Success with minAvailableReplicas: " + minAvailableReplicas
                 + " (both IdealState and ExternalView should reach the target segment assignment)",
@@ -592,7 +600,9 @@ public class TableRebalancer {
       // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
       allSegmentsFromIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        if (_controllerMetrics != null) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        }
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -608,7 +618,9 @@ public class TableRebalancer {
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
           currentAssignment, nextAssignment, rebalanceContext);
       if (_tableRebalanceObserver.isStopped()) {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        if (_controllerMetrics != null) {
+          _controllerMetrics.addMeteredGlobalValue(ControllerMeter.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, -1L);
+        }
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState with the next assignment",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
