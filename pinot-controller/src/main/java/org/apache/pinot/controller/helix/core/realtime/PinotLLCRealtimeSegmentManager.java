@@ -621,7 +621,6 @@ public class PinotLLCRealtimeSegmentManager {
     preProcessNewSegmentZKMetadata();
 
     // Step-2: Create new segment metadata if needed
-    LOGGER.info("Creating new segment metadata with status: {}", Status.IN_PROGRESS);
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName =
         createNewSegmentMetadata(tableConfig, idealState, committingSegmentDescriptor, committingSegmentZKMetadata,
