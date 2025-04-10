@@ -238,6 +238,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return _numUpdatesToZk;
   }
 
+  /**
+   * Emits the rebalance progress in percent to the metrics. Uses the percentage of remaining segments to be added as
+   * the indicator of the overall progress.
+   * @param overallProgress the latest overall progress
+   */
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getJobId(),
         ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
