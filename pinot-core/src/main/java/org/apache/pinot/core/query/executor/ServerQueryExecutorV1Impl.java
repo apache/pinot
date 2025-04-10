@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
@@ -73,11 +74,8 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -199,128 +197,36 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return instanceResponse;
     }
 
-    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
-    if (tableDataManager == null) {
-      String errorMessage = "Failed to find table: " + tableNameWithType + " on server: "
-          + _instanceDataManager.getInstanceId();
+    TableExecutionInfo executionInfo;
+    try {
+      executionInfo = getTableExecutionInfo(tableNameWithType, queryRequest.getSegmentsToQuery(),
+          queryRequest.getOptionalSegments(), queryContext);
+    } catch (NoSuchElementException ne) {
+      String errorMessage =
+          "Failed to find table: " + ne.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
     }
 
-    List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    List<String> optionalSegments = queryRequest.getOptionalSegments();
-    List<String> notAcquiredSegments = new ArrayList<>();
-    int numSegmentsAcquired;
-    List<SegmentDataManager> segmentDataManagers;
-    List<IndexSegment> indexSegments;
-    Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
-    if (!isUpsertTable(tableDataManager)) {
-      segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-      numSegmentsAcquired = segmentDataManagers.size();
-      indexSegments = new ArrayList<>(numSegmentsAcquired);
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        indexSegments.add(segmentDataManager.getSegment());
-      }
-    } else {
-      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
-      TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
-      boolean isUsingConsistencyMode =
-          rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
-      if (isUsingConsistencyMode) {
-        tumm.lockForSegmentContexts();
-      }
-      try {
-        // Get newly added segments as tracked by the upsert table manager to expand the list of segments for query.
-        // Those segments are treated as optional segments as they don't fail the query if not able to get acquired.
-        Set<String> allSegmentsToQuery = new HashSet<>(segmentsToQuery);
-        if (optionalSegments == null) {
-          optionalSegments = new ArrayList<>();
-        } else {
-          allSegmentsToQuery.addAll(optionalSegments);
-        }
-        for (String segmentName : tumm.getNewlyAddedSegments()) {
-          if (!allSegmentsToQuery.contains(segmentName)) {
-            optionalSegments.add(segmentName);
-          }
-        }
-        segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-        numSegmentsAcquired = segmentDataManagers.size();
-        indexSegments = new ArrayList<>(numSegmentsAcquired);
-        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          if (segmentDataManager.hasMultiSegments()) {
-            indexSegments.addAll(segmentDataManager.getSegments());
-          } else {
-            indexSegments.add(segmentDataManager.getSegment());
-          }
-        }
-        // When using consistency mode, we should acquire segments and get their contexts atomically.
-        if (isUsingConsistencyMode) {
-          List<SegmentContext> segmentContexts =
-              tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
-          providedSegmentContexts = new HashMap<>(segmentContexts.size());
-          for (SegmentContext sc : segmentContexts) {
-            providedSegmentContexts.put(sc.getIndexSegment(), sc);
-          }
-        }
-      } finally {
-        if (isUsingConsistencyMode) {
-          tumm.unlockForSegmentContexts();
-        }
-      }
-    }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",
-          requestId, segmentsToQuery, optionalSegments,
-          segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(Collectors.toList()));
+          requestId, executionInfo.getSegmentsToQuery(), executionInfo.getOptionalSegments(),
+          executionInfo.getSegmentDataManagers().stream().map(SegmentDataManager::getSegmentName)
+              .collect(Collectors.toList()));
     }
 
     // Gather stats for realtime consuming segments
     // TODO: the freshness time should not be collected at query time because there is no guarantee that the consuming
     //       segment is queried (consuming segment might be pruned, or the server only contains relocated committed
     //       segments)
-    int numConsumingSegmentsQueried = 0;
-    long minIndexTimeMs = 0;
-    long minIngestionTimeMs = 0;
-    long maxEndTimeMs = 0;
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      minIndexTimeMs = Long.MAX_VALUE;
-      minIngestionTimeMs = Long.MAX_VALUE;
-      maxEndTimeMs = Long.MIN_VALUE;
-      for (IndexSegment indexSegment : indexSegments) {
-        SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-        if (indexSegment instanceof MutableSegment) {
-          numConsumingSegmentsQueried += 1;
-          long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
-          if (indexTimeMs > 0) {
-            minIndexTimeMs = Math.min(minIndexTimeMs, indexTimeMs);
-          }
-          long ingestionTimeMs =
-              ((RealtimeTableDataManager) tableDataManager).getPartitionIngestionTimeMs(indexSegment.getSegmentName());
-          if (ingestionTimeMs > 0) {
-            minIngestionTimeMs = Math.min(minIngestionTimeMs, ingestionTimeMs);
-          }
-        } else if (indexSegment instanceof ImmutableSegment) {
-          long indexCreationTime = segmentMetadata.getIndexCreationTime();
-          if (indexCreationTime > 0) {
-            maxEndTimeMs = Math.max(maxEndTimeMs, indexCreationTime);
-          } else {
-            // NOTE: the endTime may be totally inaccurate based on the value added in the timeColumn
-            long endTime = segmentMetadata.getEndTime();
-            if (endTime > 0) {
-              maxEndTimeMs = Math.max(maxEndTimeMs, endTime);
-            }
-          }
-        }
-      }
-    }
+    TableExecutionInfo.ConsumingSegmentsInfo consumingSegmentsInfo = executionInfo.getConsumingSegmentsInfo();
 
     InstanceResponseBlock instanceResponse = null;
     try {
-      instanceResponse =
-          executeInternal(tableDataManager, indexSegments, providedSegmentContexts, queryContext, timerContext,
-              executorService, streamer, queryRequest.isEnableStreaming());
+      instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
+          queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
@@ -345,9 +251,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
             "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
       }
     } finally {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
+      executionInfo.releaseSegmentDataManagers();
       if (queryRequest.isEnableTrace()) {
         if (TraceContext.traceEnabled() && instanceResponse != null) {
           instanceResponse.addMetadata(MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
@@ -357,7 +261,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_QUERIED.getName(), Integer.toString(numSegmentsAcquired));
+    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_QUERIED.getName(),
+        Integer.toString(executionInfo.getNumSegmentsAcquired()));
     instanceResponse.addMetadata(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
 
     // When segment is removed from the IdealState:
@@ -368,10 +273,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     //
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    if (notAcquiredSegments.size() > 0) {
-      List<String> missingSegments =
-          notAcquiredSegments.stream().filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
-              .collect(Collectors.toList());
+    if (!executionInfo.getNotAcquiredSegments().isEmpty()) {
+      List<String> missingSegments = executionInfo.getMissingSegments();
+
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
         instanceResponse.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
@@ -381,25 +285,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      if (numConsumingSegmentsQueried > 0) {
+    if (executionInfo.isRealtime()) {
+      if (consumingSegmentsInfo.getNumConsumingSegmentsQueried() > 0) {
         instanceResponse.addMetadata(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
-            Integer.toString(numConsumingSegmentsQueried));
+            Integer.toString(consumingSegmentsInfo.getNumConsumingSegmentsQueried()));
       }
-      long minConsumingFreshnessTimeMs = 0;
-      if (minIngestionTimeMs != Long.MAX_VALUE) {
-        minConsumingFreshnessTimeMs = minIngestionTimeMs;
-      } else if (minIndexTimeMs != Long.MAX_VALUE) {
-        minConsumingFreshnessTimeMs = minIndexTimeMs;
-      } else if (maxEndTimeMs != Long.MIN_VALUE) {
-        minConsumingFreshnessTimeMs = maxEndTimeMs;
-      }
+      long minConsumingFreshnessTimeMs = consumingSegmentsInfo.getMinConsumingFreshnessTimeMs();
       if (minConsumingFreshnessTimeMs > 0) {
         instanceResponse.addMetadata(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
             Long.toString(minConsumingFreshnessTimeMs));
       }
       LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
-          numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+          consumingSegmentsInfo.getNumConsumingSegmentsQueried(), minConsumingFreshnessTimeMs);
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
@@ -419,13 +316,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
-  private InstanceResponseBlock executeInternal(TableDataManager tableDataManager, List<IndexSegment> indexSegments,
-      @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts, QueryContext queryContext,
+  private InstanceResponseBlock executeInternal(TableExecutionInfo executionInfo, QueryContext queryContext,
       TimerContext timerContext, ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
       boolean enableStreaming)
       throws Exception {
-    handleSubquery(queryContext, tableDataManager, indexSegments, providedSegmentContexts, timerContext,
-        executorService);
+    handleSubquery(queryContext, executionInfo, timerContext, executorService);
+
+    List<IndexSegment> indexSegments = executionInfo.getCopyOfIndexSegments();
+    Map<IndexSegment, SegmentContext> providedSegmentContexts = executionInfo.getProvidedSegmentContexts();
 
     // Compute total docs for the table before pruning the segments
     long numTotalDocs = 0;
@@ -442,7 +340,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     List<SegmentContext> selectedSegmentContexts;
     if (providedSegmentContexts == null) {
-      selectedSegmentContexts = tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());
+      selectedSegmentContexts = executionInfo.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());
     } else {
       selectedSegmentContexts = new ArrayList<>(selectedSegments.size());
       selectedSegments.forEach(s -> selectedSegmentContexts.add(providedSegmentContexts.get(s)));
@@ -574,14 +472,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * Handles the subquery in the given query.
    * <p>Currently only supports subquery within the filter.
    */
-  private void handleSubquery(QueryContext queryContext, TableDataManager tableDataManager,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
+  private void handleSubquery(QueryContext queryContext, TableExecutionInfo tableExecutionInfo,
       TimerContext timerContext, ExecutorService executorService)
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null && !filter.isConstant()) {
-      handleSubquery(filter, tableDataManager, indexSegments, providedSegmentContexts, timerContext, executorService,
-          queryContext.getEndTimeMs());
+      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext.getEndTimeMs());
     }
   }
 
@@ -589,19 +485,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * Handles the subquery in the given filter.
    * <p>Currently only supports subquery within the lhs of the predicate.
    */
-  private void handleSubquery(FilterContext filter, TableDataManager tableDataManager, List<IndexSegment> indexSegments,
-      @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts, TimerContext timerContext,
+  private void handleSubquery(FilterContext filter, TableExecutionInfo executionInfo, TimerContext timerContext,
       ExecutorService executorService, long endTimeMs)
       throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        handleSubquery(child, tableDataManager, indexSegments, providedSegmentContexts, timerContext, executorService,
-            endTimeMs);
+        handleSubquery(child, executionInfo, timerContext, executorService, endTimeMs);
       }
     } else {
-      handleSubquery(filter.getPredicate().getLhs(), tableDataManager, indexSegments, providedSegmentContexts,
-          timerContext, executorService, endTimeMs);
+      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, endTimeMs);
     }
   }
 
@@ -612,8 +505,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * <p>Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
    * rewritten to an IN_ID_SET transform function.
    */
-  private void handleSubquery(ExpressionContext expression, TableDataManager tableDataManager,
-      List<IndexSegment> indexSegments, @Nullable Map<IndexSegment, SegmentContext> providedSegmentContexts,
+  private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo,
       TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
     FunctionContext function = expression.getFunction();
@@ -641,8 +533,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       subquery.setEndTimeMs(endTimeMs);
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
-          executeInternal(tableDataManager, new ArrayList<>(indexSegments), providedSegmentContexts, subquery,
-              timerContext, executorService, null, false);
+          executeInternal(executionInfo, subquery, timerContext, executorService, null, false);
       BaseResultsBlock resultsBlock = instanceResponse.getResultsBlock();
       Preconditions.checkState(resultsBlock instanceof AggregationResultsBlock,
           "Got unexpected results block type: %s, expecting aggregation results",
@@ -655,8 +546,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
-        handleSubquery(argument, tableDataManager, indexSegments, providedSegmentContexts, timerContext,
-            executorService, endTimeMs);
+        handleSubquery(argument, executionInfo, timerContext, executorService, endTimeMs);
       }
     }
   }
@@ -791,5 +681,75 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);
     planExecTimer.stopAndRecord();
     return result;
+  }
+
+  private TableExecutionInfo getTableExecutionInfo(String tableNameWithType, List<String> segmentsToQuery,
+      List<String> optionalSegments, QueryContext queryContext) {
+    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+    if (tableDataManager == null) {
+      throw new NoSuchElementException(tableNameWithType);
+    }
+
+    List<String> notAcquiredSegments = new ArrayList<>();
+    int numSegmentsAcquired;
+    List<SegmentDataManager> segmentDataManagers;
+    List<IndexSegment> indexSegments;
+    Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
+
+    if (!isUpsertTable(tableDataManager)) {
+      segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
+      indexSegments = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        indexSegments.add(segmentDataManager.getSegment());
+      }
+    } else {
+      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
+      TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
+      boolean isUsingConsistencyMode =
+          rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+      if (isUsingConsistencyMode) {
+        tumm.lockForSegmentContexts();
+      }
+      try {
+        // Get newly added segments as tracked by the upsert table manager to expand the list of segments for query.
+        // Those segments are treated as optional segments as they don't fail the query if not able to get acquired.
+        Set<String> allSegmentsToQuery = new HashSet<>(segmentsToQuery);
+        if (optionalSegments == null) {
+          optionalSegments = new ArrayList<>();
+        } else {
+          allSegmentsToQuery.addAll(optionalSegments);
+        }
+        for (String segmentName : tumm.getNewlyAddedSegments()) {
+          if (!allSegmentsToQuery.contains(segmentName)) {
+            optionalSegments.add(segmentName);
+          }
+        }
+        segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
+        indexSegments = new ArrayList<>(segmentDataManagers.size());
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          if (segmentDataManager.hasMultiSegments()) {
+            indexSegments.addAll(segmentDataManager.getSegments());
+          } else {
+            indexSegments.add(segmentDataManager.getSegment());
+          }
+        }
+        // When using consistency mode, we should acquire segments and get their contexts atomically.
+        if (isUsingConsistencyMode) {
+          List<SegmentContext> segmentContexts =
+              tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
+          providedSegmentContexts = new HashMap<>(segmentContexts.size());
+          for (SegmentContext sc : segmentContexts) {
+            providedSegmentContexts.put(sc.getIndexSegment(), sc);
+          }
+        }
+      } finally {
+        if (isUsingConsistencyMode) {
+          tumm.unlockForSegmentContexts();
+        }
+      }
+    }
+
+    return new SingleTableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
+        segmentsToQuery, optionalSegments, notAcquiredSegments);
   }
 }
