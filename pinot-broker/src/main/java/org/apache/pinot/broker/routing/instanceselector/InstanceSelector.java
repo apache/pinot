@@ -25,9 +25,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.transport.ServerInstance;
 
 
 /**
@@ -49,7 +49,7 @@ public interface InstanceSelector {
    * (segments with ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}).
    * Should be called only once before calling other methods.
    */
-  void init(Set<String> enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore enabledServerManager,
+  void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
       IdealState idealState, ExternalView externalView, Set<String> onlineSegments);
 
   /**

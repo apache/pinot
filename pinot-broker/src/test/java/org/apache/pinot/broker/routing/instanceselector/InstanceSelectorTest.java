@@ -42,7 +42,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -51,6 +50,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.TestClock;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -99,6 +99,8 @@ public class InstanceSelectorTest {
   private TableConfig _tableConfig;
 
   private TestClock _mutableClock;
+
+  private static final Map<String, ServerInstance> EMPTY_SERVER_MAP = Collections.EMPTY_MAP;
 
   private static final String TABLE_NAME = "testTable_OFFLINE";
 
@@ -308,13 +310,10 @@ public class InstanceSelectorTest {
     onlineSegments.add(segment3);
     List<String> segments = Arrays.asList(segment0, segment1, segment2, segment3);
 
-    balancedInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
-    replicaGroupInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
-    strictReplicaGroupInstanceSelector.init(enabledInstances,
-        BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    balancedInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    strictReplicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
+            onlineSegments);
 
     int requestId = 0;
 
@@ -804,8 +803,7 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     //   ReplicaGroupInstanceSelector
     //     segment0 -> instance0
     //     segment2 -> instance0
@@ -889,8 +887,7 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     //   ReplicaGroupInstanceSelector
     //     segment0 -> instance0
     //     segment3 -> instance0
@@ -973,8 +970,7 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    replicaGroupInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    replicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     // since numReplicaGroupsToQuery is not set, first query should go to first replica group,
     // 2nd query should go to next replica group
 
@@ -1062,9 +1058,8 @@ public class InstanceSelectorTest {
       onlineSegments.add(segment);
     }
 
-    multiStageSelector.init(new HashSet<>(enabledInstances),
-        BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+            onlineSegments);
 
     // Using requestId=0 should select replica-group 0. Even segments get assigned to instance-0 and odd segments get
     // assigned to instance-1.
@@ -1089,17 +1084,15 @@ public class InstanceSelectorTest {
 
     // If instance-0 is down, replica-group 1 should be picked even with requestId=0
     enabledInstances.remove("instance-0");
-    multiStageSelector.init(new HashSet<>(enabledInstances),
-        BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+            onlineSegments);
     selectionResult = multiStageSelector.select(brokerRequest, segments, 0);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedReplicaGroupInstanceSelectorResult);
 
     // If instance-2 also goes down, no replica-group is eligible
     enabledInstances.remove("instance-2");
-    multiStageSelector.init(new HashSet<>(enabledInstances),
-        BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    multiStageSelector.init(new HashSet<>(enabledInstances), EMPTY_SERVER_MAP, idealState, externalView,
+            onlineSegments);
     try {
       multiStageSelector.select(brokerRequest, segments, 0);
       fail("Method call above should have failed");
@@ -1159,11 +1152,9 @@ public class InstanceSelectorTest {
     //     (disabled) errorInstance: ERROR
     //   }
     // }
-    balancedInstanceSelector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
-    strictReplicaGroupInstanceSelector.init(enabledInstances,
-        BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    balancedInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    strictReplicaGroupInstanceSelector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView,
+            onlineSegments);
     BrokerRequest brokerRequest = mock(BrokerRequest.class);
     PinotQuery pinotQuery = mock(PinotQuery.class);
     when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
@@ -1437,8 +1428,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
     InstanceSelector selector = createTestInstanceSelector(selectorType);
 
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     {
       int requestId = 0;
@@ -1482,8 +1472,7 @@ public class InstanceSelectorTest {
     // Advance the clock to make newSeg to old segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     // Upon re-initialization, newly old segments can only be served from online instances: instance1
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     {
       int requestId = 0;
       InstanceSelector.SelectionResult selectionResult =
@@ -1551,8 +1540,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     // We don't mark segment as unavailable.
     int requestId = 0;
     Map<String, String> expectedResult = ImmutableMap.of(oldSeg, instance0);
@@ -1564,8 +1552,7 @@ public class InstanceSelectorTest {
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     if (STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equals(selectorType)) {
       expectedResult = ImmutableMap.of();
@@ -1613,8 +1600,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;
@@ -1695,8 +1681,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;
@@ -1765,8 +1750,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // Add a new segment to ideal state with missing external view.
     String newSeg = "segment2";
@@ -1852,8 +1836,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // First selection, we select instance1 for newSeg.
     int requestId = 0;
@@ -1925,8 +1908,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // No selection because the external view is not in ideal state.
     int requestId = 0;
@@ -1974,8 +1956,7 @@ public class InstanceSelectorTest {
     ExternalView externalView = createExternalView(externalViewMap);
 
     InstanceSelector selector = createTestInstanceSelector(selectorType);
-    selector.init(enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore.getInstance(),
-        idealState, externalView, onlineSegments);
+    selector.init(enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
 
     // We don't mark segment as unavailable.
     int requestId = 0;

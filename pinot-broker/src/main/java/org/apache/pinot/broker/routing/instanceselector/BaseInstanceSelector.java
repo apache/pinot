@@ -37,7 +37,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityGroupInstanceSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
@@ -109,7 +108,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   private volatile SegmentStates _segmentStates;
-  private BrokerRoutingManager.EnabledServerInstanceStore _enabledServerStore;
+  private Map<String, ServerInstance> _enabledServerStore;
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
@@ -135,11 +134,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, BrokerRoutingManager.EnabledServerInstanceStore enabledServerManager,
+  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap,
                    IdealState idealState, ExternalView externalView,
                    Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
-    _enabledServerStore = enabledServerManager;
+    _enabledServerStore = enabledServerMap;
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
@@ -474,7 +473,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @VisibleForTesting
   int getGroup(String instanceID) {
     int group = DEFAULT_SERVER_REPLICA_GROUP_OF_BROKER_VIEW;
-    ServerInstance server = _enabledServerStore.getServers().get(instanceID);
+    ServerInstance server = _enabledServerStore.get(instanceID);
     if (server == null) {
       LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
               instanceID, _tableNameWithType);

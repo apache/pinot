@@ -103,7 +103,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private final BrokerMetrics _brokerMetrics;
   private final Map<String, RoutingEntry> _routingEntryMap = new ConcurrentHashMap<>();
-  private final EnabledServerInstanceStore _enabledServerStore = EnabledServerInstanceStore.getInstance();
+  private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
   // NOTE: _excludedServers doesn't need to be concurrent because it is only accessed within the synchronized block
   private final Set<String> _excludedServers = new HashSet<>();
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -256,7 +256,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           // Always refresh the server instance with the latest instance config in case it changes
           InstanceConfig instanceConfig = new InstanceConfig(instanceConfigZNRecord);
           ServerInstance serverInstance = new ServerInstance(instanceConfig);
-          if (_enabledServerStore.getServers().put(instanceId, serverInstance) == null) {
+          if (_enabledServerInstanceMap.put(instanceId, serverInstance) == null) {
             newEnabledServers.add(instanceId);
 
             // NOTE: Remove new enabled server from excluded servers because the server is likely being restarted
@@ -270,7 +270,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
     List<String> newDisabledServers = new ArrayList<>();
-    for (String instance : _enabledServerStore.getServers().keySet()) {
+    for (String instance : _enabledServerInstanceMap.keySet()) {
       if (!enabledServers.contains(instance)) {
         newDisabledServers.add(instance);
       }
@@ -318,7 +318,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     // Remove new disabled servers from _enabledServerInstanceMap after updating all routing entries to ensure it
     // always contains the selected servers
     for (String newDisabledInstance : newDisabledServers) {
-      _enabledServerStore.getServers().remove(newDisabledInstance);
+      _enabledServerInstanceMap.remove(newDisabledInstance);
     }
 
     LOGGER.info("Processed instance config change in {}ms "
@@ -390,7 +390,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       LOGGER.info("Server: {} is not previously excluded, skipping updating the routing", instanceId);
       return;
     }
-    if (!_enabledServerStore.getServers().containsKey(instanceId)) {
+    if (!_enabledServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);
       return;
     }
@@ -455,7 +455,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     InstanceSelector instanceSelector =
         InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
             adaptiveServerSelector, _pinotConfig);
-    instanceSelector.init(_routableServers, _enabledServerStore, idealState, externalView, preSelectedOnlineSegments);
+    instanceSelector.init(_routableServers, _enabledServerInstanceMap,
+            idealState, externalView, preSelectedOnlineSegments);
 
     // Add time boundary manager if both offline and real-time part exist for a hybrid table
     TimeBoundaryManager timeBoundaryManager = null;
@@ -641,7 +642,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       InstanceSelector.SelectionResult selectionResult) {
     Map<ServerInstance, ServerRouteInfo> merged = new HashMap<>();
     for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerStore.getServers().get(entry.getValue());
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
         ServerRouteInfo serverRouteInfoInfo =
             merged.computeIfAbsent(serverInstance, k -> new ServerRouteInfo(new ArrayList<>(), new ArrayList<>()));
@@ -652,7 +653,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
     for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
-      ServerInstance serverInstance = _enabledServerStore.getServers().get(entry.getValue());
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
         ServerRouteInfo serverRouteInfo = merged.get(serverInstance);
         // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
@@ -677,7 +678,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
-    return _enabledServerStore.getServers();
+    return _enabledServerInstanceMap;
   }
 
   private String getIdealStatePath(String tableNameWithType) {
@@ -867,57 +868,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         }
       }
       return new ArrayList<>(selectedSegments);
-    }
-  }
-
-  /**
-   * A singleton class that serves as a central in single broker in-memory storage for server instances in the cluster.
-   * This class maintains a thread-safe map of server instance IDs to their corresponding ServerInstance objects.
-   * It is used as the single source of truth for all active server instances in the cluster.
-   * Example usage:
-   * <pre>
-   * // Get the singleton instance
-   * ServerInstanceStore store = ServerInstanceStore.getInstance();
-   * // Store a new server instance
-   * store.getServers().put(instanceId, serverInstance);
-   * // Retrieve a server instance
-   * ServerInstance server = store.getServers().get(instanceId);
-   * </pre>
-   */
-  public static class EnabledServerInstanceStore {
-    private static volatile EnabledServerInstanceStore _instance;
-    private final Map<String, ServerInstance> _enabledServerInstanceMap = new ConcurrentHashMap<>();
-
-    private EnabledServerInstanceStore() {
-      // Private constructor to prevent instantiation
-    }
-
-    /**
-     * Returns the singleton instance of ServerInstanceStore.
-     * This method implements thread-safe lazy initialization.
-     *
-     * @return the singleton instance
-     */
-    public static EnabledServerInstanceStore getInstance() {
-      if (_instance == null) {
-        synchronized (EnabledServerInstanceStore.class) {
-          if (_instance == null) {
-            _instance = new EnabledServerInstanceStore();
-          }
-        }
-      }
-      return _instance;
-    }
-
-    /**
-     * Returns the thread-safe map that stores server instances.
-     * This map is the central storage for all server instances in the cluster.
-     * Direct modifications to this map (put/remove) will affect the server instance registry.
-     *
-     * @return the map of server instance IDs to their corresponding ServerInstance objects
-     */
-    public Map<String, ServerInstance> getServers() {
-      return _enabledServerInstanceMap;
     }
   }
 }
