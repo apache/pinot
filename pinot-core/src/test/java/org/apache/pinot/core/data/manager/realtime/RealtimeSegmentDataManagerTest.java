@@ -828,7 +828,7 @@ public class RealtimeSegmentDataManagerTest {
   public void testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached()
       throws Exception {
     final int segmentTimeThresholdMins = 10;
-    TimeSupplier timeSupplier  = new TimeSupplier();
+    TimeSupplier timeSupplier = new TimeSupplier();
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
         String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null)) {
       segmentDataManager._stubConsumeLoop = false;
