@@ -83,14 +83,20 @@ public class QueryRouter {
     _serverRoutingStatsManager = serverRoutingStatsManager;
   }
 
-  public AsyncQueryResponse submitQuery(QueryRouteInfo queryRouteInfo) {
-    BrokerRequest offlineBrokerRequest = queryRouteInfo.getOfflineBrokerRequest();
-    BrokerRequest realtimeBrokerRequest = queryRouteInfo.getRealtimeBrokerRequest();
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = queryRouteInfo.getOfflineRoutingTable();
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = queryRouteInfo.getRealtimeRoutingTable();
-    long requestId = queryRouteInfo.getRequestId();
-    String rawTableName = queryRouteInfo.getRawTableName();
-    long timeoutMs = queryRouteInfo.getTimeoutMs();
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
+    TableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest,
+        offlineRoutingTable, realtimeRoutingTable);
+
+    return submitQuery(requestId, rawTableName, tableRouteInfo, timeoutMs);
+  }
+
+  public AsyncQueryResponse submitQuery(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs) {
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
 
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
@@ -101,7 +107,7 @@ public class QueryRouter {
     boolean skipUnavailableServers = isSkipUnavailableServers(offlineBrokerRequest, realtimeBrokerRequest);
 
     // Build map from server to request based on the routing table
-    Map<ServerRoutingInstance, InstanceRequest> requestMap = queryRouteInfo.getRequestMap(preferTls);
+    Map<ServerRoutingInstance, InstanceRequest> requestMap = route.getRequestMap(requestId, _brokerId, preferTls);
 
     // Create the asynchronous query response with the request map
     AsyncQueryResponse asyncQueryResponse =

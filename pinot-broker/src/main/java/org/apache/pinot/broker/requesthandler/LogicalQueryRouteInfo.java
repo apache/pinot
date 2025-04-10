@@ -22,40 +22,40 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.core.routing.ServerRouteInfo;
-import org.apache.pinot.core.transport.QueryRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.query.planner.physical.table.HybridTableRoute;
 import org.apache.pinot.query.planner.physical.table.PhysicalTableRoute;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class LogicalQueryRouteInfo extends QueryRouteInfo {
-  private final HybridTableRoute _hybridTableRoute;
+public class LogicalQueryRouteInfo implements org.apache.pinot.core.transport.TableRouteInfo {
+  private final BrokerRequest _offlineBrokerRequest;
+  private final BrokerRequest _realtimeBrokerRequest;
+  private final List<PhysicalTableRoute> _offlineTableRoutes;
+  private final List<PhysicalTableRoute> _realtimeTableRoutes;
 
-  public LogicalQueryRouteInfo(String brokerId, long requestId, String rawTableName,
-      BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
-      HybridTableRoute hybridTableRoute, long timeoutMs, RequestContext requestContext) {
-    super(brokerId, requestId, rawTableName, originalBrokerRequest, serverBrokerRequest, rawTableName,
-        serverBrokerRequest, null, rawTableName, serverBrokerRequest, null, 0, timeoutMs,
-        requestContext);
-    _hybridTableRoute = hybridTableRoute;
+  public LogicalQueryRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+      List<PhysicalTableRoute> offlineTableRoutes, List<PhysicalTableRoute> realtimeTableRoutes) {
+    _offlineBrokerRequest = offlineBrokerRequest;
+    _realtimeBrokerRequest = realtimeBrokerRequest;
+    _offlineTableRoutes = offlineTableRoutes;
+    _realtimeTableRoutes = realtimeTableRoutes;
   }
 
   @Override
-  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(boolean preferTls) {
+  public Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls) {
     Map<ServerInstance, List<TableRouteInfo>> offlineTableRouteInfo = new HashMap<>();
     Map<ServerInstance, List<TableRouteInfo>> realtimeTableRouteInfo = new HashMap<>();
 
-    for (PhysicalTableRoute physicalTableRoute : _hybridTableRoute.getOfflineTableRoutes()) {
+    for (PhysicalTableRoute physicalTableRoute : _offlineTableRoutes) {
       for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
         TableRouteInfo tableRouteInfo = new TableRouteInfo();
         tableRouteInfo.setTableName(physicalTableRoute.getTableName());
@@ -66,10 +66,9 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
 
         offlineTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
       }
-      _numPrunedSegments += physicalTableRoute.getNumPrunedSegments();
     }
 
-    for (PhysicalTableRoute physicalTableRoute : _hybridTableRoute.getRealtimeTableRoutes()) {
+    for (PhysicalTableRoute physicalTableRoute : _realtimeTableRoutes) {
       for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getServerRouteInfoMap().entrySet()) {
         TableRouteInfo tableRouteInfo = new TableRouteInfo();
         tableRouteInfo.setTableName(physicalTableRoute.getTableName());
@@ -80,28 +79,27 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
 
         realtimeTableRouteInfo.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(tableRouteInfo);
       }
-      _numPrunedSegments += physicalTableRoute.getNumPrunedSegments();
     }
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
 
     for (Map.Entry<ServerInstance, List<TableRouteInfo>> entry : offlineTableRouteInfo.entrySet()) {
       requestMap.put(
           new ServerRoutingInstance(entry.getKey().getHostname(), entry.getKey().getPort(), TableType.OFFLINE),
-          getInstanceRequest(_serverBrokerRequest, entry.getValue()));
+          getInstanceRequest(requestId, brokerId, _offlineBrokerRequest, entry.getValue()));
     }
 
     for (Map.Entry<ServerInstance, List<TableRouteInfo>> entry : realtimeTableRouteInfo.entrySet()) {
       requestMap.put(
           new ServerRoutingInstance(entry.getKey().getHostname(), entry.getKey().getPort(), TableType.REALTIME),
-          getInstanceRequest(_serverBrokerRequest, entry.getValue()));
+          getInstanceRequest(requestId, brokerId, _realtimeBrokerRequest, entry.getValue()));
     }
 
     return requestMap;
   }
 
-  private InstanceRequest getInstanceRequest(BrokerRequest brokerRequest, List<TableRouteInfo> tableRouteInfo) {
+  private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest, List<TableRouteInfo> tableRouteInfo) {
     InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(_requestId);
+    instanceRequest.setRequestId(requestId);
     instanceRequest.setCid(QueryThreadContext.getCid());
     instanceRequest.setQuery(brokerRequest);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
@@ -109,7 +107,31 @@ public class LogicalQueryRouteInfo extends QueryRouteInfo {
       instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
     }
     instanceRequest.setLogicalTableRouteInfo(tableRouteInfo);
-    instanceRequest.setBrokerId(_brokerId);
+    instanceRequest.setBrokerId(brokerId);
     return instanceRequest;
+  }
+
+  @Nullable
+  @Override
+  public BrokerRequest getOfflineBrokerRequest() {
+    return _offlineBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public BrokerRequest getRealtimeBrokerRequest() {
+    return _realtimeBrokerRequest;
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+    return Map.of();
+  }
+
+  @Nullable
+  @Override
+  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+    return Map.of();
   }
 }

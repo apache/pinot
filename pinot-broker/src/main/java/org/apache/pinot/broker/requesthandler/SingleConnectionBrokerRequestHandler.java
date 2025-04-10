@@ -41,16 +41,18 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryResponse;
-import org.apache.pinot.core.transport.QueryRouteInfo;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.server.ServerStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,23 +93,22 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(QueryRouteInfo routeInfo, ServerStats serverStats)
+  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+      BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception {
-    BrokerRequest originalBrokerRequest = routeInfo.getOriginalBrokerRequest();
-    BrokerRequest serverBrokerRequest = routeInfo.getServerBrokerRequest();
-    BrokerRequest offlineBrokerRequest = routeInfo.getOfflineBrokerRequest();
-    BrokerRequest realtimeBrokerRequest = routeInfo.getRealtimeBrokerRequest();
-    long timeoutMs = routeInfo.getTimeoutMs();
-    RequestContext requestContext = routeInfo.getRequestContext();
-    String rawTableName = routeInfo.getRawTableName();
+    BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
+    BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
 
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
 
+    String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse = _queryRouter.submitQuery(routeInfo);
+    AsyncQueryResponse asyncQueryResponse =
+        _queryRouter.submitQuery(requestId, rawTableName, route, timeoutMs);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
       BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
