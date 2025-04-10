@@ -311,13 +311,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
   private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
-  private long _consumeStartTime;
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamConfig _streamConfig;
 
   private RowMetadata _lastRowMetadata;
   private long _lastConsumedTimestampMs = -1;
-
+  private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
   private String _stopReason = null;
@@ -748,8 +747,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _segmentLogger.info("Acquired consumer semaphore.");
 
         _consumeStartTime = now();
-        _segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
-            _llcSegmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
+        _segmentLogger.info("Starting consumption on segment: {}, maxRowCount: {}, maxEndTime: {}.", _llcSegmentName,
+            _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
 
         // TODO:
         //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
@@ -1507,6 +1506,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private boolean catchupToFinalOffset(StreamPartitionMsgOffset endOffset, long timeoutMs) {
     _finalOffset = endOffset;
+    if (_consumeStartTime == -1) {
+      _consumeStartTime = now();
+    }
     _consumeEndTime = now() + timeoutMs;
     _state = State.CONSUMING_TO_ONLINE;
     _shouldStop = false;
@@ -1725,7 +1727,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
       _state = State.INITIAL_CONSUMING;
       _latestStreamOffsetAtStartupTime = fetchLatestStreamOffset(5000);
-      _consumeStartTime = now();
       setConsumeEndTime(segmentZKMetadata, now());
       _segmentCommitterFactory =
           new SegmentCommitterFactory(_segmentLogger, _protocolHandler, tableConfig, indexLoadingConfig, serverMetrics);
