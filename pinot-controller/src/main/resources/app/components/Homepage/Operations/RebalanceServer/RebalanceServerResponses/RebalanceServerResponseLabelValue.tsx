@@ -25,7 +25,7 @@ export const RebalanceServerResponseLabelValue = (
     return (
         <Box>
             <Typography color='textSecondary' variant='caption'>{label}</Typography>
-            <div><Typography style={{ fontWeight: 600 }} variant='body2'>{value.split("\n").join("<br />")}</Typography></div>
+            <Typography style={{ fontWeight: 600 }} variant='body2'>{value.split("\n").join("<br />")}</Typography>
         </Box>
     );
 }
