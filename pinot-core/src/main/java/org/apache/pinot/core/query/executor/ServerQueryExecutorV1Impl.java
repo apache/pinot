@@ -96,7 +96,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker;
   private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
-  private LogicalTableExecutor _logicalTableExecutor = new LogicalTableExecutor();
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
@@ -116,7 +115,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _planMaker.init(config);
     _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    _logicalTableExecutor.init(config, instanceDataManager, serverMetrics);
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
         _enablePrefetch);
   }
@@ -139,10 +137,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-
-    if (queryRequest.getTableRouteInfos() != null && !queryRequest.getTableRouteInfos().isEmpty()) {
-      return _logicalTableExecutor.execute(queryRequest, executorService, streamer);
-    }
 
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, executorService, streamer);
@@ -200,9 +194,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableExecutionInfo executionInfo;
     try {
+      if (queryRequest.getTableRouteInfos() != null && !queryRequest.getTableRouteInfos().isEmpty()) {
+        executionInfo = LogicalTableExecutionInfo.create(_instanceDataManager, queryRequest, queryContext);
+      } else {
         executionInfo =
             SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
                 queryRequest.getOptionalSegments(), queryContext);
+      }
     } catch (TableNotFoundException exception) {
       String errorMessage =
           "Failed to find table: " + exception.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
