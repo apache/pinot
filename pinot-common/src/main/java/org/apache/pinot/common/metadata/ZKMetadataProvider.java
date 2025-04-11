@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metadata;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -820,8 +821,13 @@ public class ZKMetadataProvider {
   }
 
   public static void setLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, LogicalTable logicalTable) {
-    propertyStore.set(constructPropertyStorePathForLogical(logicalTable.getTableName()),
-        LogicalTableUtils.toZNRecord(logicalTable), AccessOption.PERSISTENT);
+    try {
+      ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTable);
+      String path = constructPropertyStorePathForLogical(logicalTable.getTableName());
+      propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to convert logical table to ZNRecord", e);
+    }
   }
 
   public static List<LogicalTable> getAllLogicalTables(ZkHelixPropertyStore<ZNRecord> propertyStore) {

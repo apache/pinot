@@ -2213,10 +2213,18 @@ public class PinotHelixResourceManager {
 
     validateLogicalTable(logicalTable);
 
-    LogicalTable oldLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
-    if (oldLogicalTable != null) {
+    // Check if the logical table name is already used
+    LogicalTable existingLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
+    if (existingLogicalTable != null) {
       throw new TableAlreadyExistsException("Logical table: " + tableName + " already exists");
     }
+
+    // Check if the table name is already used by a physical table
+    getAllTables().stream().map(TableNameBuilder::extractRawTableName).distinct().filter(tableName::equals)
+        .findFirst().ifPresent(tableNameWithType -> {
+          throw new TableAlreadyExistsException("Table name: " + tableName + " already exists");
+        });
+
     ZKMetadataProvider.setLogicalTable(_propertyStore, logicalTable);
     LOGGER.info("Added logical table: {}", tableName);
   }

@@ -24,17 +24,21 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LogicalTable implements Serializable {
+public class LogicalTable {
+
+  public static final String TABLE_NAME_KEY = "tableName";
+  public static final String PHYSICAL_TABLE_NAMES_KEY = "physicalTableNames";
+  public static final String BROKER_TENANT_KEY = "brokerTenant";
+
   private String _tableName;
   private List<String> _physicalTableNames;
-  private String _brokerTenant = "DefaultTenant";
+  private String _brokerTenant;
 
   public static LogicalTable fromFile(File logicalTableFile)
       throws IOException {
@@ -107,13 +111,12 @@ public class LogicalTable implements Serializable {
       return false;
     }
     LogicalTable that = (LogicalTable) object;
-    return Objects.equals(getTableName(), that.getTableName()) && Objects.equals(getBrokerTenant(),
-        that.getBrokerTenant()) && Objects.equals(getPhysicalTableNames(), that.getPhysicalTableNames());
+    return Objects.equals(getTableName(), that.getTableName());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getTableName(), getBrokerTenant(), getPhysicalTableNames());
+    return Objects.hash(getTableName());
   }
 
   @Override

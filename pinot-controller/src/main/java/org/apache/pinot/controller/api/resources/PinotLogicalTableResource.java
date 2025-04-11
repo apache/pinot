@@ -59,6 +59,7 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,9 +201,16 @@ public class PinotLogicalTableResource {
   }
 
   private void validateLogicalTableName(LogicalTable logicalTable) {
-    if (StringUtils.isEmpty(logicalTable.getTableName())) {
+    String tableName = logicalTable.getTableName();
+    if (StringUtils.isEmpty(tableName)) {
       throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table. Reason: 'tableName' should not be null or empty", Response.Status.BAD_REQUEST);
+          "Invalid logical table name. Reason: 'tableName' should not be null or empty", Response.Status.BAD_REQUEST);
+    }
+
+    if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid logical table name. Reason: 'tableName' should not end with _OFFLINE or _REALTIME",
+          Response.Status.BAD_REQUEST);
     }
   }
 

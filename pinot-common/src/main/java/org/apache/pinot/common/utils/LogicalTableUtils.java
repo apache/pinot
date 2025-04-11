@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.data.LogicalTable;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -37,16 +40,27 @@ public class LogicalTableUtils {
    */
   public static LogicalTable fromZNRecord(@Nonnull ZNRecord record)
       throws IOException {
-    String tableJSON = record.getSimpleField("tableJSON");
-    return LogicalTable.fromString(tableJSON);
+    String tableName = record.getSimpleField(LogicalTable.TABLE_NAME_KEY);
+    String physicalTableNamesString = record.getSimpleField(LogicalTable.PHYSICAL_TABLE_NAMES_KEY);
+    String brokerTenant = record.getSimpleField(LogicalTable.BROKER_TENANT_KEY);
+
+    LogicalTable logicalTable = new LogicalTable();
+    logicalTable.setTableName(tableName);
+    logicalTable.setPhysicalTableNames(JsonUtils.stringToObject(physicalTableNamesString, new TypeReference<>() { }));
+    logicalTable.setBrokerTenant(brokerTenant);
+    return logicalTable;
   }
 
   /**
    * Wrap {@link LogicalTable} into a {@link ZNRecord}.
    */
-  public static ZNRecord toZNRecord(@Nonnull LogicalTable table) {
+  public static ZNRecord toZNRecord(@Nonnull LogicalTable table)
+      throws JsonProcessingException {
     ZNRecord record = new ZNRecord(table.getTableName());
-    record.setSimpleField("tableJSON", table.toSingleLineJsonString());
+    record.setSimpleField(LogicalTable.TABLE_NAME_KEY, table.getTableName());
+    record.setSimpleField(LogicalTable.PHYSICAL_TABLE_NAMES_KEY,
+        JsonUtils.objectToString(table.getPhysicalTableNames()));
+    record.setSimpleField(LogicalTable.BROKER_TENANT_KEY, table.getBrokerTenant());
     return record;
   }
 }
