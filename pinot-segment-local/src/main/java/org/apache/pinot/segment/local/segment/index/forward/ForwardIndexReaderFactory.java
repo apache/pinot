@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
@@ -72,13 +71,11 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       throws IndexReaderConstraintException {
     if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_READER_CLASS_NAME)) {
       String className = indexConfig.getConfigs().get(FORWARD_INDEX_READER_CLASS_NAME).toString();
-      //FIXME : remove precondition check
-      Preconditions.checkNotNull(className, "MapIndexReader class name must be provided");
       try {
         return (ForwardIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
             .newInstance(dataBuffer, metadata);
       } catch (Exception e) {
-        throw new RuntimeException("Failed to create MapIndexReader", e);
+        throw new RuntimeException("Failed to create ForwardIndexReader", e);
       }
     }
     return createIndexReader(dataBuffer, metadata);
@@ -125,9 +122,8 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION ? new FixedBytePower2ChunkSVForwardIndexReader(
+          dataBuffer, storedType) : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
     if (version == VarByteChunkForwardIndexWriterV5.VERSION) {

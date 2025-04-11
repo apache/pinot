@@ -195,13 +195,6 @@ public class FilterPlanNode implements PlanNode {
     }
   }
 
-  /**
-   * FIXME: Map filter can be applied iff:
-   * <ul>
-   *   <li>Predicate </li>
-   *   <li>Map has index like </li>
-   * </ul>
-   */
   private boolean canApplyMapFilter(Predicate predicate, String column) {
     // Get column name and key name from function arguments
     FunctionContext function = predicate.getLhs().getFunction();
