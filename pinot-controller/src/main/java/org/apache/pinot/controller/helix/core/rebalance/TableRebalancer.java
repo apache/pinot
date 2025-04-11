@@ -142,7 +142,7 @@ public class TableRebalancer {
   // TODO: Consider making the timeoutMs below table rebalancer configurable
   private static final int TABLE_SIZE_READER_TIMEOUT_MS = 30_000;
   private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 10_000;
-  private static final AtomicInteger _rebalanceJobCounter = new AtomicInteger(0);
+  private static final AtomicInteger REBALANCE_JOB_COUNTER = new AtomicInteger(0);
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
@@ -184,7 +184,7 @@ public class TableRebalancer {
     String tableNameWithType = tableConfig.getTableName();
     RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
     try {
-      int jobCount = _rebalanceJobCounter.incrementAndGet();
+      int jobCount = REBALANCE_JOB_COUNTER.incrementAndGet();
       if (_controllerMetrics != null) {
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, jobCount);
       }
@@ -192,7 +192,7 @@ public class TableRebalancer {
       status = result.getStatus();
       return result;
     } finally {
-      int jobCount = _rebalanceJobCounter.decrementAndGet();
+      int jobCount = REBALANCE_JOB_COUNTER.decrementAndGet();
       if (_controllerMetrics != null) {
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_REBALANCE_IN_PROGRESS_GLOBAL, jobCount);
         _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status.toString()),
