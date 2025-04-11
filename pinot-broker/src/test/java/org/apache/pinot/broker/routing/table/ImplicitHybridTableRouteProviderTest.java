@@ -21,6 +21,7 @@ package org.apache.pinot.broker.routing.table;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.QueryErrorCode;

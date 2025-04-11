@@ -1,21 +1,19 @@
-package org.apache.pinot.broker.routing.table;
+package org.apache.pinot.query.routing.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.broker.requesthandler.LogicalQueryRouteInfo;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.TableRouteInfo;
-import org.apache.pinot.query.planner.physical.table.PhysicalTable;
-import org.apache.pinot.query.planner.physical.table.PhysicalTableRoute;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,12 +21,14 @@ import org.slf4j.LoggerFactory;
 public class LogicalTableRouteProvider implements TableRouteProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableRouteProvider.class);
 
+  private final String _logicalTableName;
   private final List<PhysicalTable> _offlineTables;
   private final List<PhysicalTable> _realtimeTables;
   private final List<String> _unavailableSegments = new ArrayList<>();
   private int _numPrunedSegments = 0;
 
-  public static LogicalTableRouteProvider create(LogicalTable logicalTable, TableCache tableCache, RoutingManager routingManager) {
+  public static LogicalTableRouteProvider create(LogicalTable logicalTable, TableCache tableCache,
+      RoutingManager routingManager) {
     List<PhysicalTable> offlineTables = new ArrayList<>();
     List<PhysicalTable> realtimeTables = new ArrayList<>();
     for (String physicalTableName : logicalTable.getPhysicalTableNames()) {
@@ -46,10 +46,33 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-    return new LogicalTableRouteProvider(offlineTables, realtimeTables);
+    return new LogicalTableRouteProvider(logicalTable.getTableName(), offlineTables, realtimeTables);
   }
 
-  private LogicalTableRouteProvider(List<PhysicalTable> offlineTables, List<PhysicalTable> realtimeTables) {
+  public static LogicalTableRouteProvider create(String logicalTableName, List<String> physicalTableNames,
+      RoutingManager routingManager) {
+    List<PhysicalTable> offlineTables = new ArrayList<>();
+    List<PhysicalTable> realtimeTables = new ArrayList<>();
+    for (String physicalTableName : physicalTableNames) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(physicalTableName);
+      Preconditions.checkNotNull(tableType);
+      if (routingManager.routingExists(physicalTableName)) {
+        if (tableType == TableType.OFFLINE) {
+          offlineTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, null,
+              routingManager.isTableDisabled(physicalTableName)));
+        } else {
+          realtimeTables.add(new PhysicalTable(physicalTableName, physicalTableName, tableType, null,
+              routingManager.isTableDisabled(physicalTableName)));
+        }
+      }
+    }
+
+    return new LogicalTableRouteProvider(logicalTableName, offlineTables, realtimeTables);
+  }
+
+  private LogicalTableRouteProvider(String logicalTableName, List<PhysicalTable> offlineTables,
+      List<PhysicalTable> realtimeTables) {
+    _logicalTableName = logicalTableName;
     _offlineTables = offlineTables;
     _realtimeTables = realtimeTables;
   }
@@ -131,6 +154,24 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   }
 
   @Override
+  public TableRouteInfo calculateRoutes(RoutingManager routingManager, long requestId) {
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+
+    if (hasOffline()) {
+      offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + TableNameBuilder.OFFLINE.tableNameWithType(_logicalTableName) + "\"");
+    }
+
+    if (hasRealtime()) {
+      realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+          "SELECT * FROM \"" + TableNameBuilder.REALTIME.tableNameWithType(_logicalTableName) + "\"");
+    }
+
+    return calculateRoutes(routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+  }
+
+  @Override
   public TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,
       BrokerRequest realtimeBrokerRequest, long requestId) {
     List<PhysicalTableRoute> offlineTableRoutes = new ArrayList<>();
@@ -164,7 +205,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
       }
     }
 
-    return new LogicalQueryRouteInfo(offlineBrokerRequest, realtimeBrokerRequest, offlineTableRoutes,
+    return new LogicalTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest, offlineTableRoutes,
         realtimeTableRoutes);
   }
 

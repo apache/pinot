@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.table;
+package org.apache.pinot.query.routing.table;
 
 import java.util.List;
 import javax.annotation.Nullable;
@@ -105,6 +105,8 @@ public interface TableRouteProvider {
 
   @Nullable
   TimeBoundaryInfo getTimeBoundaryInfo();
+
+  TableRouteInfo calculateRoutes(RoutingManager routingManager, long requestId);
 
   /**
    * Calculate the Routing Table for a query. The routing table consists of the server name and list of segments that

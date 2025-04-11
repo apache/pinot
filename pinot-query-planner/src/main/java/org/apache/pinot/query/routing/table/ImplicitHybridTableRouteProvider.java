@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.table;
+package org.apache.pinot.query.routing.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -35,6 +35,7 @@ import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +67,13 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
       RoutingManager routingManager) {
     ImplicitHybridTableRouteProvider provider = new ImplicitHybridTableRouteProvider(tableName);
     provider.getTableConfig(tableCache);
+    provider.checkRoutes(routingManager);
+
+    return provider;
+  }
+
+  public static ImplicitHybridTableRouteProvider create(String tableName, RoutingManager routingManager) {
+    ImplicitHybridTableRouteProvider provider = new ImplicitHybridTableRouteProvider(tableName);
     provider.checkRoutes(routingManager);
 
     return provider;
@@ -276,6 +284,22 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   /*
    *  Calculate Routes Section
    */
+
+  @Override
+  public TableRouteInfo calculateRoutes(RoutingManager routingManager, long requestId) {
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+
+    if (_offlineTableName != null) {
+      offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + _offlineTableName + "\"");
+    }
+
+    if (_realtimeTableName != null) {
+      realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + _realtimeTableName + "\"");
+    }
+
+    return calculateRoutes(routingManager, offlineBrokerRequest, realtimeBrokerRequest, requestId);
+  }
 
   @Override
   public TableRouteInfo calculateRoutes(RoutingManager routingManager, BrokerRequest offlineBrokerRequest,

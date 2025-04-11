@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.query.routing.table;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,19 +31,21 @@ import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.query.planner.physical.table.PhysicalTableRoute;
+import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class LogicalQueryRouteInfo implements org.apache.pinot.core.transport.TableRouteInfo {
+public class LogicalTableRouteInfo implements org.apache.pinot.core.transport.TableRouteInfo {
   private final BrokerRequest _offlineBrokerRequest;
   private final BrokerRequest _realtimeBrokerRequest;
   private final List<PhysicalTableRoute> _offlineTableRoutes;
   private final List<PhysicalTableRoute> _realtimeTableRoutes;
 
-  public LogicalQueryRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
+  public LogicalTableRouteInfo(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
       List<PhysicalTableRoute> offlineTableRoutes, List<PhysicalTableRoute> realtimeTableRoutes) {
     _offlineBrokerRequest = offlineBrokerRequest;
     _realtimeBrokerRequest = realtimeBrokerRequest;
@@ -97,7 +100,8 @@ public class LogicalQueryRouteInfo implements org.apache.pinot.core.transport.Ta
     return requestMap;
   }
 
-  private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest, List<TableRouteInfo> tableRouteInfo) {
+  private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
+      List<TableRouteInfo> tableRouteInfo) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setCid(QueryThreadContext.getCid());
@@ -133,5 +137,53 @@ public class LogicalQueryRouteInfo implements org.apache.pinot.core.transport.Ta
   @Override
   public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
     return Map.of();
+  }
+
+  public void assignWorkersForMSQE(DispatchablePlanMetadata metadata, DispatchablePlanContext context) {
+    Map<ServerInstance, Map<String, Map<String, List<String>>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
+
+    String tableType = TableType.OFFLINE.name();
+    for (PhysicalTableRoute physicalTableRoute : _offlineTableRoutes) {
+      transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getTableName(),
+          physicalTableRoute.getServerRouteInfoMap(), tableType, serverInstanceToLogicalSegmentsMap);
+    }
+
+    tableType = TableType.REALTIME.name();
+    for (PhysicalTableRoute physicalTableRoute : _realtimeTableRoutes) {
+      transferToServerInstanceLogicalSegmentsMap(physicalTableRoute.getTableName(),
+          physicalTableRoute.getServerRouteInfoMap(), tableType, serverInstanceToLogicalSegmentsMap);
+    }
+
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, Map<String, Map<String, List<String>>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, Map<String, Map<String, List<String>>>> entry
+        : serverInstanceToLogicalSegmentsMap.entrySet()) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
+    }
+
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    metadata.setWorkerIdToLogicalTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
+  }
+
+  private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
+      Map<ServerInstance, ServerRouteInfo> segmentsMap, String tableType,
+      Map<ServerInstance, Map<String, Map<String, List<String>>>> serverInstanceToLogicalSegmentsMap) {
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+      Map<String, List<String>> tableTypeToSegmentListMap =
+          serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+      // TODO: support optional segments for multi-stage engine.
+      Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
+          "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+    }
+
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
+      Map<String, Map<String, List<String>>> logicalTableSegmentsMap =
+          serverInstanceToLogicalSegmentsMap.computeIfAbsent(entry.getKey(), k -> new HashMap<>());
+      logicalTableSegmentsMap.put(physicalTableName, entry.getValue());
+    }
   }
 }

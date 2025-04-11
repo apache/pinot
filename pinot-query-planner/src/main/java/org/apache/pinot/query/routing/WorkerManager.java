@@ -40,14 +40,16 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.physical.table.HybridTable;
-import org.apache.pinot.query.planner.physical.table.HybridTableRoute;
-import org.apache.pinot.query.planner.physical.table.PhysicalTableRoute;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
+import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
+import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
+import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -412,21 +414,19 @@ public class WorkerManager {
   private void assignWorkersToNonPartitionedLeafFragmentForPhysicalTable(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    HybridTable hybridTable = HybridTable.from(tableName, _routingManager);
-    HybridTableRoute hybridTableRoute = HybridTableRoute.from(hybridTable, _routingManager,
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + tableName + "\""), context.getRequestId());
-    Preconditions.checkState(!hybridTableRoute.isEmpty(), "Unable to find routing entries for table: %s", tableName);
+    TableRouteProvider tableRouteProvider = ImplicitHybridTableRouteProvider.create(tableName, _routingManager);
+    TableRouteInfo tableRouteInfo = tableRouteProvider.calculateRoutes(_routingManager, context.getRequestId());
 
     // extract all the instances associated to each table type
     // Value is Map<TableType, List<Segments>>
     Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (PhysicalTableRoute physicalTableRoute : hybridTableRoute.getOfflineTableRoutes()) {
-      transferToServerInstanceSegmentsMap(metadata, physicalTableRoute, serverInstanceToSegmentsMap, tableName,
+    if (tableRouteInfo.getOfflineRoutingTable() != null) {
+      transferToServerInstanceSegmentsMap(tableRouteInfo.getOfflineRoutingTable(), serverInstanceToSegmentsMap,
           TableType.OFFLINE.name());
     }
 
-    for (PhysicalTableRoute physicalTableRoute : hybridTableRoute.getRealtimeTableRoutes()) {
-      transferToServerInstanceSegmentsMap(metadata, physicalTableRoute, serverInstanceToSegmentsMap, tableName,
+    if (tableRouteInfo.getRealtimeRoutingTable() != null) {
+      transferToServerInstanceSegmentsMap(tableRouteInfo.getRealtimeRoutingTable(), serverInstanceToSegmentsMap,
           TableType.REALTIME.name());
     }
 
@@ -440,89 +440,29 @@ public class WorkerManager {
     }
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    metadata.addUnavailableSegments(tableName, tableRouteProvider.getUnavailableSegments());
   }
 
-  private static void transferToServerInstanceSegmentsMap(DispatchablePlanMetadata metadata,
-      PhysicalTableRoute physicalTableRoute, Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap,
-      String tableName, String tableType) {
+  private static void transferToServerInstanceSegmentsMap(Map<ServerInstance, ServerRouteInfo> segmentsMap,
+      Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap, String tableType) {
     // for each server instance, attach all table types and their associated segment list.
-    Map<ServerInstance, ServerRouteInfo> segmentsMap = physicalTableRoute.getServerRouteInfoMap();
     for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
       Map<String, List<String>> tableTypeToSegmentListMap =
           serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
       // TODO: support optional segments for multi-stage engine.
       Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
           "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-    }
-
-    // attach unavailable segments to metadata
-    if (!physicalTableRoute.getUnavailableSegments().isEmpty()) {
-      metadata.addUnavailableSegments(tableName, physicalTableRoute.getUnavailableSegments());
     }
   }
 
   private void assignWorkersToNonPartitionedLeafFragmentForLogicalTable(DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
-    // Value is Map<TableName, Map<TableType, List<Segments>>>
-    Map<ServerInstance, Map<String, Map<String, List<String>>>> serverInstanceToLogicalSegmentsMap = new HashMap<>();
-
     String logicalTableName = metadata.getScannedTables().get(0);
-    HybridTable hybridTable = HybridTable.from(metadata.getPhysicalTableNames(), _routingManager);
-    Preconditions.checkState(!hybridTable.isEmpty(), "Unable to find routing entries for table: %s", logicalTableName);
-
-    HybridTableRoute hybridTableRoute = HybridTableRoute.from(hybridTable, _routingManager,
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM \"" + logicalTableName + "\""),
-        context.getRequestId());
-    Preconditions.checkState(!hybridTable.isEmpty(), "Unable to find routing entries for table: %s", logicalTableName);
-
-    String tableType = TableType.OFFLINE.name();
-    for (PhysicalTableRoute physicalTableRoute : hybridTableRoute.getOfflineTableRoutes()) {
-      transferToServerInstanceLogicalSegmentsMap(metadata, physicalTableRoute, tableType,
-          serverInstanceToLogicalSegmentsMap);
-    }
-
-    tableType = TableType.REALTIME.name();
-    for (PhysicalTableRoute physicalTableRoute : hybridTableRoute.getRealtimeTableRoutes()) {
-      transferToServerInstanceLogicalSegmentsMap(metadata, physicalTableRoute, tableType,
-          serverInstanceToLogicalSegmentsMap);
-    }
-
-    int workerId = 0;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, Map<String, List<String>>>> workerIdToLogicalTableSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, Map<String, List<String>>>> entry
-        : serverInstanceToLogicalSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToLogicalTableSegmentsMap.put(workerId, entry.getValue());
-      workerId++;
-    }
-
-    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    metadata.setWorkerIdToLogicalTableSegmentsMap(workerIdToLogicalTableSegmentsMap);
-  }
-
-  private static void transferToServerInstanceLogicalSegmentsMap(DispatchablePlanMetadata metadata,
-      PhysicalTableRoute physicalTableRoute, String tableType,
-      Map<ServerInstance, Map<String, Map<String, List<String>>>> serverInstanceToLogicalSegmentsMap) {
-    Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
-    Map<ServerInstance, ServerRouteInfo> segmentsMap = physicalTableRoute.getServerRouteInfoMap();
-    for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
-      Map<String, List<String>> tableTypeToSegmentListMap =
-          serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-      // TODO: support optional segments for multi-stage engine.
-      Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getSegments()) == null,
-          "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-    }
-
-    if (!physicalTableRoute.getUnavailableSegments().isEmpty()) {
-      metadata.addUnavailableSegments(physicalTableRoute.getTableName(), physicalTableRoute.getUnavailableSegments());
-    }
-
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
-      Map<String, Map<String, List<String>>> logicalTableSegmentsMap =
-          serverInstanceToLogicalSegmentsMap.computeIfAbsent(entry.getKey(), k -> new HashMap<>());
-      logicalTableSegmentsMap.put(physicalTableRoute.getTableName(), entry.getValue());
-    }
+    LogicalTableRouteProvider tableRouteProvider =
+        LogicalTableRouteProvider.create(logicalTableName, metadata.getPhysicalTableNames(), _routingManager);
+    LogicalTableRouteInfo tableRouteInfo =
+        (LogicalTableRouteInfo) tableRouteProvider.calculateRoutes(_routingManager, context.getRequestId());
+    tableRouteInfo.assignWorkersForMSQE(metadata, context);
   }
 
   // --------------------------------------------------------------------------

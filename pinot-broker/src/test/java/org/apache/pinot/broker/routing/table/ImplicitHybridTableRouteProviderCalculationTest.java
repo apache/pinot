@@ -32,6 +32,8 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
+import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
