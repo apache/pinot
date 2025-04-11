@@ -53,9 +53,8 @@ public class PooledByteBufAllocatorWithLimits {
         (int) Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5)));
     boolean useCacheForAllThreads = SystemPropertyUtil.getBoolean("io.netty.allocator.useCacheForAllThreads", false);
 
-    return new PooledByteBufAllocator(true, // preferDirect
-        metric.numHeapArenas(), numDirectArenas, defaultPageSize, defaultMaxOrder, metric.smallCacheSize(),
-        metric.normalCacheSize(), useCacheForAllThreads);
+    return new PooledByteBufAllocator(true, metric.numHeapArenas(), numDirectArenas, defaultPageSize, defaultMaxOrder,
+        metric.smallCacheSize(), metric.normalCacheSize(), useCacheForAllThreads);
   }
 
   //Get reserved direct memory allocated so far
