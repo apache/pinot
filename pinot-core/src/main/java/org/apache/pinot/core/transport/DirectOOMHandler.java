@@ -77,18 +77,20 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
    * Closes and removes all active channels from the map to release direct memory.
    */
   private void closeAllChannels() {
-    LOGGER.warn("OOM detected: Closing all channels to release direct memory");
+    LOGGER.warn("OOM detected: Closing all channels to server to release direct memory");
     for (SocketChannel channel : _allChannels.keySet()) {
       try {
         setSilentShutdown(channel);
-        LOGGER.info("Closing channel: {}", channel);
         if (channel != null) {
+          LOGGER.info("Closing channel: {}", channel);
           channel.close();
         }
       } catch (Exception e) {
         LOGGER.error("Error while closing channel: {}", channel, e);
       } finally {
-        _allChannels.remove(channel);
+        if (channel != null) {
+          _allChannels.remove(channel);
+        }
       }
     }
   }
