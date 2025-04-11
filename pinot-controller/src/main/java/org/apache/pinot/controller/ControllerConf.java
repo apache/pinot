@@ -199,10 +199,10 @@ public class ControllerConf extends PinotConfiguration {
     public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
         "controller.segmentRelocator.rebalanceTablesSequentially";
     public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
-        "controller.segmentRelocator.rebalanceIncludeConsuming";
+        "controller.segmentRelocator.includeConsuming";
     // Available options are: "ENABLE", "DISABLE", "DEFAULT"
     public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
-        "controller.segmentRelocator.rebalanceMinimizeDataMovement";
+        "controller.segmentRelocator.minimizeDataMovement";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
