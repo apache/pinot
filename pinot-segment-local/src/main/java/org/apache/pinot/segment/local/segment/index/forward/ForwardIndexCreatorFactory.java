@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
@@ -51,8 +50,6 @@ public class ForwardIndexCreatorFactory {
       throws Exception {
     if (indexConfig.getConfigs().containsKey(FORWARD_INDEX_CREATOR_CLASS_NAME)) {
       String className = indexConfig.getConfigs().get(FORWARD_INDEX_CREATOR_CLASS_NAME).toString();
-      //FIXME: raghav remove precondition
-      Preconditions.checkNotNull(className, "ForwardIndexCreator class name must be provided");
       return (ForwardIndexCreator) Class.forName(className)
           .getConstructor(IndexCreationContext.class, ForwardIndexConfig.class).newInstance(context, indexConfig);
     }
