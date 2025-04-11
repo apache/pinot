@@ -192,12 +192,13 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           }
           if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
             return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
-                ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
-                + "with disabled")
+                ? RebalancePreCheckerResult.warn(
+                "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden "
+                    + "with disabled")
                 : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
-          return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled but instance assignment is "
-              + "allowed");
+          return RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is not enabled for CONSUMING segments but instance assignment is allowed");
         }
         return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       }
@@ -221,37 +222,40 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()
             && instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
-              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
-              + "with disabled")
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for both COMPLETED and CONSUMING segments in table config but it's "
+                  + "overridden with disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement may not be enabled for consuming or completed, but instance assigment is allowed "
-                + "for both");
+            "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
+                + "assignment is allowed for both");
       } else if (instanceAssignmentConfigConsuming != null) {
         if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
-              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
-              + "with disabled")
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with "
+                  + "disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement is not enabled for consuming segments, but instance assignment is allowed");
+            "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
       } else {
         if (rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == RebalanceConfig.MinimizeDataMovementOptions.DISABLE
-              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled in table config but it's overridden "
-              + "with disabled")
+              ? RebalancePreCheckerResult.warn(
+              "minimizeDataMovement is enabled for COMPLETED segments in table config but it's overridden "
+                  + "with disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement is not enabled for completed segments, but instance assignment is allowed");
+            "minimizeDataMovement is not enabled for COMPLETED segments, but instance assignment is allowed");
       }
     } catch (IllegalStateException e) {
       LOGGER.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
