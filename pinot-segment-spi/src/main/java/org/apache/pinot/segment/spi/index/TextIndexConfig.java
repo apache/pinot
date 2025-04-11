@@ -43,6 +43,15 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY = false;
   private static final DocIdTranslatorMode LUCENE_TRANSLATOR_MODE = null;
 
+  // keep in sync with constructor!
+  private static final List<String> PROPERTY_NAMES = List.of(
+      "disabled", "fst", "rawValue", "queryCache", "useANDForMultiTermQueries", "stopWordsInclude", "stopWordsExclude",
+      "luceneUseCompoundFile", "luceneMaxBufferSizeMB", "luceneAnalyzerClass", "luceneAnalyzerClassArgs",
+      "luceneAnalyzerClassArgTypes", "luceneQueryParserClass", "enablePrefixSuffixMatchingInPhraseQueries",
+      "reuseMutableIndex", "luceneNRTCachingDirectoryMaxBufferSizeMB", "useLogByteSizeMergePolicy",
+      "docIdTranslatorMode"
+  );
+
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
           LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false,
@@ -426,5 +435,9 @@ public class TextIndexConfig extends IndexConfig {
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
         _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode);
+  }
+
+  public static boolean isProperty(String prop) {
+    return PROPERTY_NAMES.contains(prop);
   }
 }
