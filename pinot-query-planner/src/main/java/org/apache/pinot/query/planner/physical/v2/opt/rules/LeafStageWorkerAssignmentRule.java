@@ -225,6 +225,10 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     return new TableScanWorkerAssignmentResult(pinotDataDistribution, workerIdToSegmentsMap);
   }
 
+  /**
+   * Tries to assign workers for the table-scan node to generate a partitioned data distribution. If this is not
+   * possible, we simply return null.
+   */
   @Nullable
   @VisibleForTesting
   static TableScanWorkerAssignmentResult attemptPartitionedDistribution(String tableNameWithType,
