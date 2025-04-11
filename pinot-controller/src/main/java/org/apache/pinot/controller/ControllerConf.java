@@ -198,6 +198,11 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.enableLocalTierMigration";
     public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
         "controller.segmentRelocator.rebalanceTablesSequentially";
+    public static final String SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING =
+        "controller.segmentRelocator.includeConsuming";
+    // Available options are: "ENABLE", "DISABLE", "DEFAULT"
+    public static final String SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT =
+        "controller.segmentRelocator.minimizeDataMovement";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
@@ -800,6 +805,20 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
   }
 
+  public boolean isSegmentRelocatorIncludingConsuming() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_INCLUDE_CONSUMING, false);
+  }
+
+  public RebalanceConfig.MinimizeDataMovementOptions getSegmentRelocatorRebalanceMinimizeDataMovement() {
+    String value = getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_MINIMIZE_DATA_MOVEMENT,
+        RebalanceConfig.MinimizeDataMovementOptions.ENABLE.name());
+    try {
+      return RebalanceConfig.MinimizeDataMovementOptions.valueOf(value.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      return RebalanceConfig.MinimizeDataMovementOptions.ENABLE;
+    }
+  }
+
   public boolean tieredSegmentAssignmentEnabled() {
     return getProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, false);
   }
@@ -1108,7 +1127,6 @@ public class ControllerConf extends PinotConfiguration {
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
     setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
   }
-
 
   public long getPinotTaskManagerInitialDelaySeconds() {
     return getPeriodicTaskInitialDelayInSeconds();
