@@ -47,8 +47,8 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   private final ServerRoutingInstance _serverRoutingInstance;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> _serverToChannelMap;
   private volatile boolean _silentShutDown = false;
-  private ConcurrentHashMap<SocketChannel, Boolean> _allChannels;
-  private ServerSocketChannel _serverSocketChannel;
+  private final ConcurrentHashMap<SocketChannel, Boolean> _allChannels;
+  private final ServerSocketChannel _serverSocketChannel;
 
   public DirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
       ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap,
