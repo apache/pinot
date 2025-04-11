@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.CaseFormat;
@@ -8,8 +26,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
@@ -25,7 +44,7 @@ import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 
 
 /**
- * Filter operator for Map matching that internally uses JsonMatchFilterOperator.
+ * Filter operator for Map matching that internally uses JsonMatchFilterOperator or ExpressionFilterOperator.
  * This operator converts map predicates to JSON predicates and delegates filtering operations
  * to JsonMatchFilterOperator.
  */
@@ -59,7 +78,7 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     if (dataSource instanceof MapDataSource) {
       MapDataSource mapDS = (MapDataSource) dataSource;
       MapIndexReader mapIndexReader = mapDS.getMapIndex();
-      if (mapIndexReader != null) {
+      if (mapIndexReader != null && useJsonIndex(_predicate.getType())) {
         Map<IndexType, IndexReader> indexes = mapIndexReader.getKeyIndexes(_keyName);
         JsonIndexReader jsonIndex = (JsonIndexReader) indexes.get(StandardIndexes.json());
         _jsonMatchPredicate = createJsonMatchPredicate();
@@ -84,64 +103,25 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
     String jsonValue;
     switch (_predicate.getType()) {
       case EQ:
-        jsonValue = createJsonPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
+        jsonValue = createJsonEqPredicateValue(_keyName, ((EqPredicate) _predicate).getValue());
+        break;
+      case NOT_EQ:
+        jsonValue = createJsonNotEqPredicateValue(_keyName, ((NotEqPredicate) _predicate).getValue());
         break;
       case IN:
-        jsonValue = createJsonArrayPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
+        jsonValue = createJsonInPredicateValue(_keyName, ((InPredicate) _predicate).getValues());
         break;
-      case RANGE:
-        RangePredicate rangePredicate = (RangePredicate) _predicate;
-        jsonValue =
-            createJsonRangePredicateValue(_keyName, rangePredicate.getLowerBound(), rangePredicate.getUpperBound(),
-                rangePredicate.isLowerInclusive(), rangePredicate.isUpperInclusive());
+      case NOT_IN:
+        jsonValue = createJsonNotInPredicateValue(_keyName, ((NotInPredicate) _predicate).getValues());
         break;
       default:
-        throw new IllegalStateException("Unsupported predicate type for map index: " + _predicate.getType());
+        throw new IllegalStateException(
+            "Unsupported predicate type for creating json match predicate: " + _predicate.getType());
     }
 
     // Create identifier expression for the JSON column
     ExpressionContext jsonLhs = ExpressionContext.forIdentifier("json");
     return new JsonMatchPredicate(jsonLhs, jsonValue);
-  }
-
-  /**
-   * Initializes the JsonMatchFilterOperator with the given JsonIndexReader
-   */
-  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex, int numDocs) {
-    return new JsonMatchFilterOperator(jsonIndex, _jsonMatchPredicate, numDocs);
-  }
-
-  private String createJsonPredicateValue(String key, String value) {
-    return String.format("%s = %s", key, value);
-  }
-
-  private String createJsonArrayPredicateValue(String key, List<String> values) {
-    StringBuilder valuesStr = new StringBuilder();
-    for (int i = 0; i < values.size(); i++) {
-        if (i > 0) {
-            valuesStr.append(", ");
-        }
-        valuesStr.append("''").append(values.get(i)).append("''");
-    }
-    // Format: '"$[0].key" IN (''value1'', ''value2'')'
-    return String.format("\"$[0].%s\" IN (%s)", key, valuesStr);
-  }
-
-  private String createJsonRangePredicateValue(String key, String lower, String upper, 
-                                             boolean lowerInclusive, boolean upperInclusive) {
-    StringBuilder predicate = new StringBuilder();
-    if (lower != null) {
-        predicate.append(String.format("\"$[0].%s\" %s ''%s''", 
-            key, lowerInclusive ? ">=" : ">", lower));
-    }
-    if (lower != null && upper != null) {
-        predicate.append(" AND ");
-    }
-    if (upper != null) {
-        predicate.append(String.format("\"$[0].%s\" %s ''%s''", 
-            key, upperInclusive ? "<=" : "<", upper));
-    }
-    return predicate.toString();
   }
 
   @Override
@@ -232,16 +212,73 @@ public class MapIndexFilterOperator extends BaseFilterOperator {
   }
 
   /**
+   * Initializes the JsonMatchFilterOperator with the given JsonIndexReader
+   */
+  private JsonMatchFilterOperator initializeJsonMatchFilterOperator(JsonIndexReader jsonIndex, int numDocs) {
+    return new JsonMatchFilterOperator(jsonIndex, _jsonMatchPredicate, numDocs);
+  }
+
+  private String createJsonEqPredicateValue(String key, String value) {
+    return String.format("%s = %s", key, value);
+  }
+
+  private String createJsonNotEqPredicateValue(String key, String value) {
+    return String.format("%s != %s", key, value);
+  }
+
+  private String createJsonInPredicateValue(String key, List<String> values) {
+    StringBuilder valuesStr = new StringBuilder();
+    for (int i = 0; i < values.size(); i++) {
+      if (i > 0) {
+        valuesStr.append(", ");
+      }
+      valuesStr.append(values.get(i));
+    }
+    // Format: '"key" IN (value1, value2)'
+    return String.format("%s IN (%s)", key, valuesStr);
+  }
+
+  private String createJsonNotInPredicateValue(String key, List<String> values) {
+    StringBuilder valuesStr = new StringBuilder();
+    for (int i = 0; i < values.size(); i++) {
+      if (i > 0) {
+        valuesStr.append(", ");
+      }
+      valuesStr.append(values.get(i));
+    }
+    // Format: '"key" NOT IN (value1, value2)'
+    return String.format("%s NOT IN (%s)", key, valuesStr);
+  }
+
+  /**
    * Cleans the key by removing leading and trailing single quotes if present.
    *
    * @param key The original key string
    * @return The cleaned key string
    */
-  public static String cleanKey(String key) {
+  private static String cleanKey(String key) {
     String cleanKey = key;
     if (cleanKey.startsWith("'") && cleanKey.endsWith("'")) {
       cleanKey = cleanKey.substring(1, cleanKey.length() - 1);
     }
     return cleanKey;
+  }
+
+  /**
+   * Determines whether to use JSON index for the given predicate type.
+   *
+   * @param predicateType The type of predicate
+   * @return true if the predicate type is supported for JSON index, false otherwise
+   */
+  private boolean useJsonIndex(Predicate.Type predicateType) {
+    switch (predicateType) {
+      case EQ:
+      case NOT_EQ:
+      case IN:
+      case NOT_IN:
+        return true;
+      default:
+        return false;
+    }
   }
 }
