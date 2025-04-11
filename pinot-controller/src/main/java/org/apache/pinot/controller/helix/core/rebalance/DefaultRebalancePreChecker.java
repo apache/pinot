@@ -74,9 +74,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     String tableNameWithType = preCheckContext.getTableNameWithType();
     TableConfig tableConfig = preCheckContext.getTableConfig();
     RebalanceConfig rebalanceConfig = preCheckContext.getRebalanceConfig();
-    Logger tableRebalanceLogger = LoggerFactory.getLogger(LOGGER.getName() + "_" + rebalanceJobId);
+    Logger tableRebalanceLogger =
+        LoggerFactory.getLogger(getClass().getSimpleName() + '-' + tableNameWithType + '-' + rebalanceJobId);
 
-    tableRebalanceLogger.info("Start pre-checks for table: {}", tableNameWithType);
+    tableRebalanceLogger.info("Start pre-checks");
 
     Map<String, RebalancePreCheckerResult> preCheckResult = new HashMap<>();
     // Check for reload status
@@ -99,7 +100,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     preCheckResult.put(REBALANCE_CONFIG_OPTIONS, checkRebalanceConfig(rebalanceConfig, tableConfig,
         preCheckContext.getCurrentAssignment(), preCheckContext.getTargetAssignment()));
 
-    tableRebalanceLogger.info("End pre-checks for table: {}", tableNameWithType);
+    tableRebalanceLogger.info("End pre-checks");
     return preCheckResult;
   }
 
@@ -111,11 +112,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    */
   private RebalancePreCheckerResult checkReloadNeededOnServers(String rebalanceJobId, String tableNameWithType,
       Map<String, Map<String, String>> currentAssignment, Logger tableRebalanceLogger) {
-    tableRebalanceLogger.info("Fetching whether reload is needed for table: {}", tableNameWithType);
+    tableRebalanceLogger.info("Fetching whether reload is needed");
     Boolean needsReload = null;
     if (_executorService == null) {
-      tableRebalanceLogger.warn("Executor service is null, skipping needsReload check for table: {}",
-          tableNameWithType);
+      tableRebalanceLogger.warn("Executor service is null, skipping needsReload check");
       return RebalancePreCheckerResult.error("Could not determine needReload status, run needReload API manually");
     }
     try (PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager()) {
@@ -130,9 +130,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       Map<String, JsonNode> needsReloadMetadata = needsReloadMetadataPair.getServerReloadJsonResponses();
       int failedResponses = needsReloadMetadataPair.getNumFailedResponses();
       tableRebalanceLogger.info(
-          "Received {} needs reload responses and {} failed responses from servers for table: {} with "
+          "Received {} needs reload responses and {} failed responses from servers with "
               + "number of servers queried: {}", needsReloadMetadata.size(), failedResponses,
-          tableNameWithType, currentlyAssignedServers.size());
+          currentlyAssignedServers.size());
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
         tableRebalanceLogger.warn(
@@ -155,7 +155,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
    */
   private RebalancePreCheckerResult checkIsMinimizeDataMovement(String rebalanceJobId, String tableNameWithType,
       TableConfig tableConfig, RebalanceConfig rebalanceConfig, Logger tableRebalanceLogger) {
-    tableRebalanceLogger.info("Checking whether minimizeDataMovement is set for table: {}", tableNameWithType);
+    tableRebalanceLogger.info("Checking whether minimizeDataMovement is set");
     try {
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         boolean isInstanceAssignmentAllowed = InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig,
