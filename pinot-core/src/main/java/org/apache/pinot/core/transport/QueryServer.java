@@ -138,7 +138,8 @@ public class QueryServer {
             protected void initChannel(SocketChannel ch) {
               _allChannels.put(ch, true);
 
-              ch.pipeline().addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
+              ch.pipeline()
+                  .addLast(ChannelHandlerFactory.getDirectOOMHandler(null, null, null, _allChannels, _channel));
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
                 ch.pipeline()
