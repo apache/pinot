@@ -41,6 +41,7 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
   NETTY_POOLED_ARENAS_DIRECT("arenas", true),
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  RESERVED_DIRECT_MEMORY("bytes", true),
 
   /**
    * The size of the small cache.

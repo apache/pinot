@@ -53,6 +53,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
   NETTY_POOLED_ARENAS_DIRECT("arenas", true),
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  RESERVED_DIRECT_MEMORY("bytes", true),
   STREAM_DATA_LOSS("streamDataLoss", false),
 
   // Segment operation throttle metrics - threshold is the upper limit of the throttle and is set whenever the

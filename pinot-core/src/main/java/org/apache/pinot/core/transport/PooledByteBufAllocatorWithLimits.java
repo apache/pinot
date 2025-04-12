@@ -38,16 +38,16 @@ public class PooledByteBufAllocatorWithLimits {
   private PooledByteBufAllocatorWithLimits() {
   }
 
-  // Allocate 1/5th of unused offheap memory to direct buffer allocators when using netty channels on broker and
-  // server side
-  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
+  // Reduce the number of direct arenas when using netty channels on broker and server side to limit the direct
+  // memory usage
+  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric,
+      long reservedMemory) {
     int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
     final int defaultMinNumArena = NettyRuntime.availableProcessors() * 2;
     int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 9);
     final int defaultChunkSize = defaultPageSize << defaultMaxOrder;
     long maxDirectMemory = PlatformDependent.maxDirectMemory();
-    long usedDirectMemory = getReservedMemory();
-    long remainingDirectMemory = maxDirectMemory - usedDirectMemory;
+    long remainingDirectMemory = maxDirectMemory - reservedMemory;
 
     int numDirectArenas = Math.max(0, SystemPropertyUtil.getInt("io.netty.allocator.numDirectArenas",
         (int) Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5)));
@@ -55,19 +55,5 @@ public class PooledByteBufAllocatorWithLimits {
 
     return new PooledByteBufAllocator(true, metric.numHeapArenas(), numDirectArenas, defaultPageSize, defaultMaxOrder,
         metric.smallCacheSize(), metric.normalCacheSize(), useCacheForAllThreads);
-  }
-
-  //Get reserved direct memory allocated so far
-  private static long getReservedMemory() {
-    try {
-      Class<?> bitsClass = Class.forName("java.nio.Bits");
-      Field reservedMemoryField = bitsClass.getDeclaredField("RESERVED_MEMORY");
-      reservedMemoryField.setAccessible(true);
-      AtomicLong reserved = (AtomicLong) reservedMemoryField.get(null);
-      return reserved.get();
-    } catch (Exception e) {
-      LOGGER.error("Failed to get the direct reserved memory");
-      return 0;
-    }
   }
 }
