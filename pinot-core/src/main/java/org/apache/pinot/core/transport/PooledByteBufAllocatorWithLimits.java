@@ -25,7 +25,6 @@ import io.netty.util.NettyRuntime;
 import io.netty.util.internal.PlatformDependent;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

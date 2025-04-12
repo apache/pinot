@@ -42,7 +42,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.util.OsCheck;
@@ -170,24 +169,6 @@ public class QueryServer {
     } finally {
       _workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
       _bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
-    }
-  }
-
-  //Get reserved direct memory allocated so far
-  private static long getReservedMemory() {
-    try {
-      Class<?> bitsClass = Class.forName("java.nio.Bits");
-      Field reservedMemoryField = bitsClass.getDeclaredField("RESERVED_MEMORY");
-      reservedMemoryField.setAccessible(true);
-      AtomicLong reserved = (AtomicLong) reservedMemoryField.get(null);
-      long reservedMemory = reserved.get();
-      ServerMetrics metrics = ServerMetrics.get();
-      LOGGER.info("Reserved memory so far: {} bytes", reservedMemory);
-      metrics.setOrUpdateGauge(String.valueOf(ServerGauge.RESERVED_DIRECT_MEMORY), reservedMemory);
-      return reservedMemory;
-    } catch (Exception e) {
-      LOGGER.error("Failed to get the direct reserved memory");
-      return 0;
     }
   }
 
