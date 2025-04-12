@@ -25,6 +25,7 @@ import io.netty.util.NettyRuntime;
 import io.netty.util.internal.PlatformDependent;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.common.metrics.BrokerGauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,14 +41,13 @@ public class PooledByteBufAllocatorWithLimits {
 
   // Reduce the number of direct arenas when using netty channels on broker and server side to limit the direct
   // memory usage
-  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric,
-      long reservedMemory) {
+  public static PooledByteBufAllocator getBufferAllocatorWithLimits(PooledByteBufAllocatorMetric metric) {
     int defaultPageSize = SystemPropertyUtil.getInt("io.netty.allocator.pageSize", 8192);
     final int defaultMinNumArena = NettyRuntime.availableProcessors() * 2;
     int defaultMaxOrder = SystemPropertyUtil.getInt("io.netty.allocator.maxOrder", 9);
     final int defaultChunkSize = defaultPageSize << defaultMaxOrder;
     long maxDirectMemory = PlatformDependent.maxDirectMemory();
-    long remainingDirectMemory = maxDirectMemory - reservedMemory;
+    long remainingDirectMemory = maxDirectMemory - getReservedMemory();
 
     int numDirectArenas = Math.max(0, SystemPropertyUtil.getInt("io.netty.allocator.numDirectArenas",
         (int) Math.min(defaultMinNumArena, remainingDirectMemory / defaultChunkSize / 5)));
@@ -55,5 +55,19 @@ public class PooledByteBufAllocatorWithLimits {
 
     return new PooledByteBufAllocator(true, metric.numHeapArenas(), numDirectArenas, defaultPageSize, defaultMaxOrder,
         metric.smallCacheSize(), metric.normalCacheSize(), useCacheForAllThreads);
+  }
+
+  //Get reserved direct memory allocated so far
+  private static long getReservedMemory() {
+    try {
+      Class<?> bitsClass = Class.forName("java.nio.Bits");
+      Field reservedMemoryField = bitsClass.getDeclaredField("RESERVED_MEMORY");
+      reservedMemoryField.setAccessible(true);
+      AtomicLong reserved = (AtomicLong) reservedMemoryField.get(null);
+      return reserved.get();
+    } catch (Exception e) {
+      LOGGER.error("Failed to get the direct reserved memory");
+      return 0;
+    }
   }
 }

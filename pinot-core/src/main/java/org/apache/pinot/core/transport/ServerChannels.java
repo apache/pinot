@@ -162,7 +162,7 @@ public class ServerChannels {
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
       PooledByteBufAllocator bufAllocatorWithLimits =
-          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric, getReservedMemory());
+          PooledByteBufAllocatorWithLimits.getBufferAllocatorWithLimits(metric);
       metric = bufAllocatorWithLimits.metric();
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
@@ -261,23 +261,6 @@ public class ServerChannels {
       } else {
         throw new TimeoutException(CHANNEL_LOCK_TIMEOUT_MSG);
       }
-    }
-  }
-
-  //Get reserved direct memory allocated so far
-  private long getReservedMemory() {
-    try {
-      Class<?> bitsClass = Class.forName("java.nio.Bits");
-      Field reservedMemoryField = bitsClass.getDeclaredField("RESERVED_MEMORY");
-      reservedMemoryField.setAccessible(true);
-      AtomicLong reserved = (AtomicLong) reservedMemoryField.get(null);
-      long reservedMemory = reserved.get();
-      LOGGER.info("Reserved memory so far is {} bytes", reservedMemory);
-      _brokerMetrics.setOrUpdateGauge(String.valueOf(BrokerGauge.RESERVED_DIRECT_MEMORY), reservedMemory);
-      return reservedMemory;
-    } catch (Exception e) {
-      LOGGER.error("Failed to get the direct reserved memory");
-      return 0;
     }
   }
 }
