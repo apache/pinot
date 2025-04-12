@@ -19,6 +19,7 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
@@ -103,7 +104,9 @@ public class ChannelHandlerFactory {
   }
 
   public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
-      ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap) {
-    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap);
+      ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap,
+      ConcurrentHashMap<SocketChannel, Boolean> allChannels, ServerSocketChannel serverSocketChannel) {
+    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap, allChannels,
+        serverSocketChannel);
   }
 }
