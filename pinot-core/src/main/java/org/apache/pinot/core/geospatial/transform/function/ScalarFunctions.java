@@ -38,6 +38,13 @@ public class ScalarFunctions {
   }
 
   /**
+   * Maximum number of cells that can be returned by the gridDisk function. This is configurable via the system property
+   * "pinot.geospatial.gridDisk.maxCells". Default value is 100,000 cells.
+   */
+  public static final int MAX_GRID_DISK_CELLS = Integer.parseInt(
+      System.getProperty("pinot.geospatial.gridDisk.maxCells", "100000"));
+
+  /**
    * Creates a point.
    *
    * @param x x
@@ -279,7 +286,26 @@ public class ScalarFunctions {
    */
   @ScalarFunction
   public static long[] gridDisk(long origin, int k) {
+    // Estimate the number of cells before computing the grid disk
+    // The formula for number of cells in a grid disk is: 3k(k+1) + 1
+    // This is an approximation that doesn't account for pentagons, but is a good estimate
+    long estimatedCells = 3L * k * (k + 1) + 1;
+    if (estimatedCells > MAX_GRID_DISK_CELLS) {
+      throw new IllegalArgumentException(String.format(
+          "gridDisk operation would return approximately %d cells, which exceeds the configured limit of %d. "
+              + "Increase the limit by setting the system property 'pinot.geospatial.gridDisk.maxCells' "
+              + "or use a smaller radius.", estimatedCells, MAX_GRID_DISK_CELLS));
+    }
+
     List<Long> diskCells = H3Utils.H3_CORE.gridDisk(origin, k);
+
+
+    if (diskCells.size() > MAX_GRID_DISK_CELLS) {
+      throw new IllegalArgumentException(String.format(
+          "gridDisk operation returned %d cells, which exceeds the configured limit of %d. "
+              + "Increase the limit by setting the system property 'pinot.geospatial.gridDisk.maxCells' "
+              + "or use a smaller radius.", diskCells.size(), MAX_GRID_DISK_CELLS));
+    }
     long[] result = new long[diskCells.size()];
     int index = 0;
     for (Long cell : diskCells) {
