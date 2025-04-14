@@ -145,7 +145,6 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, _tableRebalanceProgressStats);
         if (!_tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep().equals(latestProgress)) {
           _tableRebalanceProgressStats.setRebalanceProgressStatsCurrentStep(latestProgress);
-          emitProgressMetric(latestProgress);
           trackStatsInZk();
           updatedStatsInZk = true;
         }
@@ -244,6 +243,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
    * @param overallProgress the latest overall progress
    */
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
+    // Using the original job ID to group rebalance retries together with the same label
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
         ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
         (long) overallProgress._percentageRemainingSegmentsToBeAdded * 100);
