@@ -103,4 +103,14 @@ public class PhysicalAggregate extends Aggregate implements PRelNode {
         getAggCallList(), newNodeId, newInputs.get(0), newDistribution, _leafStage, _aggType, _leafReturnFinalResult,
         _collations, _limit);
   }
+
+  @Override
+  public PhysicalAggregate asLeafStage() {
+    if (isLeafStage()) {
+      return this;
+    }
+    return new PhysicalAggregate(getCluster(), getTraitSet(), getHints(), getGroupSet(), getGroupSets(),
+        getAggCallList(), _nodeId, _pRelInputs.get(0), _pinotDataDistribution, true, _aggType, _leafReturnFinalResult,
+        _collations, _limit);
+  }
 }
