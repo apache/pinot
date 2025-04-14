@@ -955,7 +955,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  static String getRoutingPolicy(TableConfig tableConfig) {
+  private static String getRoutingPolicy(TableConfig tableConfig) {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig == null) {
       return RoutingConfig.DEFAULT_INSTANCE_SELECTOR_TYPE;
@@ -983,7 +983,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return brokerResponse;
   }
 
-  void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
+  private void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
     if (tableConfig == null || tableConfig.getFieldConfigList() == null) {
       return;
     }
@@ -1021,12 +1021,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */
-  boolean isFilterAlwaysFalse(PinotQuery pinotQuery) {
+  private boolean isFilterAlwaysFalse(PinotQuery pinotQuery) {
     return FALSE.equals(pinotQuery.getFilterExpression());
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to true. */
-  boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
+  private boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
     return TRUE.equals(pinotQuery.getFilterExpression());
   }
 
@@ -1432,7 +1432,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * Verifies that no groovy is present in the PinotQuery when disabled.
    */
   @VisibleForTesting
-  private static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
+  static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
       validateGroovyScript(expression, disableGroovy);
@@ -1863,7 +1863,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * 5. BrokerConfig -> maxServerResponseSizeBytes
    * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
-  void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
+  private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
       @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
@@ -1933,7 +1933,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   /**
    * Helper method to attach the time boundary to the given PinotQuery.
    */
-  static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo, boolean isOfflineRequest) {
+  private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo, boolean isOfflineRequest) {
     String functionName = isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name();
     String timeColumn = timeBoundaryInfo.getTimeColumn();
     String timeValue = timeBoundaryInfo.getTimeValue();
