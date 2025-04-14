@@ -266,7 +266,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
           }
 
           if (allIdsAreEqual) {
-            LOGGER.error("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
+            LOGGER.debug("Lucene doc ids are equal to Pinot's. Deleting mapping and updating index settings.");
             // TODO: it'd be better to unmap without flushing the buffer. Only some buffer types support it, though.
             buffer.close();
             buffer = null;
