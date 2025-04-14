@@ -154,14 +154,4 @@ public enum QueryErrorCode {
         return false;
     }
   }
-
-  public boolean isIncludeStackTrace() {
-    switch (this) {
-      case INTERNAL:
-      case UNKNOWN:
-        return true;
-      default:
-        return false;
-    }
-  }
 }
