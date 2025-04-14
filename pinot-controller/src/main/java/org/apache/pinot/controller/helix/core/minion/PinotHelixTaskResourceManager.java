@@ -542,6 +542,7 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized Map<String, String> getTaskRuntimeConfig(String taskName) {
     JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    Preconditions.checkArgument(jobConfig != null, "Task: %s does not exist", taskName);
     HashMap<String, String> configs = new HashMap<>();
     configs.put("ConcurrentTasksPerWorker", String.valueOf(jobConfig.getNumConcurrentTasksPerInstance()));
     configs.put("TaskTimeoutMs", String.valueOf(jobConfig.getTimeoutPerTask()));
@@ -961,7 +962,11 @@ public class PinotHelixTaskResourceManager {
    * @return Task type
    */
   private static String getTaskType(String name) {
-    return name.split(TASK_NAME_SEPARATOR)[1];
+    String[] parts = name.split(TASK_NAME_SEPARATOR);
+    if (parts.length < 2) {
+      throw new IllegalArgumentException("Invalid task name (missing separator): " + name);
+    }
+    return parts[1];
   }
 
   public String getParentTaskName(String taskType, String taskName) {
