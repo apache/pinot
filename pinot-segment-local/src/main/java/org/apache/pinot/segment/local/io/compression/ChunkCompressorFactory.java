@@ -71,6 +71,12 @@ public class ChunkCompressorFactory {
       case GZIP:
         return new GzipCompressor();
 
+      case DELTA:
+        return DeltaCompressor.INSTANCE;
+
+      case DELTADELTA:
+        return DeltaDeltaCompressor.INSTANCE;
+
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
     }
@@ -102,8 +108,14 @@ public class ChunkCompressorFactory {
       case GZIP:
         return new GzipDecompressor();
 
+      case DELTA:
+        return DeltaDecompressor.INSTANCE;
+
+      case DELTADELTA:
+        return DeltaDeltaDecompressor.INSTANCE;
+
       default:
-        throw new IllegalArgumentException("Illegal compressor name " + compressionType);
+        throw new IllegalArgumentException("Illegal decompressor name " + compressionType);
     }
   }
 }
