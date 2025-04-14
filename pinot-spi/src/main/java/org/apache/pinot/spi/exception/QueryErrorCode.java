@@ -57,7 +57,6 @@ public enum QueryErrorCode {
   UNKNOWN_COLUMN(710, "UnknownColumnError"),
   ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError"),
-  ///  Query already errored out.
   UNKNOWN(1000, "UnknownError");
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
