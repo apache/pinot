@@ -1038,6 +1038,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     boolean useMSE = QueryOptionsUtils.isUseMSEToFillEmptySchema(
         pinotQuery.getQueryOptions(), _useMSEToFillEmptyResponseSchema);
     ParserUtils.fillEmptyResponseSchema(useMSE, brokerResponse, _tableCache, schema, database, query);
+    // at least return an empty result table
+    if (brokerResponse.getResultTable() == null) {
+      brokerResponse.setResultTable(new ResultTable(null, List.of()));
+    }
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse,
