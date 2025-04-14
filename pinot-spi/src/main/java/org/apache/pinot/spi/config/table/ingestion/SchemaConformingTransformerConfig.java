@@ -89,6 +89,9 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Array of paths to exclude from merged text index.")
   private Set<String> _mergedTextIndexPathToExclude = new HashSet<>();
 
+  @JsonPropertyDescription("Array of flattened (dot-delimited) path prefix to exclude from merged text index.")
+  private Set<String> _mergedTextIndexPrefixToExclude = new HashSet<>();
+
   @JsonPropertyDescription("Anchor before merged text index value. Default is empty String")
   private String _mergedTextIndexBeginOfDocAnchor = "";
 
@@ -127,6 +130,7 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
       @JsonProperty("mergedTextIndexBinaryDocumentDetectionMinLength")
       @Nullable Integer mergedTextIndexBinaryDocumentDetectionMinLength,
       @JsonProperty("mergedTextIndexPathToExclude") @Nullable Set<String> mergedTextIndexPathToExclude,
+      @JsonProperty("mergedTextIndexPrefixToExclude") @Nullable Set<String> mergedTextIndexPrefixToExclude,
       @JsonProperty("fieldsToDoubleIngest") @Nullable Set<String> fieldsToDoubleIngest,
       @JsonProperty("jsonKeyValueSeparator") @Nullable String jsonKeyValueSeparator,
       @JsonProperty("mergedTextIndexBeginOfDocAnchor") @Nullable String mergedTextIndexBeginOfDocAnchor,
@@ -152,6 +156,7 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
         ? mergedTextIndexBinaryTokenDetectionMinLength : mergedTextIndexBinaryDocumentDetectionMinLength;
     setMergedTextIndexBinaryDocumentDetectionMinLength(mergedTextIndexBinaryDocumentDetectionMinLength);
     setMergedTextIndexPathToExclude(mergedTextIndexPathToExclude);
+    setMergedTextIndexPrefixToExclude(mergedTextIndexPrefixToExclude);
     setFieldsToDoubleIngest(fieldsToDoubleIngest);
     setJsonKeyValueSeparator(jsonKeyValueSeparator);
     setMergedTextIndexBeginOfDocAnchor(mergedTextIndexBeginOfDocAnchor);
@@ -323,6 +328,16 @@ public class SchemaConformingTransformerConfig extends BaseJsonConfig {
   public SchemaConformingTransformerConfig setMergedTextIndexPathToExclude(Set<String> mergedTextIndexPathToExclude) {
     _mergedTextIndexPathToExclude = mergedTextIndexPathToExclude == null
         ? _mergedTextIndexPathToExclude : mergedTextIndexPathToExclude;
+    return this;
+  }
+
+  public Set<String> getMergedTextIndexPrefixToExclude() {
+    return _mergedTextIndexPrefixToExclude;
+  }
+
+  public SchemaConformingTransformerConfig setMergedTextIndexPrefixToExclude(Set<String> mergedTextIndexPrefixToExclude) {
+    _mergedTextIndexPrefixToExclude = mergedTextIndexPrefixToExclude == null
+        ? _mergedTextIndexPathToExclude : mergedTextIndexPrefixToExclude;
     return this;
   }
 
