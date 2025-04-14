@@ -287,6 +287,11 @@ public class PrioritySchedulerTest {
     }
 
     @Override
+    public InstanceDataManager getInstanceDataManager() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void start() {
     }
 

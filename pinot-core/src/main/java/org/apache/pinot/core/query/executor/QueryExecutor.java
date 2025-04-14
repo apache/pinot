@@ -40,6 +40,8 @@ public interface QueryExecutor {
   void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException;
 
+  InstanceDataManager getInstanceDataManager();
+
   /**
    * Starts the query executor.
    * <p>Should be called only once after query executor gets initialized but before calling any other method.

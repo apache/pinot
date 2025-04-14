@@ -36,6 +36,14 @@ public interface JsonIndexReader extends IndexReader {
   MutableRoaringBitmap getMatchingDocIds(String filterString);
 
   /**
+   * Returns the matching document ids for the given filter.
+   * @param flatDocCountFilter predicate used to filter results based on number of matched flattened document
+   */
+  default MutableRoaringBitmap getMatchingDocIds(String documentFilter, String flatDocCountFilter) {
+    return getMatchingDocIds(documentFilter);
+  }
+
+  /**
    * For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
    * @param docIds array of docIds
    * @param length length of the array

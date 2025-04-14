@@ -18,20 +18,30 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,9 +78,20 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(TransferableBlock block)
+  public void send(MseBlock.Data data)
+      throws IOException, TimeoutException {
+    sendInternal(data, List.of());
+  }
+
+  @Override
+  public void send(MseBlock.Eos block, List<DataBuffer> serializedStats)
+      throws IOException, TimeoutException {
+    sendInternal(block, serializedStats);
+  }
+
+  private void sendInternal(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
-    if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
+    if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
       return;
@@ -81,7 +102,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    _contentObserver.onNext(toMailboxContent(block));
+    _contentObserver.onNext(toMailboxContent(block, serializedStats));
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== message " + block + " sent to: " + _id);
     }
@@ -110,8 +131,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-      _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-          new RuntimeException("Cancelled by sender with exception: " + msg, t))));
+      _contentObserver.onNext(toMailboxContent(
+          ErrorMseBlock.fromException(new RuntimeException("Cancelled by sender with exception: " + msg, t)),
+          List.of()));
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -135,12 +157,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
         .open(_statusObserver);
   }
 
-  private MailboxContent toMailboxContent(TransferableBlock block)
+  private MailboxContent toMailboxContent(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
     try {
-      DataBlock dataBlock = block.getDataBlock();
+      DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
       ByteString byteString = DataBlockUtils.toByteString(dataBlock);
       int sizeInBytes = byteString.size();
       if (LOGGER.isDebugEnabled()) {
@@ -159,5 +181,53 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public String toString() {
     return "g" + _id;
+  }
+
+  private static class MseBlockSerializer implements MseBlock.Visitor<DataBlock, List<DataBuffer>> {
+    private static final MseBlockSerializer INSTANCE = new MseBlockSerializer();
+
+    public static DataBlock toDataBlock(MseBlock block, List<DataBuffer> serializedStats)
+        throws IOException {
+      return block.accept(INSTANCE, serializedStats);
+    }
+
+    @Override
+    public DataBlock visit(RowHeapDataBlock block, List<DataBuffer> serializedStats) {
+      // this is already guaranteed by the SendingMailbox.send(MseBlock.Data) signature, but just to be sure...
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        throw new UnsupportedOperationException("Cannot serialize stats with RowHeapDataBlock");
+      }
+      return block.asSerialized().getDataBlock();
+    }
+
+    @Override
+    public DataBlock visit(SerializedDataBlock block, List<DataBuffer> serializedStats) {
+      // this is already guaranteed by the SendingMailbox.send(MseBlock.Data) signature, but just to be sure...
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        throw new UnsupportedOperationException("Cannot serialize stats with SerializedDataBlock");
+      }
+      return block.getDataBlock();
+    }
+
+    @Override
+    public DataBlock visit(SuccessMseBlock block, List<DataBuffer> serializedStats) {
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        return MetadataBlock.newEosWithStats(serializedStats);
+      } else {
+        return MetadataBlock.newEos();
+      }
+    }
+
+    @Override
+    public DataBlock visit(ErrorMseBlock block, List<DataBuffer> serializedStats) {
+      Map<QueryErrorCode, String> errorMessagesByCode = block.getErrorMessages();
+      Map<Integer, String> errorMessagesByInt = Maps.newHashMapWithExpectedSize(errorMessagesByCode.size());
+      errorMessagesByCode.forEach((code, message) -> errorMessagesByInt.put(code.getId(), message));
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        return MetadataBlock.newErrorWithStats(errorMessagesByInt, serializedStats);
+      } else {
+        return MetadataBlock.newError(errorMessagesByInt);
+      }
+    }
   }
 }

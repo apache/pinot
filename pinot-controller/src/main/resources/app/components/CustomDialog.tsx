@@ -64,6 +64,7 @@ type Props = {
   btnOkText?: string,
   showCancelBtn?: boolean,
   showOkBtn?: boolean,
+  okBtnDisabled?: boolean,
   size?: false | "xs" | "sm" | "md" | "lg" | "xl",
   disableBackdropClick?: boolean,
   disableEscapeKeyDown?: boolean,
@@ -82,6 +83,7 @@ export default function CustomDialog({
   btnOkText,
   showCancelBtn = true,
   showOkBtn = true,
+  okBtnDisabled,
   size,
   disableBackdropClick = false,
   disableEscapeKeyDown = false,
@@ -116,7 +118,7 @@ export default function CustomDialog({
         </CancelButton>}
         {moreActions}
         {showOkBtn &&
-        <Button onClick={handleSave} variant="contained" style={{ textTransform: 'none' }} color="primary">
+        <Button disabled={okBtnDisabled} onClick={handleSave} variant="contained" style={{ textTransform: 'none' }} color="primary">
           {btnOkText || 'Save'}
         </Button>}
       </DialogActions>

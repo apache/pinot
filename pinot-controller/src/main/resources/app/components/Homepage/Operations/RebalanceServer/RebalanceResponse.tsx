@@ -18,7 +18,7 @@
  */
 import {RebalanceServerSection} from "./RebalanceServerSection";
 import React from 'react';
-import {Grid, Paper} from "@material-ui/core";
+import {Box, Grid, IconButton, Paper, Snackbar, Typography} from "@material-ui/core";
 import CustomCodemirror from "../../../CustomCodemirror";
 import {
     RebalanceServerSectionResponse
@@ -29,7 +29,31 @@ import {
     RebalanceServerRebalanceSummaryResponse
 } from "./RebalanceServerResponses/RebalanceServerRebalanceSummaryResponse";
 import {RebalanceServerResponseCard} from "./RebalanceServerResponses/RebalanceServerResponseCard";
+import {FileCopyOutlined} from "@material-ui/icons";
 
+const CopyJobIdToClipboardButton = ({ jobId }: { jobId: string }) => {
+    const [open, setOpen] = React.useState<boolean>(false);
+
+    const handleClick = () => {
+        setOpen(true);
+        navigator.clipboard.writeText(jobId);
+    };
+
+    return (
+        <>
+            <IconButton onClick={handleClick} color="primary">
+                <FileCopyOutlined color="disabled" fontSize="small" />
+            </IconButton>
+            <Snackbar
+                message="Copied job id to clibboard"
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                autoHideDuration={2000}
+                onClose={() => setOpen(false)}
+                open={open}
+            />
+        </>
+    );
+};
 export const RebalanceResponse = ({ response }) => {
     const responseSectionsToShow = [
         {
@@ -54,7 +78,15 @@ export const RebalanceResponse = ({ response }) => {
                         <Grid container spacing={2}>
                             <Grid item xs={6}><RebalanceServerResponseLabelValue label='Description' value={response.description} /></Grid>
                             <Grid item xs={6}><RebalanceServerResponseLabelValue label='Status' value={response.status} /></Grid>
-                            <Grid item xs={6}><RebalanceServerResponseLabelValue label='Job Id' value={response.jobId} /></Grid>
+                            <Grid item xs={6}>
+                                <Typography color='textSecondary' variant='caption'>Job Id</Typography>
+                                <Box flexDirection="row" display="flex" alignItems="center" marginTop={-1.25}>
+                                    <Typography style={{ fontWeight: 600 }} variant='body2'>
+                                        {response.jobId}
+                                    </Typography>
+                                    <CopyJobIdToClipboardButton jobId={response.jobId} />
+                                </Box>
+                            </Grid>
                         </Grid>
                     </RebalanceServerSection>
                 </Paper>
@@ -64,7 +96,13 @@ export const RebalanceResponse = ({ response }) => {
             {
                 responseSectionsToShow.map((section) => {
                     if (Object.keys(response).includes(section.key)) {
-                        return <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response[section.key]} />
+                        return (
+                            <Grid item xs={12}>
+                                <RebalanceServerResponseCard>
+                                    <RebalanceServerSectionResponse key={section.key} sectionTitle={section.name} sectionData={response[section.key]} />
+                                </RebalanceServerResponseCard>
+                            </Grid>
+                        );
                     }
                 })
             }

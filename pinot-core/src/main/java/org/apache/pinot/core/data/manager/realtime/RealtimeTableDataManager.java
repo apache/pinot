@@ -43,7 +43,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
@@ -201,28 +200,30 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Set up dedup/upsert metadata manager
     // NOTE: Dedup/upsert has to be set up when starting the server. Changing the table config without restarting the
     //       server won't enable/disable them on the fly.
-    DedupConfig dedupConfig = _tableConfig.getDedupConfig();
+    IndexLoadingConfig indexLoadingConfig = _indexLoadingConfig;
+    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+    assert tableConfig != null;
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
     boolean dedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
     if (dedupEnabled) {
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-
+      Schema schema = indexLoadingConfig.getSchema();
+      assert schema != null;
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(_tableConfig, schema, this, _serverMetrics,
+      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics,
           _instanceDataManagerConfig.getDedupConfig());
     }
 
-    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) {
       Preconditions.checkState(!dedupEnabled, "Dedup and upsert cannot be both enabled for table: %s",
           _tableUpsertMetadataManager);
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
+      Schema schema = indexLoadingConfig.getSchema();
+      assert schema != null;
       _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
-      _tableUpsertMetadataManager.init(_tableConfig, schema, this);
+          TableUpsertMetadataManagerFactory.create(tableConfig, _instanceDataManagerConfig.getUpsertConfig());
+      _tableUpsertMetadataManager.init(tableConfig, schema, this);
     }
 
     _enforceConsumptionInOrder = isEnforceConsumptionInOrder();
@@ -594,8 +595,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(status == Status.COMMITTING, "Invalid status: %s for segment: %s to be downloaded", status,
         segmentName);
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
+    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    assert tableConfig != null;
     long downloadTimeoutMs = getDownloadTimeoutMs(tableConfig);
     long deadlineMs = System.currentTimeMillis() + downloadTimeoutMs;
     while (System.currentTimeMillis() < deadlineMs) {
@@ -868,7 +869,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Nullable
   public StreamIngestionConfig getStreamIngestionConfig() {
-    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    assert tableConfig != null;
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     return ingestionConfig != null ? ingestionConfig.getStreamIngestionConfig() : null;
   }
 

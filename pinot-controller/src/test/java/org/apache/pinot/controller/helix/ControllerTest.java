@@ -691,6 +691,11 @@ public class ControllerTest {
     getControllerRequestClient().updateTableConfig(tableConfig);
   }
 
+  public void toggleTableState(String tableName, TableType type, boolean enable)
+      throws IOException {
+    getControllerRequestClient().toggleTableState(tableName, type, enable);
+  }
+
   public TableConfig getOfflineTableConfig(String tableName) {
     TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
     assertNotNull(offlineTableConfig);

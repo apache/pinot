@@ -84,6 +84,7 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   private static final TableConfig TABLE_CONFIG;
   private static final Schema SCHEMA;
+  private static final IndexLoadingConfig INDEX_LOADING_CONFIG;
   private static final ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
   private static final BaseTableDataManager BASE_TABLE_DATA_MANAGER;
 
@@ -93,8 +94,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     try {
       TABLE_CONFIG = getTableConfigBuilder().build();
       SCHEMA = getSchema();
+      INDEX_LOADING_CONFIG = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
       IMMUTABLE_SEGMENT_DATA_MANAGER =
-          createImmutableSegmentDataManager(TABLE_CONFIG, SCHEMA, "basicSegment", generateRows());
+          createImmutableSegmentDataManager(INDEX_LOADING_CONFIG, "basicSegment", generateRows());
       BASE_TABLE_DATA_MANAGER = BaseTableDataManagerTest.createTableManager();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -103,7 +105,8 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   protected static TableConfigBuilder getTableConfigBuilder() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
-        .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME).setNullHandlingEnabled(true)
+        .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME)
+        .setNullHandlingEnabled(true)
         .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN));
   }
 
@@ -119,7 +122,8 @@ public class BaseTableDataManagerNeedRefreshTest {
         .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NULL_VALUE_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(DISTANCE_COLUMN_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(CARRIER_COLUMN_NAME, FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension(CARRIER_COLUMN_NAME, FieldSpec.DataType.STRING)
+        .build();
   }
 
   protected static List<GenericRow> generateRows() {
@@ -159,10 +163,10 @@ public class BaseTableDataManagerNeedRefreshTest {
     return List.of(row0, row2, row1);
   }
 
-  private static File createSegment(TableConfig tableConfig, Schema schema,
-      String segmentName, List<GenericRow> rows)
+  private static File createSegment(IndexLoadingConfig indexLoadingConfig, String segmentName, List<GenericRow> rows)
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config =
+        new SegmentGeneratorConfig(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getSchema());
     config.setOutDir(TABLE_DATA_DIR.getAbsolutePath());
     config.setSegmentName(segmentName);
     config.setSegmentVersion(SegmentVersion.v3);
@@ -174,14 +178,12 @@ public class BaseTableDataManagerNeedRefreshTest {
     return new File(TABLE_DATA_DIR, segmentName);
   }
 
-  private static ImmutableSegmentDataManager createImmutableSegmentDataManager(TableConfig tableConfig, Schema schema,
+  private static ImmutableSegmentDataManager createImmutableSegmentDataManager(IndexLoadingConfig indexLoadingConfig,
       String segmentName, List<GenericRow> rows)
       throws Exception {
     ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
     when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
-    File indexDir = createSegment(tableConfig, schema, segmentName, rows);
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    File indexDir = createSegment(indexLoadingConfig, segmentName, rows);
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
         BaseTableDataManagerTest.SEGMENT_OPERATIONS_THROTTLER);
     when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
@@ -196,13 +198,15 @@ public class BaseTableDataManagerNeedRefreshTest {
   @Test
   void testAddTimeColumn()
       throws Exception {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).setNullHandlingEnabled(true)
-            .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN)).build();
-
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
+        .setNullHandlingEnabled(true)
+        .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN))
+        .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
-        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
+        .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
 
     GenericRow row = new GenericRow();
     row.putValue(TEXT_INDEX_COLUMN, "text_index_column");
@@ -210,23 +214,22 @@ public class BaseTableDataManagerNeedRefreshTest {
     row.putValue(FST_TEST_COLUMN, "fst_test_column");
 
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", List.of(row));
+        createImmutableSegmentDataManager(indexLoadingConfig, "noChanges", List.of(row));
     BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
 
-    StaleSegment response =
-        tableDataManager.isSegmentStale(tableConfig, schema, segmentDataManager);
+    StaleSegment response = tableDataManager.isSegmentStale(indexLoadingConfig, segmentDataManager);
     assertFalse(response.isStale());
 
     // Test new time column
-    response = tableDataManager.isSegmentStale(getTableConfigBuilder().build(), getSchema(), segmentDataManager);
+    response = tableDataManager.isSegmentStale(INDEX_LOADING_CONFIG, segmentDataManager);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "time column");
   }
 
   @Test
   void testChangeTimeColumn() {
-    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(
-        getTableConfigBuilder().setTimeColumnName(MS_SINCE_EPOCH_COLUMN_NAME).build(), SCHEMA,
+    TableConfig tableConfig = getTableConfigBuilder().setTimeColumnName(MS_SINCE_EPOCH_COLUMN_NAME).build();
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(tableConfig, SCHEMA),
         IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "time column");
@@ -237,8 +240,8 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN);
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(TABLE_CONFIG, schema),
+        IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "column deleted: textColumn");
   }
@@ -249,9 +252,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new MetricFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, true));
-
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(TABLE_CONFIG, schema),
+        IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "field type changed: textColumn");
   }
@@ -262,9 +264,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.INT, true));
-
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(TABLE_CONFIG, schema),
+        IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "data type changed: textColumn");
   }
@@ -275,9 +276,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, false));
-
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(TABLE_CONFIG, schema),
+        IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "single / multi value changed: textColumn");
   }
@@ -288,9 +288,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN_MV);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING, true));
-
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(TABLE_CONFIG, schema),
+        IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "single / multi value changed: textColumnMV");
   }
@@ -298,16 +297,14 @@ public class BaseTableDataManagerNeedRefreshTest {
   @Test
   void testSortColumnMismatch() {
     // Check with a column that is not sorted
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(
-            getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
-            SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    TableConfig tableConfig = getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "sort column changed: MilliSecondsSinceEpoch");
     // Check with a column that is sorted
-    assertFalse(
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(),
-            SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
+    tableConfig.getIndexingConfig().setSortedColumn(List.of(TEXT_INDEX_COLUMN));
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
   }
 
   @DataProvider(name = "testFilterArgs")
@@ -325,9 +322,9 @@ public class BaseTableDataManagerNeedRefreshTest {
             null, null))).build(), "text index changed: textColumn"
     }, {
         "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
-            null, Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(),
-        "fst index changed: DestCityName"
+        new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
+            Map.of(FieldConfig.TEXT_FST_TYPE,
+                FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(), "fst index changed: DestCityName"
     }, {
         "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
         List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"
@@ -338,22 +335,22 @@ public class BaseTableDataManagerNeedRefreshTest {
   @Test(dataProvider = "testFilterArgs")
   void testFilter(String segmentName, TableConfig tableConfigWithFilter, String expectedReason)
       throws Exception {
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfigWithFilter, SCHEMA);
     ImmutableSegmentDataManager segmentWithFilter =
-        createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
+        createImmutableSegmentDataManager(indexLoadingConfig, segmentName, generateRows());
 
     // When TableConfig has a filter but segment does not have, needRefresh is true.
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfigWithFilter, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), expectedReason);
 
     // When TableConfig does not have a filter but segment has, needRefresh is true
-    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithFilter);
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithFilter);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), expectedReason);
 
     // When TableConfig has a filter AND segment also has a filter, needRefresh is false
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfigWithFilter, SCHEMA, segmentWithFilter).isStale());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, segmentWithFilter).isStale());
   }
 
   @Test
@@ -361,23 +358,23 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     TableConfig partitionedTableConfig = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(
         Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS)))).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(partitionedTableConfig, SCHEMA);
     ImmutableSegmentDataManager segmentWithPartition =
-        createImmutableSegmentDataManager(partitionedTableConfig, SCHEMA, "partitionWithModulo", generateRows());
+        createImmutableSegmentDataManager(indexLoadingConfig, "partitionWithModulo", generateRows());
 
     // when segment has no partition AND tableConfig has partitions then needRefresh = true
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfig, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "partition function added: partitionedColumn");
 
     // when segment has partitions AND tableConfig has no partitions, then needRefresh = false
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithPartition).isStale());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithPartition).isStale());
 
     // when # of partitions is different, then needRefresh = true
     TableConfig partitionedTableConfig40 = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(
         Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, 40)))).build();
-
-    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfig40, SCHEMA, segmentWithPartition);
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(partitionedTableConfig40, SCHEMA),
+        segmentWithPartition);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "num partitions changed: partitionedColumn");
 
@@ -385,8 +382,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     TableConfig partitionedTableConfigMurmur = getTableConfigBuilder().setSegmentPartitionConfig(
         new SegmentPartitionConfig(
             Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
-
-    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition);
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(partitionedTableConfigMurmur, SCHEMA),
+        segmentWithPartition);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "partition function name changed: partitionedColumn");
   }
@@ -395,36 +392,33 @@ public class BaseTableDataManagerNeedRefreshTest {
   void testNullValueVector()
       throws Exception {
     TableConfig withoutNullHandling = getTableConfigBuilder().setNullHandlingEnabled(false).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(withoutNullHandling, SCHEMA);
     ImmutableSegmentDataManager segmentWithoutNullHandling =
-        createImmutableSegmentDataManager(withoutNullHandling, SCHEMA, "withoutNullHandling", generateRows());
+        createImmutableSegmentDataManager(indexLoadingConfig, "withoutNullHandling", generateRows());
 
     // If null handling is removed from table config AND segment has NVV, then NVV can be removed. needRefresh = true
-    StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(withoutNullHandling, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "null value vector index removed from column: NullValueColumn");
 
     // if NVV is added to table config AND segment does not have NVV, then it cannot be added. needRefresh = false
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithoutNullHandling).isStale());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithoutNullHandling).isStale());
   }
 
   @Test
-  // Test 1 : Adding a StarTree index should trigger segment refresh.
-  public void addStartreeIndex()
-      throws Exception {
+  public void addStartreeIndex() {
+    // Test 1 : Adding a StarTree index should trigger segment refresh.
+
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(getTableConfigBuilder().build(), SCHEMA, _testName, generateRows());
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(tableConfig, SCHEMA),
+        IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
   }
 
   @Test
   public void testStarTreeIndexWithDifferentColumn()
       throws Exception {
-
     // Test 2: Adding a new StarTree index with split dimension column of same size but with different element should
     // trigger segment refresh.
 
@@ -433,20 +427,21 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index on Distance.
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newTableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
   public void testStarTreeIndexWithManyColumns()
       throws Exception {
-
     // Test 3: Adding a new StarTree index with split dimension columns of different size should trigger segment
     // refresh.
 
@@ -455,19 +450,20 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newTableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
   public void testStartIndexWithDifferentOrder()
       throws Exception {
-
     // Test 4: Adding a new StarTree index with the differently ordered split dimension columns should trigger
     // segment refresh.
 
@@ -476,33 +472,39 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Distance", "Carrier"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
   void testStarTreeIndexWithSkipDimCols()
       throws Exception {
-
     // Test 5: Adding a new StarTree index with skipped dimension columns should trigger segment refresh.
     // Create a segment with StarTree index on Carrier, Distance.
+
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
             Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -510,35 +512,43 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     // Test 6: Adding a new StarTree index with skipped dimension columns in different order should not trigger
     // segment refresh.
+
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
             Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Distance", "Carrier"),
             Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertFalse(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
   void testStarTreeIndexRemoveSkipDimCols()
       throws Exception {
     // Test 7: Adding a new StarTree index with removed skipped-dimension column should trigger segment refresh.
+
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Arrays.asList("Carrier", "Distance"),
             Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -548,15 +558,17 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     StarTreeIndexConfig starTreeIndex = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndex)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
-    StarTreeIndexConfig starTreeIndexAddAggFn = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
+    StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), "MAX__Distance"), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexAddAggFn)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -569,12 +581,15 @@ public class BaseTableDataManagerNeedRefreshTest {
         Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(), "MAX__Distance"), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Arrays.asList("MAX__Distance", AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertFalse(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -587,32 +602,39 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null, null,
             List.of(new StarTreeAggregationConfig("Distance", "MAX")), 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
   void testStarTreeIndexNewMetricAgg()
       throws Exception {
     // Test 11 : Adding a new metric aggregation function through functionColumnPairs should trigger segment refresh.
+
     StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("Distance", "MAX");
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null, null, List.of(aggregationConfig), 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     // Create a StarTree index.
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()),
         Collections.singletonList(aggregationConfig), 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -627,14 +649,17 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(aggregationConfig), 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeAggregationConfig starTreeAggregationConfig2 = new StarTreeAggregationConfig("*", "count");
     StarTreeIndexConfig newStarTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null, null,
             Arrays.asList(starTreeAggregationConfig2, aggregationConfig), 100);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertFalse(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -644,12 +669,15 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 10);
-    TableConfig newConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newConfig, SCHEMA, segmentDataManager).isStale());
+    TableConfig newTableConfig =
+        getTableConfigBuilder().setStarTreeIndexConfigs(List.of(newStarTreeIndexConfig)).build();
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -659,9 +687,8 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
-    assertTrue(
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().build(), SCHEMA, segmentDataManager).isStale());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
+    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentDataManager).isStale());
   }
 
   @Test
@@ -673,13 +700,15 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     StarTreeIndexConfig newStarTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig newTableConfig =
         getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig, newStarTreeIndexConfig)).build();
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newTableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -691,11 +720,13 @@ public class BaseTableDataManagerNeedRefreshTest {
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     TableConfig newTableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     newTableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newTableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 
   @Test
@@ -706,10 +737,10 @@ public class BaseTableDataManagerNeedRefreshTest {
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
-
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfig, SCHEMA, segmentDataManager).isStale());
+        createImmutableSegmentDataManager(indexLoadingConfig, _testName, generateRows());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, segmentDataManager).isStale());
   }
 
   @Test
@@ -722,10 +753,12 @@ public class BaseTableDataManagerNeedRefreshTest {
     TableConfig tableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     tableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
     ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, SCHEMA, _testName, generateRows());
+        createImmutableSegmentDataManager(new IndexLoadingConfig(tableConfig, SCHEMA), _testName, generateRows());
 
     TableConfig newTableConfig = getTableConfigBuilder().setStarTreeIndexConfigs(List.of(starTreeIndexConfig)).build();
     newTableConfig.getIndexingConfig().setEnableDefaultStarTree(false);
-    assertTrue(BASE_TABLE_DATA_MANAGER.isSegmentStale(newTableConfig, SCHEMA, segmentDataManager).isStale());
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
+            .isStale());
   }
 }

@@ -2119,13 +2119,23 @@ public class PinotHelixResourceManager {
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(tableNameWithType, getSegmentsFromPropertyStore(tableNameWithType),
+    _segmentDeletionManager.removeSegmentsFromStoreInBatch(tableNameWithType,
+        getSegmentsFromPropertyStore(tableNameWithType),
         retentionPeriodMs);
     LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
     // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
+
+    // Remove COMMITTING segment list
+    if (TableNameBuilder.REALTIME.equals(tableType)) {
+      if (ZKMetadataProvider.removePauselessDebugMetadata(_propertyStore, tableNameWithType)) {
+        LOGGER.info("Deleting table {}: Removed pauseless debug metadata", tableNameWithType);
+      } else {
+        LOGGER.info("Deleting table {}: Failed to remove pauseless debug metadata.", tableNameWithType);
+      }
+    }
 
     // Remove instance partitions
     if (tableType == TableType.OFFLINE) {

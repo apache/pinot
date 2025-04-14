@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <localstack-utils.version>0.2.23</localstack-utils.version>
   </properties>
 
   <dependencies>

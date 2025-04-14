@@ -230,7 +230,20 @@ public class BenchmarkRoaringBitmapMapping {
   @Benchmark
   public MutableRoaringBitmap mapSimple() {
     MutableRoaringBitmap target = new MutableRoaringBitmap();
-    _docIds.forEach((IntConsumer) flattenedDocId -> target.add(getDocId(flattenedDocId)));
+    IntConsumer mapper = new IntConsumer() {
+      int _previous = -1;
+
+      @Override
+      public void accept(int flattenedDocId) {
+        int docId = getDocId(flattenedDocId);
+        if (_previous != docId) {
+          target.add(docId);
+          _previous = docId;
+        }
+      }
+    };
+
+    _docIds.forEach(mapper);
     return target;
   }
 

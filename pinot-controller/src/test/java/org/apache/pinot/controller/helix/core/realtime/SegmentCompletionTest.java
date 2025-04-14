@@ -54,6 +54,7 @@ public class SegmentCompletionTest {
   private static final String S_1 = "S1";
   private static final String S_2 = "S2";
   private static final String S_3 = "S3";
+  private static final int SEGMENT_THRESHOLD_SIZE = 100;
 
   private MockPinotLLCRealtimeSegmentManager _segmentManager;
   private MockSegmentCompletionManager _segmentCompletionMgr;
@@ -100,6 +101,7 @@ public class SegmentCompletionTest {
     final SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(_segmentNameStr);
     segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     segmentZKMetadata.setNumReplicas(3);
+    segmentZKMetadata.setSizeThresholdToFlushSegment(SEGMENT_THRESHOLD_SIZE);
     _segmentManager._segmentMetadata = segmentZKMetadata;
 
     _segmentCompletionMgr = new MockSegmentCompletionManager(_segmentManager, isLeader, isConnected);
@@ -1253,6 +1255,64 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER);
   }
 
+  // Tests that build failed -> retry with half size -> commit successfully
+  @Test
+  public void testSegmentBuildDeterministicFailure() {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    _segmentCompletionMgr._seconds = 5L;
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 sends offset of 20, gets HOLD
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s3 sends offset of 20, gets commit
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+    verifyOffset(response, _s1Offset);
+
+    // s3 sends SegmentBuildDeterministicFailure
+    Assert.assertTrue(_fsmMap.containsKey(_segmentNameStr));
+    _segmentCompletionMgr._seconds += 1;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s1Offset.toString())
+        .withSegmentName(_segmentNameStr).withNumRows((int) _s1Offset.getOffset());
+    _segmentCompletionMgr.reduceSegmentSizeAndReset(params);
+    Assert.assertEquals(
+        _segmentManager.getSegmentZKMetadata(null, null, null).getSizeThresholdToFlushSegment(),
+        _s1Offset.getOffset() / 2);
+    Assert.assertFalse(_fsmMap.containsKey(_segmentNameStr));
+
+    // s3 comes back to try to commit with a smaller offset
+    _segmentCompletionMgr._seconds += 5;
+    params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(
+        (String.valueOf(_s1Offset.getOffset() / 2))).withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+
+    // Same for s1 and s2, and eventually one of them able to commit again
+    params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(
+        (String.valueOf(_s1Offset.getOffset() / 2))).withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+
+    params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(
+        (String.valueOf(_s1Offset.getOffset() / 2))).withSegmentName(_segmentNameStr);
+    response = _segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+
+    // FSM should still be there for that segment
+    Assert.assertTrue(_fsmMap.containsKey(_segmentNameStr));
+  }
+
   private static HelixManager createMockHelixManager(boolean isLeader, boolean isConnected) {
     HelixManager helixManager = mock(HelixManager.class);
     when(helixManager.isLeader()).thenReturn(isLeader);
@@ -1304,6 +1364,12 @@ public class SegmentCompletionTest {
     @Override
     public TableConfig getTableConfig(String realtimeTableName) {
       return mock(TableConfig.class);
+    }
+
+    @Override
+    public void persistSegmentZKMetadata(
+        String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
+      _segmentMetadata.setSizeThresholdToFlushSegment(segmentZKMetadata.getSizeThresholdToFlushSegment());
     }
   }
 

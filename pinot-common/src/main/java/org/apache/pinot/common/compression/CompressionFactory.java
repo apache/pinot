@@ -18,8 +18,15 @@
  */
 package org.apache.pinot.common.compression;
 
+import org.apache.pinot.spi.utils.CommonConstants;
+
+
 public class CompressionFactory {
   private CompressionFactory() {
+  }
+
+  public static String getDefaultCompressionType() {
+    return CommonConstants.Broker.Grpc.DEFAULT_COMPRESSION;
   }
 
   public static String[] getCompressionTypes() {

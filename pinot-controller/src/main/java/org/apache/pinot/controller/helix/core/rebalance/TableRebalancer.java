@@ -21,9 +21,12 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -50,11 +54,14 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -71,7 +78,16 @@ import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,6 +136,10 @@ import org.slf4j.LoggerFactory;
  */
 public class TableRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
+  private static final int TOP_N_IN_CONSUMING_SEGMENT_SUMMARY = 10;
+  // TODO: Consider making the timeoutMs below table rebalancer configurable
+  private static final int TABLE_SIZE_READER_TIMEOUT_MS = 30_000;
+  private static final int STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS = 10_000;
   private final HelixManager _helixManager;
   private final HelixDataAccessor _helixDataAccessor;
   private final TableRebalanceObserver _tableRebalanceObserver;
@@ -402,9 +422,17 @@ public class TableRebalancer {
       }
     }
 
+    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
+
+    long estimatedAverageSegmentSizeInBytes = summaryResult.getSegmentInfo().getEstimatedAverageSegmentSizeInBytes();
+    Set<String> allSegmentsFromIdealState = currentAssignment.keySet();
+    TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+        estimatedAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
+
     // Record the beginning of rebalance
     _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
-        targetAssignment);
+        targetAssignment, rebalanceContext);
 
     // Calculate the min available replicas for no-downtime rebalance
     // NOTE:
@@ -414,8 +442,6 @@ public class TableRebalancer {
     //    current instances as this is the best we can do, and can help the table get out of this state.
     // 2. Only check the segments to be moved because we don't need to maintain available replicas for segments not
     //    being moved, including segments with all replicas OFFLINE (error segments during consumption).
-    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
-
     int numReplicas = Integer.MAX_VALUE;
     for (String segment : segmentsToMove) {
       numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
@@ -438,6 +464,17 @@ public class TableRebalancer {
       minAvailableReplicas = Math.max(numReplicas + minReplicasToKeepUpForNoDowntime, 0);
     }
 
+    int numCurrentAssignmentReplicas = Integer.MAX_VALUE;
+    for (String segment : segmentsToMove) {
+      numCurrentAssignmentReplicas = Math.min(currentAssignment.get(segment).size(), numCurrentAssignmentReplicas);
+    }
+    if (minAvailableReplicas > numCurrentAssignmentReplicas) {
+      LOGGER.warn("For rebalanceId: {}, minAvailableReplicas: {} larger than existing number of replicas: {}, "
+          + "resetting minAvailableReplicas to {}", rebalanceJobId, minAvailableReplicas, numCurrentAssignmentReplicas,
+          numCurrentAssignmentReplicas);
+      minAvailableReplicas = numCurrentAssignmentReplicas;
+    }
+
     LOGGER.info(
         "For rebalanceId: {}, rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
             + "bestEfforts: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}",
@@ -456,13 +493,13 @@ public class TableRebalancer {
     //
     // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
     //       in the previous round are also converged.
-    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
       IdealState idealState;
       try {
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
-            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
+            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, estimatedAverageSegmentSizeInBytes,
+            allSegmentsFromIdealState);
       } catch (Exception e) {
         String errorMsg = String.format(
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
@@ -555,8 +592,12 @@ public class TableRebalancer {
       }
 
       // Record change of current ideal state and the new target
+      rebalanceContext = new TableRebalanceObserver.RebalanceContext(estimatedAverageSegmentSizeInBytes,
+          allSegmentsFromIdealState, null);
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
-          targetAssignment);
+          targetAssignment, rebalanceContext);
+      // Update the segment list as the IDEAL_STATE_CHANGE_TRIGGER should've captured the newly added / deleted segments
+      allSegmentsFromIdealState = currentAssignment.keySet();
       if (_tableRebalanceObserver.isStopped()) {
         return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
             "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
@@ -568,6 +609,15 @@ public class TableRebalancer {
       LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be "
               + "added/removed for each instance: {}", rebalanceJobId, tableNameWithType,
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
+
+      // Record change of current ideal state and the next assignment
+      _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
+          currentAssignment, nextAssignment, rebalanceContext);
+      if (_tableRebalanceObserver.isStopped()) {
+        return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+            "Rebalance has stopped already before updating the IdealState with the next assignment",
+            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
 
       // Reuse current IdealState to update the IdealState in cluster
       idealStateRecord.setMapFields(nextAssignment);
@@ -607,9 +657,8 @@ public class TableRebalancer {
     }
     LOGGER.info("Fetching the table size for table: {}", tableNameWithType);
     try {
-      // TODO: Consider making the timeoutMs for fetching table size via table rebalancer configurable
       TableSizeReader.TableSubTypeSizeDetails sizeDetails =
-          _tableSizeReader.getTableSubtypeSize(tableNameWithType, 30_000);
+          _tableSizeReader.getTableSubtypeSize(tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS);
       LOGGER.info("Fetched the table size details for table: {}", tableNameWithType);
       return sizeDetails;
     } catch (InvalidConfigException e) {
@@ -627,22 +676,42 @@ public class TableRebalancer {
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, TableConfig tableConfig) {
     LOGGER.info("Calculating rebalance summary for table: {} with rebalanceJobId: {}",
         tableNameWithType, rebalanceJobId);
+    boolean isOfflineTable = TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE;
     int existingReplicationFactor = 0;
     int newReplicationFactor = 0;
     Map<String, Set<String>> existingServersToSegmentMap = new HashMap<>();
     Map<String, Set<String>> newServersToSegmentMap = new HashMap<>();
+    Map<String, Set<String>> existingServersToConsumingSegmentMap = isOfflineTable ? null : new HashMap<>();
+    Map<String, Set<String>> newServersToConsumingSegmentMap = isOfflineTable ? null : new HashMap<>();
 
     for (Map.Entry<String, Map<String, String>> entrySet : currentAssignment.entrySet()) {
       existingReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        existingServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      String segmentName = entrySet.getKey();
+      Collection<String> segmentStates = entrySet.getValue().values();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && segmentStates.stream()
+          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && segmentStates.stream()
+          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+
+      for (String instanceName : entrySet.getValue().keySet()) {
+        existingServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        if (isSegmentConsuming) {
+          existingServersToConsumingSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        }
       }
     }
 
     for (Map.Entry<String, Map<String, String>> entrySet : targetAssignment.entrySet()) {
       newReplicationFactor = entrySet.getValue().size();
-      for (String segmentKey : entrySet.getValue().keySet()) {
-        newServersToSegmentMap.computeIfAbsent(segmentKey, k -> new HashSet<>()).add(entrySet.getKey());
+      String segmentName = entrySet.getKey();
+      Collection<String> segmentStates = entrySet.getValue().values();
+      boolean isSegmentConsuming = existingServersToConsumingSegmentMap != null && segmentStates.stream()
+          .noneMatch(state -> state.equals(SegmentStateModel.ONLINE)) && segmentStates.stream()
+          .anyMatch(state -> state.equals(SegmentStateModel.CONSUMING));
+      for (String instanceName : entrySet.getValue().keySet()) {
+        newServersToSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        if (isSegmentConsuming) {
+          newServersToConsumingSegmentMap.computeIfAbsent(instanceName, k -> new HashSet<>()).add(segmentName);
+        }
       }
     }
     RebalanceSummaryResult.RebalanceChangeInfo replicationFactor
@@ -698,6 +767,7 @@ public class TableRebalancer {
     }
     Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfoMap = new HashMap<>();
     int segmentsNotMoved = 0;
+    int totalSegmentsToBeDeleted = 0;
     int maxSegmentsAddedToServer = 0;
     for (Map.Entry<String, Set<String>> entry : newServersToSegmentMap.entrySet()) {
       String server = entry.getKey();
@@ -729,6 +799,7 @@ public class TableRebalancer {
       }
       maxSegmentsAddedToServer = Math.max(maxSegmentsAddedToServer, segmentsAdded);
       int segmentsDeleted = existingSegmentSet.size() - segmentsUnchanged;
+      totalSegmentsToBeDeleted += segmentsDeleted;
 
       serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(serverStatus,
           totalNewSegments, totalExistingSegments, segmentsAdded, segmentsDeleted, segmentsUnchanged,
@@ -766,7 +837,17 @@ public class TableRebalancer {
         serverSegmentChangeInfoMap.put(server, new RebalanceSummaryResult.ServerSegmentChangeInfo(
             RebalanceSummaryResult.ServerStatus.REMOVED, 0, entry.getValue().size(), 0, entry.getValue().size(), 0,
             instanceToTagsMap.getOrDefault(server, null)));
+        totalSegmentsToBeDeleted += entry.getValue().size();
       }
+    }
+
+    if (existingServersToConsumingSegmentMap != null && newServersToConsumingSegmentMap != null) {
+      // turn the map into {server: added consuming segments}
+      for (Map.Entry<String, Set<String>> entry : newServersToConsumingSegmentMap.entrySet()) {
+        String server = entry.getKey();
+        entry.getValue().removeAll(existingServersToConsumingSegmentMap.getOrDefault(server, Collections.emptySet()));
+      }
+      newServersToConsumingSegmentMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     RebalanceSummaryResult.RebalanceChangeInfo numSegmentsInSingleReplica
@@ -777,13 +858,13 @@ public class TableRebalancer {
     RebalanceSummaryResult.RebalanceChangeInfo numSegmentsAcrossAllReplicas
         = new RebalanceSummaryResult.RebalanceChangeInfo(existingNumberSegmentsTotal, newNumberSegmentsTotal);
 
-    int totalSegmentsToBeMoved = newNumberSegmentsTotal - segmentsNotMoved;
+    int totalSegmentsToBeAdded = newNumberSegmentsTotal - segmentsNotMoved;
 
     long tableSizePerReplicaInBytes = calculateTableSizePerReplicaInBytes(tableSubTypeSizeDetails);
     long averageSegmentSizeInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
         : tableSizePerReplicaInBytes / ((long) currentAssignment.size());
     long totalEstimatedDataToBeMovedInBytes = tableSizePerReplicaInBytes <= 0 ? tableSizePerReplicaInBytes
-        : ((long) totalSegmentsToBeMoved) * averageSegmentSizeInBytes;
+        : ((long) totalSegmentsToBeAdded) * averageSegmentSizeInBytes;
 
     // Set some of the sets to null if they are empty to ensure they don't show up in the result
     RebalanceSummaryResult.ServerInfo serverInfo = new RebalanceSummaryResult.ServerInfo(
@@ -791,9 +872,12 @@ public class TableRebalancer {
         serversGettingNewSegments, serverSegmentChangeInfoMap);
     // TODO: Add a metric to estimate the total time it will take to rebalance. Need some good heuristics on how
     //       rebalance time can vary with number of segments added
-    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved,
-        maxSegmentsAddedToServer, averageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
-        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas);
+    RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary =
+        isOfflineTable ? null : getConsumingSegmentSummary(tableConfig, newServersToConsumingSegmentMap);
+    RebalanceSummaryResult.SegmentInfo segmentInfo = new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeAdded,
+        totalSegmentsToBeDeleted, maxSegmentsAddedToServer, averageSegmentSizeInBytes,
+        totalEstimatedDataToBeMovedInBytes, replicationFactor, numSegmentsInSingleReplica,
+        numSegmentsAcrossAllReplicas, consumingSegmentToBeMovedSummary);
 
     LOGGER.info("Calculated rebalance summary for table: {} with rebalanceJobId: {}", tableNameWithType,
         rebalanceJobId);
@@ -804,6 +888,172 @@ public class TableRebalancer {
     InstanceConfig instanceConfig =
         _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().instanceConfig(serverName));
     return instanceConfig.getTags();
+  }
+
+  private RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary getConsumingSegmentSummary(TableConfig tableConfig,
+      Map<String, Set<String>> newServersToConsumingSegmentMap) {
+    String tableNameWithType = tableConfig.getTableName();
+    if (newServersToConsumingSegmentMap.isEmpty()) {
+      return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(0, 0, new HashMap<>(), new HashMap<>(),
+          new HashMap<>());
+    }
+    int numConsumingSegmentsToBeMoved =
+        newServersToConsumingSegmentMap.values().stream().reduce(0, (a, b) -> a + b.size(), Integer::sum);
+    Set<String> uniqueConsumingSegments =
+        newServersToConsumingSegmentMap.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
+    Map<String, SegmentZKMetadata> consumingSegmentZKmetadata = new HashMap<>();
+    uniqueConsumingSegments.forEach(segment -> consumingSegmentZKmetadata.put(segment,
+        ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
+    Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
+        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKmetadata);
+    Map<String, Integer> consumingSegmentsAge = getConsumingSegmentsAge(tableNameWithType, consumingSegmentZKmetadata);
+
+    Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
+    Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
+        consumingSegmentSummaryPerServer = new HashMap<>();
+    if (consumingSegmentsOffsetsToCatchUp != null) {
+      consumingSegmentsOffsetsToCatchUpTopN =
+          getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
+      newServersToConsumingSegmentMap.forEach((server, segments) -> {
+        int totalOffsetsToCatchUp =
+            segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
+        consumingSegmentSummaryPerServer.put(server,
+            new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
+                segments.size(), totalOffsetsToCatchUp));
+      });
+    } else {
+      consumingSegmentsOffsetsToCatchUpTopN = null;
+      newServersToConsumingSegmentMap.forEach((server, segments) -> {
+        consumingSegmentSummaryPerServer.put(server,
+            new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
+                segments.size(), -1));
+      });
+    }
+
+    Map<String, Integer> consumingSegmentsOldestTopN =
+        consumingSegmentsAge == null ? null
+            : getTopNConsumingSegmentWithValue(consumingSegmentsAge, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
+
+    return new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary(numConsumingSegmentsToBeMoved,
+        newServersToConsumingSegmentMap.size(), consumingSegmentsOffsetsToCatchUpTopN, consumingSegmentsOldestTopN,
+        consumingSegmentSummaryPerServer);
+  }
+
+  private static Map<String, Integer> getTopNConsumingSegmentWithValue(
+      Map<String, Integer> consumingSegmentsWithValue, @Nullable Integer topN) {
+    Map<String, Integer> topNConsumingSegments = new LinkedHashMap<>();
+    consumingSegmentsWithValue.entrySet()
+        .stream()
+        .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+        .limit(topN == null ? consumingSegmentsWithValue.size() : topN)
+        .forEach(entry -> topNConsumingSegments.put(entry.getKey(), entry.getValue()));
+    return topNConsumingSegments;
+  }
+
+  /**
+   * Fetches the age of each consuming segment in minutes.
+   * The age of a consuming segment is the time since the segment was created in ZK, it could be different to when
+   * the stream should start to be consumed for the segment.
+   * consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata. Returns a map from
+   * segment name to the age of that consuming segment. Return null if failed to obtain info for any consuming segment.
+   */
+  @Nullable
+  private Map<String, Integer> getConsumingSegmentsAge(String tableNameWithType,
+      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
+    Map<String, Integer> consumingSegmentsAge = new HashMap<>();
+    long now = System.currentTimeMillis();
+    try {
+      consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
+        if (segmentZKMetadata == null) {
+          LOGGER.warn("SegmentZKMetadata is null for segment: {} in table: {}", s, tableNameWithType);
+          throw new RuntimeException("SegmentZKMetadata is null");
+        }
+        long creationTime = segmentZKMetadata.getCreationTime();
+        if (creationTime < 0) {
+          LOGGER.warn("Creation time is not found for segment: {} in table: {}", s, tableNameWithType);
+          throw new RuntimeException("Creation time is not found");
+        }
+        consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
+      }));
+    } catch (Exception e) {
+      return null;
+    }
+    return consumingSegmentsAge;
+  }
+
+  /**
+   * Fetches the consuming segment info for the table and calculates the number of offsets to catch up for each
+   * consuming segment. consumingSegmentZKMetadata is a map from consuming segments to be moved to their ZK metadata.
+   * Returns a map from segment name to the number of offsets to catch up for that consuming
+   * segment. Return null if failed to obtain info for any consuming segment.
+   */
+  @Nullable
+  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
+      Map<String, SegmentZKMetadata> consumingSegmentZKMetadata) {
+    String tableNameWithType = tableConfig.getTableName();
+    Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
+    try {
+      for (Map.Entry<String, SegmentZKMetadata> entry : consumingSegmentZKMetadata.entrySet()) {
+        String segmentName = entry.getKey();
+        SegmentZKMetadata segmentZKMetadata = entry.getValue();
+        if (segmentZKMetadata == null) {
+          LOGGER.warn("Cannot find SegmentZKMetadata for segment: {} in table: {}", segmentName, tableNameWithType);
+          return null;
+        }
+        String startOffset = segmentZKMetadata.getStartOffset();
+        if (startOffset == null) {
+          LOGGER.warn("Start offset is null for segment: {} in table: {}", segmentName, tableNameWithType);
+          return null;
+        }
+        Integer partitionId = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+        // for simplicity here we disable consuming segment info if they do not have partitionId in segmentName
+        if (partitionId == null) {
+          LOGGER.warn("Cannot determine partition id for realtime segment: {} in table: {}", segmentName,
+              tableNameWithType);
+          return null;
+        }
+        Integer latestOffset = getLatestOffsetOfStream(tableConfig, partitionId);
+        if (latestOffset == null) {
+          return null;
+        }
+        int offsetsToCatchUp = latestOffset - Integer.parseInt(startOffset);
+        segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while trying to fetch consuming segment info for table: {}", tableNameWithType, e);
+      return null;
+    }
+    LOGGER.info("Successfully fetched consuming segments info for table: {}", tableNameWithType);
+    return segmentToOffsetsToCatchUp;
+  }
+
+  @VisibleForTesting
+  StreamPartitionMsgOffset fetchStreamPartitionOffset(TableConfig tableConfig, int partitionId)
+      throws Exception {
+    StreamConsumerFactory streamConsumerFactory =
+        StreamConsumerFactoryProvider.create(new StreamConfig(tableConfig.getTableName(),
+            IngestionConfigUtils.getStreamConfigMap(tableConfig, partitionId)));
+    try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(
+        TableRebalancer.class.getCanonicalName(), partitionId)) {
+      return streamMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
+          STREAM_PARTITION_OFFSET_READ_TIMEOUT_MS);
+    }
+  }
+
+  @Nullable
+  private Integer getLatestOffsetOfStream(TableConfig tableConfig, int partitionId) {
+    try {
+      StreamPartitionMsgOffset partitionMsgOffset = fetchStreamPartitionOffset(tableConfig, partitionId);
+      if (!(partitionMsgOffset instanceof LongMsgOffset)) {
+        LOGGER.warn("Unsupported stream partition message offset type: {}", partitionMsgOffset);
+        return null;
+      }
+      return (int) ((LongMsgOffset) partitionMsgOffset).getOffset();
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while trying to fetch stream partition of partitionId: {}",
+          partitionId, e);
+      return null;
+    }
   }
 
   private void onReturnFailure(String errorMsg, Exception e) {
@@ -1052,7 +1302,8 @@ public class TableRebalancer {
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean lowDiskMode, boolean bestEfforts,
-      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs)
+      Set<String> segmentsToMonitor, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs,
+      long estimateAverageSegmentSizeInBytes, Set<String> allSegmentsFromIdealState)
       throws InterruptedException, TimeoutException {
     long endTimeMs = System.currentTimeMillis() + externalViewStabilizationTimeoutInMs;
 
@@ -1068,9 +1319,13 @@ public class TableRebalancer {
       // ExternalView might be null when table is just created, skipping check for this iteration
       if (externalView != null) {
         // Record external view and ideal state convergence status
+        TableRebalanceObserver.RebalanceContext rebalanceContext = new TableRebalanceObserver.RebalanceContext(
+            estimateAverageSegmentSizeInBytes, allSegmentsFromIdealState, segmentsToMonitor);
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
-            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
+            externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(), rebalanceContext);
+        // Update unique segment list as IS-EV trigger must have processed these
+        allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
         if (_tableRebalanceObserver.isStopped()) {
           throw new RuntimeException(
               String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
