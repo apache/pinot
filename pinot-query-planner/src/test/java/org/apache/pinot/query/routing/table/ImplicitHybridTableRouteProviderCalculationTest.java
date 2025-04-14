@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.broker.routing.table;
+package org.apache.pinot.query.routing.table;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
@@ -32,8 +32,6 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
-import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
-import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
