@@ -542,7 +542,9 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
   }
 
-  public boolean continueWithoutDeepStore() { return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false); }
+  public boolean continueWithoutDeepStore() {
+    return getProperty(CONTINUE_WITHOUT_DEEP_STORE, false);
+  }
 
   public String generateVipUrl() {
     return getControllerVipProtocol() + "://" + getControllerVipHost() + ":" + getControllerVipPort();
