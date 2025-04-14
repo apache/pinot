@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -49,11 +49,12 @@ public class TestZkBasedTableRebalanceObserver {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     // Mocking this. We will verify using numZkUpdate stat
     when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
-    ControllerMetrics controllerMetrics = Mockito.mock(ControllerMetrics.class);
+    ControllerMetrics controllerMetrics = ControllerMetrics.get();
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
+    retryCtx.setOriginalJobId("testZkObserverTracking");
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "testZkObserverTracking", retryCtx, pinotHelixResourceManager);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     target.put("segment1",
@@ -67,21 +68,38 @@ public class TestZkBasedTableRebalanceObserver {
         segmentSet, segmentSet);
     observer.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, source, target, rebalanceContext);
     assertEquals(observer.getNumUpdatesToZk(), 1);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, source, rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, source,
         rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     // START_TRIGGER will set up the ZK progress stats to have the diff between source and target. When calling the
     // triggers for IS and EV-IS, since source and source are compared, the diff will change for the IS trigger
     // but not for the EV-IS trigger, so ZK must be updated 1 extra time
     assertEquals(observer.getNumUpdatesToZk(), 2);
     observer.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, source, target, rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     observer.onTrigger(TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER, source, target,
         rebalanceContext);
+    checkProgressPercentMetrics(controllerMetrics, observer);
     // Both of the changes above will update ZK for progress stats
     assertEquals(observer.getNumUpdatesToZk(), 4);
     // Try a rollback and this should trigger a ZK update as well
     observer.onRollback();
     assertEquals(observer.getNumUpdatesToZk(), 5);
+  }
+
+  private void checkProgressPercentMetrics(ControllerMetrics controllerMetrics,
+      ZkBasedTableRebalanceObserver observer) {
+    Long additionProgress = controllerMetrics.getGaugeValue(
+        ControllerGauge.TABLE_REBALANCE_JOB_ADDITION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
+    Long deletionProgress = controllerMetrics.getGaugeValue(
+        ControllerGauge.TABLE_REBALANCE_JOB_DELETION_PROGRESS_PERCENT.getGaugeName() + ".dummy.testZkObserverTracking");
+    assertEquals(additionProgress, (long) observer.getTableRebalanceProgressStats()
+        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeAdded);
+    assertEquals(deletionProgress, (long) observer.getTableRebalanceProgressStats()
+        .getRebalanceProgressStatsOverall()._percentageRemainingSegmentsToBeDeleted);
   }
 
   @Test

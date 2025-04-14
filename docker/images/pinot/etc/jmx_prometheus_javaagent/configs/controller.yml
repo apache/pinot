@@ -49,7 +49,7 @@ rules:
     tableType: "$5"
     taskType: "$6"
 # Gauge for rebalanceJobId and tableNameWithType
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(tableRebalanceJobAddingProgressPercent|tableRebalanceJobDeletingProgressPercent)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([0-9a-fA-F-]+)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(tableRebalanceJobAdditionProgressPercent|tableRebalanceJobDeletionProgressPercent)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.([0-9a-fA-F-]+)\"><>(\\w+)"
   name: "pinot_controller_$1_$7"
   cache: true
   labels:
