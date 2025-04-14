@@ -290,11 +290,23 @@ public class DebugResource {
       serverToSegmentDebugInfo.put(streamResponse.getKey(), segmentDebugInfo);
     }
 
+    if (evStateMap == null) {
+      evStateMap = constructEvStateMapIfISOffline(isServerToStateMap,
+          CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
+    }
+
     Map<String, TableDebugInfo.SegmentState> segmentServerState = new HashMap<>();
     for (String instanceName : isServerToStateMap.keySet()) {
       String isState = isServerToStateMap.get(instanceName);
       String evState = (evStateMap != null) ? evStateMap.get(instanceName) : null;
       SegmentServerDebugInfo segmentServerDebugInfo = serverToSegmentDebugInfo.get(instanceName);
+
+      // If isState is OFFLINE, evState should also be set to OFFLINE if it is null. If evStateMap itself is null,
+      // treat this as an error scenario since if any IS is not OFFLINE, evStateMap should exist too
+      if ((evStateMap != null) && evState == null
+          && CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE.equals(isState)) {
+        evState = CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
+      }
 
       if (segmentServerDebugInfo != null) {
         segmentServerState.put(instanceName,
@@ -363,9 +375,24 @@ public class DebugResource {
             segmentServerState.put(instanceName,
                 new TableDebugInfo.SegmentState(isState, evState, segmentServerDebugInfo.getSegmentSize(),
                     segmentServerDebugInfo.getConsumerInfo(), segmentServerDebugInfo.getErrorInfo()));
+          } else if (segmentServerDebugInfo == null && verbosity > 0) {
+            segmentServerState.put(instanceName,
+                new TableDebugInfo.SegmentState(isState, evState, null, null, null));
           }
         } else {
-          segmentServerState.put(instanceName, new TableDebugInfo.SegmentState(isState, null, null, null, null));
+          if (evStateMap == null) {
+            evStateMap = constructEvStateMapIfISOffline(segmentIsMap,
+                CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE);
+          }
+
+          // If isState is OFFLINE, evState should also be set to OFFLINE if it is null. If evStateMap itself is null,
+          // treat this as an error scenario since if any IS is not OFFLINE, evStateMap should exist too
+          if ((evStateMap != null) && CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE.equals(isState)) {
+            evState = CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
+          }
+          if (evState == null || verbosity > 0) {
+            segmentServerState.put(instanceName, new TableDebugInfo.SegmentState(isState, evState, null, null, null));
+          }
         }
       }
 
@@ -375,6 +402,33 @@ public class DebugResource {
     }
 
     return result;
+  }
+
+  /**
+   * Helper method to construct the evStateMap for the given segment with all OFFLINE entries if the IS's instance state
+   * map also contains all OFFLINE entries
+   * @param isInstanceStateMap IdealState's instanceStateMap
+   * @param state State string to compare with
+   * @return ExternalView instanceStateMap with all states OFFLINE if all IS states are offline, otherwise null
+   */
+  private Map<String, String> constructEvStateMapIfISOffline(Map<String, String> isInstanceStateMap, String state) {
+    // Create an evInstanceStateMap with state set to OFFLINE if IS is OFFLINE across all instances
+    Map<String, String> evInstanceStateMap = new HashMap<>();
+    boolean isAllISOffline = true;
+    for (Map.Entry<String, String> instanceToState : isInstanceStateMap.entrySet()) {
+      if (!state.equals(instanceToState.getValue())) {
+        isAllISOffline = false;
+        break;
+      } else {
+        evInstanceStateMap.put(instanceToState.getKey(), state);
+      }
+    }
+    if (!isAllISOffline) {
+      evInstanceStateMap.clear();
+      evInstanceStateMap = null;
+    }
+
+    return evInstanceStateMap;
   }
 
   /**
@@ -417,10 +471,21 @@ public class DebugResource {
     ExternalView externalView =
         helixDataAccessor.getProperty(helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE));
 
+    // EV might be null if all brokers are in OFFLINE state in the IS, construct a map with all OFFLINE states for this
+    // scenario
+    Map<String, String> evInstanceToStateMap = externalView.getStateMap(tableNameWithType);
+    if (evInstanceToStateMap == null) {
+      evInstanceToStateMap = constructEvStateMapIfISOffline(idealState.getInstanceStateMap(tableNameWithType),
+          CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE);
+    }
+
     for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(tableNameWithType).entrySet()) {
       String brokerName = entry.getKey();
       String isState = entry.getValue();
-      String evState = externalView.getStateMap(tableNameWithType).get(brokerName);
+      String evState = evInstanceToStateMap != null ? evInstanceToStateMap.get(brokerName) : null;
+      if (CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE.equals(isState) && evState == null) {
+        evState = CommonConstants.Helix.StateModel.BrokerResourceStateModel.OFFLINE;
+      }
       if (verbosity > 0 || !isState.equals(evState)) {
         brokerDebugInfos.add(new TableDebugInfo.BrokerDebugInfo(brokerName, isState, evState));
       }
