@@ -245,8 +245,12 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private void emitProgressMetric(TableRebalanceProgressStats.RebalanceProgressStats overallProgress) {
     // Using the original job ID to group rebalance retries together with the same label
     _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
-        ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT,
+        ControllerGauge.TABLE_REBALANCE_JOB_ADDING_PROGRESS_PERCENT,
         (long) overallProgress._percentageRemainingSegmentsToBeAdded * 100);
+
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType + "." + _tableRebalanceContext.getOriginalJobId(),
+        ControllerGauge.TABLE_REBALANCE_JOB_DELETING_PROGRESS_PERCENT,
+        (long) overallProgress._percentageRemainingSegmentsToBeDeleted * 100);
   }
 
   @VisibleForTesting

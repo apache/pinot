@@ -178,10 +178,11 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
             String.format("%s.%s", ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, TaskState.IN_PROGRESS));
         assertGaugeExportedCorrectly(ControllerGauge.TASK_STATUS.getGaugeName(),
             ExportedLabels.JOBSTATUS_CONTROLLER_TASKTYPE, EXPORTED_METRIC_PREFIX);
-      } else if (controllerGauge == ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT) {
+      } else if (controllerGauge == ControllerGauge.TABLE_REBALANCE_JOB_ADDING_PROGRESS_PERCENT
+          || controllerGauge == ControllerGauge.TABLE_REBALANCE_JOB_DELETING_PROGRESS_PERCENT) {
         addGaugeWithLabels(controllerGauge,
             String.format("%s.%s", TABLE_NAME_WITH_TYPE, REBALANCE_JOB_ID));
-        assertGaugeExportedCorrectly(ControllerGauge.TABLE_REBALANCE_JOB_PROGRESS_PERCENT.getGaugeName(),
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
             ExportedLabels.JOBID_TABLENAME_TABLETYPE, EXPORTED_METRIC_PREFIX);
       } else {
         addGaugeWithLabels(controllerGauge, TABLE_NAME_WITH_TYPE);
