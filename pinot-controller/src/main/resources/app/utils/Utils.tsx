@@ -32,6 +32,16 @@ import {
 } from 'Models';
 import Loading from '../components/Loading';
 import moment from "moment";
+import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
+
+const getRebalanceConfigValue = (
+    rebalanceConfig: { [optionName: string]: string | boolean | number },
+    option: RebalanceServerOption
+) => {
+  return (
+      Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue
+  );
+}
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -483,5 +493,6 @@ export default {
   pinotTableDetailsFormat,
   pinotTableDetailsFromArray,
   getLoadingTableData,
-  formatTime
+  formatTime,
+  getRebalanceConfigValue
 };

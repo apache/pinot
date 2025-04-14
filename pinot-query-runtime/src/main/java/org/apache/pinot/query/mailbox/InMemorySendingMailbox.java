@@ -117,9 +117,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
     _receivingMailbox.setErrorBlock(
-        ErrorMseBlock.fromException(
-            new QueryCancelledException("Cancelled by sender with exception: " + t.getMessage())),
-        Collections.emptyList());
+        ErrorMseBlock.fromException(new QueryCancelledException(
+            "Cancelled by sender with exception: " + t.getMessage())), Collections.emptyList());
   }
 
   @Override

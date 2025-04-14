@@ -115,9 +115,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     LOGGER.warn("Error on receiver side", t);
     if (_mailbox != null) {
       _mailbox.setErrorBlock(
-          ErrorMseBlock.fromException(
-              new QueryCancelledException("Cancelled by sender with exception: " + t.getMessage())),
-          Collections.emptyList());
+          ErrorMseBlock.fromException(new QueryCancelledException(
+              "Cancelled by sender with exception: " + t.getMessage())), Collections.emptyList());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
     }

@@ -23,12 +23,23 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public abstract class BasePinotFS implements PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePinotFS.class);
+
+  @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    boolean result = true;
+    for (URI segmentUri : segmentUris) {
+      result &= delete(segmentUri, forceDelete);
+    }
+    return result;
+  }
 
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)

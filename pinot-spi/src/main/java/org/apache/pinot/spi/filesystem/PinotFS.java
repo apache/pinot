@@ -71,6 +71,16 @@ public interface PinotFS extends Closeable, Serializable {
       throws IOException;
 
   /**
+   * Deletes the files at the locations provided. If the segmentUri is a directory, it will delete the entire directory.
+   * @param segmentUris List of URIs of the segments
+   * @param forceDelete true if we want the uri and any sub-uris to always be deleted, false if we want delete to fail
+   * @return true if delete is successful else false
+   * @throws IOException on IO failure, e.g Uri is not present or not valid
+   */
+  boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException;
+
+  /**
    * Moves the file or directory from the src to dst. Does not keep the original file. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
    * Note: In Pinot we recommend the full paths of both src and dst be specified.

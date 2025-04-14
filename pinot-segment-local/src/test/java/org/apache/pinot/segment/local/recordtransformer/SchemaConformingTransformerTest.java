@@ -1037,13 +1037,20 @@ public class SchemaConformingTransformerTest {
     String binaryDataWithTrailingPeriods = "ABCxyz12345-_+/=..";
     String binaryDataWithRandomPeriods = "A.BCxy.z12345-_+/=..";
     String shortBinaryData = "short";
+    String longBinaryDataWithColon = "field:1:1:v1Cgy+ypzk8yf9JzsdkBjvZ1jM8Mem/BTtNilst64Df/34xmJzeRstmihpfrWZ";
+    String jsonBinaryData = "{\"field\":\"text:1:1:v1Cgy+ypzk8yf9JzsdkBjvZ1jM8Mem/BTtNilst64Df/34xmJzeRstmihpfrWZ\"}";
     int minLength = 10;
 
+    // A space is not expected in a based64 encoded string.
     assertFalse(SchemaConformingTransformer.base64ValueFilter(text.getBytes(), minLength));
     assertTrue(SchemaConformingTransformer.base64ValueFilter(binaryData.getBytes(), minLength));
     assertTrue(SchemaConformingTransformer.base64ValueFilter(binaryDataWithTrailingPeriods.getBytes(), minLength));
     assertFalse(SchemaConformingTransformer.base64ValueFilter(binaryDataWithRandomPeriods.getBytes(), minLength));
     assertFalse(SchemaConformingTransformer.base64ValueFilter(shortBinaryData.getBytes(), minLength));
+    // A colon : is not expected in base64 encoded string.
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(longBinaryDataWithColon.getBytes(), minLength));
+    // Json string can not be detected as base64 encoded string even one field has base64 encoded strings.
+    assertFalse(SchemaConformingTransformer.base64ValueFilter(jsonBinaryData.getBytes(), minLength));
   }
 
   @Test
