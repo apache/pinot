@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -65,6 +66,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     MinMaxRangePair minMax = new MinMaxRangePair();
+    AtomicBoolean empty = new AtomicBoolean(true);
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
@@ -72,6 +74,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
         for (int i = from; i < to; i++) {
           double value = doubleValues[i];
           minMax.apply(value);
+          empty.set(false);
         }
       });
     } else {
@@ -81,10 +84,13 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
         for (int i = from; i < to; i++) {
           MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
           minMax.apply(minMaxRangePair);
+          empty.set(false);
         }
       });
     }
-    setAggregationResult(aggregationResultHolder, minMax.getMin(), minMax.getMax());
+    if (!empty.get()) {
+      setAggregationResult(aggregationResultHolder, minMax.getMin(), minMax.getMax());
+    }
   }
 
   protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double min, double max) {
