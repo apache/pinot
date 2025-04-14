@@ -22,14 +22,14 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -67,30 +67,30 @@ public class SortOperatorTest {
   public void shouldHandleUpstreamErrorBlock() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
+    when(_input.nextBlock()).thenReturn(ErrorMseBlock.fromException(new Exception("foo!")));
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
-    assertTrue(block.isErrorBlock(), "expected error block to propagate");
+    assertTrue(block.isError(), "expected error block to propagate");
   }
 
   @Test
   public void shouldCreateEmptyBlockOnUpstreamEOS() {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    MseBlock block = operator.nextBlock();
 
     // Then:
-    assertTrue(block.isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(block.isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -98,18 +98,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -120,18 +120,18 @@ public class SortOperatorTest {
     // Purposefully setting input as unsorted order for validation but 'isInputSorted' should only be true if actually
     // sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2});
     assertEquals(resultRows.get(1), new Object[]{1});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -139,18 +139,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"ignored", "sort"}, new DataSchema.ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(1, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -158,18 +158,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{STRING});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{"a"});
     assertEquals(resultRows.get(1), new Object[]{"b"});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -177,18 +177,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.DESCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2});
     assertEquals(resultRows.get(1), new Object[]{1});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -196,18 +196,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations, 10, 1);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2});
     assertEquals(resultRows.get(1), new Object[]{3});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -217,18 +217,18 @@ public class SortOperatorTest {
     _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations, 10, 1);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2});
     assertEquals(resultRows.get(1), new Object[]{3});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -236,17 +236,17 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations, 1, 1);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -256,17 +256,17 @@ public class SortOperatorTest {
     _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations, 1, 1);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -274,18 +274,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = new SortOperator(OperatorTestUtil.getTracingContext(), _input,
         new SortNode(-1, schema, PlanNode.NodeHint.EMPTY, List.of(), collations, -1, 0), 10, 1);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 1, "expected 1 element even though fetch is 2 because of max limit");
     assertEquals(resultRows.get(0), new Object[]{1});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -293,19 +293,19 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations, -1, 0);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
     assertEquals(resultRows.get(2), new Object[]{3});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -313,18 +313,18 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2})).thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -334,18 +334,18 @@ public class SortOperatorTest {
     _input = mock(SortedMailboxReceiveOperator.class);
     // Set input rows as sorted since input is expected to be sorted
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1})).thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -353,20 +353,20 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST),
         new RelFieldCollation(1, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 2});
     assertEquals(resultRows.get(2), new Object[]{1, 3});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -374,20 +374,20 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST),
         new RelFieldCollation(1, Direction.DESCENDING, NullDirection.FIRST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1, 3});
     assertEquals(resultRows.get(1), new Object[]{1, 2});
     assertEquals(resultRows.get(2), new Object[]{1, 1});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -395,19 +395,19 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
     assertEquals(resultRows.get(2), new Object[]{null});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -415,19 +415,19 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{null});
     assertEquals(resultRows.get(1), new Object[]{1});
     assertEquals(resultRows.get(2), new Object[]{2});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -435,20 +435,20 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations =
         List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.UNSPECIFIED));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{1});
     assertEquals(resultRows.get(1), new Object[]{2});
     assertEquals(resultRows.get(2), new Object[]{null});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   @Test
@@ -456,20 +456,20 @@ public class SortOperatorTest {
     // Given:
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 1}, new Object[]{1, null}, new Object[]{null, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     List<RelFieldCollation> collations = List.of(new RelFieldCollation(0, Direction.ASCENDING, NullDirection.FIRST),
         new RelFieldCollation(1, Direction.DESCENDING, NullDirection.LAST));
     SortOperator operator = getOperator(schema, collations);
 
     // When:
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
 
     // Then:
     assertEquals(resultRows.size(), 3);
     assertEquals(resultRows.get(0), new Object[]{null, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 1});
     assertEquals(resultRows.get(2), new Object[]{1, null});
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "expected EOS block to propagate");
+    assertTrue(operator.nextBlock().isSuccess(), "expected EOS block to propagate");
   }
 
   private SortOperator getOperator(DataSchema schema, List<RelFieldCollation> collations, int fetch, int offset) {
@@ -481,7 +481,7 @@ public class SortOperatorTest {
     return getOperator(schema, collations, 10, 0);
   }
 
-  private static TransferableBlock block(DataSchema schema, Object[]... rows) {
-    return new TransferableBlock(List.of(rows), schema, DataBlock.Type.ROW);
+  private static RowHeapDataBlock block(DataSchema schema, Object[]... rows) {
+    return new RowHeapDataBlock(List.of(rows), schema);
   }
 }
