@@ -54,6 +54,10 @@ public class ErrorMseBlock implements MseBlock.Eos {
     return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
   }
 
+  public static ErrorMseBlock fromError(QueryErrorCode errorCode, String errorMessage) {
+    return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
+  }
+
   @Override
   public boolean isError() {
     return true;

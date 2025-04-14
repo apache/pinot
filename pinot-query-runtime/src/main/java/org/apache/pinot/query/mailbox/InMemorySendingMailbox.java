@@ -89,7 +89,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
       case CANCELLED:
         throw new QueryCancelledException(String.format("Mailbox: %s already cancelled from upstream", _id));
       case ERROR:
-        throw new QueryException(QueryErrorCode.ERRORED_OUT, String.format(
+        throw new QueryException(QueryErrorCode.INTERNAL, String.format(
             "Mailbox: %s already errored out (received error block before)", _id));
       case TIMEOUT:
         throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,

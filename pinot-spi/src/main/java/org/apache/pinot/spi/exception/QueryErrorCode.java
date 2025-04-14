@@ -58,7 +58,6 @@ public enum QueryErrorCode {
   ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError"),
   ///  Query already errored out.
-  ERRORED_OUT(800, "ErroredOutError"),
   UNKNOWN(1000, "UnknownError");
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryErrorCode.class);
 
