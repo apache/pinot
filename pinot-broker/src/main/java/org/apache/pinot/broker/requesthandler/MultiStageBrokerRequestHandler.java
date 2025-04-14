@@ -253,7 +253,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long queryTimeoutMs = getTimeout(sqlNodeAndOptions.getOptions());
     Timer queryTimer = new Timer(queryTimeoutMs, TimeUnit.MILLISECONDS);
 
-    try (QueryEnvironment.CompiledQuery compiledQuery =
+    try (QueryEnvironment.OptimizedQuery compiledQuery =
         compileQuery(requestId, query, sqlNodeAndOptions, httpHeaders, queryTimer)) {
 
       checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery);
@@ -269,14 +269,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /// Compiles the query.
   ///
   /// In this phase the query can be either planned or explained
-  private QueryEnvironment.CompiledQuery compileQuery(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
-      HttpHeaders httpHeaders, Timer queryTimer) {
+  private QueryEnvironment.OptimizedQuery compileQuery(long requestId, String query,
+      SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders, Timer queryTimer) {
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
 
     try {
       ImmutableQueryEnvironment.Config queryEnvConf = getQueryEnvConf(httpHeaders, queryOptions);
       QueryEnvironment queryEnv = new QueryEnvironment(queryEnvConf);
-      return callAsync(requestId, query, () -> queryEnv.compile(query, sqlNodeAndOptions), queryTimer);
+      return callAsync(requestId, query, () -> queryEnv.optimize(query, sqlNodeAndOptions), queryTimer);
     } catch (WebApplicationException e) {
       throw e;
     } catch (QueryException e) {
@@ -292,8 +292,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private void checkAuthorization(RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
-    Set<String> tables = compiledQuery.getTableNames();
+      HttpHeaders httpHeaders, QueryEnvironment.OptimizedQuery optimizedQuery) {
+    Set<String> tables = optimizedQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
       TableAuthorizationResult tableAuthorizationResult =
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
@@ -336,7 +336,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    *
    * Throws using the same conventions as handleRequestThrowing.
    */
-  private BrokerResponse explain(QueryEnvironment.CompiledQuery query, long requestId, RequestContext requestContext,
+  private BrokerResponse explain(QueryEnvironment.OptimizedQuery query, long requestId, RequestContext requestContext,
       Timer timer)
       throws WebApplicationException, QueryException {
     Map<String, String> queryOptions = query.getOptions();
@@ -356,7 +356,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return constructMultistageExplainPlan(query.getTextQuery(), plan, extraFields);
   }
 
-  private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
+  private BrokerResponse query(QueryEnvironment.OptimizedQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),

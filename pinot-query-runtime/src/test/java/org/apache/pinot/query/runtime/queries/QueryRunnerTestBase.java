@@ -105,7 +105,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryEnvironment.QueryPlannerResult planQuery(String sql) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+    try (QueryEnvironment.OptimizedQuery compiledQuery = _queryEnvironment.optimize(sql, sqlNodeAndOptions)) {
       return compiledQuery.planQuery(requestId);
     }
   }
@@ -118,7 +118,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult;
-    try (QueryEnvironment.CompiledQuery compiledQuery = _queryEnvironment.compile(sql, sqlNodeAndOptions)) {
+    try (QueryEnvironment.OptimizedQuery compiledQuery = _queryEnvironment.optimize(sql, sqlNodeAndOptions)) {
       queryPlannerResult = compiledQuery.planQuery(requestId);
     }
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
