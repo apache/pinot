@@ -484,14 +484,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       assert timeBoundaryInfo != null;
       attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
       handleExpressionOverride(offlinePinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig, _tableCache);
+      handleTimestampIndexOverride(offlinePinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(offlinePinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
 
       PinotQuery realtimePinotQuery = serverPinotQuery.deepCopy();
       realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
       handleExpressionOverride(realtimePinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig, _tableCache);
+      handleTimestampIndexOverride(realtimePinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(realtimePinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
 
@@ -502,7 +502,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // OFFLINE only
       setTableName(serverBrokerRequest, offlineTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(offlineTableName));
-      handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig, _tableCache);
+      handleTimestampIndexOverride(serverPinotQuery, offlineTableConfig);
       _queryOptimizer.optimize(serverPinotQuery, offlineTableConfig, schema);
       offlineBrokerRequest = serverBrokerRequest;
 
@@ -512,7 +512,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // REALTIME only
       setTableName(serverBrokerRequest, realtimeTableName);
       handleExpressionOverride(serverPinotQuery, _tableCache.getExpressionOverrideMap(realtimeTableName));
-      handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig, _tableCache);
+      handleTimestampIndexOverride(serverPinotQuery, realtimeTableConfig);
       _queryOptimizer.optimize(serverPinotQuery, realtimeTableConfig, schema);
       realtimeBrokerRequest = serverBrokerRequest;
 
@@ -654,7 +654,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     if (offlineBrokerRequest != null) {
       Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
-      setMaxServerResponseSizeBytes(_config, numServers, queryOptions, offlineTableConfig);
+      setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
       // Set the query option to directly return final result for single server query unless it is explicitly disabled
       if (numServers == 1) {
         // Set the same flag in the original server request to be used in the reduce phase for hybrid table
@@ -667,7 +667,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
     if (realtimeBrokerRequest != null) {
       Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
-      setMaxServerResponseSizeBytes(_config, numServers, queryOptions, realtimeTableConfig);
+      setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
       // Set the query option to directly return final result for single server query unless it is explicitly disabled
       if (numServers == 1) {
         // Set the same flag in the original server request to be used in the reduce phase for hybrid table
@@ -983,13 +983,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return brokerResponse;
   }
 
-  static void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig,
-      TableCache tableCache) {
+  void handleTimestampIndexOverride(PinotQuery pinotQuery, @Nullable TableConfig tableConfig) {
     if (tableConfig == null || tableConfig.getFieldConfigList() == null) {
       return;
     }
 
-    Set<String> timestampIndexColumns = tableCache.getTimestampIndexColumns(tableConfig.getTableName());
+    Set<String> timestampIndexColumns = _tableCache.getTimestampIndexColumns(tableConfig.getTableName());
     if (CollectionUtils.isEmpty(timestampIndexColumns)) {
       return;
     }
@@ -1010,7 +1009,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  private static void setTimestampIndexExpressionOverrideHints(@Nullable Expression expression,
+  private void setTimestampIndexExpressionOverrideHints(@Nullable Expression expression,
       Set<String> timestampIndexColumns, PinotQuery pinotQuery) {
     if (expression == null || expression.getFunctionCall() == null) {
       return;
@@ -1022,12 +1021,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */
-  static boolean isFilterAlwaysFalse(PinotQuery pinotQuery) {
+  boolean isFilterAlwaysFalse(PinotQuery pinotQuery) {
     return FALSE.equals(pinotQuery.getFilterExpression());
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to true. */
-  static boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
+  boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
     return TRUE.equals(pinotQuery.getFilterExpression());
   }
 
@@ -1419,7 +1418,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return new HandlerContext(disableGroovy, useApproximateFunction);
   }
 
-  static class HandlerContext {
+  private static class HandlerContext {
     final boolean _disableGroovy;
     final boolean _useApproximateFunction;
 
@@ -1433,7 +1432,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * Verifies that no groovy is present in the PinotQuery when disabled.
    */
   @VisibleForTesting
-  static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
+  private static void validateGroovyScript(PinotQuery pinotQuery, boolean disableGroovy) {
     List<Expression> selectList = pinotQuery.getSelectList();
     for (Expression expression : selectList) {
       validateGroovyScript(expression, disableGroovy);
@@ -1547,7 +1546,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
-  static void handleExpressionOverride(PinotQuery pinotQuery,
+  private static void handleExpressionOverride(PinotQuery pinotQuery,
       @Nullable Map<Expression, Expression> expressionOverrideMap) {
     if (expressionOverrideMap == null) {
       return;
@@ -1864,7 +1863,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * 5. BrokerConfig -> maxServerResponseSizeBytes
    * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
-  static void setMaxServerResponseSizeBytes(PinotConfiguration config, int numServers, Map<String, String> queryOptions,
+  void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
       @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
@@ -1893,14 +1892,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     // BrokerConfig
-    String maxServerResponseSizeBrokerConfig = config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
+    String maxServerResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
     if (maxServerResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(DataSizeUtils.toBytes(maxServerResponseSizeBrokerConfig)));
       return;
     }
 
-    String maxQueryResponseSizeBrokerConfig = config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
+    String maxQueryResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
     if (maxQueryResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(DataSizeUtils.toBytes(maxQueryResponseSizeBrokerConfig) / numServers));
