@@ -42,7 +42,6 @@ public class ErrorMseBlock implements MseBlock.Eos {
   }
 
   public static ErrorMseBlock fromException(Exception e) {
-    String errorMessage = DataBlockUtils.extractErrorMsg(e);
     QueryErrorCode errorCode;
     if (e instanceof QueryException) {
       errorCode = ((QueryException) e).getErrorCode();
@@ -51,6 +50,7 @@ public class ErrorMseBlock implements MseBlock.Eos {
     } else {
       errorCode = QueryErrorCode.UNKNOWN;
     }
+    String errorMessage = errorCode.isIncludeStackTrace() ? DataBlockUtils.extractErrorMsg(e) : e.getMessage();
     return new ErrorMseBlock(Collections.singletonMap(errorCode, errorMessage));
   }
 
