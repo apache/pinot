@@ -439,8 +439,8 @@ public class TableRebalancer {
     if (minReplicasToKeepUpForNoDowntime >= 0) {
       // For non-negative value, use it as min available replicas
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
-        onReturnFailure("Illegal config for minReplicasToKeepUpForNoDowntime: " + minReplicasToKeepUpForNoDowntime +
-                ", must be less than number of replicas: " + numReplicas + ", aborting the rebalance", null,
+        onReturnFailure("Illegal config for minReplicasToKeepUpForNoDowntime: " + minReplicasToKeepUpForNoDowntime
+                + ", must be less than number of replicas: " + numReplicas + ", aborting the rebalance", null,
             tableRebalanceLogger);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Illegal min available replicas config", instancePartitionsMap, tierToInstancePartitionsMap,
@@ -565,10 +565,10 @@ public class TableRebalancer {
       }
 
       if (currentAssignment.equals(targetAssignment)) {
-        String msg = "Finished rebalancing with minAvailableReplicas: " + minAvailableReplicas +
-            ", enableStrictReplicaGroup: " + enableStrictReplicaGroup +
-            ", bestEfforts: " + bestEfforts +
-            " in " + (System.currentTimeMillis() - startTimeMs) + " ms.";
+        String msg =
+            "Finished rebalancing with minAvailableReplicas: " + minAvailableReplicas + ", enableStrictReplicaGroup: "
+                + enableStrictReplicaGroup + ", bestEfforts: " + bestEfforts + " in " + (System.currentTimeMillis()
+                - startTimeMs) + " ms.";
         tableRebalanceLogger.info(msg);
         // Record completion
         _tableRebalanceObserver.onSuccess(msg);
