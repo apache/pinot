@@ -419,7 +419,7 @@
               <dependency>
                 <groupId>net.sourceforge.fmpp</groupId>
                 <artifactId>fmpp</artifactId>
-                <version>0.9.16</version>
+                <version>${fmpp.version}</version>
               </dependency>
             </dependencies>
           </plugin>

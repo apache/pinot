@@ -1450,9 +1450,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
                 buildSegmentAndReplace();
               } else {
-                _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-                boolean success = catchupToFinalOffset(endOffset,
-                    TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                boolean success = false;
+                // Since online helix transition for a segment can arrive before segment's consumer acquires the
+                // semaphore, check _consumerSemaphoreAcquired before catching up.
+                // This is to avoid consuming in parallel to another segment's consumer.
+                if (_consumerSemaphoreAcquired.get()) {
+                  _segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+                  success = catchupToFinalOffset(endOffset,
+                      TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+                } else {
+                  _segmentLogger.warn("Consumer semaphore was not acquired, Skipping catch up from offset {} to {} ",
+                      _currentOffset, endOffset);
+                }
+
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
                   buildSegmentAndReplace();
@@ -2044,5 +2054,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   public void forceCommit() {
     _forceCommitMessageReceived = true;
+  }
+
+  @VisibleForTesting
+  AtomicBoolean getConsumerSemaphoreAcquired() {
+    return _consumerSemaphoreAcquired;
   }
 }
