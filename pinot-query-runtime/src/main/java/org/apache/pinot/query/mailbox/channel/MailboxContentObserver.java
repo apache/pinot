@@ -21,12 +21,13 @@ package org.apache.pinot.query.mailbox.channel;
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +93,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     } catch (Exception e) {
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;
       LOGGER.error(errorMessage, e);
-      _mailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage, e)));
+      _mailbox.setErrorBlock(
+          ErrorMseBlock.fromException(new RuntimeException(errorMessage, e)), Collections.emptyList());
       cancelStream();
     }
   }
@@ -112,7 +114,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     LOGGER.warn("Error on receiver side", t);
     if (_mailbox != null) {
       _mailbox.setErrorBlock(
-          TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by sender", t)));
+          ErrorMseBlock.fromException(new RuntimeException("Cancelled by sender", t)),
+          Collections.emptyList());
     } else {
       LOGGER.error("Got error before mailbox is set up", t);
     }

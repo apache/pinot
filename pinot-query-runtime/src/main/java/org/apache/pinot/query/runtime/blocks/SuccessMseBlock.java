@@ -16,32 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator.utils;
+package org.apache.pinot.query.runtime.blocks;
 
-/**
- * An interface that represents an abstract blocking stream of elements that can be consumed.
- *
- * These streams are designed to be consumed by a single thread and do not support null elements.
- *
- * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.MseBlock}
- */
-public interface BlockingStream<E> {
-  /**
-   * The id of the stream. Mostly used for logging.
-   *
-   * Implementations of this method must be thread safe.
-   */
-  Object getId();
 
-  /**
-   * Returns the next element on the stream, blocking if there is no element ready.
-   */
-  E get();
+/// A block that represents a successful execution.
+///
+/// Given this class has no state, it is a singleton.
+public class SuccessMseBlock implements MseBlock.Eos {
+  public static final SuccessMseBlock INSTANCE = new SuccessMseBlock();
 
-  /**
-   * Cancels the stream.
-   *
-   * This method can be called by any thread.
-   */
-  void cancel();
+  private SuccessMseBlock() {
+  }
+
+  @Override
+  public boolean isError() {
+    return false;
+  }
+
+  @Override
+  public <R, A> R accept(Visitor<R, A> visitor, A arg) {
+    return visitor.visit(this, arg);
+  }
+
+  @Override
+  public String toString() {
+    return "{\"type\": \"success\"}";
+  }
 }

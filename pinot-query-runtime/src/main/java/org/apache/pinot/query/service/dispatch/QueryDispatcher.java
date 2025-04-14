@@ -70,8 +70,8 @@ import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -512,11 +512,12 @@ public class QueryDispatcher {
     DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
-    TransferableBlock block;
+    MseBlock block;
+    MultiStageQueryStats queryStats;
     try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(executionContext, receiveNode)) {
       block = receiveOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        DataBlock dataBlock = block.getDataBlock();
+      while (block.isData()) {
+        DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
         int numRows = dataBlock.getNumberOfRows();
         if (numRows > 0) {
           resultRows.ensureCapacity(resultRows.size() + numRows);
@@ -535,42 +536,41 @@ public class QueryDispatcher {
         }
         block = receiveOperator.nextBlock();
       }
+      queryStats = receiveOperator.calculateStats();
     }
     // TODO: Improve the error handling, e.g. return partial response
-    if (block.isErrorBlock()) {
-      Map<Integer, String> queryExceptions = block.getExceptions();
+    if (block.isError()) {
+      Map<QueryErrorCode, String> queryExceptions = ((ErrorMseBlock) block).getErrorMessages();
 
       if (queryExceptions.size() == 1) {
-        Map.Entry<Integer, String> error = queryExceptions.entrySet().iterator().next();
-        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(error.getKey());
+        Map.Entry<QueryErrorCode, String> error = queryExceptions.entrySet().iterator().next();
+        QueryErrorCode errorCode = error.getKey();
         throw errorCode.asException("Received 1 error from servers: " + error.getValue());
       } else {
-        Map.Entry<Integer, String> highestPriorityError = queryExceptions.entrySet().stream()
+        Map.Entry<QueryErrorCode, String> highestPriorityError = queryExceptions.entrySet().stream()
             .max(QueryDispatcher::compareErrors)
             .orElseThrow();
-        throw QueryErrorCode.fromErrorCode(highestPriorityError.getKey())
+        throw highestPriorityError.getKey()
             .asException("Received " + queryExceptions.size() + " errors from servers. "
                 + "The one with highest priority is: " + highestPriorityError.getValue());
       }
     }
-    assert block.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = block.getQueryStats();
-    assert queryStats != null;
+    assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
   }
 
   // TODO: Improve the way the errors are compared
-  private static int compareErrors(Map.Entry<Integer, String> entry1, Map.Entry<Integer, String> entry2) {
-    int errorCode1 = entry1.getKey();
-    int errorCode2 = entry2.getKey();
-    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION.getId()) {
-      return errorCode1;
+  private static int compareErrors(Map.Entry<QueryErrorCode, String> entry1, Map.Entry<QueryErrorCode, String> entry2) {
+    QueryErrorCode errorCode1 = entry1.getKey();
+    QueryErrorCode errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION) {
+      return 1;
     }
-    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION.getId()) {
-      return errorCode2;
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION) {
+      return -1;
     }
-    return Integer.compare(errorCode1, errorCode2);
+    return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
   public void shutdown() {

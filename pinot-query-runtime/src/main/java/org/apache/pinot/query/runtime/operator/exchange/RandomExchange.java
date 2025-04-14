@@ -27,7 +27,7 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
 /**
@@ -56,7 +56,7 @@ class RandomExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
+  protected void route(List<SendingMailbox> destinations, MseBlock.Data block)
       throws IOException, TimeoutException {
     int destinationIdx = _rand.apply(destinations.size());
     sendBlock(destinations.get(destinationIdx), block);
