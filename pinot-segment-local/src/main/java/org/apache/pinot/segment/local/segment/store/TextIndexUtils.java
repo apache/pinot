@@ -312,15 +312,20 @@ public class TextIndexUtils {
    */
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
-    List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs().stream()
-        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
-    List<String> escapedLuceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes().stream()
-        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
+    List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs()
+        .stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue)
+        .collect(Collectors.toList());
+    List<String> escapedLuceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes()
+        .stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue)
+        .collect(Collectors.toList());
 
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS, config.getLuceneAnalyzerClass());
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS, escapedLuceneAnalyzerClassArgs);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
     properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE, config.getDocIdTranslatorMode());
 
     File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
@@ -342,17 +347,23 @@ public class TextIndexUtils {
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
     List<String> luceneAnalyzerClassArgTypes =
         properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
+
     List<String> recoveredLuceneAnalyzerClassArgs = luceneAnalyzerClassArgs == null ? new ArrayList<>()
-        : luceneAnalyzerClassArgs.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
-            .collect(Collectors.toList());
-    List<String> recoveredLuceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes == null ? new ArrayList<>()
-        : luceneAnalyzerClassArgTypes.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+        : luceneAnalyzerClassArgs.stream()
+            .map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
             .collect(Collectors.toList());
 
-    return new TextIndexConfigBuilder(config).withLuceneAnalyzerClass(
-            properties.getString(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS))
+    List<String> recoveredLuceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes == null ? new ArrayList<>()
+        : luceneAnalyzerClassArgTypes.stream()
+            .map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+            .collect(Collectors.toList());
+
+    return new TextIndexConfigBuilder(config)
+        .withLuceneAnalyzerClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS))
         .withLuceneAnalyzerClassArgs(recoveredLuceneAnalyzerClassArgs)
         .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
-        .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS)).build();
+        .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS))
+        .withDocIdTranslatorMode(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_DOC_ID_TRANSLATOR_MODE))
+        .build();
   }
 }

@@ -23,10 +23,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -69,6 +72,14 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     if (firstArgument instanceof IdentifierTransformFunction) {
       String columnName = ((IdentifierTransformFunction) firstArgument).getColumnName();
       _jsonIndexReader = columnContextMap.get(columnName).getDataSource().getJsonIndex();
+      if (_jsonIndexReader == null) { //TODO: rework
+        Optional<IndexType<?, ?, ?>> compositeIndex =
+            IndexService.getInstance().getOptional("composite_json_index");
+        if (compositeIndex.isPresent()) {
+          _jsonIndexReader = (JsonIndexReader) columnContextMap.get(columnName)
+              .getDataSource().getIndex(compositeIndex.get());
+        }
+      }
       if (_jsonIndexReader == null) {
         throw new IllegalStateException("jsonExtractIndex can only be applied on a column with JSON index");
       }
