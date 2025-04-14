@@ -246,7 +246,11 @@ public class ${parser.class} extends SqlAbstractParserImpl
     }
 
     public SqlNodeList parseSqlStmtList() throws Exception {
+      try {
         return SqlStmtList();
+        } catch ( ParseException pe){
+          throw cleanupParseException((ParseException) pe);
+        }
     }
 
     public SqlNode parseArray() throws SqlParseException {
@@ -601,9 +605,8 @@ JAVACODE ParseException cleanupParseException(ParseException ex)
         }
     }
 
-    ex.expectedTokenSequences =
-        (int [][]) list.toArray(new int [list.size()][]);
-    return ex;
+    // throw new exception because message can't be overriden
+    throw new ParseException(ex.currentToken, (int [][]) list.toArray(new int [list.size()][]), ex.tokenImage );
 }
 
 JAVACODE boolean matchesPrefix(int[] seq, int[][] prefixes)
@@ -937,8 +940,6 @@ SqlNodeList ParenthesizedQueryOrCommaListWithDefault(
     }
     (
         e = OrderedQueryOrExpr(firstExprContext) { list.add(e); }
-    |
-        e = Default() { list.add(e); }
     )
     (
         <COMMA>
@@ -948,8 +949,6 @@ SqlNodeList ParenthesizedQueryOrCommaListWithDefault(
         }
         (
             e = Expression(exprContext) { list.add(e); }
-        |
-            e = Default() { list.add(e); }
         )
     )*
     <RPAREN>
@@ -1039,6 +1038,7 @@ void AddArg0(List<SqlNode> list, ExprContext exprContext) :
     |   { name = null; }
     )
     (
+        LOOKAHEAD(1) // clash with DEFAULT on PartitionedQueryOrQueryOrExpr->nonKeywordsList(), suppress it
         e = Default()
     |
         LOOKAHEAD((SimpleIdentifierOrList() | <LPAREN> <RPAREN>) <LAMBDA>)
@@ -1069,6 +1069,7 @@ void AddArg(List<SqlNode> list, ExprContext exprContext) :
     |   { name = null; }
     )
     (
+        LOOKAHEAD(1) // clash with DEFAULT on PartitionedQueryOrQueryOrExpr->nonKeywordsList(), suppress it
         e = Default()
     |
         LOOKAHEAD((SimpleIdentifierOrList() | <LPAREN> <RPAREN>) <LAMBDA>)
@@ -1150,8 +1151,10 @@ SqlNode SqlStmt() :
         LOOKAHEAD(2) stmt = ${method}
     |
 </#list>
+        LOOKAHEAD(1) /* clashes with OrderedQueryOrExpr() because RESET FORMAT could be a column name and alias  */
         stmt = SqlSetOption(Span.of(), null)
     |
+        LOOKAHEAD(1) /* clashes with OrderedQueryOrExpr() because ALTER could be a column name  */
         stmt = SqlAlter()
     |
 <#if (parser.createStatementParserMethods!default.parser.createStatementParserMethods)?size != 0>
@@ -1167,6 +1170,7 @@ SqlNode SqlStmt() :
         stmt = SqlTruncate()
     |
 </#if>
+        LOOKAHEAD(1) /* clashes with SqlInsert on UPSERT, TODO: maybe switch to 2  */
         stmt = OrderedQueryOrExpr(ExprContext.ACCEPT_QUERY)
     |
         stmt = SqlExplain()
@@ -1357,6 +1361,7 @@ SqlSelect SqlSelect() :
         }
     )?
     (
+        LOOKAHEAD(2) // clashes on ALL with select items
         keyword = AllOrDistinct() { keywords.add(keyword); }
     )?
     {
@@ -1440,6 +1445,7 @@ SqlNode SqlQueryOrDml() :
 }
 {
     (
+        LOOKAHEAD(2) //clashes on UPSERT with SqlInsert
         stmt = OrderedQueryOrExpr(ExprContext.ACCEPT_QUERY)
     |
         stmt = SqlInsert()
@@ -1792,8 +1798,13 @@ SqlNode SqlDelete() :
     }
     <FROM> tableName = CompoundTableIdentifier()
     ( tableRef = TableHints(tableName) | { tableRef = tableName; } )
-    [ tableRef = ExtendTable(tableRef) ]
-    ( [ <AS> ] alias = SimpleIdentifier() | { alias = null; } )
+    [ LOOKAHEAD(2) // clashes on EXTEND with SimpleIdentifier()
+      tableRef = ExtendTable(tableRef)
+    ]
+    (
+      [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ]
+      alias = SimpleIdentifier() | { alias = null; }
+    )
     ( where = Where() | { where = null; } )
     {
         return new SqlDelete(s.add(tableRef).addIf(alias).addIf(where).pos(),
@@ -1823,12 +1834,13 @@ SqlNode SqlUpdate() :
     }
     tableName = CompoundTableIdentifier()
     ( tableRef = TableHints(tableName) | { tableRef = tableName; } )
-    [ tableRef = ExtendTable(tableRef) ]
-    ( [ <AS> ] alias = SimpleIdentifier() | { alias = null; } )
+    [ LOOKAHEAD(2) // clashes on EXTEND with SimpleIdentifier()
+      tableRef = ExtendTable(tableRef) ]
+    ( [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ] alias = SimpleIdentifier() | { alias = null; } )
     <SET> id = SimpleIdentifier() {
         targetColumnList.add(id);
     }
-    // TODO:  support DEFAULT also
+
     <EQ> AddExpression(sourceExpressionList, ExprContext.ACCEPT_SUB_QUERY)
     (
         <COMMA>
@@ -1861,8 +1873,9 @@ SqlNode SqlMerge() :
 {
     <MERGE> { s = span(); } <INTO> tableName = CompoundTableIdentifier()
     ( tableRef = TableHints(tableName) | { tableRef = tableName; } )
-    [ tableRef = ExtendTable(tableRef) ]
-    ( [ <AS> ] alias = SimpleIdentifier() | { alias = null; } )
+    [ LOOKAHEAD(2) // clashes on EXTEND with SimpleIdentifier()
+      tableRef = ExtendTable(tableRef) ]
+    ( [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ] alias = SimpleIdentifier() | { alias = null; } )
     <USING> sourceTableRef = TableRef()
     <ON> condition = Expression(ExprContext.ACCEPT_SUB_QUERY)
     (
@@ -1956,7 +1969,7 @@ void AddSelectItem(List<SqlNode> list) :
 {
     e = SelectExpression()
     (
-        [ <AS> ]
+        [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ]
         (
             id = SimpleIdentifier()
         |
@@ -2215,9 +2228,9 @@ SqlNode TableRef3(ExprContext exprContext, boolean lateral) :
             tableRef = ImplicitTableFunctionCallArgs(tableName)
         |
             ( tableRef = TableHints(tableName) | { tableRef = tableName; } )
-            [ tableRef = ExtendTable(tableRef) ]
+            [ LOOKAHEAD(1) /* clash with Over that can't be looked-ahead  */ tableRef = ExtendTable(tableRef) ]
             tableRef = Over(tableRef)
-            [ tableRef = Snapshot(tableRef) ]
+            [ LOOKAHEAD(2) /* clash on FOR */ tableRef = Snapshot(tableRef) ]
             [ tableRef = MatchRecognize(tableRef) ]
         )
     |
@@ -2254,7 +2267,7 @@ SqlNode TableRef3(ExprContext exprContext, boolean lateral) :
         tableRef = Unpivot(tableRef)
     ]
     [
-        [ <AS> ] alias = SimpleIdentifier()
+        [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ] alias = SimpleIdentifier()
         (
             columnAliasList = ParenthesizedSimpleIdentifierList()
         |   { columnAliasList = null; }
@@ -2449,7 +2462,7 @@ SqlNode TableFunctionCall() :
 }
 {
     <TABLE> { s = span(); } <LPAREN>
-    [
+    [ LOOKAHEAD(2) /* clash on SPECIFIC, which could be a function name */
         <SPECIFIC>
         {
             funcType = SqlFunctionCategory.USER_DEFINED_TABLE_SPECIFIC_FUNCTION;
@@ -2648,7 +2661,8 @@ void AddGroupingElement(List<SqlNode> list) :
         list.add(
             SqlStdOperatorTable.ROLLUP.createCall(s.end(this), nodes.getList()));
     }
-|   <CUBE> { s = span(); }
+|   LOOKAHEAD(2) /* clash on CUBE( */
+    <CUBE> { s = span(); }
     <LPAREN> nodes = ExpressionCommaList(s, ExprContext.ACCEPT_SUB_QUERY)
     <RPAREN> {
         list.add(
@@ -2767,7 +2781,7 @@ SqlWindow WindowSpecification() :
         |
             <RANGE> { isRows = SqlLiteral.createBoolean(false, getPos()); }
         )
-        (
+        (  LOOKAHEAD(1) /* clash on BETWEEN */
             <BETWEEN> lowerBound = WindowRange()
             <AND> upperBound = WindowRange()
         |
@@ -2987,7 +3001,7 @@ void AddPivotAgg(List<SqlNode> list) :
     (
         // Because babel put FOR into non-reserved keyword set.
         LOOKAHEAD({getToken(1).kind != COMMA && getToken(1).kind != FOR})
-        [ <AS> ] alias = SimpleIdentifier() {
+        [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ] alias = SimpleIdentifier() {
             list.add(
                 SqlStdOperatorTable.AS.createCall(Span.of(e).end(this), e,
                     alias));
@@ -3006,7 +3020,7 @@ void AddPivotValue(List<SqlNode> list) :
 {
     e = RowConstructor() { tuple = SqlParserUtil.stripRow(e); }
     (
-        [ <AS> ] alias = SimpleIdentifier() {
+        [ LOOKAHEAD(1) /* clash on AS with SimpleIdentifier()*/ <AS> ] alias = SimpleIdentifier() {
             list.add(
                 SqlStdOperatorTable.AS.createCall(Span.of(tuple).end(this),
                     tuple, alias));
@@ -3325,16 +3339,7 @@ SqlNode PatternPrimary() :
     final List<SqlNode> list;
 }
 {
-    e = SimpleIdentifier() { return e; }
-|
-    <LPAREN> e = PatternExpression() <RPAREN> { return e; }
-|
-    <LBRACE> { s = span(); }
-    <MINUS> e = PatternExpression()
-    <MINUS> <RBRACE> {
-        return SqlStdOperatorTable.PATTERN_EXCLUDE.createCall(s.end(this), e);
-    }
-|
+    LOOKAHEAD(2) /* clash on PERMUTE */
     (
         <PERMUTE> { s = span(); list = new ArrayList<SqlNode>(); }
         <LPAREN>
@@ -3345,6 +3350,16 @@ SqlNode PatternPrimary() :
                 s.end(this), list);
         }
     )
+|
+    e = SimpleIdentifier() { return e; }
+|
+    <LPAREN> e = PatternExpression() <RPAREN> { return e; }
+|
+    <LBRACE> { s = span(); }
+    <MINUS> e = PatternExpression()
+    <MINUS> <RBRACE> {
+        return SqlStdOperatorTable.PATTERN_EXCLUDE.createCall(s.end(this), e);
+    }
 }
 
 SqlNodeList SubsetDefinitionCommaList(Span s) :
@@ -3452,7 +3467,7 @@ SqlNode QueryOrExpr(ExprContext exprContext) :
     final List<Object> list = new ArrayList<Object>();
 }
 {
-    [ withList = WithList() ]
+    [ LOOKAHEAD(1) withList = WithList() ]
     e = LeafQueryOrExpr(exprContext) { list.add(e); }
     ( AddSetOpQuery(list, exprContext) )*
     { return addWith(withList, SqlParserUtil.toTree(list)); }
@@ -3542,7 +3557,7 @@ SqlNodeList WithList() :
     boolean recursive = false;
 }
 {
-    <WITH> [ <RECURSIVE> { recursive = true; } ]{ s = span(); }
+    <WITH> [ LOOKAHEAD(1) /* clash on RECURSIVE with AddWithItem*/ <RECURSIVE> { recursive = true; } ]{ s = span(); }
     AddWithItem(list, SqlLiteral.createBoolean(recursive, getPos()))
     ( <COMMA> AddWithItem(list, SqlLiteral.createBoolean(recursive, getPos())) )*
     { return new SqlNodeList(list, s.end(this)); }
@@ -3571,6 +3586,7 @@ SqlNode LeafQueryOrExpr(ExprContext exprContext) :
     SqlNode e;
 }
 {
+    LOOKAHEAD(2) /* 'value' is a valid column name, so within max(value), it should not match TableConstructor()  */
     e = LeafQuery(exprContext) { return e; }
 |
     e = Expression(exprContext) { return e; }
@@ -4221,13 +4237,16 @@ SqlNode AtomicRowExpression() :
     |
         e = JdbcFunctionCall()
     |
+        LOOKAHEAD(2)
         e = MultisetConstructor()
     |
+        LOOKAHEAD(3) /* clash on ARRAY ( */
         e = ArrayConstructor()
     |
         LOOKAHEAD(3)
         e = MapConstructor()
     |
+        LOOKAHEAD(3) /* clash on PERIOD ( */
         e = PeriodConstructor()
     |
         // NOTE jvs 18-Jan-2005:  use syntactic lookahead to discriminate
@@ -4236,6 +4255,7 @@ SqlNode AtomicRowExpression() :
         LOOKAHEAD( [<SPECIFIC>] FunctionName() <LPAREN>)
         e = NamedFunctionCall()
     |
+        LOOKAHEAD(2) /* clash on CURRENT_CATALOG */
         e = ContextVariable()
     |
         e = CompoundIdentifier()
@@ -4325,7 +4345,7 @@ SqlSetOption SqlSetOption(Span s, String scope) :
         }
         name = CompoundIdentifier()
         <EQ>
-        (
+        ( LOOKAHEAD(2) /* clash on DECIMAL */
             val = Literal()
         |
             val = SimpleIdentifier()
@@ -4343,13 +4363,13 @@ SqlSetOption SqlSetOption(Span s, String scope) :
         <RESET> {
             s.add(this);
         }
-        (
-            name = CompoundIdentifier()
-        |
+        (  LOOKAHEAD(2) /* clash on ALL */
             <ALL> {
                 name = new SqlIdentifier(token.image.toUpperCase(Locale.ROOT),
                     getPos());
             }
+        |
+            name = CompoundIdentifier()
         )
         {
             return new SqlSetOption(s.end(name), scope, name, null);
@@ -4701,7 +4721,7 @@ SqlNode StringLiteral() :
             }
         }
     )*
-    [
+    [   LOOKAHEAD(2) /* clash on UESCAPE */
         <UESCAPE> <QUOTED_STRING>
         {
             if (unicodeEscapeChar == 0) {
@@ -5090,7 +5110,7 @@ SqlNode IntervalLiteralOrExpression() :
             <LPAREN>
             e = Expression(ExprContext.ACCEPT_SUB_QUERY)
             <RPAREN>
-        |
+        | LOOKAHEAD(2) /* clash on DECIMAL */
             e = UnsignedNumericLiteral()
         |
             e = CompoundIdentifier()
@@ -6929,7 +6949,7 @@ SqlCall JsonArrayAggFunctionCall() :
         aggCall = SqlStdOperatorTable.JSON_ARRAYAGG.with(nullClause)
             .createCall(span.end(this), valueExpr, orderList);
     }
-    [
+    [ LOOKAHEAD(1)
         e = withinGroup(aggCall) {
             if (orderList != null) {
                 throw SqlUtil.newContextException(span.pos().plus(e.getParserPosition()),
@@ -7612,7 +7632,7 @@ SqlIdentifier FunctionName() :
     SqlIdentifier qualifiedName;
 }
 {
-    (
+    (  LOOKAHEAD(2) /* clash on CHAR */
         qualifiedName = CompoundIdentifier()
     |
         qualifiedName = ReservedFunctionName()
@@ -7803,7 +7823,7 @@ SqlNode JdbcFunctionCall() :
             name = call.getOperator().getName();
             args = new SqlNodeList(call.getOperandList(), getPos());
         }
-    |
+    |   LOOKAHEAD(3) /* clash on CONVERT ( */
         <CONVERT> { name = unquotedIdentifier(); }
         <LPAREN>
         e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
@@ -7820,9 +7840,11 @@ SqlNode JdbcFunctionCall() :
             LOOKAHEAD(1)
             ( <INSERT> | <LEFT> | <RIGHT> | <TRUNCATE> ) { name = unquotedIdentifier(); }
         |
+            LOOKAHEAD(1) /* prefer known function name to a generic identifier */
             // For cases like {fn power(1,2)} and {fn lower('a')}
             id = ReservedFunctionName() { name = id.getSimple(); }
         |
+            LOOKAHEAD(1) /* prefer known function name to a generic identifier */
             // For cases like {fn substring('foo', 1,2)}
             name = NonReservedJdbcFunctionName()
         |

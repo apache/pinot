@@ -107,7 +107,7 @@
               <includes>
                 <include>Parser.jj</include>
               </includes>
-              <lookAhead>2</lookAhead>
+              <lookAhead>1</lookAhead><!-- calcite uses '1' -->
               <isStatic>false</isStatic>
             </configuration>
           </execution>
