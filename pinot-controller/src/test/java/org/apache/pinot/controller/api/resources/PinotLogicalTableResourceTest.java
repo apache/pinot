@@ -233,7 +233,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     logicalTable.setTableName(LOGICAL_TABLE_NAME);
     logicalTable.setBrokerTenant(BROKER_TENANT);
 
-    // Verify physical table from unknown database fails
+    // Verify physical table from unknown database fails (testDB does not exist yet)
     logicalTable.setPhysicalTableNames(List.of(
         "testDB.test_table_3_OFFLINE",
         "testDB.test_table_3_REALTIME",
@@ -259,10 +259,12 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     controllerRequestClient.addTableConfig(getOfflineTable("test_table_3"));
     controllerRequestClient.addTableConfig(getRealtimeTable("test_table_3"));
 
-    // Verify physical table from unknown database passes
-    logicalTable.setPhysicalTableNames(
-        List.of("testDB.test_table_3_OFFLINE", "testDB.test_table_3_REALTIME", "test_table_1_OFFLINE",
-            "test_table_1_REALTIME")
+    // Verify physical table from different database - passes
+    logicalTable.setPhysicalTableNames(List.of(
+        "testDB.test_table_3_OFFLINE",
+        "testDB.test_table_3_REALTIME",
+        "test_table_1_OFFLINE", 
+        "test_table_1_REALTIME")
     );
     String resp =
         ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
