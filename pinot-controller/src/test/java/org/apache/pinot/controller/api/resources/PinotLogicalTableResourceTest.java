@@ -74,6 +74,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3")},
         {"test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
         {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
+        {"test_logical_table", List.of("db.test_table_1", "db.test_table_2"), List.of("db.test_table_3")},
         {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3")},
         {"db.test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
         {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
@@ -147,6 +148,15 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
           e.getMessage());
     }
 
+    logicalTable = getLogicalTable("testLogicalTable_REALTIME", physicalTableNamesWithType);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: 'tableName' should not end with _OFFLINE or _REALTIME"),
+          e.getMessage());
+    }
+
     // Test logical table name can not be same as existing physical table name
     logicalTable =
         getLogicalTable("test_table_1", physicalTableNamesWithType);
@@ -165,6 +175,16 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
       fail("Logical Table POST request should have failed");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("'physicalTableNames' should not be null or empty"), e.getMessage());
+    }
+
+    // Test all table names are physical table names and none is hybrid table name
+    logicalTable = getLogicalTable(LOGICAL_TABLE_NAME, physicalTableNames);
+    try {
+      ControllerTest.sendPostRequest(addLogicalTableUrl, logicalTable.toSingleLineJsonString(), getHeaders());
+      fail("Logical Table POST request should have failed");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Reason: 'test_table_1' should be one of the existing tables"),
+          e.getMessage());
     }
   }
 
