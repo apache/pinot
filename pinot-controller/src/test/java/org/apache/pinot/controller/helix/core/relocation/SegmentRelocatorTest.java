@@ -43,7 +43,6 @@ import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -93,8 +92,7 @@ public class SegmentRelocatorTest {
 
     ArgumentCaptor<Criteria> criteriaCapture = ArgumentCaptor.forClass(Criteria.class);
     ArgumentCaptor<SegmentReloadMessage> reloadMessageCapture = ArgumentCaptor.forClass(SegmentReloadMessage.class);
-    verify(messagingService, times(2)).send(criteriaCapture.capture(), reloadMessageCapture.capture(), eq(null),
-        eq(-1));
+    verify(messagingService, times(2)).send(criteriaCapture.capture(), reloadMessageCapture.capture());
 
     List<Criteria> criteriaList = criteriaCapture.getAllValues();
     List<SegmentReloadMessage> msgList = reloadMessageCapture.getAllValues();
