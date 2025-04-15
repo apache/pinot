@@ -390,13 +390,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
     if (logicalTable != null) {
       AuthorizationResult authorizationResult =
-          hasTableAccess(requesterIdentity, Set.of(tableName), requestContext, httpHeaders);
+          hasTableAccess(requesterIdentity, new HashSet<>(logicalTable.getPhysicalTableNames()), requestContext, httpHeaders);
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
 
       // Validate QPS
-      if (hasExceededQPSQuota(database, Set.of(tableName), requestContext)) {
+      if (hasExceededQPSQuota(database, new HashSet<>(logicalTable.getPhysicalTableNames()), requestContext)) {
         String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
