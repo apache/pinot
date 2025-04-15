@@ -785,8 +785,9 @@ public class RealtimeSegmentDataManagerTest {
       @Override
       public Long get() {
         long now = System.currentTimeMillis();
-        // now() is called once in the run() method, once before each batch reading and once for every row indexation
-        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 4) {
+        // now() is called once in the run() method, then once on setting consumeStartTime, once before each batch
+        // reading and once for every row indexation
+        if (_timeCheckCounter.incrementAndGet() <= FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 5) {
           return now;
         }
         // Exceed segment time threshold
@@ -810,10 +811,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once more when metrics are updated after each batch is processed and then 4 more times in
-      // run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 8);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once more when metrics are updated after each batch
+      // is processed and then 4 more times in run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 9);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
@@ -845,9 +846,10 @@ public class RealtimeSegmentDataManagerTest {
 
       consumer.run();
 
-      // millis() is called first in run before consumption, then once for each batch and once for each message in
-      // the batch, then once for metrics updates and then 4 more times in run() after consume loop
-      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 6);
+      // millis() is called first in run before consumption, then once on setting consumeStartTime, then once for
+      // each batch and once for each message in the batch, then once for metrics updates and then 4 more times in
+      // run() after consume loop
+      Assert.assertEquals(timeSupplier._timeCheckCounter.get(), FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS + 7);
       Assert.assertEquals(((LongMsgOffset) segmentDataManager.getCurrentOffset()).getOffset(),
           START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
       Assert.assertEquals(segmentDataManager.getSegment().getNumDocsIndexed(),
