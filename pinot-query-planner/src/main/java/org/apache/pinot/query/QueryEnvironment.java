@@ -593,10 +593,10 @@ public class QueryEnvironment {
   /// They should also be closed to release resources, including the [PlannerContext], unless they are used to create a
   /// [RelationalQuery], in which case the [RelationalQuery] could be closed instead.
   public class ValidatedQuery implements Closeable {
-    private final String _textQuery;
-    private final PlannerContext _plannerContext;
-    private final SqlNodeAndOptions _sqlNodeAndOptions;
-    private final SqlNode _validated;
+    protected final String _textQuery;
+    protected final PlannerContext _plannerContext;
+    protected final SqlNodeAndOptions _sqlNodeAndOptions;
+    protected final SqlNode _validated;
 
     private ValidatedQuery(String textQuery, PlannerContext plannerContext,
         SqlNodeAndOptions sqlNodeAndOptions, SqlNode validated) {
@@ -607,7 +607,8 @@ public class QueryEnvironment {
     }
 
     public RelationalQuery toRelational() {
-      return new RelationalQuery(this, toRelation(_validated, _plannerContext));
+      RelRoot relRoot = toRelation(_validated, _plannerContext);
+      return new RelationalQuery(_textQuery, _plannerContext, _sqlNodeAndOptions, _validated, relRoot);
     }
 
     public String getDatabase() {
@@ -618,12 +619,12 @@ public class QueryEnvironment {
       return _textQuery;
     }
 
-    public PlannerContext getPlannerContext() {
-      return _plannerContext;
-    }
-
     public SqlNodeAndOptions getSqlNodeAndOptions() {
       return _sqlNodeAndOptions;
+    }
+
+    public Map<String, String> getOptions() {
+      return _sqlNodeAndOptions.getOptions();
     }
 
     public SqlNode getValidated() {
@@ -643,47 +644,32 @@ public class QueryEnvironment {
   ///
   /// They should be closed to release resources, including the [PlannerContext], unless they are used to create an
   /// [OptimizedQuery], in which case the [OptimizedQuery] could be closed instead.
-  public class RelationalQuery implements Closeable {
-    private final ValidatedQuery _validatedQuery;
-    private final RelRoot _relRoot;
-    private final Set<String> _tableNames;
+  public class RelationalQuery extends ValidatedQuery {
+    protected final RelRoot _relRoot;
+    protected final Set<String> _tableNames;
 
-    public RelationalQuery(ValidatedQuery validatedQuery, RelRoot relRoot) {
-      _validatedQuery = validatedQuery;
+    public RelationalQuery(String textQuery, PlannerContext plannerContext, SqlNodeAndOptions sqlNodeAndOptions,
+        SqlNode validated, RelRoot relRoot) {
+      super(textQuery, plannerContext, sqlNodeAndOptions, validated);
       _relRoot = relRoot;
       // Important & tricky: RelToPlanNodeConverter uses thread local. Therefore we need to get the table names here
       // instead of lazily in getTableNames() method.
       _tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
     }
 
+    @Override
+    public RelationalQuery toRelational() {
+      return this;
+    }
+
     public OptimizedQuery optimize() {
-      RelNode optimize = QueryEnvironment.this.optimize(_relRoot, getPlannerContext());
-      return new OptimizedQuery(this, _relRoot.withRel(optimize));
+      RelNode optimize = QueryEnvironment.this.optimize(_relRoot, _plannerContext);
+      RelRoot optimizedRelRoot = _relRoot.withRel(optimize);
+      return new OptimizedQuery(_textQuery, _plannerContext, _sqlNodeAndOptions, _validated, optimizedRelRoot);
     }
 
     public Set<String> getTableNames() {
       return _tableNames;
-    }
-
-    public String getDatabase() {
-      return _validatedQuery.getDatabase();
-    }
-
-    public String getTextQuery() {
-      return _validatedQuery.getTextQuery();
-    }
-
-    public PlannerContext getPlannerContext() {
-      return _validatedQuery.getPlannerContext();
-    }
-
-    public SqlNodeAndOptions getSqlNodeAndOptions() {
-      return _validatedQuery.getSqlNodeAndOptions();
-    }
-
-    @Override
-    public void close() {
-      _validatedQuery.close();
     }
   }
 
@@ -697,17 +683,10 @@ public class QueryEnvironment {
   /// Optimized queries are created by calling [QueryEnvironment#optimize] and should be closed to release resources,
   /// including the [PlannerContext].
   /// They are also not static classes. Instead they are bound to the [QueryEnvironment] that created them.
-  public class OptimizedQuery implements Closeable {
-    private final RelationalQuery _relationalQuery;
-    private final RelRoot _relRoot;
-
-    public OptimizedQuery(RelationalQuery relationalQuery, RelRoot relRoot) {
-      _relationalQuery = relationalQuery;
-      _relRoot = relRoot;
-    }
-
-    public Set<String> getTableNames() {
-      return _relationalQuery.getTableNames();
+  public class OptimizedQuery extends RelationalQuery {
+    public OptimizedQuery(String textQuery, PlannerContext plannerContext, SqlNodeAndOptions sqlNodeAndOptions,
+        SqlNode validated, RelRoot optimizedRelRoot) {
+      super(textQuery, plannerContext, sqlNodeAndOptions, validated, optimizedRelRoot);
     }
 
     public boolean isExplain() {
@@ -719,16 +698,14 @@ public class QueryEnvironment {
     /// query and the [QueryEnvironment.Config] used to create the [QueryEnvironment] that compiled this query.
     public QueryEnvironment.QueryPlannerResult explain(long requestId,
         @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
-      SqlNodeAndOptions sqlNodeAndOptions = getSqlNodeAndOptions();
-      PlannerContext plannerContext = _relationalQuery.getPlannerContext();
       try {
-        SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
+        SqlExplain explain = (SqlExplain) _sqlNodeAndOptions.getSqlNode();
 
-        SqlExplainFormat format = plannerContext.getSqlExplainFormat();
+        SqlExplainFormat format = _plannerContext.getSqlExplainFormat();
         if (explain instanceof SqlPhysicalExplain) {
           // get the physical plan for query.
-          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, plannerContext, requestId);
-          return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
+          DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+          return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
               PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), dispatchableSubPlan.getTableNames());
         } else {
           // get the logical plan for query.
@@ -736,10 +713,10 @@ public class QueryEnvironment {
               explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
           Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(_relRoot.rel);
           if (!explain.withImplementation() || onServerExplainer == null) {
-            return getQueryPlannerResult(plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
+            return getQueryPlannerResult(_plannerContext, null, PlannerUtils.explainPlan(_relRoot.rel, format, level),
                 tableNames);
           } else {
-            Map<String, String> options = sqlNodeAndOptions.getOptions();
+            Map<String, String> options = _sqlNodeAndOptions.getOptions();
             boolean explainPlanVerbose = QueryOptionsUtils.isExplainPlanVerbose(options);
 
             // A map from the actual PlanNodes to the original RelNode in the logical rel tree
@@ -747,7 +724,7 @@ public class QueryEnvironment {
                 new TransformationTracker.ByIdentity.Builder<>();
             // Transform RelNodes into DispatchableSubPlan
             DispatchableSubPlan dispatchableSubPlan =
-                toDispatchableSubPlan(_relRoot, plannerContext, requestId, nodeTracker);
+                toDispatchableSubPlan(_relRoot, _plannerContext, requestId, nodeTracker);
 
             AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
                 onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
@@ -755,12 +732,12 @@ public class QueryEnvironment {
             RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(_relRoot.rel,
                 dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
 
-            return getQueryPlannerResult(plannerContext, dispatchableSubPlan,
+            return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
                 PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());
           }
         }
       } catch (Exception e) {
-        throw new RuntimeException("Error explain query plan for: " + getTextQuery(), e);
+        throw new RuntimeException("Error explain query plan for: " + _textQuery, e);
       }
     }
 
@@ -770,44 +747,22 @@ public class QueryEnvironment {
         // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
         // Each SubPlan should be able to run independently from Broker then set the results into the dependent
         // SubPlan for further processing.
-        PlannerContext plannerContext = _relationalQuery.getPlannerContext();
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, plannerContext, requestId);
-        return getQueryPlannerResult(plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(_relRoot, _plannerContext, requestId);
+        return getQueryPlannerResult(_plannerContext, dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
-        String textQuery = getTextQuery();
-        throw new RuntimeException("Error composing query plan for '" + textQuery + "': " + t.getMessage() + "'", t);
+        throw new RuntimeException("Error composing query plan for '" + _textQuery + "': " + t.getMessage() + "'", t);
       }
     }
 
     @Override
-    public void close() {
-      _relationalQuery.close();
-    }
-
-    public String getTextQuery() {
-      return _relationalQuery.getTextQuery();
-    }
-
-    public SqlNodeAndOptions getSqlNodeAndOptions() {
-      return _relationalQuery.getSqlNodeAndOptions();
-    }
-
-    public String getDatabase() {
-      return _relationalQuery.getDatabase();
-    }
-
-    public Map<String, String> getOptions() {
-      return _relationalQuery.getSqlNodeAndOptions().getOptions();
+    public OptimizedQuery optimize() {
+      return this;
     }
 
     public RelRoot getRelRoot() {
       return _relRoot;
-    }
-
-    public RelNode getRelNode() {
-      return _relRoot.rel;
     }
   }
 }
