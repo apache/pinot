@@ -20,16 +20,11 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
@@ -66,6 +61,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void tearDown() {
     // cleans up the physical tables after each testcase
     cleanup();
+    System.out.println("abhishek-bafna");
   }
 
   @DataProvider
@@ -216,9 +212,9 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public Object[][] physicalTableShouldExistProvider() {
     return new Object[][]{
         {LOGICAL_TABLE_NAME, List.of("test_table_1"), "unknown_table_OFFLINE"},
-        {LOGICAL_TABLE_NAME, List.of("test_table_1"), "unknown_table_REALTIME"},
+        {LOGICAL_TABLE_NAME, List.of("test_table_2"), "unknown_table_REALTIME"},
         {LOGICAL_TABLE_NAME, List.of("test_table_1"), "db.test_table_1_OFFLINE"},
-        {LOGICAL_TABLE_NAME, List.of("test_table_1"), "db.test_table_1_REALTIME"},
+        {LOGICAL_TABLE_NAME, List.of("test_table_2"), "db.test_table_2_REALTIME"},
     };
   }
 
@@ -292,21 +288,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     }
   }
 
-  private List<String> createPhysicalTables(List<String> physicalTableNames)
-      throws IOException {
-    List<String> physicalTableNamesWithType = new ArrayList<>();
-    for (String physicalTable : physicalTableNames) {
-      addDummySchema(physicalTable);
-      TableConfig offlineTable = getOfflineTable(physicalTable);
-      TableConfig realtimeTable = getRealtimeTable(physicalTable);
-      addTableConfig(offlineTable);
-      addTableConfig(realtimeTable);
-      physicalTableNamesWithType.add(offlineTable.getTableName());
-      physicalTableNamesWithType.add(realtimeTable.getTableName());
-    }
-    return physicalTableNamesWithType;
-  }
-
   protected Map<String, String> getHeaders() {
     return Map.of();
   }
@@ -316,26 +297,5 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     logicalTable.setTableName(tableName);
     logicalTable.setPhysicalTableNames(physicalTableNames);
     return logicalTable;
-  }
-
-  private TableConfig getRealtimeTable(String physicalTable) {
-    return new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(physicalTable)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .build();
-  }
-
-  private static TableConfig getOfflineTable(String physicalTable) {
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(physicalTable)
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .build();
   }
 }

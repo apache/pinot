@@ -19,17 +19,12 @@
 package org.apache.pinot.controller.api.resources;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTable;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -180,41 +175,5 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
     logicalTable.setTableName(logicalTableName);
     logicalTable.setPhysicalTableNames(physicalTableNames);
     return logicalTable;
-  }
-
-  private TableConfig getRealtimeTable(String physicalTable) {
-    return new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(physicalTable)
-        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .build();
-  }
-
-  private static TableConfig getOfflineTable(String physicalTable) {
-    return new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(physicalTable)
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .build();
-  }
-
-  private List<String> createPhysicalTables(List<String> physicalTableNames)
-      throws IOException {
-    List<String> physicalTableNamesWithType = new ArrayList<>();
-    for (String physicalTable : physicalTableNames) {
-      addDummySchema(physicalTable);
-      TableConfig offlineTable = getOfflineTable(physicalTable);
-      TableConfig realtimeTable = getRealtimeTable(physicalTable);
-      addTableConfig(offlineTable);
-      addTableConfig(realtimeTable);
-      physicalTableNamesWithType.add(offlineTable.getTableName());
-      physicalTableNamesWithType.add(realtimeTable.getTableName());
-    }
-    return physicalTableNamesWithType;
   }
 }
