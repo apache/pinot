@@ -2211,8 +2211,6 @@ public class PinotHelixResourceManager {
     String tableName = logicalTable.getTableName();
     LOGGER.info("Adding logical table: {}", tableName);
 
-    validateLogicalTable(logicalTable);
-
     // Check if the logical table name is already used
     LogicalTable existingLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
     if (existingLogicalTable != null) {
@@ -2233,8 +2231,6 @@ public class PinotHelixResourceManager {
       throws TableNotFoundException {
     String tableName = logicalTable.getTableName();
     LOGGER.info("Updating logical table: {}", tableName);
-
-    validateLogicalTable(logicalTable);
 
     LogicalTable oldLogicalTable = ZKMetadataProvider.getLogicalTable(_propertyStore, tableName);
     if (oldLogicalTable == null) {
@@ -2266,29 +2262,6 @@ public class PinotHelixResourceManager {
   public List<String> getAllLogicalTableNames() {
     return ZKMetadataProvider.getAllLogicalTables(_propertyStore).stream().map(LogicalTable::getTableName)
         .collect(Collectors.toList());
-  }
-
-  private void validateLogicalTable(LogicalTable logicalTable) {
-    if (logicalTable.getPhysicalTableNames() == null || logicalTable.getPhysicalTableNames().isEmpty()) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table. Reason: 'physicalTableNames' should not be null or empty",
-          Response.Status.BAD_REQUEST);
-    }
-
-    for (String physicalTableName : logicalTable.getPhysicalTableNames()) {
-      if (!hasTable(physicalTableName)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables",
-            Response.Status.BAD_REQUEST);
-      }
-    }
-
-    if (!getAllBrokerTenantNames().contains(logicalTable.getBrokerTenant())) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table. Reason: '" + logicalTable.getBrokerTenant()
-              + "' should be one of the existing broker tenants",
-          Response.Status.BAD_REQUEST);
-    }
   }
 
   /**

@@ -135,14 +135,14 @@ public class PinotLogicalTableResource {
     Pair<LogicalTable, Map<String, Object>> logicalTableAndUnrecognizedProps =
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
     LogicalTable logicalTable = logicalTableAndUnrecognizedProps.getLeft();
-
-    validateLogicalTableName(logicalTable);
     String tableName = DatabaseUtils.translateTableName(logicalTable.getTableName(), httpHeaders);
     logicalTable.setTableName(tableName);
 
     // validate permission
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
+
+    validateLogicalTableName(logicalTable);
 
     SuccessResponse successResponse = addLogicalTable(logicalTable);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
@@ -211,6 +211,20 @@ public class PinotLogicalTableResource {
       throw new ControllerApplicationException(LOGGER,
           "Invalid logical table name. Reason: 'tableName' should not end with _OFFLINE or _REALTIME",
           Response.Status.BAD_REQUEST);
+    }
+
+    if (logicalTable.getPhysicalTableNames() == null || logicalTable.getPhysicalTableNames().isEmpty()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid logical table. Reason: 'physicalTableNames' should not be null or empty",
+          Response.Status.BAD_REQUEST);
+    }
+
+    for (String physicalTableName : logicalTable.getPhysicalTableNames()) {
+      if (!_pinotHelixResourceManager.hasTable(physicalTableName)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables",
+            Response.Status.BAD_REQUEST);
+      }
     }
   }
 

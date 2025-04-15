@@ -22,14 +22,17 @@ import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 
 
-public class PinotWithAuthLogicalTableResourceTest extends PinotLogicalTableResourceTest {
+public class PinotAdminUserLogicalTableResourceTest extends PinotLogicalTableResourceTest {
 
-  private static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA=====";
+  public static final String AUTH_TOKEN = "Basic YWRtaW46dmVyeXNlY3JldA=====";
   public static final Map<String, String> AUTH_HEADER = Map.of("Authorization", AUTH_TOKEN);
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put("controller.segment.fetcher.auth.token", AUTH_TOKEN);
+    properties.put("controller.admin.access.control.factory.class",
+        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+    properties.put("controller.admin.access.control.principals", "admin");
+    properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
   }
 
   @Override

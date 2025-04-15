@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metadata;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,7 +41,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.LogicalTableUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
@@ -822,7 +822,7 @@ public class ZKMetadataProvider {
 
   public static void setLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, LogicalTable logicalTable) {
     try {
-      ZNRecord znRecord = LogicalTableUtils.toZNRecord(logicalTable);
+      ZNRecord znRecord = toZNRecord(logicalTable);
       String path = constructPropertyStorePathForLogical(logicalTable.getTableName());
       propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
     } catch (JsonProcessingException e) {
@@ -836,7 +836,7 @@ public class ZKMetadataProvider {
     if (znRecords != null) {
       return znRecords.stream().map(znRecord -> {
         try {
-          return LogicalTableUtils.fromZNRecord(znRecord);
+          return fromZNRecord(znRecord);
         } catch (IOException e) {
           LOGGER.error("Caught exception while converting ZNRecord to LogicalTable: {}", znRecord.getId(), e);
           return null;
@@ -847,7 +847,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  @Nullable
   public static LogicalTable getLogicalTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     try {
       ZNRecord logicalTableZNRecord =
@@ -855,10 +854,30 @@ public class ZKMetadataProvider {
       if (logicalTableZNRecord == null) {
         return null;
       }
-      return LogicalTableUtils.fromZNRecord(logicalTableZNRecord);
+      return fromZNRecord(logicalTableZNRecord);
     } catch (Exception e) {
       LOGGER.error("Caught exception while getting logical table: {}", tableName, e);
       return null;
     }
+  }
+
+  private static LogicalTable fromZNRecord(ZNRecord record)
+      throws IOException {
+    String tableName = record.getSimpleField(LogicalTable.TABLE_NAME_KEY);
+    String physicalTableNamesString = record.getSimpleField(LogicalTable.PHYSICAL_TABLE_NAMES_KEY);
+
+    LogicalTable logicalTable = new LogicalTable();
+    logicalTable.setTableName(tableName);
+    logicalTable.setPhysicalTableNames(JsonUtils.stringToObject(physicalTableNamesString, new TypeReference<>() { }));
+    return logicalTable;
+  }
+
+  private static ZNRecord toZNRecord(LogicalTable table)
+      throws JsonProcessingException {
+    ZNRecord record = new ZNRecord(table.getTableName());
+    record.setSimpleField(LogicalTable.TABLE_NAME_KEY, table.getTableName());
+    record.setSimpleField(LogicalTable.PHYSICAL_TABLE_NAMES_KEY,
+        JsonUtils.objectToString(table.getPhysicalTableNames()));
+    return record;
   }
 }

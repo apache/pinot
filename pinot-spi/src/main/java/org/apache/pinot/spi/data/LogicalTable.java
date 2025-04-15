@@ -34,11 +34,9 @@ public class LogicalTable {
 
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String PHYSICAL_TABLE_NAMES_KEY = "physicalTableNames";
-  public static final String BROKER_TENANT_KEY = "brokerTenant";
 
   private String _tableName;
   private List<String> _physicalTableNames;
-  private String _brokerTenant;
 
   public static LogicalTable fromFile(File logicalTableFile)
       throws IOException {
@@ -58,14 +56,6 @@ public class LogicalTable {
     _tableName = tableName;
   }
 
-  public String getBrokerTenant() {
-    return _brokerTenant;
-  }
-
-  public void setBrokerTenant(String brokerTenant) {
-    _brokerTenant = brokerTenant;
-  }
-
   public List<String> getPhysicalTableNames() {
     return _physicalTableNames;
   }
@@ -75,7 +65,7 @@ public class LogicalTable {
   }
 
   private ObjectNode toJsonObject() {
-    ObjectNode node = JsonUtils.newObjectNode().put("tableName", _tableName).put("brokerTenant", _brokerTenant);
+    ObjectNode node = JsonUtils.newObjectNode().put("tableName", _tableName);
     ArrayNode arrayNode = JsonUtils.newArrayNode();
     for (String physicalTableName : _physicalTableNames) {
       arrayNode.add(physicalTableName);
@@ -121,6 +111,6 @@ public class LogicalTable {
 
   @Override
   public String toString() {
-    return "LogicalTable{" + "_tableName='" + _tableName + '\'' + ", _brokerTenant='" + _brokerTenant + '\'' + '}';
+    return "LogicalTable{" + "_tableName='" + _tableName + '\'' + ", _physicalTableNames=" + _physicalTableNames + '}';
   }
 }
