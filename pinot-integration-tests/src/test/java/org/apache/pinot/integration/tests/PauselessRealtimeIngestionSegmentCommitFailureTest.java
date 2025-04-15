@@ -45,6 +45,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -56,6 +58,9 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(PauselessRealtimeIngestionSegmentCommitFailureTest.class);
+
   private static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
   private static final long MAX_SEGMENT_COMPLETION_TIME_MILLIS = 10_000L;
 
@@ -136,8 +141,8 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
 
     addTableConfig(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
-    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 600_000L,
-        "Segments still not in error state: expected " + MAX_NUMBER_OF_FAILURES + ", found: "
+    TestUtils.waitForCondition(aVoid -> getNumErrorSegmentsInEV(realtimeTableName) == MAX_NUMBER_OF_FAILURES, 10_000L,
+        600_000L, "Segments still not in error state: expected " + MAX_NUMBER_OF_FAILURES + ", found: "
             + getNumErrorSegmentsInEV(realtimeTableName));
   }
 
@@ -153,16 +158,22 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
     if (externalView == null) {
+      LOGGER.error("Found NULL EV for resource: {}!", realtimeTableName);
       return 0;
     }
     int numErrorSegments = 0;
+    int numNonErrorSegments = 0;
     for (Map<String, String> instanceStateMap : externalView.getRecord().getMapFields().values()) {
       for (String state : instanceStateMap.values()) {
         if (state.equals(SegmentStateModel.ERROR)) {
           numErrorSegments++;
+        } else {
+          numNonErrorSegments++;
         }
       }
     }
+    LOGGER.error("Total EV segments: {}, error segments found: {}, non-error segments found: {}, for table: {}",
+        externalView.getRecord().getMapFields().size(), numErrorSegments, numNonErrorSegments, realtimeTableName);
     return numErrorSegments;
   }
 
