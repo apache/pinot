@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
@@ -56,12 +57,12 @@ public class PinotLogicalQueryPlanner {
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
   public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, TableCache tableCache, boolean useSpools) {
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, TableCache tableCache, boolean useSpools,
+      Set<String> tableNames) {
     PlanNode rootNode = new RelToPlanNodeConverter(tracker, tableCache).toPlanNode(relRoot.rel);
 
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools);
-    return new SubPlan(rootFragment,
-        new SubPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields), List.of());
+    return new SubPlan(rootFragment, new SubPlanMetadata(tableNames, relRoot.fields), List.of());
 
     // TODO: Currently we don't support multiple sub-plans. Revisit the following logic when we add the support.
     // Fragment the stage tree into multiple SubPlans.

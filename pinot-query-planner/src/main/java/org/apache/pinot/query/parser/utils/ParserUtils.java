@@ -81,8 +81,8 @@ public class ParserUtils {
     if (useMSE) {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
       RelRoot root;
-      try (QueryEnvironment.OptimizedQuery optimizedQuery = queryEnvironment.optimize(query)) {
-        root = optimizedQuery.getRelRoot();
+      try (QueryEnvironment.MseQuery mseQuery = queryEnvironment.createQuery(query)) {
+        root = mseQuery.getOptimizedRelRoot();
       } catch (Exception ignored) {
         root = null;
       }
