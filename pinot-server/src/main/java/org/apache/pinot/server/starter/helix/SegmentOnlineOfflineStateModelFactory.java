@@ -77,7 +77,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "CONSUMING")
     public void onBecomeConsumingFromOffline(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeConsumingFromOffline() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeConsumingFromOffline() : {}", message);
 
       try {
         _instanceDataManager.addConsumingSegment(message.getResourceName(), message.getPartitionName());
@@ -93,7 +93,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "CONSUMING", to = "ONLINE")
     public void onBecomeOnlineFromConsuming(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromConsuming() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeOnlineFromConsuming() : {}", message);
 
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
@@ -109,7 +109,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "CONSUMING", to = "OFFLINE")
     public void onBecomeOfflineFromConsuming(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromConsuming() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeOfflineFromConsuming() : {}", message);
       try {
         String realtimeTableName = message.getResourceName();
         String segmentName = message.getPartitionName();
@@ -127,7 +127,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "CONSUMING", to = "DROPPED")
     public void onBecomeDroppedFromConsuming(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : {}", message);
       try {
         String realtimeTableName = message.getResourceName();
         String segmentName = message.getPartitionName();
@@ -161,7 +161,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : {}", message);
 
       try {
         _instanceDataManager.addOnlineSegment(message.getResourceName(), message.getPartitionName());
@@ -177,7 +177,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : {}", message);
       try {
         _instanceDataManager.offloadSegment(message.getResourceName(), message.getPartitionName());
       } catch (Exception e) {
@@ -192,7 +192,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : {}", message);
 
       try {
         String tableNameWithType = message.getResourceName();
@@ -219,7 +219,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
 
       try {
         String tableNameWithType = message.getResourceName();
@@ -237,13 +237,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "ERROR", to = "OFFLINE")
     public void onBecomeOfflineFromError(Message message, NotificationContext context) {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeOfflineFromError() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeOfflineFromError() : {}", message);
     }
 
     @Transition(from = "ERROR", to = "DROPPED")
     public void onBecomeDroppedFromError(Message message, NotificationContext context)
         throws Exception {
-      _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromError() : {}", message);
+      _logger.error("SegmentOnlineOfflineStateModel.onBecomeDroppedFromError() : {}", message);
 
       try {
         _instanceDataManager.deleteSegment(message.getResourceName(), message.getPartitionName());

@@ -182,6 +182,14 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
         }
       }
     }
+    if (idealState != null) {
+      Map<String, Map<String, String>> evEntries = externalView.getRecord().getMapFields();
+      for (String segmentName : idealState.getRecord().getMapFields().keySet()) {
+        if (!evEntries.containsKey(segmentName)) {
+          LOGGER.error("Found segment {} in IS that is not in EV", segmentName);
+        }
+      }
+    }
     LOGGER.error("Total EV segments: {}, total IS segments: {}, error segments found: {}, non-error segments "
             + "found: {}, for table: {}",
         externalView.getRecord().getMapFields().size(),
