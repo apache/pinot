@@ -964,7 +964,8 @@ public class PinotHelixTaskResourceManager {
   private static String getTaskType(String name) {
     String[] parts = name.split(TASK_NAME_SEPARATOR);
     if (parts.length < 2) {
-      throw new IllegalArgumentException("Invalid task name (missing separator): " + name);
+      throw new IllegalArgumentException(String.format("Invalid task name : %s. Missing seperator %s",
+              name, TASK_NAME_SEPARATOR));
     }
     return parts[1];
   }
