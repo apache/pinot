@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config.provider;
 
 import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -57,4 +58,19 @@ public interface PinotConfigProvider {
    *         registered.
    */
   boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
+
+  /**
+   * Returns the logical table for the given logical table name.
+   * @param logicalTableName the name of the logical table
+   * @return the logical table
+   */
+  LogicalTable getLogicalTable(String logicalTableName);
+
+  /**
+   * Registers the {@link LogicalTableChangeListener} and notifies it whenever any changes (addition, update,
+   * @param logicalTableChangeListener the listener to be registered
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
+   */
+  boolean registerLogicalTableChangeListener(LogicalTableChangeListener logicalTableChangeListener);
 }

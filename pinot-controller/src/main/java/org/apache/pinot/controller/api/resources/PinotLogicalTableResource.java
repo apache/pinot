@@ -43,10 +43,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.arrow.util.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -59,7 +59,6 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.LogicalTable;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,8 +141,6 @@ public class PinotLogicalTableResource {
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-    validateLogicalTableName(logicalTable);
-
     SuccessResponse successResponse = addLogicalTable(logicalTable);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableAndUnrecognizedProps.getRight());
   }
@@ -167,7 +164,6 @@ public class PinotLogicalTableResource {
         getLogicalAndUnrecognizedPropertiesFromJson(logicalTableJsonString);
     LogicalTable logicalTable = logicalTableAndUnrecognizedProps.getLeft();
 
-    validateLogicalTableName(logicalTable);
     Preconditions.checkArgument(logicalTable.getTableName().equals(tableName),
         "Logical table name in the request body should match the table name in the URL");
 
@@ -200,34 +196,6 @@ public class PinotLogicalTableResource {
     }
   }
 
-  private void validateLogicalTableName(LogicalTable logicalTable) {
-    String tableName = logicalTable.getTableName();
-    if (StringUtils.isEmpty(tableName)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table name. Reason: 'tableName' should not be null or empty", Response.Status.BAD_REQUEST);
-    }
-
-    if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table name. Reason: 'tableName' should not end with _OFFLINE or _REALTIME",
-          Response.Status.BAD_REQUEST);
-    }
-
-    if (logicalTable.getPhysicalTableNames() == null || logicalTable.getPhysicalTableNames().isEmpty()) {
-      throw new ControllerApplicationException(LOGGER,
-          "Invalid logical table. Reason: 'physicalTableNames' should not be null or empty",
-          Response.Status.BAD_REQUEST);
-    }
-
-    for (String physicalTableName : logicalTable.getPhysicalTableNames()) {
-      if (!_pinotHelixResourceManager.hasTable(physicalTableName)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Invalid logical table. Reason: '" + physicalTableName + "' should be one of the existing tables",
-            Response.Status.BAD_REQUEST);
-      }
-    }
-  }
-
   private Pair<LogicalTable, Map<String, Object>> getLogicalAndUnrecognizedPropertiesFromJson(
       String logicalTableJsonString)
       throws ControllerApplicationException {
@@ -243,10 +211,13 @@ public class PinotLogicalTableResource {
   private SuccessResponse addLogicalTable(LogicalTable logicalTable) {
     String tableName = logicalTable.getTableName();
     try {
+      LogicalTableUtils.validateLogicalTableName(logicalTable, _pinotHelixResourceManager.getAllTables());
       _pinotHelixResourceManager.addLogicalTable(logicalTable);
       return new SuccessResponse(tableName + " logical table successfully added.");
     } catch (TableAlreadyExistsException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to add new logical table " + tableName + ". Reason: " + e.getMessage(),
@@ -256,11 +227,14 @@ public class PinotLogicalTableResource {
 
   private SuccessResponse updateLogicalTable(String tableName, LogicalTable logicalTable) {
     try {
+      LogicalTableUtils.validateLogicalTableName(logicalTable, _pinotHelixResourceManager.getAllTables());
       _pinotHelixResourceManager.updateLogicalTable(logicalTable);
       return new SuccessResponse(logicalTable.getTableName() + " logical table successfully updated.");
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find logical table " + tableName,
           Response.Status.NOT_FOUND, e);
+    } catch (IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to update logical table " + tableName + ". Reason: " + e.getMessage(),
