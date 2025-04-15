@@ -2749,9 +2749,13 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
     Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
     Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+    Map<String, String> idealStateStateMap = idealState.getInstanceStateMap(segmentName);
 
     for (String instance : instanceSet) {
-      if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
+      // EV can be empty for a given instance that is OFFLINE in IS, skip processing those too
+      if (externalViewStateMap == null || (SegmentStateModel.OFFLINE.equals(idealStateStateMap.get(instance))
+          && !externalViewStateMap.containsKey(instance))
+          || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
         LOGGER.info("Skipping resetting for segment: {} of table: {} on instance: {}", segmentName, tableNameWithType,
             instance);
       } else {
@@ -2777,13 +2781,17 @@ public class PinotHelixResourceManager {
     for (String segmentName : idealState.getPartitionSet()) {
       Set<String> instanceSet = parseInstanceSet(idealState, segmentName, targetInstance);
       Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      Map<String, String> idealStateStateMap = idealState.getInstanceStateMap(segmentName);
       for (String instance : instanceSet) {
         if (errorSegmentsOnly) {
           if (externalViewStateMap != null && SegmentStateModel.ERROR.equals(externalViewStateMap.get(instance))) {
             instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
           }
         } else {
-          if (externalViewStateMap == null || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
+          // EV can be empty for a given instance that is OFFLINE in IS, skip processing those too
+          if (externalViewStateMap == null || (SegmentStateModel.OFFLINE.equals(idealStateStateMap.get(instance))
+              && !externalViewStateMap.containsKey(instance))
+              || SegmentStateModel.OFFLINE.equals(externalViewStateMap.get(instance))) {
             instanceToSkippedSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
           } else {
             instanceToResetSegmentsMap.computeIfAbsent(instance, i -> new HashSet<>()).add(segmentName);
