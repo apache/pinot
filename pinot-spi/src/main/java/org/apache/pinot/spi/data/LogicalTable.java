@@ -32,9 +32,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LogicalTable {
 
-  public static final String TABLE_NAME_KEY = "tableName";
-  public static final String PHYSICAL_TABLE_NAMES_KEY = "physicalTableNames";
-
   private String _tableName;
   private List<String> _physicalTableNames;
 
