@@ -546,7 +546,7 @@ public class ControllerConf extends PinotConfiguration {
     String zkAddress = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) ? getProperty(
         CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) : getProperty(ZK_STR);
     Preconditions.checkState(zkAddress != null,
-        "ZK address is not configured. Please configure it using the config: 'pinot.zk.str'");
+        "ZK address is not configured. Please configure it using the config: '" + ZK_STR + "'");
     return zkAddress;
   }
 
