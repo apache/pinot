@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.spi.utils;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -30,14 +35,19 @@ import static org.testng.Assert.assertEquals;
 public class BigDecimalUtilsTest {
 
   @Test
-  public void testBigDecimal() {
+  public void testBigDecimal()
+      throws IOException {
     BigDecimal[] testCases = {
+        new BigDecimal("0"),
+        new BigDecimal("0.0"),
         new BigDecimal("0.123456789"),
         new BigDecimal("-0.123456789"),
         new BigDecimal("123456789"),
         new BigDecimal("-123456789"),
         new BigDecimal("123456789.0123456789"),
         new BigDecimal("-123456789.0123456789"),
+        new BigDecimal("9223372036854775808.123"),
+        new BigDecimal("-9223372036854775808.123"),
         // Set the scale to a negative value
         new BigDecimal("123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
         new BigDecimal("-123456789.0123456789").setScale(-1, RoundingMode.HALF_UP),
@@ -45,10 +55,18 @@ public class BigDecimalUtilsTest {
         new BigDecimal("123456789.0123456789").setScale(128, RoundingMode.HALF_UP),
         new BigDecimal("-123456789.0123456789").setScale(128, RoundingMode.HALF_UP)
     };
+
     for (BigDecimal value : testCases) {
       byte[] serializedValue = BigDecimalUtils.serialize(value);
       assertEquals(BigDecimalUtils.byteSize(value), serializedValue.length);
       BigDecimal deserializedValue = BigDecimalUtils.deserialize(serializedValue);
+      assertEquals(deserializedValue, value);
+
+      ByteArrayOutputStream byteArr = new ByteArrayOutputStream();
+      DataOutputStream output = new DataOutputStream(byteArr);
+      BigDecimalUtils.serialize(value, output);
+      DataInputStream input = new DataInputStream(new ByteArrayInputStream(byteArr.toByteArray()));
+      deserializedValue = BigDecimalUtils.deserialize(input);
       assertEquals(deserializedValue, value);
     }
   }

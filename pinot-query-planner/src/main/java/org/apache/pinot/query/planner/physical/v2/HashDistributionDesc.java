@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.calcite.util.mapping.Mappings;
+import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 
 
 /**
@@ -63,15 +63,15 @@ public class HashDistributionDesc {
    * partitioning info.
    */
   @Nullable
-  public HashDistributionDesc apply(Mappings.TargetMapping targetMapping) {
+  public HashDistributionDesc apply(PinotDistMapping mapping) {
     for (Integer currentKey : _keys) {
-      if (currentKey >= targetMapping.getSourceCount() || targetMapping.getTargetOpt(currentKey) == -1) {
+      if (currentKey >= mapping.getSourceCount() || mapping.getTarget(currentKey) == -1) {
         return null;
       }
     }
     List<Integer> newKey = new ArrayList<>();
     for (int currentKey : _keys) {
-      newKey.add(targetMapping.getTargetOpt(currentKey));
+      newKey.add(mapping.getTarget(currentKey));
     }
     return new HashDistributionDesc(newKey, _hashFunction, _numPartitions);
   }

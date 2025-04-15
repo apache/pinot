@@ -81,6 +81,21 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
   }
 
   @Test(dataProvider = "scenarios")
+  void aggrWithAllNulls(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select minmaxrange(myField) from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
+  @Test(dataProvider = "scenarios")
   void aggrSvWithoutNull(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
